@@ -1,9 +1,8 @@
 package com.kengine.graphics
 
-import com.kengine.sdl.SDLContext
+import com.kengine.context.SDLKontext
 import com.kengine.sdl.SDL_LoadBMP
 import kotlinx.cinterop.CValuesRef
-import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.IntVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -33,22 +32,22 @@ class Sprite(
         get() = textureHeight
 
     private fun load() {
-        val sdlContext = SDLContext.get()
+        val sdlKontext = SDLKontext.get()
 
         // Load surface
         val surface = SDL_LoadBMP(imagePath)
         if (surface == null) {
             println("Error loading image: ${SDL_GetError()?.toKString()}")
-            sdlContext.cleanup()
+            sdlKontext.cleanup()
             exit(1)
         }
 
         // Create texture from surface
-        texture = SDL_CreateTextureFromSurface(sdlContext.renderer, surface)
+        texture = SDL_CreateTextureFromSurface(sdlKontext.renderer, surface)
         if (texture == null) {
             println("Error creating texture: ${SDL_GetError()?.toKString()}")
             SDL_FreeSurface(surface)
-            sdlContext.cleanup()
+            sdlKontext.cleanup()
             exit(1)
         }
 
@@ -65,7 +64,7 @@ class Sprite(
     }
 
     fun draw(x: Double, y: Double) {
-        val sdlContext = SDLContext.get()
+        val sdlKontext = SDLKontext.get()
 
         if (texture == null) {
             load()
@@ -79,7 +78,7 @@ class Sprite(
                 this.w = width
                 this.h = height
             }
-            SDL_RenderCopy(sdlContext.renderer, texture, null, destRect.ptr)
+            SDL_RenderCopy(sdlKontext.renderer, texture, null, destRect.ptr)
         }
     }
 

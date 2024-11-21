@@ -1,4 +1,4 @@
-package com.kengine.sdl
+package com.kengine.context
 
 import kotlinx.cinterop.CValuesRef
 import kotlinx.cinterop.toKString
@@ -15,21 +15,21 @@ import sdl2.SDL_RENDERER_ACCELERATED
 import sdl2.SDL_WINDOWPOS_CENTERED
 import sdl2.SDL_WINDOW_SHOWN
 
-class SDLContext private constructor(
+class SDLKontext private constructor(
     private val window: CValuesRef<cnames.structs.SDL_Window>,
     val renderer: CValuesRef<cnames.structs.SDL_Renderer>,
     val screenWidth: Int,
     val screenHeight: Int,
-) {
+) : Kontext() {
     companion object {
-        private var currentContext: SDLContext? = null
+        private var currentContext: SDLKontext? = null
 
         fun create(
             title: String,
             width: Int,
             height: Int,
             flags: UInt = SDL_WINDOW_SHOWN
-        ): SDLContext {
+        ): SDLKontext {
             if (currentContext != null) {
                 throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
             }
@@ -54,20 +54,21 @@ class SDLContext private constructor(
             val renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED)
                 ?: throw IllegalStateException("Error creating renderer: ${SDL_GetError()?.toKString()}")
 
-            val context = SDLContext(window, renderer, width, height)
+            val context = SDLKontext(window, renderer, width, height)
             currentContext = context
             return context
         }
 
-        fun get(): SDLContext {
+        fun get(): SDLKontext {
             return currentContext ?: throw IllegalStateException("SDLContext has not been created. Call create() first.")
         }
-
     }
 
-    fun cleanup() {
+
+    override fun cleanup() {
         SDL_DestroyRenderer(renderer)
         SDL_DestroyWindow(window)
         SDL_Quit()
+        currentContext = null
     }
 }

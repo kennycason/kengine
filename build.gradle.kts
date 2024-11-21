@@ -44,7 +44,10 @@ kotlin {
         all {
             compilations.all {
                 kotlinOptions {
-                    freeCompilerArgs += "-opt-in=kotlinx.cinterop.ExperimentalForeignApi"
+                    freeCompilerArgs += listOf(
+                        "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
+                        "-opt-in=kotlin.ExperimentalStdlibApi"
+                    )
                 }
             }
         }
