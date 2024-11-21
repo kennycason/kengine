@@ -17,4 +17,4 @@ fun main() {
 }
 ```
 
-<img src="https://raw.githubusercontent.com/kennycason/kotlin-native-sdl/refs/heads/main/images/kengine_demo.png" />
+<img src="https://raw.githubusercontent.com/kennycason/kengine-sdl/refs/heads/main/images/kengine_demo.png" />
