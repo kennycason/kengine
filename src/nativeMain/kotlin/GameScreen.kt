@@ -1,5 +1,6 @@
 
 import com.kengine.graphics.Sprite
+import com.kengine.input.KeyboardController
 import com.kengine.sdl.SDLContext
 import sdl2.SDL_RenderClear
 import sdl2.SDL_RenderPresent
@@ -8,9 +9,19 @@ import kotlin.random.Random
 
 class GameScreen {
     val sdlContext = SDLContext.get()
+    private val keyboardController = KeyboardController()
+
+    private val bulbasaurSprite = Sprite("images/bulbasaur.bmp")
+    private val bulbasaur = Entity(
+        x = (sdlContext.screenWidth / 2 - bulbasaurSprite.width / 2).toDouble(),
+        y = (sdlContext.screenHeight / 2 - bulbasaurSprite.height / 2).toDouble(),
+        vx = 0.0,
+        vy = 0.0
+    )
+
     private val pokeballSprite = Sprite("images/pokeball.bmp")
     private val pokeballs = List(size = 20) {
-        Pokeball(
+        Entity(
             x = Random.nextInt(0, sdlContext.screenWidth - pokeballSprite.width).toDouble(),
             y = Random.nextInt(0, sdlContext.screenHeight - pokeballSprite.height).toDouble(),
             vx = 100.0 * if (Random.nextBoolean()) 1 else -1,
@@ -29,6 +40,26 @@ class GameScreen {
                 it.vy *= -1
             }
         }
+
+        bulbasaur.vx *= 0.9
+        bulbasaur.vy *= 0.9
+
+        keyboardController.update()
+        if (keyboardController.isLeftPressed()) {
+            bulbasaur.vx = -10.0
+        }
+        if (keyboardController.isRightPressed()) {
+            bulbasaur.vx = 10.0
+        }
+        if (keyboardController.isUpPressed()) {
+            bulbasaur.vy = -10.0
+        }
+        if (keyboardController.isDownPressed()) {
+            bulbasaur.vy = 10.0
+        }
+
+        bulbasaur.x += bulbasaur.vx
+        bulbasaur.y += bulbasaur.vy
     }
 
     fun draw(delta: Double) {
@@ -40,15 +71,18 @@ class GameScreen {
             pokeballSprite.draw(it.x, it.y)
         }
 
+        bulbasaurSprite.draw(bulbasaur.x, bulbasaur.y)
+
         // render to screen
         SDL_RenderPresent(sdlContext.renderer)
     }
 
     fun cleanup() {
+        bulbasaurSprite.cleanup()
         pokeballSprite.cleanup()
     }
 
-    data class Pokeball(
+    data class Entity(
         var x: Double,
         var y: Double,
         var vx: Double,

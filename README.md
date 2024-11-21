@@ -4,6 +4,8 @@ A light game library in Kotlin Native + SDL
 
 ### GameLauncher.kt
 
+Press Up, Down, Left, Right keys to move Bulbasaur while the Pokeballs bounce around in the background.
+
 ```kotlin
 fun main() {
     val sdlContext = SDLContext.create(title = "Kengine Demo", width = 800, height = 600)
