@@ -1,4 +1,6 @@
-# Kotlin Native + SDL Demo
+# Kengine SDL
+
+A light game library in Kotlin Native + SDL
 
 ### GameLauncher.kt
 
