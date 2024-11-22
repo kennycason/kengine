@@ -8,16 +8,17 @@ Press Up, Down, Left, Right keys to move Bulbasaur while the Pokeballs bounce ar
 
 ```kotlin
 fun main() {
-    val sdlContext = SDLContext.create(title = "Kengine Demo", width = 800, height = 600)
-    val gameScreen = GameScreen()
+    AppContext.create(title = "Kengine Demo", width = 800, height = 600)
+    useContext(AppContext.get(), cleanup = true) {
+        val gameScreen = GameScreen()
 
-    GameLoop(frameRate = 60) { delta ->
-        gameScreen.update(delta)
-        gameScreen.draw(delta)
+        GameLoop(frameRate = 60) { elapsedSeconds ->
+            gameScreen.update(elapsedSeconds)
+            gameScreen.draw(elapsedSeconds)
+        }
+
+        gameScreen.cleanup()
     }
-
-    gameScreen.cleanup()
-    sdlContext.cleanup()
 }
 ```
 

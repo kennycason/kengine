@@ -49,7 +49,6 @@ class BouncingPokeballEntity : Entity {
             if (p.y < 0 || p.y > screenHeight - height) {
                 v.y *= -1
             }
-            println("$p, $v")
         }
     }
 
