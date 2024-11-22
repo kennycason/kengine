@@ -46,7 +46,9 @@ kotlin {
                 kotlinOptions {
                     freeCompilerArgs += listOf(
                         "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
-                        "-opt-in=kotlin.ExperimentalStdlibApi"
+                        "-opt-in=kotlin.ExperimentalStdlibApi",
+                        "-g", // enable debug symbols
+                        "-ea" // enable assertions
                     )
                 }
             }

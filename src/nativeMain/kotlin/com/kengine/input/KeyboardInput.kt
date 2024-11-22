@@ -1,8 +1,10 @@
 package com.kengine.input
 
+import com.kengine.context.SDLContext
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
+import platform.posix.exit
 import sdl2.SDLK_DOWN
 import sdl2.SDLK_LEFT
 import sdl2.SDLK_RIGHT
@@ -16,9 +18,8 @@ import sdl2.SDL_KEYUP
 import sdl2.SDL_KeyCode
 import sdl2.SDL_PollEvent
 import sdl2.SDL_QUIT
-import sdl2.SDL_Quit
 
-class KeyboardController {
+class KeyboardInput {
     private val keyStates = mutableMapOf<Int, KeyState>()
 
     data class KeyState(
@@ -52,7 +53,9 @@ class KeyboardController {
 
                     SDL_QUIT -> {
                         println("Quit event received")
-                        SDL_Quit()
+                        // TODO centralize existing and cleanup, this doesn't include GameScreen for example
+                        SDLContext.get().cleanup()
+                        exit(0)
                     }
                 }
             }

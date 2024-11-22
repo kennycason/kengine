@@ -1,6 +1,6 @@
 package com.kengine.graphics
 
-import com.kengine.context.SDLKontext
+import com.kengine.context.SDLContext
 import com.kengine.sdl.SDL_LoadBMP
 import kotlinx.cinterop.CValuesRef
 import kotlinx.cinterop.IntVar
@@ -32,7 +32,7 @@ class Sprite(
         get() = textureHeight
 
     private fun load() {
-        val sdlKontext = SDLKontext.get()
+        val sdlKontext = SDLContext.get()
 
         // Load surface
         val surface = SDL_LoadBMP(imagePath)
@@ -64,7 +64,7 @@ class Sprite(
     }
 
     fun draw(x: Double, y: Double) {
-        val sdlKontext = SDLKontext.get()
+        val sdlKontext = SDLContext.get()
 
         if (texture == null) {
             load()

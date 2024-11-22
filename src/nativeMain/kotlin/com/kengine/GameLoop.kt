@@ -4,30 +4,36 @@ import sdl2.SDL_Delay
 import sdl2.SDL_GetTicks
 
 class GameLoop(
-    val frameRate: Int,
-    update: (delta: Double) -> Unit
+    frameRate: Int,
+    update: (elapsedSeconds: Double) -> Unit
 ) {
     private var running = true
 
+    fun stop() {
+        running = false
+    }
+
     init {
-        val frameDelay = 1000.0 / frameRate
+        val targetFrameTime = 1000.0 / frameRate
+        var lastFrameTime = SDL_GetTicks().toDouble()
+
         while (running) {
-            val frameStart = SDL_GetTicks()
-            val frameDelayRatio = frameDelay / 1000.0
+            val currentFrameTime = SDL_GetTicks().toDouble()
+            val elapsedSeconds = (currentFrameTime - lastFrameTime) / 1000.0
+            lastFrameTime = currentFrameTime
 
-            update(frameDelayRatio) // TODO update to actual time between last frame (some will be shorter/longer than frameDelay)
+            update(elapsedSeconds)
 
-            // cap frame rate
-            val frameTime = (SDL_GetTicks() - frameStart).toDouble()
-            if (frameDelay > frameTime) {
-                SDL_Delay((frameDelay - frameTime).toUInt())
+            val frameTime = SDL_GetTicks().toDouble() - currentFrameTime
+            if (frameTime < targetFrameTime) {
+                SDL_Delay((targetFrameTime - frameTime).toUInt())
             }
         }
     }
 
     companion object {
-        operator fun invoke(frameRate: Int, gameLoop: () -> Unit) {
-            GameLoop(frameRate, gameLoop)
+        operator fun invoke(frameRate: Int, update: (delta: Double) -> Unit): GameLoop {
+            return GameLoop(frameRate, update)
         }
     }
 }
