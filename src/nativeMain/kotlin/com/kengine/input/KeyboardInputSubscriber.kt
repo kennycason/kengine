@@ -63,7 +63,6 @@ class KeyboardInputSubscriber {
         } ?: UInt.MAX_VALUE // TODO confirm if I want to return this
     }
 
-    // convenience functions for specific keys
     fun isUpPressed() = isKeyPressed(SDLK_UP)
     fun isDownPressed() = isKeyPressed(SDLK_DOWN)
     fun isLeftPressed() = isKeyPressed(SDLK_LEFT)

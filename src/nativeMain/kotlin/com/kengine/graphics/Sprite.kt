@@ -1,5 +1,6 @@
 package com.kengine.graphics
 
+import com.kengine.log.Logger
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDL_LoadBMP
 import kotlinx.cinterop.CValuesRef
@@ -47,7 +48,7 @@ class Sprite {
             val h = alloc<IntVar>()
             val result = SDL_QueryTexture(texture, null, null, w.ptr, h.ptr)
             if (result != 0) {
-                println("Error querying texture dimensions: ${SDL_GetError()?.toKString()}")
+                Logger.error { "Error querying texture dimensions: ${SDL_GetError()?.toKString()}" }
                 SDLContext.get().cleanup()
                 exit(1)
             }

@@ -1,5 +1,6 @@
 
 import com.kengine.context.Context
+import com.kengine.log.Logger
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
@@ -78,14 +79,14 @@ class EventContext private constructor() : Context() {
                     try {
                         handler(event)
                     } catch (e: Exception) {
-                        println("Error handling event: ${e.message}")
+                        Logger.error { "Error handling event: ${e.message}" }
                     }
                 }
             } else {
-                println("No subscribers for event type: $eventType")
+                Logger.warn { "No subscribers for event type: $eventType" }
             }
         } else {
-            println("Unsupported event type: ${event.type}")
+            Logger.warn { "Unsupported event type: ${event.type}" }
         }
     }
 

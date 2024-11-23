@@ -5,6 +5,7 @@ import com.kengine.entity.SpriteEntity
 import com.kengine.graphics.Sprite
 import com.kengine.input.KeyboardContext
 import com.kengine.input.MouseContext
+import com.kengine.log.Logger
 import com.kengine.sdl.SDLContext
 
 class BulbasaurEntity : SpriteEntity(
@@ -47,6 +48,7 @@ class BulbasaurEntity : SpriteEntity(
             if (mouseInput.isLeftPressed() || mouseInput.isRightPressed()) {
                 p.x = mouseInput.getCursor().x - width / 2
                 p.y = mouseInput.getCursor().y - height / 2
+                Logger.info { "Move Bulbasaur to mouse cursor ${p}" }
             }
         }
         p.x += v.x

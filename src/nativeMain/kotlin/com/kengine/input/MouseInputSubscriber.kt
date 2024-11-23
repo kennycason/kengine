@@ -70,7 +70,6 @@ class MouseInputSubscriber {
         } ?: UInt.MAX_VALUE
     }
 
-    // convenience functions for common mouse buttons
     fun isLeftPressed() = isButtonPressed(SDL_BUTTON_LEFT)
     fun isRightPressed() = isButtonPressed(SDL_BUTTON_RIGHT)
     fun isMiddlePressed() = isButtonPressed(SDL_BUTTON_MIDDLE)

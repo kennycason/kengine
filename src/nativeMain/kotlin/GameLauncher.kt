@@ -2,6 +2,7 @@
 import com.kengine.GameLoop
 import com.kengine.context.AppContext
 import com.kengine.context.useContext
+import com.kengine.log.Logger
 import demo.GameScreen
 
 
@@ -20,7 +21,7 @@ fun main() {
         }
 
     } catch (e: Exception) {
-        println("Unhandled exception in GameLoop: ${e.message}")
+        Logger.error { "Unhandled exception in GameLoop: ${e.message}" }
         e.printStackTrace()
     }
 
