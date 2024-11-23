@@ -1,42 +1,45 @@
 package com.kengine.context
 
 import EventContext
-import com.kengine.graphics.TextureManager
+import com.kengine.graphics.TextureManagerContext
 import com.kengine.input.KeyboardContext
 import com.kengine.input.MouseContext
 import com.kengine.sdl.SDLContext
-import com.kengine.sdl.SDLQuitEventSubscriber
+import com.kengine.sdl.useSDLQuitEventSubscriber
 
-class AppContext private constructor(
+class GameContext private constructor(
     val sdl: SDLContext,
     val events: EventContext,
     val keyboard: KeyboardContext,
-    val mouse: MouseContext
+    val mouse: MouseContext,
+    val textureManager: TextureManagerContext
 ) : Context() {
-
-    private val sDLQuitEventSubscriber = SDLQuitEventSubscriber()
+    init {
+        useSDLQuitEventSubscriber()
+    }
 
     companion object {
-        private var currentContext: AppContext? = null
+        private var currentContext: GameContext? = null
 
         fun create(
             title: String,
             width: Int,
             height: Int
-        ): AppContext {
+        ): GameContext {
             if (currentContext != null) {
                 throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
             }
-            currentContext = AppContext(
+            currentContext = GameContext(
                 sdl = SDLContext.create(title, width, height),
                 events = EventContext.get(),
                 keyboard = KeyboardContext.get(),
-                mouse = MouseContext.get()
+                mouse = MouseContext.get(),
+                textureManager = TextureManagerContext.get()
             )
             return currentContext!!
         }
 
-        fun get(): AppContext {
+        fun get(): GameContext {
             return currentContext ?: throw IllegalStateException("AppContext has not been created. Call create() first.")
         }
 
@@ -47,6 +50,7 @@ class AppContext private constructor(
         keyboard.cleanup()
         mouse.cleanup()
         events.cleanup()
-        TextureManager.cleanup()
+        textureManager.cleanup()
     }
+
 }

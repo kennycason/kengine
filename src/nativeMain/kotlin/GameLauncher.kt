@@ -1,23 +1,23 @@
 
 import com.kengine.GameLoop
-import com.kengine.context.AppContext
+import com.kengine.context.GameContext
 import com.kengine.context.useContext
 import com.kengine.log.Logger
-import games.demo.DemoGameScreen
+import games.boxxle.BoxxleGame
 
 
 fun main() {
     try {
-        AppContext.create(title = "Kengine Demo", width = 800, height = 600)
-        useContext(AppContext.get(), cleanup = true) {
-            val gameScreen = DemoGameScreen()
+        GameContext.create(title = "Kengine", width = 800, height = 600)
+        useContext(GameContext.get(), cleanup = true) {
+            val boxxle = BoxxleGame()
 
             GameLoop(frameRate = 60) { elapsedSeconds ->
-                gameScreen.update(elapsedSeconds)
-                gameScreen.draw(elapsedSeconds)
+                boxxle.update(elapsedSeconds)
+                boxxle.draw(elapsedSeconds)
             }
 
-            gameScreen.cleanup()
+            boxxle.cleanup()
         }
 
     } catch (e: Exception) {

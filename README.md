@@ -13,20 +13,20 @@ Left or Right clicking will move Bulbasaur to the cursor.
 fun main() {
     AppContext.create(title = "Kengine Demo", width = 800, height = 600)
     useContext(AppContext.get(), cleanup = true) {
-        val gameScreen = GameScreen()
+        val demoGame = DemoGame()
 
         GameLoop(frameRate = 60) { elapsedSeconds ->
-            gameScreen.update(elapsedSeconds)
-            gameScreen.draw(elapsedSeconds)
+            demoGame.update(elapsedSeconds)
+            demoGame.draw(elapsedSeconds)
         }
 
-        gameScreen.cleanup()
+        demoGame.cleanup()
     }
 }
 ```
 
 ```kotlin
-class DemoGameScreen {
+class DemoGame {
     private val bulbasaur = BulbasaurEntity()
 
     fun update(elapsedSeconds: Double) {
@@ -34,16 +34,16 @@ class DemoGameScreen {
     }
 
     fun draw(elapsedSeconds: Double) {
-        val sdlContext = SDLContext.get()
+        useContext(SDLContext.get()) {
+            // clear screen
+            SDL_SetRenderDrawColor(renderer, 0u, 0u, 0u, 255u)
+            SDL_RenderClear(renderer)
+            
+            bulbasaur.draw(elapsedSeconds)
 
-        // clear screen (black)
-        SDL_SetRenderDrawColor(sdlContext.renderer, 0u, 0u, 0u, 255u)
-        SDL_RenderClear(sdlContext.renderer)
-        
-        bulbasaur.draw(elapsedSeconds)
-
-        // render to screen
-        SDL_RenderPresent(sdlContext.renderer)
+            // render to screen
+            SDL_RenderPresent(renderer)
+        }
     }
 
     fun cleanup() {
@@ -113,10 +113,8 @@ class BulbasaurEntity : SpriteEntity(
 
 ## Roadmap
 
-- SDL_Quit Handler
 - Rect type (x,y,width,height)
 - Animated Sprites
-- Sprite Sheets
 - Sound / Sound Manager
 - TiledMapLoader
 - Shape Drawing

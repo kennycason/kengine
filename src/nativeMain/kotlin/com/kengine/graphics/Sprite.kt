@@ -1,5 +1,6 @@
 package com.kengine.graphics
 
+import com.kengine.context.useContext
 import com.kengine.sdl.SDLContext
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -8,7 +9,7 @@ import sdl2.SDL_Rect
 import sdl2.SDL_RenderCopy
 
 class Sprite {
-    private lateinit var texture: Texture
+    lateinit var texture: Texture
     val width: Int by lazy { texture.width }
     val height: Int by lazy { texture.height }
 
@@ -16,7 +17,9 @@ class Sprite {
      * Create a sprite from an image file path.
      */
     constructor(imagePath: String) {
-        texture = TextureManager.getTexture(imagePath)
+        useContext(TextureManagerContext.get()) {
+            texture = textureManager.getTexture(imagePath)
+        }
     }
 
     /**

@@ -24,7 +24,7 @@ import sdl2.SDL_SetRenderTarget
 /**
  * A centralized texture manager to help with caching for faster, more efficient sprite loading.
  */
-object TextureManager {
+class TextureManager {
     private val textureCache = mutableMapOf<String, Texture>()
 
     fun getTexture(texturePath: String): Texture {
