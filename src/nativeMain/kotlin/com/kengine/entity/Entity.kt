@@ -1,10 +1,10 @@
 package com.kengine.entity
 
-import com.kengine.Vec2D
+import com.kengine.Vec2
 
 interface Entity {
-    val p: Vec2D
-    val v: Vec2D
+    val p: Vec2
+    val v: Vec2
     val width: Int
     val height: Int
 

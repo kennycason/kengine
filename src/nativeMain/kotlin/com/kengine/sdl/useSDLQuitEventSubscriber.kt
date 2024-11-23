@@ -1,6 +1,5 @@
 package com.kengine.sdl
 
-import EventContext
 import com.kengine.log.Logger
 import platform.posix.exit
 import sdl2.SDL_Event
@@ -13,6 +12,6 @@ fun useSDLQuitEventSubscriber() {
         exit(0)
     }
 
-    EventContext.get()
-        .subscribe(EventContext.EventType.QUIT, ::handleSDLQuitEvent)
+    SDLEventContext.get()
+        .subscribe(SDLEventContext.EventType.QUIT, ::handleSDLQuitEvent)
 }

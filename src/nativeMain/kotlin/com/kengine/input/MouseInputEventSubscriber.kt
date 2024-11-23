@@ -1,7 +1,9 @@
 package com.kengine.input
 
-import EventContext
-import com.kengine.Vec2D
+import com.kengine.Vec2
+import com.kengine.context.useContext
+import com.kengine.sdl.SDLContext
+import com.kengine.sdl.SDLEventContext
 import sdl2.SDL_BUTTON_LEFT
 import sdl2.SDL_BUTTON_MIDDLE
 import sdl2.SDL_BUTTON_RIGHT
@@ -13,7 +15,7 @@ import sdl2.SDL_MOUSEMOTION
 
 class MouseInputEventSubscriber {
     private val buttonStates = mutableMapOf<Int, ButtonState>()
-    private var mouseCursor: Vec2D = Vec2D()
+    private var mouseCursor: Vec2 = Vec2()
 
     data class ButtonState(
         var isPressed: Boolean = false,
@@ -21,8 +23,9 @@ class MouseInputEventSubscriber {
     )
 
     init {
-        EventContext.get()
-            .subscribe(EventContext.EventType.MOUSE, ::handleMouseEvent)
+        useContext(SDLContext.get()) {
+            events.subscribe(SDLEventContext.EventType.MOUSE, ::handleMouseEvent)
+        }
     }
 
     private fun handleMouseEvent(event: SDL_Event) {
@@ -51,7 +54,7 @@ class MouseInputEventSubscriber {
     /**
      * Get mouse cursor (x,y) position
      */
-    fun getCursor(): Vec2D = mouseCursor
+    fun getCursor(): Vec2 = mouseCursor
 
     /**
      * Check if a specific mouse button is currently pressed.

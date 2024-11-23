@@ -5,7 +5,7 @@ data class LevelData(
     val boxes: List<List<Int>>,
     val goals: List<List<Int>>,
     val start: List<Int>,
-    val scale: Double = 1.0
+    val scale: Double = 2.0
 )
 
 val LEVEL_DATA: List<LevelData> = listOf(

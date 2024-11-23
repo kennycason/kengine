@@ -22,13 +22,13 @@ import sdl2.SDL_RenderCopy
 import sdl2.SDL_SetRenderTarget
 
 /**
- * A centralized texture manager to help with caching for faster, more efficient sprite loading.
+ * A centralized texture manager to help with caching for faster, more efficient texture loading.
  */
 class TextureManager {
     private val textureCache = mutableMapOf<String, Texture>()
 
     fun getTexture(texturePath: String): Texture {
-        val sdlContext = SDLContext.get()
+        useContext(SDLContext.get()) {
 
         if (texturePath in textureCache) {
             Logger.debug { "Loading texture $texturePath from cache" }
@@ -39,7 +39,7 @@ class TextureManager {
 
         val surface = SDL_LoadBMP(texturePath)
             ?: throw IllegalStateException("Error loading image: ${SDL_GetError()?.toKString()}")
-        val texture = SDL_CreateTextureFromSurface(sdlContext.renderer, surface)
+        val texture = SDL_CreateTextureFromSurface(renderer, surface)
             ?: throw IllegalStateException("Error creating texture from surface: ${SDL_GetError()?.toKString()}")
         SDL_FreeSurface(surface)
 
@@ -63,6 +63,7 @@ class TextureManager {
         }
 
         return textureCache[texturePath]!!
+            }
     }
 
     fun copyTexture(texturePath: String): Texture {

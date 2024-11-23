@@ -1,5 +1,6 @@
 package com.kengine.graphics
 
+import com.kengine.Vec2
 import com.kengine.context.useContext
 import com.kengine.sdl.SDLContext
 import kotlinx.cinterop.alloc
@@ -12,13 +13,14 @@ class Sprite {
     lateinit var texture: Texture
     val width: Int by lazy { texture.width }
     val height: Int by lazy { texture.height }
+    val scale = Vec2(1.0, 1.0)
 
     /**
      * Create a sprite from an image file path.
      */
     constructor(imagePath: String) {
-        useContext(TextureManagerContext.get()) {
-            texture = textureManager.getTexture(imagePath)
+        useContext(TextureContext.get()) {
+            texture = manager.getTexture(imagePath)
         }
     }
 
@@ -29,18 +31,20 @@ class Sprite {
         this.texture = texture
     }
 
-    fun draw(x: Double, y: Double) {
-        val sdlContext = SDLContext.get()
+    fun draw(p: Vec2) = draw(p.x, p.y)
 
-        // define destination rectangle for rendering
-        memScoped {
-            val destRect = alloc<SDL_Rect>().apply {
-                this.x = x.toInt()
-                this.y = y.toInt()
-                this.w = width
-                this.h = height
+    fun draw(x: Double, y: Double) {
+        useContext(SDLContext.get()) {
+            // define destination rectangle for rendering
+            memScoped {
+                val destRect = alloc<SDL_Rect>().apply {
+                    this.x = (x * scale.x).toInt()
+                    this.y = (y * scale.y).toInt()
+                    this.w = (width * scale.x).toInt()
+                    this.h = (height * scale.y).toInt()
+                }
+                SDL_RenderCopy(renderer, texture.texture, null, destRect.ptr)
             }
-            SDL_RenderCopy(sdlContext.renderer, texture.texture, null, destRect.ptr)
         }
     }
 

@@ -14,6 +14,9 @@ import sdl2.SDL_INIT_VIDEO
 import sdl2.SDL_Init
 import sdl2.SDL_Quit
 import sdl2.SDL_RENDERER_ACCELERATED
+import sdl2.SDL_RenderClear
+import sdl2.SDL_RenderPresent
+import sdl2.SDL_SetRenderDrawColor
 import sdl2.SDL_WINDOWPOS_CENTERED
 import sdl2.SDL_WINDOW_SHOWN
 
@@ -23,6 +26,7 @@ class SDLContext private constructor(
     val screenHeight: Int,
     private val window: CValuesRef<cnames.structs.SDL_Window>,
     val renderer: CValuesRef<cnames.structs.SDL_Renderer>,
+    val events: SDLEventContext
 ) : Context() {
 
     companion object {
@@ -57,7 +61,7 @@ class SDLContext private constructor(
             val renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED)
                 ?: throw IllegalStateException("Error creating renderer: ${SDL_GetError()?.toKString()}")
 
-            currentContext = SDLContext(title, width, height, window, renderer)
+            currentContext = SDLContext(title, width, height, window, renderer, SDLEventContext.get())
             return currentContext!!
         }
 
@@ -72,4 +76,14 @@ class SDLContext private constructor(
         SDL_Quit()
         currentContext = null
     }
+
+    fun fillScreen(r: UInt, g: UInt, b: UInt, a: UInt) {
+        SDL_SetRenderDrawColor(renderer, 255u, 255u, 255u, 255u)
+        SDL_RenderClear(renderer)
+    }
+
+    fun flipScreen() {
+        SDL_RenderPresent(renderer)
+    }
+
 }

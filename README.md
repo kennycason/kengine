@@ -115,6 +115,8 @@ class BulbasaurEntity : SpriteEntity(
 
 - Rect type (x,y,width,height)
 - Animated Sprites
+- GameLoop updates (improve handling of delta timestamps, use SDL_GetTicks)
+- Determine how to better lockdown access to more internal contexts/classes, internal vs protected
 - Sound / Sound Manager
 - TiledMapLoader
 - Shape Drawing

@@ -1,10 +1,6 @@
 package com.kengine.log
 
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
-import platform.posix.gettimeofday
-import platform.posix.timeval
+import com.kengine.time.getCurrentTimestampMilliseconds
 
 /**
  * A simple logger
@@ -48,21 +44,9 @@ object Logger {
      */
     private fun log(level: Level, message: String) {
         if (level.ordinal >= logLevel.ordinal) {
-            val timestamp = currentTimestampString()
+            val timestamp = getCurrentTimestampMilliseconds()
             println("[$timestamp] [${level.name}] $message")
         }
     }
 
-    /**
-     * Gets the current timestamp as a string for log message
-     */
-    private fun currentTimestampString(): String {
-        memScoped {
-            val timeVal = alloc<timeval>()
-            gettimeofday(timeVal.ptr, null)
-            val seconds = timeVal.tv_sec
-            val microseconds = timeVal.tv_usec
-            return "$seconds.${microseconds.toString().padStart(6, '0')}"
-        }
-    }
 }

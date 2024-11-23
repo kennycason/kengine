@@ -2,47 +2,59 @@ package games.boxxle
 
 import com.kengine.Game
 import com.kengine.context.useContext
+import com.kengine.graphics.Sprite
+import com.kengine.graphics.SpriteContext
+import com.kengine.graphics.SpriteSheet
 import com.kengine.input.KeyboardContext
-import com.kengine.log.Logger
 import com.kengine.sdl.SDLContext
-import sdl2.SDL_RenderClear
-import sdl2.SDL_RenderPresent
-import sdl2.SDL_SetRenderDrawColor
 
 class BoxxleGame : Game {
     private var levelNumber = 0
-    private var level = Level(LEVEL_DATA[levelNumber])
+    private lateinit var level: Level
+    private lateinit var player: Player
+
+    init {
+        useContext(SpriteContext.get()) {
+            val spriteSheet = SpriteSheet(Sprite("images/boxxle/boxxle.bmp"), 32, 32)
+            manager.setSpriteSheet("boxxle", spriteSheet)
+
+            level = Level(LEVEL_DATA[levelNumber])
+            player = Player(scale = level.data.scale)
+        }
+    }
 
     override fun update(elapsedSeconds: Double) {
+        player.update(elapsedSeconds)
+
         useContext(KeyboardContext.get()) {
-            if (keyboard.isUpPressed()) {
+            if (keyboard.isAPressed()) {
                 levelNumber = (levelNumber + 1) % LEVEL_DATA.size
-                Logger.info(levelNumber)
-                level = Level(LEVEL_DATA[levelNumber])
+                loadLevel()
             }
-            if (keyboard.isDownPressed()) {
+            if (keyboard.isBPressed()) {
                 levelNumber = (levelNumber - 1 + LEVEL_DATA.size) % LEVEL_DATA.size
-                Logger.info(levelNumber)
-                level = Level(LEVEL_DATA[levelNumber])
+                loadLevel()
             }
         }
-
     }
 
     override fun draw(elapsedSeconds: Double) {
         useContext(SDLContext.get()) {
-            // clear screen
-            SDL_SetRenderDrawColor(renderer, 255u, 255u, 255u, 255u)
-            SDL_RenderClear(renderer)
+            fillScreen(255u, 255u, 255u, 255u)
 
-            level.draw()
+            level.draw(elapsedSeconds)
+            player.draw(elapsedSeconds)
 
-            // render to screen
-            SDL_RenderPresent(renderer)
+            flipScreen()
         }
     }
 
     override fun cleanup() {
+    }
+
+    private fun loadLevel() {
+        level = Level(LEVEL_DATA[levelNumber])
+        player.scale = level.data.scale
     }
 
 }

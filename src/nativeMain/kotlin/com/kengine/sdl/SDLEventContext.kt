@@ -1,4 +1,4 @@
-
+package com.kengine.sdl
 import com.kengine.context.Context
 import com.kengine.log.Logger
 import kotlinx.cinterop.alloc
@@ -13,7 +13,7 @@ import sdl2.SDL_MOUSEMOTION
 import sdl2.SDL_PollEvent
 import sdl2.SDL_QUIT
 
-class EventContext private constructor() : Context() {
+class SDLEventContext private constructor() : Context() {
     private val events = mutableListOf<SDL_Event>()
     private val subscribers = mutableMapOf<EventType, MutableList<(SDL_Event) -> Unit>>()
 
@@ -22,11 +22,11 @@ class EventContext private constructor() : Context() {
     }
 
     companion object {
-        private var currentContext: EventContext? = null
+        private var currentContext: SDLEventContext? = null
 
-        fun get(): EventContext {
+        fun get(): SDLEventContext {
             if (currentContext == null) {
-                currentContext = EventContext()
+                currentContext = SDLEventContext()
             }
             return currentContext ?: throw IllegalStateException("Failed to create event context")
         }

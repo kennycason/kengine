@@ -1,6 +1,7 @@
-
 package com.kengine.graphics
 
+import com.kengine.Vec2
+import com.kengine.context.useContext
 import com.kengine.sdl.SDLContext
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -21,29 +22,34 @@ class ClippedSprite(
     val height: Int
         get() = clipHeight
 
+    val scale = Vec2(1.0, 1.0)
+
+    fun draw(p: Vec2) = draw(p.x, p.y)
+
     fun draw(x: Double, y: Double) {
-        val sdlContext = SDLContext.get()
+        useContext(SDLContext.get()) {
+            memScoped {
+                val srcRect = alloc<SDL_Rect>().apply {
+                    this.x = clipX
+                    this.y = clipY
+                    this.w = clipWidth
+                    this.h = clipHeight
+                }
 
-        memScoped {
-            val srcRect = alloc<SDL_Rect>().apply {
-                this.x = clipX
-                this.y = clipY
-                this.w = clipWidth
-                this.h = clipHeight
+                val destRect = alloc<SDL_Rect>().apply {
+                    this.x = (x * scale.x).toInt()
+                    this.y = (y * scale.y).toInt()
+                    this.w = (clipWidth * scale.x).toInt()
+                    this.h = (clipHeight * scale.y).toInt()
+                }
+
+                SDL_RenderCopy(renderer, sprite.texture.texture, srcRect.ptr, destRect.ptr)
             }
-
-            val destRect = alloc<SDL_Rect>().apply {
-                this.x = x.toInt()
-                this.y = y.toInt()
-                this.w = clipWidth
-                this.h = clipHeight
-            }
-
-            SDL_RenderCopy(sdlContext.renderer, sprite.texture.texture, srcRect.ptr, destRect.ptr)
         }
     }
 
     fun cleanup() {
         sprite.cleanup()
     }
+
 }

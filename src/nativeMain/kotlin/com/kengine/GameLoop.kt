@@ -1,6 +1,6 @@
 package com.kengine
 
-import EventContext
+import com.kengine.sdl.SDLEventContext
 import sdl2.SDL_Delay
 import sdl2.SDL_GetTicks
 
@@ -23,7 +23,7 @@ class GameLoop(
             val elapsedSeconds = (currentFrameTime - lastFrameTime) / 1000.0
             lastFrameTime = currentFrameTime
 
-            EventContext.get().pollEvents()
+            SDLEventContext.get().pollEvents()
 
             update(elapsedSeconds)
 

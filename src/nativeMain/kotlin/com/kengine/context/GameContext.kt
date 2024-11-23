@@ -1,7 +1,8 @@
 package com.kengine.context
 
-import EventContext
-import com.kengine.graphics.TextureManagerContext
+import com.kengine.sdl.SDLEventContext
+import com.kengine.graphics.SpriteContext
+import com.kengine.graphics.TextureContext
 import com.kengine.input.KeyboardContext
 import com.kengine.input.MouseContext
 import com.kengine.sdl.SDLContext
@@ -9,11 +10,13 @@ import com.kengine.sdl.useSDLQuitEventSubscriber
 
 class GameContext private constructor(
     val sdl: SDLContext,
-    val events: EventContext,
+    val events: SDLEventContext,
     val keyboard: KeyboardContext,
     val mouse: MouseContext,
-    val textureManager: TextureManagerContext
+    val textures: TextureContext,
+    val sprites: SpriteContext
 ) : Context() {
+
     init {
         useSDLQuitEventSubscriber()
     }
@@ -31,10 +34,11 @@ class GameContext private constructor(
             }
             currentContext = GameContext(
                 sdl = SDLContext.create(title, width, height),
-                events = EventContext.get(),
+                events = SDLEventContext.get(),
                 keyboard = KeyboardContext.get(),
                 mouse = MouseContext.get(),
-                textureManager = TextureManagerContext.get()
+                textures = TextureContext.get(),
+                sprites = SpriteContext.get()
             )
             return currentContext!!
         }
@@ -50,7 +54,8 @@ class GameContext private constructor(
         keyboard.cleanup()
         mouse.cleanup()
         events.cleanup()
-        textureManager.cleanup()
+        textures.cleanup()
+        sprites.cleanup()
     }
 
 }

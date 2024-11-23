@@ -1,6 +1,8 @@
 package com.kengine.input
 
-import EventContext
+import com.kengine.context.useContext
+import com.kengine.sdl.SDLContext
+import com.kengine.sdl.SDLEventContext
 import sdl2.SDLK_DOWN
 import sdl2.SDLK_LEFT
 import sdl2.SDLK_RIGHT
@@ -23,8 +25,9 @@ class KeyboardInputEventSubscriber {
     )
 
     init {
-        EventContext.get()
-            .subscribe(EventContext.EventType.KEYBOARD, ::handleKeyboardEvent)
+        useContext(SDLContext.get()) {
+            events.subscribe(SDLEventContext.EventType.KEYBOARD, ::handleKeyboardEvent)
+        }
     }
 
     private fun handleKeyboardEvent(event: SDL_Event) {

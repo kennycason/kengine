@@ -1,6 +1,6 @@
 package games.demo.entity
 
-import com.kengine.Vec2D
+import com.kengine.Vec2
 import com.kengine.context.useContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.Sprite
@@ -9,8 +9,8 @@ import kotlin.random.Random
 
 class BouncingPokeballEntity : Entity {
     private val pokeballSprite = Sprite("images/demo/pokeball.bmp")
-    override val p: Vec2D = Vec2D()
-    override val v: Vec2D = Vec2D()
+    override val p: Vec2 = Vec2()
+    override val v: Vec2 = Vec2()
     override val width = pokeballSprite.width
     override val height = pokeballSprite.height
     private var state = State.INIT

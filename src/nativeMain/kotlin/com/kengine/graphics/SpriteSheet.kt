@@ -6,8 +6,8 @@ import sdl2.SDL_Rect
 
 class SpriteSheet(
     private val sprite: Sprite,
-    private val tileWidth: Int,
-    private val tileHeight: Int,
+    val tileWidth: Int,
+    val tileHeight: Int,
     private val offsetX: Int = 0,
     private val offsetY: Int = 0,
     private val dx: Int = 0, // spacing between tiles
@@ -32,5 +32,8 @@ class SpriteSheet(
                 clipHeight = clipRect.h
             )
         }
+    }
+
+    fun cleanup() {
     }
 }
