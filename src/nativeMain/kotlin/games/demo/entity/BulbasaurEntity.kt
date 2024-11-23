@@ -1,4 +1,4 @@
-package demo.entity
+package games.demo.entity
 
 import com.kengine.context.useContext
 import com.kengine.entity.SpriteEntity
@@ -9,7 +9,7 @@ import com.kengine.log.Logger
 import com.kengine.sdl.SDLContext
 
 class BulbasaurEntity : SpriteEntity(
-    sprite = Sprite("images/bulbasaur.bmp")
+    sprite = Sprite("images/demo/bulbasaur.bmp")
 ) {
     private val speed = 100.0
     private var state = State.INIT
@@ -48,7 +48,7 @@ class BulbasaurEntity : SpriteEntity(
             if (mouseInput.isLeftPressed() || mouseInput.isRightPressed()) {
                 p.x = mouseInput.getCursor().x - width / 2
                 p.y = mouseInput.getCursor().y - height / 2
-                Logger.info { "Move Bulbasaur to mouse cursor ${p}" }
+                Logger.info { "Move Bulbasaur to mouse cursor $p" }
             }
         }
         p.x += v.x
@@ -58,6 +58,7 @@ class BulbasaurEntity : SpriteEntity(
     private fun init() {
         useContext(SDLContext.get()) {
             p.x = screenWidth / 2.0 - width / 2.0
+            p.y = screenHeight / 2.0 - height / 2.0
         }
         state = State.READY
     }

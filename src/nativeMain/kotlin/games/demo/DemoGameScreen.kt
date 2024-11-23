@@ -1,13 +1,13 @@
-package demo
+package games.demo
 
 import com.kengine.sdl.SDLContext
-import demo.entity.BouncingPokeballEntity
-import demo.entity.BulbasaurEntity
+import games.demo.entity.BouncingPokeballEntity
+import games.demo.entity.BulbasaurEntity
 import sdl2.SDL_RenderClear
 import sdl2.SDL_RenderPresent
 import sdl2.SDL_SetRenderDrawColor
 
-class GameScreen {
+class DemoGameScreen {
     private val bulbasaur = BulbasaurEntity()
     private val pokeballs = List(size = 50) { BouncingPokeballEntity() }
 
@@ -19,11 +19,11 @@ class GameScreen {
     }
 
     fun draw(elapsedSeconds: Double) {
-        val sdlKontext = SDLContext.get()
+        val sdlContext = SDLContext.get()
 
         // clear screen
-        SDL_SetRenderDrawColor(sdlKontext.renderer, 0u, 0u, 0u, 255u)
-        SDL_RenderClear(sdlKontext.renderer)
+        SDL_SetRenderDrawColor(sdlContext.renderer, 0u, 0u, 0u, 255u)
+        SDL_RenderClear(sdlContext.renderer)
 
         pokeballs.forEach {
             it.draw(elapsedSeconds)
@@ -31,7 +31,7 @@ class GameScreen {
         bulbasaur.draw(elapsedSeconds)
 
         // render to screen
-        SDL_RenderPresent(sdlKontext.renderer)
+        SDL_RenderPresent(sdlContext.renderer)
     }
 
     fun cleanup() {

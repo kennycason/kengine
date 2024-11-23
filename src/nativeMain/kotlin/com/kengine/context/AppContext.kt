@@ -1,6 +1,7 @@
 package com.kengine.context
 
 import EventContext
+import com.kengine.graphics.TextureManager
 import com.kengine.input.KeyboardContext
 import com.kengine.input.MouseContext
 import com.kengine.sdl.SDLContext
@@ -43,5 +44,6 @@ class AppContext private constructor(
         keyboard.cleanup()
         mouse.cleanup()
         events.cleanup()
+        TextureManager.cleanup()
     }
 }

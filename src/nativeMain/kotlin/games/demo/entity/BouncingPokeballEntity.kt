@@ -1,4 +1,4 @@
-package demo.entity
+package games.demo.entity
 
 import com.kengine.Vec2D
 import com.kengine.context.useContext
@@ -20,7 +20,7 @@ class BouncingPokeballEntity : Entity {
     }
 
     /**
-     * Demo useKontext() pattern + state pattern
+     * Demo useContext() pattern + state pattern
      */
     override fun update(elapsedSeconds: Double) {
         when (state) {
@@ -61,6 +61,6 @@ class BouncingPokeballEntity : Entity {
     }
 
     companion object {
-        val pokeballSprite = Sprite("images/pokeball.bmp") // shared sprite
+        val pokeballSprite = Sprite("images/demo/pokeball.bmp") // shared sprite
     }
 }

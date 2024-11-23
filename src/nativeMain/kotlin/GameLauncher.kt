@@ -3,14 +3,14 @@ import com.kengine.GameLoop
 import com.kengine.context.AppContext
 import com.kengine.context.useContext
 import com.kengine.log.Logger
-import demo.GameScreen
+import games.demo.DemoGameScreen
 
 
 fun main() {
     try {
         AppContext.create(title = "Kengine Demo", width = 800, height = 600)
         useContext(AppContext.get(), cleanup = true) {
-            val gameScreen = GameScreen()
+            val gameScreen = DemoGameScreen()
 
             GameLoop(frameRate = 60) { elapsedSeconds ->
                 gameScreen.update(elapsedSeconds)
