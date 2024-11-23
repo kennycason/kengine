@@ -1,10 +1,6 @@
 package com.kengine.input
 
-import com.kengine.context.SDLContext
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
-import platform.posix.exit
+import EventContext
 import sdl2.SDLK_DOWN
 import sdl2.SDLK_LEFT
 import sdl2.SDLK_RIGHT
@@ -16,10 +12,9 @@ import sdl2.SDL_GetTicks
 import sdl2.SDL_KEYDOWN
 import sdl2.SDL_KEYUP
 import sdl2.SDL_KeyCode
-import sdl2.SDL_PollEvent
-import sdl2.SDL_QUIT
 
-class KeyboardInput {
+
+class KeyboardInputSubscriber {
     private val keyStates = mutableMapOf<Int, KeyState>()
 
     data class KeyState(
@@ -27,37 +22,26 @@ class KeyboardInput {
         var lastPressedTime: UInt = 0u
     )
 
-    // update the key states based on SDL events
-    fun update() {
-        memScoped {
-            // TODO consolidate event handling, and then components will subscribe to events.
-            // this is needed so GameLoop can also receive the SDL_Quit event and gracefully shutdown
-            val event = alloc<SDL_Event>()
-            while (SDL_PollEvent(event.ptr) != 0) {
-                when (event.type) {
-                    SDL_KEYDOWN -> {
-                        val key = event.key.keysym.sym
-                        if (!keyStates.containsKey(key)) {
-                            keyStates[key] = KeyState()
-                        }
-                        keyStates[key]?.apply {
-                            isPressed = true
-                            lastPressedTime = SDL_GetTicks()
-                        }
-                    }
+    init {
+        EventContext.get()
+            .subscribe(EventContext.EventType.KEYBOARD, ::handleKeyboardEvent)
+    }
 
-                    SDL_KEYUP -> {
-                        val key = event.key.keysym.sym
-                        keyStates[key]?.isPressed = false
-                    }
-
-                    SDL_QUIT -> {
-                        println("Quit event received")
-                        // TODO centralize existing and cleanup, this doesn't include GameScreen for example
-                        SDLContext.get().cleanup()
-                        exit(0)
-                    }
+    private fun handleKeyboardEvent(event: SDL_Event) {
+        when (event.type) {
+            SDL_KEYDOWN -> {
+                val key = event.key.keysym.sym
+                if (!keyStates.containsKey(key)) {
+                    keyStates[key] = KeyState()
                 }
+                keyStates[key]?.apply {
+                    isPressed = true
+                    lastPressedTime = SDL_GetTicks()
+                }
+            }
+            SDL_KEYUP -> {
+                val key = event.key.keysym.sym
+                keyStates[key]?.isPressed = false
             }
         }
     }

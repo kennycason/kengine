@@ -1,7 +1,6 @@
 package demo
 
-import com.kengine.context.KeyboardContext
-import com.kengine.context.SDLContext
+import com.kengine.sdl.SDLContext
 import demo.entity.BouncingPokeballEntity
 import demo.entity.BulbasaurEntity
 import sdl2.SDL_RenderClear
@@ -13,13 +12,10 @@ class GameScreen {
     private val pokeballs = List(size = 50) { BouncingPokeballEntity() }
 
     fun update(elapsedSeconds: Double) {
-        KeyboardContext.get().keyboardInput.update()
-
         pokeballs.forEach {
             it.update(elapsedSeconds)
         }
         bulbasaur.update(elapsedSeconds)
-
     }
 
     fun draw(elapsedSeconds: Double) {

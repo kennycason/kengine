@@ -1,10 +1,10 @@
 package demo.entity
 
 import com.kengine.Vec2D
-import com.kengine.context.SDLContext
 import com.kengine.context.useContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.Sprite
+import com.kengine.sdl.SDLContext
 import kotlin.random.Random
 
 class BouncingPokeballEntity : Entity {

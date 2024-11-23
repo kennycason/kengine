@@ -1,9 +1,9 @@
-package com.kengine.context
+package com.kengine.input
 
-import com.kengine.input.KeyboardInput
+import com.kengine.context.Context
 
 class KeyboardContext private constructor(
-    val keyboardInput: KeyboardInput
+    val keyboardInput: KeyboardInputSubscriber
 ) : Context() {
 
     companion object {
@@ -12,7 +12,7 @@ class KeyboardContext private constructor(
         fun get(): KeyboardContext {
             if (currentContext == null) {
                 currentContext = KeyboardContext(
-                    keyboardInput = KeyboardInput()
+                    keyboardInput = KeyboardInputSubscriber()
                 )
             }
             return currentContext ?: throw IllegalStateException("Failed to create keyboard context")

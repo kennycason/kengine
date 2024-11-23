@@ -5,7 +5,7 @@ abstract class Context {
 
     open fun create() {
         if (isCreated) {
-            error("Kontext already created. Cleanup before re-creating.")
+            error("Context already created. Cleanup before re-creating.")
         }
         isCreated = true
     }

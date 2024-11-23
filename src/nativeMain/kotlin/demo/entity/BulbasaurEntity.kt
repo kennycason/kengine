@@ -1,10 +1,11 @@
 package demo.entity
 
-import com.kengine.context.KeyboardContext
-import com.kengine.context.SDLContext
 import com.kengine.context.useContext
 import com.kengine.entity.SpriteEntity
 import com.kengine.graphics.Sprite
+import com.kengine.input.KeyboardContext
+import com.kengine.input.MouseContext
+import com.kengine.sdl.SDLContext
 
 class BulbasaurEntity : SpriteEntity(
     sprite = Sprite("images/bulbasaur.bmp")
@@ -29,7 +30,6 @@ class BulbasaurEntity : SpriteEntity(
         v.x *= 0.9
         v.y *= 0.9
         useContext(KeyboardContext.get()) {
-            keyboardInput.update()
             if (keyboardInput.isLeftPressed()) {
                 v.x = -speed * elapsedSeconds
             }
@@ -41,6 +41,12 @@ class BulbasaurEntity : SpriteEntity(
             }
             if (keyboardInput.isDownPressed()) {
                 v.y = speed * elapsedSeconds
+            }
+        }
+        useContext(MouseContext.get()) {
+            if (mouseInput.isLeftPressed() || mouseInput.isRightPressed()) {
+                p.x = mouseInput.getCursor().x - width / 2
+                p.y = mouseInput.getCursor().y - height / 2
             }
         }
         p.x += v.x

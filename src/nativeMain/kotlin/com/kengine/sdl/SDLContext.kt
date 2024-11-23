@@ -1,5 +1,6 @@
-package com.kengine.context
+package com.kengine.sdl
 
+import com.kengine.context.Context
 import kotlinx.cinterop.CValuesRef
 import kotlinx.cinterop.toKString
 import platform.posix.exit
