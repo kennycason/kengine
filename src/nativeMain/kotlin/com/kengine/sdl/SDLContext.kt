@@ -1,6 +1,7 @@
 package com.kengine.sdl
 
 import com.kengine.context.Context
+import com.kengine.log.Logger
 import kotlinx.cinterop.CValuesRef
 import kotlinx.cinterop.toKString
 import platform.posix.exit
@@ -39,7 +40,7 @@ class SDLContext private constructor(
 
             // init SDL
             if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-                println("Error initializing SDL: ${SDL_GetError()?.toKString()}")
+                Logger.error("Error initializing SDL: ${SDL_GetError()?.toKString()}")
                 exit(1)
             }
             

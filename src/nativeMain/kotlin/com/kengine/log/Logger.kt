@@ -21,6 +21,19 @@ object Logger {
     fun info(message: () -> String) = log(Level.INFO, message())
     fun warn(message: () -> String) = log(Level.WARN, message())
     fun error(message: () -> String) = log(Level.ERROR, message())
+    fun debug(message: () -> Any) = log(Level.DEBUG, message().toString())
+    fun info(message: () -> Any) = log(Level.INFO, message().toString())
+    fun warn(message: () -> Any) = log(Level.WARN, message().toString())
+    fun error(message: () -> Any) = log(Level.ERROR, message().toString())
+
+    fun debug(message: String) = log(Level.DEBUG, message)
+    fun info(message: String) = log(Level.INFO, message)
+    fun warn(message: String) = log(Level.WARN, message)
+    fun error(message: String) = log(Level.ERROR, message)
+    fun debug(message: Any) = log(Level.DEBUG, message.toString())
+    fun info(message: Any) = log(Level.INFO, message.toString())
+    fun warn(message: Any) = log(Level.WARN, message.toString())
+    fun error(message: Any) = log(Level.ERROR, message.toString())
 
     /**
      * Sets the global log level.
