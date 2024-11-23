@@ -3,7 +3,7 @@ package com.kengine.input
 import com.kengine.context.Context
 
 class KeyboardContext private constructor(
-    val keyboardInput: KeyboardInputSubscriber
+    val keyboard: KeyboardInputEventSubscriber
 ) : Context() {
 
     companion object {
@@ -12,7 +12,7 @@ class KeyboardContext private constructor(
         fun get(): KeyboardContext {
             if (currentContext == null) {
                 currentContext = KeyboardContext(
-                    keyboardInput = KeyboardInputSubscriber()
+                    keyboard = KeyboardInputEventSubscriber()
                 )
             }
             return currentContext ?: throw IllegalStateException("Failed to create keyboard context")

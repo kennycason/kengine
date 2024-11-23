@@ -3,7 +3,7 @@ package com.kengine.input
 import com.kengine.context.Context
 
 class MouseContext private constructor(
-    val mouseInput: MouseInputSubscriber
+    val mouse: MouseInputEventSubscriber
 ) : Context() {
 
     companion object {
@@ -12,7 +12,7 @@ class MouseContext private constructor(
         fun get(): MouseContext {
             if (currentContext == null) {
                 currentContext = MouseContext(
-                    mouseInput = MouseInputSubscriber(),
+                    mouse = MouseInputEventSubscriber(),
                 )
             }
             return currentContext ?: throw IllegalStateException("Failed to create mouse context")

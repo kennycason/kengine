@@ -11,7 +11,7 @@ import sdl2.SDL_MOUSEBUTTONDOWN
 import sdl2.SDL_MOUSEBUTTONUP
 import sdl2.SDL_MOUSEMOTION
 
-class MouseInputSubscriber {
+class MouseInputEventSubscriber {
     private val buttonStates = mutableMapOf<Int, ButtonState>()
     private var mouseCursor: Vec2D = Vec2D()
 

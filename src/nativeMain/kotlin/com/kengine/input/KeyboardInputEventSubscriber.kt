@@ -14,7 +14,7 @@ import sdl2.SDL_KEYUP
 import sdl2.SDL_KeyCode
 
 
-class KeyboardInputSubscriber {
+class KeyboardInputEventSubscriber {
     private val keyStates = mutableMapOf<Int, KeyState>()
 
     data class KeyState(

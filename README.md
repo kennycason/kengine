@@ -77,21 +77,21 @@ class BulbasaurEntity : SpriteEntity(
         v.x *= 0.9
         v.y *= 0.9
         useContext(KeyboardContext.get()) {
-            if (keyboardInput.isLeftPressed()) {
+            if (keyboard.isLeftPressed()) {
                 v.x = -speed * elapsedSeconds
             }
-            if (keyboardInput.isRightPressed()) {
+            if (keyboard.isRightPressed()) {
                 v.x = speed * elapsedSeconds
             }
-            if (keyboardInput.isUpPressed()) {
+            if (keyboard.isUpPressed()) {
                 v.y = -speed * elapsedSeconds
             }
-            if (keyboardInput.isDownPressed()) {
+            if (keyboard.isDownPressed()) {
                 v.y = speed * elapsedSeconds
             }
         }
         useContext(MouseContext.get()) {
-            if (mouseInput.isLeftPressed() || mouseInput.isRightPressed()) {
+            if (mouse.isLeftPressed() || mouse.isRightPressed()) {
                 p.x = mouseInput.getCursor().x - width / 2
                 p.y = mouseInput.getCursor().y - height / 2
                 Logger.info { "Move Bulbasaur to mouse cursor $p" }

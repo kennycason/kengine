@@ -5,6 +5,7 @@ import com.kengine.graphics.TextureManager
 import com.kengine.input.KeyboardContext
 import com.kengine.input.MouseContext
 import com.kengine.sdl.SDLContext
+import com.kengine.sdl.SDLQuitEventSubscriber
 
 class AppContext private constructor(
     val sdl: SDLContext,
@@ -12,6 +13,8 @@ class AppContext private constructor(
     val keyboard: KeyboardContext,
     val mouse: MouseContext
 ) : Context() {
+
+    private val sDLQuitEventSubscriber = SDLQuitEventSubscriber()
 
     companion object {
         private var currentContext: AppContext? = null

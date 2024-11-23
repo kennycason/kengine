@@ -8,10 +8,11 @@ import com.kengine.sdl.SDLContext
 import kotlin.random.Random
 
 class BouncingPokeballEntity : Entity {
+    private val pokeballSprite = Sprite("images/demo/pokeball.bmp")
     override val p: Vec2D = Vec2D()
     override val v: Vec2D = Vec2D()
-    override val width: Int by lazy { pokeballSprite.width }
-    override val height: Int by lazy { pokeballSprite.height }
+    override val width = pokeballSprite.width
+    override val height = pokeballSprite.height
     private var state = State.INIT
 
     private enum class State {
@@ -60,7 +61,4 @@ class BouncingPokeballEntity : Entity {
         pokeballSprite.cleanup()
     }
 
-    companion object {
-        val pokeballSprite = Sprite("images/demo/pokeball.bmp") // shared sprite
-    }
 }

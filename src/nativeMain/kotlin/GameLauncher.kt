@@ -22,6 +22,7 @@ fun main() {
 
     } catch (e: Exception) {
         Logger.error { "Unhandled exception in GameLoop: ${e.message}" }
+        Logger.error { "Stacktrace: ${e.stackTraceToString()}" }
         e.printStackTrace()
     }
 
