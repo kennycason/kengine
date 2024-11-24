@@ -19,7 +19,7 @@ class BoxxleContext private constructor(
             if (currentContext == null) {
                 loadSprites()
 
-                val levelNumber = 0
+                val levelNumber = 5
                 val level = Level(LEVEL_DATA[levelNumber])
 
                 currentContext = BoxxleContext(
