@@ -1,6 +1,6 @@
 
+import com.kengine.GameContext
 import com.kengine.GameLoop
-import com.kengine.context.GameContext
 import com.kengine.context.useContext
 import com.kengine.log.Logger
 import games.boxxle.BoxxleGame
@@ -8,7 +8,11 @@ import games.boxxle.BoxxleGame
 
 fun main() {
     try {
-        GameContext.create(title = "Kengine", width = 800, height = 600)
+        GameContext.create(
+            title = "Kengine",
+            width = 800,
+            height = 600
+        )
         useContext(GameContext.get(), cleanup = true) {
             val boxxle = BoxxleGame()
 

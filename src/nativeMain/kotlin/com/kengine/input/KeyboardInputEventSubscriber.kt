@@ -9,6 +9,9 @@ import sdl2.SDLK_RIGHT
 import sdl2.SDLK_UP
 import sdl2.SDLK_a
 import sdl2.SDLK_b
+import sdl2.SDLK_d
+import sdl2.SDLK_s
+import sdl2.SDLK_w
 import sdl2.SDL_Event
 import sdl2.SDL_GetTicks
 import sdl2.SDL_KEYDOWN
@@ -66,10 +69,10 @@ class KeyboardInputEventSubscriber {
         } ?: UInt.MAX_VALUE // TODO confirm if I want to return this
     }
 
-    fun isUpPressed() = isKeyPressed(SDLK_UP)
-    fun isDownPressed() = isKeyPressed(SDLK_DOWN)
-    fun isLeftPressed() = isKeyPressed(SDLK_LEFT)
-    fun isRightPressed() = isKeyPressed(SDLK_RIGHT)
+    fun isUpPressed() = isKeyPressed(SDLK_UP) || isKeyPressed(SDLK_w)
+    fun isDownPressed() = isKeyPressed(SDLK_DOWN)|| isKeyPressed(SDLK_s)
+    fun isLeftPressed() = isKeyPressed(SDLK_LEFT)|| isKeyPressed(SDLK_a)
+    fun isRightPressed() = isKeyPressed(SDLK_RIGHT)|| isKeyPressed(SDLK_d)
     fun isAPressed() = isKeyPressed(SDLK_a)
     fun isBPressed() = isKeyPressed(SDLK_b)
 

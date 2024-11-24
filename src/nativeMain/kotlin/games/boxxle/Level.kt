@@ -45,12 +45,12 @@ class Level(val data: LevelData) {
             }
         }
 
-        for (box in boxes) {
-            box.draw()
-        }
-
         for (goal in goals) {
             goalSprite.draw(goal.x * 32, goal.y * 32)
+        }
+
+        for (box in boxes) {
+            box.draw(elapsedSeconds)
         }
     }
 }

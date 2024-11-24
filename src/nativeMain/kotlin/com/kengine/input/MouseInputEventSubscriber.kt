@@ -4,11 +4,11 @@ import com.kengine.Vec2
 import com.kengine.context.useContext
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
+import com.kengine.time.getCurrentTimestampMilliseconds
 import sdl2.SDL_BUTTON_LEFT
 import sdl2.SDL_BUTTON_MIDDLE
 import sdl2.SDL_BUTTON_RIGHT
 import sdl2.SDL_Event
-import sdl2.SDL_GetTicks
 import sdl2.SDL_MOUSEBUTTONDOWN
 import sdl2.SDL_MOUSEBUTTONUP
 import sdl2.SDL_MOUSEMOTION
@@ -19,7 +19,7 @@ class MouseInputEventSubscriber {
 
     data class ButtonState(
         var isPressed: Boolean = false,
-        var lastPressedTime: UInt = 0u
+        var lastPressedTime: Long = 0
     )
 
     init {
@@ -37,7 +37,7 @@ class MouseInputEventSubscriber {
                 }
                 buttonStates[button]?.apply {
                     isPressed = true
-                    lastPressedTime = SDL_GetTicks()
+                    lastPressedTime = getCurrentTimestampMilliseconds()
                 }
             }
             SDL_MOUSEBUTTONUP -> {
@@ -66,11 +66,11 @@ class MouseInputEventSubscriber {
     /**
      * Check how much time has passed since a button was last pressed.
      */
-    fun timeSinceButtonPressed(buttonCode: Int): UInt {
-        val currentTime = SDL_GetTicks()
+    fun timeSinceButtonPressed(buttonCode: Int): Long {
+        val currentTime = getCurrentTimestampMilliseconds()
         return buttonStates[buttonCode]?.let {
-            if (it.isPressed) 0u else currentTime - it.lastPressedTime
-        } ?: UInt.MAX_VALUE
+            if (it.isPressed) 0L else currentTime - it.lastPressedTime
+        } ?: Long.MAX_VALUE
     }
 
     fun isLeftPressed() = isButtonPressed(SDL_BUTTON_LEFT)

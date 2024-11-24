@@ -1,5 +1,7 @@
 package com.kengine.time
 
+import sdl2.SDL_GetTicks
+
 fun getCurrentTimestampMilliseconds(): Long {
-    return getCurrentTimestampMicroseconds() / 1_000L // Divide by 1000 to get milliseconds
+    return SDL_GetTicks().toLong()
 }

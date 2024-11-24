@@ -2,38 +2,30 @@ package games.boxxle
 
 import com.kengine.Game
 import com.kengine.context.useContext
-import com.kengine.graphics.Sprite
-import com.kengine.graphics.SpriteContext
-import com.kengine.graphics.SpriteSheet
 import com.kengine.input.KeyboardContext
 import com.kengine.sdl.SDLContext
+import sdl2.SDLK_MINUS
+import sdl2.SDLK_PLUS
+import sdl2.SDLK_r
 
 class BoxxleGame : Game {
-    private var levelNumber = 0
-    private lateinit var level: Level
-    private lateinit var player: Player
-
-    init {
-        useContext(SpriteContext.get()) {
-            val spriteSheet = SpriteSheet(Sprite("images/boxxle/boxxle.bmp"), 32, 32)
-            manager.setSpriteSheet("boxxle", spriteSheet)
-
-            level = Level(LEVEL_DATA[levelNumber])
-            player = Player(scale = level.data.scale)
-        }
-    }
 
     override fun update(elapsedSeconds: Double) {
-        player.update(elapsedSeconds)
+        useContext(BoxxleContext.get()) {
+            player.update(elapsedSeconds)
 
-        useContext(KeyboardContext.get()) {
-            if (keyboard.isAPressed()) {
-                levelNumber = (levelNumber + 1) % LEVEL_DATA.size
-                loadLevel()
-            }
-            if (keyboard.isBPressed()) {
-                levelNumber = (levelNumber - 1 + LEVEL_DATA.size) % LEVEL_DATA.size
-                loadLevel()
+            useContext(KeyboardContext.get()) {
+                if (keyboard.isKeyPressed(SDLK_r) && keyboard.timeSinceKeyPressed(SDLK_r) > 300u) {
+                    loadLevel()
+                }
+                if (keyboard.isKeyPressed(SDLK_PLUS) && keyboard.timeSinceKeyPressed(SDLK_PLUS) > 300u) {
+                    levelNumber = (levelNumber + 1) % LEVEL_DATA.size
+                    loadLevel()
+                }
+                if (keyboard.isKeyPressed(SDLK_MINUS) && keyboard.timeSinceKeyPressed(SDLK_MINUS) > 300u) {
+                    levelNumber = (levelNumber - 1 + LEVEL_DATA.size) % LEVEL_DATA.size
+                    loadLevel()
+                }
             }
         }
     }
@@ -42,8 +34,10 @@ class BoxxleGame : Game {
         useContext(SDLContext.get()) {
             fillScreen(255u, 255u, 255u, 255u)
 
-            level.draw(elapsedSeconds)
-            player.draw(elapsedSeconds)
+            useContext(BoxxleContext.get()) {
+                level.draw(elapsedSeconds)
+                player.draw(elapsedSeconds)
+            }
 
             flipScreen()
         }
@@ -53,8 +47,11 @@ class BoxxleGame : Game {
     }
 
     private fun loadLevel() {
-        level = Level(LEVEL_DATA[levelNumber])
-        player.scale = level.data.scale
+        useContext(BoxxleContext.get()) {
+            level = Level(LEVEL_DATA[levelNumber])
+            player.p.set(level.start)
+            player.setScale(level.data.scale)
+        }
     }
 
 }

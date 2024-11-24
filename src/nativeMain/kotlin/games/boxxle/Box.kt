@@ -2,17 +2,20 @@ package games.boxxle
 
 import com.kengine.Vec2
 import com.kengine.context.useContext
+import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.TextureContext
 
 class Box(
-    private val p: Vec2 = Vec2(),
-    scale: Double = 1.0
-) {
+    override val p: Vec2 = Vec2(),
+    override val v: Vec2 = Vec2(),
+    override val width: Int = 32,
+    override val height: Int = 32,
+    var scale: Double = 1.0
+): Entity {
     private val spriteSheet = SpriteContext.get().manager.getSpriteSheet("boxxle")
     private val box = spriteSheet.getTile(1, 0)
     private val boxPlaced = spriteSheet.getTile(2, 0)
-    private var isMoving = false
     private var isPlaced = false
 
     init {
@@ -20,24 +23,22 @@ class Box(
         boxPlaced.scale.set(scale)
     }
 
-    fun move(newP: Vec2, goals: List<Vec2>) {
-        if (isMoving) return
-
-        isMoving = true
-        p.set(newP)
-
-        isMoving = false
-        afterPush(goals)
+    override fun update(elapsedSeconds: Double) {
     }
 
-    private fun afterPush(goals: List<Vec2>) {
-        isPlaced = goals.any { goal -> goal.x == p.x && goal.y == p.y }
-    }
-
-    fun draw() {
+    override fun draw(elapsedSeconds: Double) {
         useContext(TextureContext.get()) {
             if (isPlaced) boxPlaced.draw(p.x * 32, p.y * 32)
             else box.draw(p.x * 32, p.y * 32)
+        }
+    }
+
+    override fun cleanup() {
+    }
+
+    fun afterPush() {
+        useContext(BoxxleContext.get()) {
+            isPlaced = level.goals.any { goal -> goal.x == p.x && goal.y == p.y }
         }
     }
 }
