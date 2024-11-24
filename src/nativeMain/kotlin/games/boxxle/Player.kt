@@ -36,83 +36,63 @@ class Player(
     override fun update(elapsedSeconds: Double) {
         useContext(KeyboardContext.get()) {
             if (!isMoving && getCurrentTimestampMilliseconds() - lastMovedMs > 300) {
-                if (keyboard.isLeftPressed()) {
-                    v.x = -speed * elapsedSeconds
-                    face = Direction.LEFT
-                    move(-1.0, 0.0)
-                } else if (keyboard.isRightPressed()) {
-                    v.x = speed * elapsedSeconds
-                    face = Direction.RIGHT
-                    move(1.0, 0.0)
-                } else if (keyboard.isUpPressed()) {
-                    v.y = -speed * elapsedSeconds
-                    face = Direction.UP
-                    move(0.0, -1.0)
-                } else if (keyboard.isDownPressed()) {
-                    v.y = speed * elapsedSeconds
-                    face = Direction.DOWN
-                    move(0.0, 1.0)
+                val delta = when {
+                    keyboard.isLeftPressed() -> Vec2(-1.0, 0.0).also { face = Direction.LEFT }
+                    keyboard.isRightPressed() -> Vec2(1.0, 0.0).also { face = Direction.RIGHT }
+                    keyboard.isUpPressed() -> Vec2(0.0, -1.0).also { face = Direction.UP }
+                    keyboard.isDownPressed() -> Vec2(0.0, 1.0).also { face = Direction.DOWN }
+                    else -> null
                 }
+                delta?.let { tryMove(it, elapsedSeconds) }
             }
         }
     }
 
-    private fun move(dx: Double, dy: Double) {
-        useContext(BoxxleContext.get()) {
-            if (p.x + dx < 0 || p.x + dx >= level.tiles[0].size ||
-                p.y + dy < 0 || p.y + dy >= level.tiles.size) return // TODO read from level dims
-
-            if (level.tiles[(p.y + dy).toInt()][(p.x + dx).toInt()] == Tiles.BRICK) {
-                return
-            }
-        }
-
-        lastMovedMs = getCurrentTimestampMilliseconds()
-        ActionsContext.get()
-            .moveTo(this@Player, Vec2(p.x + dx, p.y + dy), speed, onComplete = { isMoving = false })
-        pushBoxIfExists(Vec2(dx, dy))
-    }
-
-    fun pushBoxIfExists(delta: Vec2): Boolean {
+    private fun tryMove(delta: Vec2, elapsedSeconds: Double) {
         useContext(BoxxleContext.get()) {
             val newP = p + delta
 
+            // is a brick blocking the player?
+            if (level.tiles.getOrNull(newP.y.toInt())?.getOrNull(newP.x.toInt()) == Tiles.BRICK) return
+
+            // is player pushing box
             for (box in level.boxes) {
                 if (newP == box.p) {
                     if (canMoveBox(box.p + delta)) {
-                        ActionsContext.get()
-                            .moveTo(box, box.p + delta, speed, onComplete = { box.afterPush() })
-                        return true
+                        // move both the player and the box
+                        isMoving = true
+                        ActionsContext.get().moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
+                        ActionsContext.get().moveTo(box, box.p + delta, speed, onComplete = { box.afterPush() })
+                        lastMovedMs = getCurrentTimestampMilliseconds()
+                        return
                     }
-                    return false
+                    return // player can't move if the box can't be pushed
                 }
             }
+
+            // if no box is being pushed, just move the player
+            isMoving = true
+            ActionsContext.get().moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
+            lastMovedMs = getCurrentTimestampMilliseconds()
+        }
+    }
+
+    private fun canMoveBox(newP: Vec2): Boolean {
+        useContext(BoxxleContext.get()) {
+            // is new position is within bounds
+            if (!isWithinBounds(newP)) return false
+
+            // is there a brick at the new position
+            if (level.tiles[newP.y.toInt()][newP.x.toInt()] == Tiles.BRICK) return false
+
+            // is another box is already at the new position
+            if (level.boxes.any { it.p == newP }) return false
+
             return true
         }
     }
 
-    fun canMoveBox(newP: Vec2): Boolean {
-        useContext(BoxxleContext.get()) {
-            // check if the new position is within level boundaries and not colliding with walls or other boxes
-            if (!isWithinBounds(newP)) {
-                return false
-            }
-
-            if (level.tiles[p.y.toInt()][p.x.toInt()] == Tiles.BRICK) {
-                return false
-            }
-
-            for (box in level.boxes) {
-                if (box.p == newP) {
-                    return false // box is blocking
-                }
-            }
-
-            return true // box can move
-        }
-    }
-
-    fun isWithinBounds(p: Vec2): Boolean {
+    private fun isWithinBounds(p: Vec2): Boolean {
         useContext(BoxxleContext.get()) {
             return p.x >= 0 && p.y >= 0 && p.x < level.tiles[0].size && p.y < level.tiles.size
         }
@@ -136,8 +116,6 @@ class Player(
         playerSpriteLeft.scale.set(scale)
         playerSpriteRight.scale.set(scale)
     }
-
-    fun getScale() = scale
 
     override fun cleanup() {
         playerSpriteUp.cleanup()

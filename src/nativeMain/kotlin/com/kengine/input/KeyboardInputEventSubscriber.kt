@@ -3,6 +3,7 @@ package com.kengine.input
 import com.kengine.context.useContext
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
+import com.kengine.time.getCurrentTimestampMilliseconds
 import sdl2.SDLK_DOWN
 import sdl2.SDLK_LEFT
 import sdl2.SDLK_RIGHT
@@ -13,7 +14,6 @@ import sdl2.SDLK_d
 import sdl2.SDLK_s
 import sdl2.SDLK_w
 import sdl2.SDL_Event
-import sdl2.SDL_GetTicks
 import sdl2.SDL_KEYDOWN
 import sdl2.SDL_KEYUP
 import sdl2.SDL_KeyCode
@@ -24,7 +24,7 @@ class KeyboardInputEventSubscriber {
 
     data class KeyState(
         var isPressed: Boolean = false,
-        var lastPressedTime: UInt = 0u
+        var lastPressedTime: Long = 0L
     )
 
     init {
@@ -42,7 +42,7 @@ class KeyboardInputEventSubscriber {
                 }
                 keyStates[key]?.apply {
                     isPressed = true
-                    lastPressedTime = SDL_GetTicks()
+                    lastPressedTime = getCurrentTimestampMilliseconds()
                 }
             }
             SDL_KEYUP -> {
@@ -62,11 +62,11 @@ class KeyboardInputEventSubscriber {
     /**
      * check how much time has passed since a key was last pressed
      */
-    fun timeSinceKeyPressed(keyCode: SDL_KeyCode): UInt {
-        val currentTime = SDL_GetTicks()
+    fun timeSinceKeyPressed(keyCode: SDL_KeyCode): Long {
+        val currentTime = getCurrentTimestampMilliseconds()
         return keyStates[keyCode.toInt()]?.let {
-            if (it.isPressed) 0u else currentTime - it.lastPressedTime
-        } ?: UInt.MAX_VALUE // TODO confirm if I want to return this
+            if (it.isPressed) 0L else currentTime - it.lastPressedTime
+        } ?: Long.MAX_VALUE
     }
 
     fun isUpPressed() = isKeyPressed(SDLK_UP) || isKeyPressed(SDLK_w)
