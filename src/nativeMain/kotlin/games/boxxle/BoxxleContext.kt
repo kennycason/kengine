@@ -7,7 +7,6 @@ import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.SpriteSheet
 
 class BoxxleContext private constructor(
-    var levelNumber: Int,
     var level: Level,
     val player: Player
 ) : Context() {
@@ -19,11 +18,9 @@ class BoxxleContext private constructor(
             if (currentContext == null) {
                 loadSprites()
 
-                val levelNumber = 5
-                val level = Level(LEVEL_DATA[levelNumber])
+                val level = Level(0)
 
                 currentContext = BoxxleContext(
-                    levelNumber = levelNumber,
                     level = level,
                     player = Player(p = level.start, scale = level.data.scale)
                 )

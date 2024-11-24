@@ -6,6 +6,7 @@ import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.TextureContext
 import com.kengine.input.KeyboardContext
 import com.kengine.input.MouseContext
+import com.kengine.log.Logger
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
 import com.kengine.sdl.useSDLQuitEventSubscriber
@@ -21,6 +22,7 @@ class GameContext private constructor(
     val sounds: SoundContext,
     val actions: ActionsContext
 ) : Context() {
+    var isRunning = true
 
     init {
         useSDLQuitEventSubscriber()
@@ -57,14 +59,15 @@ class GameContext private constructor(
     }
 
     override fun cleanup() {
-        sdl.cleanup()
+        Logger.info { "Cleaning up game resources" }
+        actions.cleanup()
+        events.cleanup()
         keyboard.cleanup()
         mouse.cleanup()
-        events.cleanup()
         textures.cleanup()
         sprites.cleanup()
         sounds.cleanup()
-        actions.cleanup()
+        sdl.cleanup()
     }
 
 }

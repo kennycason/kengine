@@ -21,7 +21,6 @@ import sdl2.SDL_WINDOWPOS_CENTERED
 import sdl2.SDL_WINDOW_SHOWN
 
 class SDLContext private constructor(
-    val title: String,
     val screenWidth: Int,
     val screenHeight: Int,
     private val window: CValuesRef<cnames.structs.SDL_Window>,
@@ -62,7 +61,7 @@ class SDLContext private constructor(
                 ?: throw IllegalStateException("Error creating renderer: ${SDL_GetError()?.toKString()}")
 
 
-            currentContext = SDLContext(title, width, height, window, renderer, SDLEventContext.get())
+            currentContext = SDLContext(width, height, window, renderer, SDLEventContext.get())
             return currentContext!!
         }
 

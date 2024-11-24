@@ -8,11 +8,12 @@ object Tiles {
     const val BRICK = 1
 }
 
-class Level(val data: LevelData) {
+class Level(val levelNumber: Int,) {
     private val spriteSheet = SpriteContext.get().manager.getSpriteSheet("boxxle")
     private val brickSprite = spriteSheet.getTile(0, 0)
     private val goalSprite = spriteSheet.getTile(3, 0)
 
+    val data = LEVEL_DATA[levelNumber]
     val tiles: List<List<Int>> = data.tiles
     val boxes: MutableList<Box> = mutableListOf()
     val goals: MutableList<Vec2> = mutableListOf()

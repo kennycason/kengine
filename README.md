@@ -18,16 +18,16 @@ There are 40 levels total.
 
 ```kotlin
 fun main() {
-    GameContext.create(title = "Boxxle", width = 800, height = 600)
-    useContext(GameContext.get(), cleanup = true) {
-        val boxxle = BoxxleGame()
-
-        GameLoop(frameRate = 60) { elapsedSeconds ->
-            boxxle.update(elapsedSeconds)
-            boxxle.draw(elapsedSeconds)
+    useContext(
+        GameContext.create(
+            title = "Boxxle",
+            width = 800,
+            height = 600
+        )
+    ) {
+        GameRunner(frameRate = 60) {
+            BoxxleGame()
         }
-
-        boxxle.cleanup()
     }
 }
 ```

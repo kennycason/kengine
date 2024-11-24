@@ -9,6 +9,18 @@ data class LevelData(
 )
 
 val LEVEL_DATA: List<LevelData> = listOf(
+    LevelData( // 0
+        tiles = listOf(
+            listOf(1, 1, 1, 1, 1),
+            listOf(1, 0, 0, 0, 1),
+            listOf(1, 0, 0, 0, 1),
+            listOf(1, 0, 0, 0, 1),
+            listOf(1, 1, 1, 1, 1)
+        ),
+        boxes = listOf(listOf(2, 2)),
+        goals = listOf(listOf(3, 3)),
+        start = listOf(1, 1)
+    ),
     LevelData( // 1
         tiles = listOf(
             listOf(1, 1, 1, 1, 1, 0, 0, 0, 0),
