@@ -4,12 +4,21 @@ import com.kengine.Game
 import com.kengine.context.useContext
 import com.kengine.input.KeyboardContext
 import com.kengine.sdl.SDLContext
+import com.kengine.sound.Sound
+import com.kengine.sound.SoundContext
 import com.kengine.time.getCurrentTimestampMilliseconds
 import sdl2.SDLK_RETURN
 import sdl2.SDLK_SPACE
 import sdl2.SDLK_r
 
 class BoxxleGame : Game {
+
+    init {
+        useContext(SoundContext.get()) {
+            manager.setSound("title", Sound("sound/boxxle/title.wav"))
+            manager.getSound("title").loop()
+        }
+    }
 
     private var timeSinceOptionChange = 0L // TODO fix keyboard.timeSinceKeyPressed function
 
@@ -55,6 +64,9 @@ class BoxxleGame : Game {
     }
 
     override fun cleanup() {
+        useContext(SoundContext.get()) {
+            manager.getSound("title").stop()
+        }
     }
 
     private fun loadLevel() {

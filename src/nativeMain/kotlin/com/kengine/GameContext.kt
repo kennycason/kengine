@@ -9,6 +9,7 @@ import com.kengine.input.MouseContext
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
 import com.kengine.sdl.useSDLQuitEventSubscriber
+import com.kengine.sound.SoundContext
 
 class GameContext private constructor(
     val sdl: SDLContext,
@@ -17,6 +18,7 @@ class GameContext private constructor(
     val mouse: MouseContext,
     val textures: TextureContext,
     val sprites: SpriteContext,
+    val sounds: SoundContext,
     val actions: ActionsContext
 ) : Context() {
 
@@ -42,6 +44,7 @@ class GameContext private constructor(
                 mouse = MouseContext.get(),
                 textures = TextureContext.get(),
                 sprites = SpriteContext.get(),
+                sounds = SoundContext.get(),
                 actions = ActionsContext.get()
             )
             return currentContext!!
@@ -60,6 +63,7 @@ class GameContext private constructor(
         events.cleanup()
         textures.cleanup()
         sprites.cleanup()
+        sounds.cleanup()
         actions.cleanup()
     }
 

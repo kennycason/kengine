@@ -44,7 +44,7 @@ class SDLContext private constructor(
 
             // init SDL
             if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-                Logger.error("Error initializing SDL: ${SDL_GetError()?.toKString()}")
+                Logger.error("Error initializing SDL Video: ${SDL_GetError()?.toKString()}")
                 exit(1)
             }
             
@@ -60,6 +60,7 @@ class SDLContext private constructor(
             
             val renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED)
                 ?: throw IllegalStateException("Error creating renderer: ${SDL_GetError()?.toKString()}")
+
 
             currentContext = SDLContext(title, width, height, window, renderer, SDLEventContext.get())
             return currentContext!!

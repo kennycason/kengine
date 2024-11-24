@@ -104,7 +104,7 @@ val LEVEL_DATA: List<LevelData> = listOf(
         boxes = listOf(listOf(4, 6), listOf(6, 6), listOf(4, 8), listOf(6, 8)),
         goals = listOf(listOf(4, 4), listOf(8, 6), listOf(2, 8), listOf(6, 10)),
         start = listOf(6, 3),
-        scale = 1.4
+        scale = 1.3
     ),
     LevelData( // 7
         tiles = listOf(

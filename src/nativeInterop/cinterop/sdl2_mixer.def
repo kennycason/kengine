@@ -1,0 +1,3 @@
+headers = SDL_mixer.h
+package = sdl2.mixer
+linkerOpts = -lSDL2_mixer

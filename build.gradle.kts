@@ -37,6 +37,11 @@ kotlin {
                 compilerOpts("-I/opt/homebrew/include/SDL2")
                 linkerOpts("-L/opt/homebrew/lib", "-lSDL2")
             }
+            val sdl2Mixer by creating {
+                defFile = file("src/nativeInterop/cinterop/sdl2_mixer.def")
+                compilerOpts("-I/opt/homebrew/include/SDL2")
+                linkerOpts("-L/opt/homebrew/lib", "-lSDL2_mixer")
+            }
         }
     }
 
