@@ -1,20 +1,20 @@
 package games.boxxle
 
 import com.kengine.Game
+import com.kengine.action.ActionsContext
 import com.kengine.context.useContext
 import com.kengine.input.KeyboardContext
 import com.kengine.sdl.SDLContext
 import com.kengine.sound.Sound
 import com.kengine.sound.SoundContext
 import com.kengine.time.getCurrentTimestampMilliseconds
-import platform.posix.sleep
 import sdl2.SDLK_RETURN
 import sdl2.SDLK_SPACE
 import sdl2.SDLK_r
 
 class BoxxleGame : Game {
     enum class State {
-        BEGIN_PLAY, PLAY, FINISH
+        BEGIN_PLAY, PLAY, WAIT_FOR_FINISH_MUSIC_TO_FINISH
     }
     private var state = State.BEGIN_PLAY
     private var timeSinceOptionChange = 0L // TODO fix keyboard.timeSinceKeyPressed function
@@ -22,11 +22,11 @@ class BoxxleGame : Game {
     private lateinit var finishSound: Sound
     init {
         useContext(SoundContext.get()) {
-            manager.setSound("finish", Sound("sound/boxxle/finish.wav"))
-            manager.setSound("main", Sound("sound/boxxle/main.wav"))
-            manager.setSound("title", Sound("sound/boxxle/title.wav"))
-            mainSound = manager.getSound("main")
-            finishSound = manager.getSound("finish")
+            manager.setSound(Sounds.FINISH, Sound(Sounds.FINISH_WAV))
+            manager.setSound(Sounds.MAIN, Sound(Sounds.MAIN_WAV))
+            manager.setSound(Sounds.TITLE, Sound(Sounds.TITLE_WAV))
+            mainSound = manager.getSound(Sounds.MAIN)
+            finishSound = manager.getSound(Sounds.FINISH)
         }
     }
 
@@ -34,7 +34,20 @@ class BoxxleGame : Game {
         when (state) {
             State.BEGIN_PLAY -> beginPlay()
             State.PLAY -> play(elapsedSeconds)
-            State.FINISH -> finish()
+            State.WAIT_FOR_FINISH_MUSIC_TO_FINISH -> {}
+        }
+    }
+
+    override fun draw(elapsedSeconds: Double) {
+        useContext(SDLContext.get()) {
+            fillScreen(255u, 255u, 255u, 255u)
+
+            useContext(BoxxleContext.get()) {
+                level.draw(elapsedSeconds)
+                player.draw(elapsedSeconds)
+            }
+
+            flipScreen()
         }
     }
 
@@ -64,40 +77,23 @@ class BoxxleGame : Game {
 
             if (isLevelComplete()) {
                 mainSound.stop()
-                state = State.FINISH
+                finishSound.play()
+                ActionsContext.get().timer(6000) {
+                    state = State.BEGIN_PLAY
+                    loadLevel((level.levelNumber + 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
+                }
+                state = State.WAIT_FOR_FINISH_MUSIC_TO_FINISH
             }
         }
     }
 
-    private fun finish() {
-        finishSound.play()
-        sleep(6u) // track is 6 seconds long TODO handle more gracefully
-        state = State.BEGIN_PLAY
-        useContext(BoxxleContext.get()) {
-            loadLevel((level.levelNumber + 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
-        }
-    }
-
-    override fun draw(elapsedSeconds: Double) {
-        useContext(SDLContext.get()) {
-            fillScreen(255u, 255u, 255u, 255u)
-
-            useContext(BoxxleContext.get()) {
-                level.draw(elapsedSeconds)
-                player.draw(elapsedSeconds)
-            }
-
-            flipScreen()
-        }
-    }
-
-    fun reloadLevel() {
+    private fun reloadLevel() {
         useContext(BoxxleContext.get()) {
             loadLevel(level.levelNumber)
         }
     }
 
-    fun loadLevel(levelNumber: Int) {
+    private fun loadLevel(levelNumber: Int) {
         useContext(BoxxleContext.get()) {
             level = Level(levelNumber)
             player.p.set(level.start)

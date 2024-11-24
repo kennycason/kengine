@@ -19,7 +19,7 @@ class Player(
     override val height: Int = 32,
     private var scale: Double = 1.0
 ) : Entity {
-    private val spriteSheet = SpriteContext.get().manager.getSpriteSheet("boxxle")
+    private val spriteSheet = SpriteContext.get().manager.getSpriteSheet(Sprites.BOXXLE_SHEET)
     private val playerSpriteUp = spriteSheet.getTile(0, 1)
     private val playerSpriteDown = spriteSheet.getTile(1, 1)
     private val playerSpriteLeft = spriteSheet.getTile(2, 1)

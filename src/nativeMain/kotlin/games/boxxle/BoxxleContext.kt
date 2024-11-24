@@ -30,8 +30,8 @@ class BoxxleContext private constructor(
 
         private fun loadSprites() {
             useContext(SpriteContext.get()) {
-                val spriteSheet = SpriteSheet(Sprite("images/boxxle/boxxle.bmp"), 32, 32)
-                manager.setSpriteSheet("boxxle", spriteSheet)
+                val spriteSheet = SpriteSheet(Sprite(Sprites.BOXXLE_SHEET_BMP), 32, 32)
+                manager.setSpriteSheet(Sprites.BOXXLE_SHEET, spriteSheet)
             }
         }
     }

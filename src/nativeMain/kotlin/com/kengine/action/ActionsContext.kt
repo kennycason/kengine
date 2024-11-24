@@ -11,6 +11,10 @@ class ActionsContext: Context() {
         actions.add(MoveAction(entity, destination, speed, onComplete))
     }
 
+    fun timer(delayMs: Long, onComplete: (() -> Unit)? = null) {
+        actions.add(TimerAction(delayMs, onComplete))
+    }
+
     fun update(deltaTime: Double) {
         val iterator = actions.iterator()
         while (iterator.hasNext()) {
