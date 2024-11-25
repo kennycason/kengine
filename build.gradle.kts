@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlinxSerialization)
 }
 
-group = "kengine-sdl"
+group = "kengine"
 version = "1.0.0"
 
 repositories {
@@ -50,8 +50,9 @@ kotlin {
             compilations.all {
                 kotlinOptions {
                     freeCompilerArgs += listOf(
-                        "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
+                        "-opt-in=kotlin.experimental.ExperimentalNativeApi",
                         "-opt-in=kotlin.ExperimentalStdlibApi",
+                        "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
                         "-g", // enable debug symbols
                         "-ea" // enable assertions
                     )
