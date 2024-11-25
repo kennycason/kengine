@@ -37,6 +37,8 @@ View `GameLauncher.kt` and `BoxxleGame` or `DemoGame` for more examples.
 
 ## Installation 
 
+Install OpenJDK 17.0
+
 Install SDL via Brew (on Mac)
 ```shell
 brew install sdl2 sdl2_mixer

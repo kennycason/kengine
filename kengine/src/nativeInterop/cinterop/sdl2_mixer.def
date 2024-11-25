@@ -1,0 +1,4 @@
+headers = SDL_mixer.h
+package = sdl2.mixer
+compilerOpts = -I/opt/homebrew/include/SDL2
+linkerOpts = -L/opt/homebrew/lib -lSDL2_mixer

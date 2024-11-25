@@ -1,3 +1,4 @@
 headers = SDL.h
+package = sdl2
 compilerOpts = -I/opt/homebrew/include/SDL2
 linkerOpts = -L/opt/homebrew/lib -lSDL2
