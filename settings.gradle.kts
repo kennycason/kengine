@@ -5,4 +5,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "kengine-sdl"
+rootProject.name = "kengine"

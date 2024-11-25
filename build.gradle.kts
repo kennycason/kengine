@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlinxSerialization)
 }
 
-group = "kengine-sdl"
+group = "kengine"
 version = "1.0.0"
 
 repositories {
@@ -25,9 +25,9 @@ kotlin {
 
     nativeTarget.apply {
         binaries {
-            executable {
-                entryPoint = "main"
-                linkerOpts("-L/opt/homebrew/lib", "-lSDL2")
+            sharedLib {
+                baseName = "kengine"
+                linkerOpts("-v")
             }
         }
 
@@ -35,12 +35,10 @@ kotlin {
             val sdl2 by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl2.def")
                 compilerOpts("-I/opt/homebrew/include/SDL2")
-                linkerOpts("-L/opt/homebrew/lib", "-lSDL2")
             }
             val sdl2Mixer by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl2_mixer.def")
                 compilerOpts("-I/opt/homebrew/include/SDL2")
-                linkerOpts("-L/opt/homebrew/lib", "-lSDL2_mixer")
             }
         }
     }
@@ -53,7 +51,7 @@ kotlin {
                         "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
                         "-opt-in=kotlin.ExperimentalStdlibApi",
                         "-g", // enable debug symbols
-                        "-ea" // enable assertions
+                        "-ea", // enable assertions
                     )
                 }
             }

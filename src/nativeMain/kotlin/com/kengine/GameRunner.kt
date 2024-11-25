@@ -2,6 +2,7 @@ package com.kengine
 
 import com.kengine.log.Logger
 
+
 class GameRunner(
     frameRate: Int = 60,
     gameBuilder: () -> Game
