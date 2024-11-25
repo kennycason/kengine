@@ -1,10 +1,16 @@
-# Kengine SDL
+# Kengine
 
 A light game library in Kotlin Native + SDL
 
-WIP
+## Example Games
 
-### Boxxle - Clone of the Gameboy classic
+### [Hello, World](helloworld/)
+
+A sample game app to help get started.
+
+### [Boxxle](boxxle/) 
+
+A more robust example
 
 Controls:
 - **WASD or Arrows:** Movement
@@ -14,7 +20,7 @@ Controls:
 
 There are 40 levels total. 
 
-<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/images/boxxle01.png" />
+<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/boxxle/screenshot.png" />
 
 ```kotlin
 fun main() {
@@ -34,8 +40,33 @@ fun main() {
 
 View `GameLauncher.kt` and `BoxxleGame` or `DemoGame` for more examples.
 
+## Project structure
+
+```shell
+kengine/
+├── kengine/                       // kengine core code
+├── boxxle/                        // boxxle - a more robust example game
+└── helloworld/                    // a simple example, a good starting point.
+```
+
+## Project structure for a Kengine game
+
+```shell
+sample-game/
+├── build.gradle.kts               
+├── gradle.properties    
+│   └── assets/                    // game assets (shared across platforms)
+│       ├── sprites/               // images and sprite sheets
+│       └── sounds/                // sound files     
+└── src/
+    ├── nativeMain/
+    │   └── kotlin/                // game-specific code
+    └── test/                      // Unit and integration tests
+```
 
 ## Installation 
+
+Install OpenJDK 17.0
 
 Install SDL via Brew (on Mac)
 ```shell
@@ -61,4 +92,6 @@ Build the project
 - GUI
 - Box2D
 - Networking
-- Package as library and separate out demo games.
+
+
+
