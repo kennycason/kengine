@@ -7,4 +7,4 @@ pluginManagement {
 
 rootProject.name = "kengine"
 
-include("kengine", "boxxle")
+include("kengine", "boxxle", "helloworld")

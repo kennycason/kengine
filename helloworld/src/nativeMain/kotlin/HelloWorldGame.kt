@@ -1,15 +1,11 @@
-package games.demo
-
 import com.kengine.Game
 import com.kengine.context.useContext
 import com.kengine.sdl.SDLContext
-import games.demo.entity.BouncingPokeballEntity
-import games.demo.entity.BulbasaurEntity
 import sdl2.SDL_RenderClear
 import sdl2.SDL_RenderPresent
 import sdl2.SDL_SetRenderDrawColor
 
-class DemoGame : Game {
+class HelloWorldGame : Game {
     private val bulbasaur = BulbasaurEntity()
     private val pokeballs = List(size = 50) { BouncingPokeballEntity() }
 

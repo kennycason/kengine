@@ -1,4 +1,4 @@
-package games.boxxle
+package boxxle
 
 import com.kengine.context.Context
 import com.kengine.context.useContext

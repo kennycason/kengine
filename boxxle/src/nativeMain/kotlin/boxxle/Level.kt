@@ -1,4 +1,4 @@
-package games.boxxle
+package boxxle
 
 import com.kengine.Vec2
 import com.kengine.graphics.SpriteContext

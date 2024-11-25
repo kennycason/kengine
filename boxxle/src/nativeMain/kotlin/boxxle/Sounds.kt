@@ -1,7 +1,7 @@
-package games.boxxle
+package boxxle
 
 object Sounds {
-    private const val SOUND_PATH = "sound/boxxle/"
+    private const val SOUND_PATH = "assets/sounds/"
     const val FINISH = "finish"
     const val FINISH_WAV = "${SOUND_PATH}finish.wav"
     const val MAIN = "main"

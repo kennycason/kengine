@@ -1,5 +1,3 @@
-package games.demo.entity
-
 import com.kengine.context.useContext
 import com.kengine.entity.SpriteEntity
 import com.kengine.graphics.Sprite
@@ -9,7 +7,7 @@ import com.kengine.log.Logger
 import com.kengine.sdl.SDLContext
 
 class BulbasaurEntity : SpriteEntity(
-    sprite = Sprite("images/demo/bulbasaur.bmp")
+    sprite = Sprite("assets/sprites/bulbasaur.bmp")
 ) {
     private val speed = 100.0
     private var state = State.INIT

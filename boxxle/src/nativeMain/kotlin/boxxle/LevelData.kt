@@ -1,4 +1,4 @@
-package games.boxxle
+package boxxle
 
 data class LevelData(
     val tiles: List<List<Int>>,

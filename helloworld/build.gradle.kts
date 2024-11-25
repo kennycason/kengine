@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform)
 }
 
-group = "kengine.boxxle"
+group = "kengine.helloworld"
 version = "1.0.0"
 
 repositories {
