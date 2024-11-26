@@ -52,12 +52,12 @@ kengine/
 ## Project structure for a Kengine game
 
 ```shell
-sample-game/
+<game_name>/
 ├── build.gradle.kts               
 ├── gradle.properties    
-│   └── assets/                    // game assets (shared across platforms)
-│       ├── sprites/               // images and sprite sheets
-│       └── sounds/                // sound files     
+├── assets/                        // game assets (shared across platforms)
+│   ├── sprites/                   // images and sprite sheets
+│   └── sounds/                    // sound files     
 └── src/
     ├── nativeMain/
     │   └── kotlin/                // game-specific code
@@ -80,6 +80,7 @@ Build the project
 
 ## Roadmap
 
+- Embed data files in executable binary
 - Rect type (x,y,width,height)
 - Animated Sprites
 - GameLoop updates (improve handling of delta timestamps, decouple update/draw calls)
@@ -92,6 +93,7 @@ Build the project
 - GUI
 - Box2D
 - Networking
+- fix -Wno-c99-designator
 
 
 

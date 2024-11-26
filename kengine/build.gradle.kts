@@ -38,10 +38,12 @@ kotlin {
             val sdl2 by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl2.def")
                 compilerOpts("-I/opt/homebrew/include/SDL2")
+                compilerOpts("-Wno-c99-designator")
             }
             val sdl2Mixer by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl2_mixer.def")
                 compilerOpts("-I/opt/homebrew/include/SDL2")
+                compilerOpts("-Wno-c99-designator")
             }
         }
         compilations.all {
