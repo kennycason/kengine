@@ -1,5 +1,9 @@
 package com.kengine.log
 
+import com.kengine.log.Logger.Level.DEBUG
+import com.kengine.log.Logger.Level.ERROR
+import com.kengine.log.Logger.Level.INFO
+import com.kengine.log.Logger.Level.WARN
 import com.kengine.time.getCurrentTimestampMilliseconds
 
 /**
@@ -11,25 +15,25 @@ object Logger {
         DEBUG, INFO, WARN, ERROR
     }
 
-    private var logLevel: Level = Level.INFO
+    private var logLevel: Level = INFO
 
-    fun debug(message: () -> String) = log(Level.DEBUG, message())
-    fun info(message: () -> String) = log(Level.INFO, message())
-    fun warn(message: () -> String) = log(Level.WARN, message())
-    fun error(message: () -> String) = log(Level.ERROR, message())
-    fun debug(message: () -> Any) = log(Level.DEBUG, message().toString())
-    fun info(message: () -> Any) = log(Level.INFO, message().toString())
-    fun warn(message: () -> Any) = log(Level.WARN, message().toString())
-    fun error(message: () -> Any) = log(Level.ERROR, message().toString())
+    fun debug(message: () -> String) = log(DEBUG, message())
+    fun info(message: () -> String) = log(INFO, message())
+    fun warn(message: () -> String) = log(WARN, message())
+    fun error(message: () -> String) = log(ERROR, message())
+    fun debug(message: () -> Any) = log(DEBUG, message().toString())
+    fun info(message: () -> Any) = log(INFO, message().toString())
+    fun warn(message: () -> Any) = log(WARN, message().toString())
+    fun error(message: () -> Any) = log(ERROR, message().toString())
 
-    fun debug(message: String) = log(Level.DEBUG, message)
-    fun info(message: String) = log(Level.INFO, message)
-    fun warn(message: String) = log(Level.WARN, message)
-    fun error(message: String) = log(Level.ERROR, message)
-    fun debug(message: Any) = log(Level.DEBUG, message.toString())
-    fun info(message: Any) = log(Level.INFO, message.toString())
-    fun warn(message: Any) = log(Level.WARN, message.toString())
-    fun error(message: Any) = log(Level.ERROR, message.toString())
+    fun debug(message: String) = log(DEBUG, message)
+    fun info(message: String) = log(INFO, message)
+    fun warn(message: String) = log(WARN, message)
+    fun error(message: String) = log(ERROR, message)
+    fun debug(message: Any) = log(DEBUG, message.toString())
+    fun info(message: Any) = log(INFO, message.toString())
+    fun warn(message: Any) = log(WARN, message.toString())
+    fun error(message: Any) = log(ERROR, message.toString())
 
     /**
      * Sets the global log level.

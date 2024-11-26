@@ -40,6 +40,58 @@ fun main() {
 
 View `GameLauncher.kt` and `BoxxleGame` or `DemoGame` for more examples.
 
+## Drawing Sprites & Shapes
+
+```kotlin
+private val sprite = Sprite("sprites/bulbasaur.bmp")
+useContext(SDLContext.get()) {
+    // clear screen
+    fillScreen(0u, 0u, 0u)
+
+    useContext(GeometryContext.get()) {
+        // basic shapes, color format rgba
+        drawRectangle(10, 10, 10, 10, 0xFFu, 0xFFu, 0xFFu, 0xFFu)
+        fillRectangle(20, 20, 10, 10, 0xFFu, 0x00u, 0x00u, 0xFFu)
+        drawCircle(30, 30, 10, 0x00u, 0xFFu, 0x00u, 0xFFu)
+        fillCircle(40, 40, 10, 0x00u, 0x00u, 0xFFu, 0xFFu)
+
+        // draw overlapping, transparent red, blue, and green circles.
+        fillCircle(screenWidth / 2 - 32, screenWidth / 2 - 16, 64, 0xFFu, 0x00u, 0x00u, 0x77u)
+        fillCircle(screenWidth / 2 + 32, screenWidth / 2 - 16, 64, 0x00u, 0xFFu, 0x00u, 0x77u)
+        fillCircle(screenWidth / 2, screenWidth / 2 + 38, 64, 0x00u, 0x00u, 0xFFu, 0x77u)
+        
+        // draw a single pixel
+        drawPixel(50, 50, 0xFFu, 0xFFu, 0xFFu, 0xFFu)
+        
+        // overlapping lines
+        drawLine(150, 50, 300, 50, 0xFFu, 0u, 0u, 0xFFu)
+        drawLine(160, 150, 310, 20, 0x57u, 0x23u, 0x5Eu, 0xFFu)
+    }
+
+    sprite.draw(elapsedSeconds)
+
+    flipScreen()
+}
+```
+
+## Reading Keyboard & Mouse Events
+
+```kotlin
+useContext(KeyboardContext.get()) {
+    if (keyboard.isLeftPressed()) {
+        Logger.info { "pressed left" }
+    }
+    if (keyboard.isKeyPressed(SDLK_SPACE)) {
+        Logger.info { "pressed space" }
+    }
+}
+useContext(MouseContext.get()) {
+    if (mouse.isLeftPressed() || mouse.isRightPressed()) {
+        Logger.info { "Clicked mouse @ (${mouse.getCursor().x}, ${mouse.getCursor().y})" }
+    }
+}
+```
+
 ## Project structure
 
 ```shell
