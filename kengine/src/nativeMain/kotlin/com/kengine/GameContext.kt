@@ -2,6 +2,7 @@ package com.kengine
 
 import com.kengine.action.ActionsContext
 import com.kengine.context.Context
+import com.kengine.geometry.GeometryContext
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.TextureContext
 import com.kengine.input.KeyboardContext
@@ -19,6 +20,7 @@ class GameContext private constructor(
     val mouse: MouseContext,
     val textures: TextureContext,
     val sprites: SpriteContext,
+    val geometry: GeometryContext,
     val sounds: SoundContext,
     val actions: ActionsContext
 ) : Context() {
@@ -47,6 +49,7 @@ class GameContext private constructor(
                 textures = TextureContext.get(),
                 sprites = SpriteContext.get(),
                 sounds = SoundContext.get(),
+                geometry = GeometryContext.get(),
                 actions = ActionsContext.get()
             )
             return currentContext!!
@@ -66,6 +69,7 @@ class GameContext private constructor(
         mouse.cleanup()
         textures.cleanup()
         sprites.cleanup()
+        geometry.cleanup()
         sounds.cleanup()
         sdl.cleanup()
     }

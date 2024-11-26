@@ -84,9 +84,8 @@ Build the project
 - Rect type (x,y,width,height)
 - Animated Sprites
 - GameLoop updates (improve handling of delta timestamps, decouple update/draw calls)
-- Sound / Sound Manager
+- Documentation
 - TiledMapLoader
-- Shape Drawing
 - TTF support
 - Logger -> File
 - Menu system
@@ -94,6 +93,7 @@ Build the project
 - Box2D
 - Networking
 - fix -Wno-c99-designator
+- fix @OptIn(ExperimentalForeignApi::class) (-opt-in being ignored by compiler in multi-module project in IJ)
 
 
 

@@ -77,8 +77,8 @@ class SDLContext private constructor(
         currentContext = null
     }
 
-    fun fillScreen(r: UInt, g: UInt, b: UInt, a: UInt) {
-        SDL_SetRenderDrawColor(renderer, 255u, 255u, 255u, 255u)
+    fun fillScreen(r: UInt, g: UInt, b: UInt, a: UInt = 0xFFu) {
+        SDL_SetRenderDrawColor(renderer, r.toUByte(), g.toUByte(), b.toUByte(), a.toUByte())
         SDL_RenderClear(renderer)
     }
 

@@ -1,0 +1,5 @@
+headers = SDL2_gfxPrimitives.h
+package = sdl2gfx
+headerFilter = SDL2_gfxPrimitives.h
+compilerOpts = -I/opt/homebrew/include/SDL2
+linkerOpts = -L/opt/homebrew/lib -lSDL2_gfx
