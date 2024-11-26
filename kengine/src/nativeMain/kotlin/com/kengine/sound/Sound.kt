@@ -1,6 +1,7 @@
 package com.kengine.sound
 
 import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.ExperimentalForeignApi
 import sdl2.mixer.Mix_Chunk
 import sdl2.mixer.Mix_FreeChunk
 import sdl2.mixer.Mix_HaltChannel
@@ -8,6 +9,7 @@ import sdl2.mixer.Mix_LoadWAV
 import sdl2.mixer.Mix_Pause
 import sdl2.mixer.Mix_PlayChannel
 
+@OptIn(ExperimentalForeignApi::class)
 class Sound(private val filePath: String) {
     private var sound: CPointer<Mix_Chunk>? = null
     private var channel: Int = -1

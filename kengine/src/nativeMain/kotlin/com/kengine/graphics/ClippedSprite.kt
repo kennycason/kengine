@@ -3,12 +3,14 @@ package com.kengine.graphics
 import com.kengine.Vec2
 import com.kengine.context.useContext
 import com.kengine.sdl.SDLContext
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import sdl2.SDL_Rect
 import sdl2.SDL_RenderCopy
 
+@OptIn(ExperimentalForeignApi::class)
 class ClippedSprite(
     private val sprite: Sprite,
     private val clipX: Int,

@@ -1,9 +1,11 @@
 package com.kengine.graphics
 
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import sdl2.SDL_Rect
 
+@OptIn(ExperimentalForeignApi::class)
 class SpriteSheet(
     private val sprite: Sprite,
     val tileWidth: Int,

@@ -3,6 +3,7 @@ package com.kengine.sdl
 import com.kengine.context.Context
 import com.kengine.log.Logger
 import kotlinx.cinterop.CValuesRef
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
 import platform.posix.exit
 import sdl2.SDL_CreateRenderer
@@ -20,6 +21,7 @@ import sdl2.SDL_SetRenderDrawColor
 import sdl2.SDL_WINDOWPOS_CENTERED
 import sdl2.SDL_WINDOW_SHOWN
 
+@OptIn(ExperimentalForeignApi::class)
 class SDLContext private constructor(
     val screenWidth: Int,
     val screenHeight: Int,

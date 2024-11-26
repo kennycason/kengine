@@ -2,6 +2,7 @@ package com.kengine.sound
 
 import com.kengine.context.Context
 import com.kengine.log.Logger
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
 import platform.posix.exit
 import sdl2.SDL_GetError
@@ -11,6 +12,7 @@ import sdl2.mixer.MIX_DEFAULT_FORMAT
 import sdl2.mixer.Mix_CloseAudio
 import sdl2.mixer.Mix_OpenAudio
 
+@OptIn(ExperimentalForeignApi::class)
 class SoundContext private constructor(
     val manager: SoundManager
 ) : Context() {

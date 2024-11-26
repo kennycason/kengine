@@ -5,6 +5,7 @@ import com.kengine.log.Logger
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDL_LoadBMP
 import kotlinx.cinterop.CValuesRef
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.IntVar
 import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.alloc
@@ -24,6 +25,7 @@ import sdl2.SDL_SetRenderTarget
 /**
  * A centralized texture manager to help with caching for faster, more efficient texture loading.
  */
+@OptIn(ExperimentalForeignApi::class)
 class TextureManager {
     private val textureCache = mutableMapOf<String, Texture>()
 

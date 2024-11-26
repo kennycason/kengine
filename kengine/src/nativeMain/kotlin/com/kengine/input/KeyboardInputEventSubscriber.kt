@@ -4,6 +4,7 @@ import com.kengine.context.useContext
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
 import com.kengine.time.getCurrentTimestampMilliseconds
+import kotlinx.cinterop.ExperimentalForeignApi
 import sdl2.SDLK_DOWN
 import sdl2.SDLK_LEFT
 import sdl2.SDLK_RIGHT
@@ -18,7 +19,7 @@ import sdl2.SDL_KEYDOWN
 import sdl2.SDL_KEYUP
 import sdl2.SDL_KeyCode
 
-
+@OptIn(ExperimentalForeignApi::class)
 class KeyboardInputEventSubscriber {
     private val keyStates = mutableMapOf<Int, KeyState>()
 

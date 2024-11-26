@@ -1,6 +1,7 @@
 package com.kengine.sdl
 import com.kengine.context.Context
 import com.kengine.log.Logger
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
@@ -13,6 +14,7 @@ import sdl2.SDL_MOUSEMOTION
 import sdl2.SDL_PollEvent
 import sdl2.SDL_QUIT
 
+@OptIn(ExperimentalForeignApi::class)
 class SDLEventContext private constructor() : Context() {
     private val events = mutableListOf<SDL_Event>()
     private val subscribers = mutableMapOf<EventType, MutableList<(SDL_Event) -> Unit>>()

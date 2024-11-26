@@ -2,8 +2,10 @@ package com.kengine.sdl
 
 import com.kengine.GameContext
 import com.kengine.log.Logger
+import kotlinx.cinterop.ExperimentalForeignApi
 import sdl2.SDL_Event
 
+@OptIn(ExperimentalForeignApi::class)
 fun useSDLQuitEventSubscriber() {
     fun handleSDLQuitEvent(sdlEvent: SDL_Event) {
         Logger.info { "Exiting game" }

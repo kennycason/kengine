@@ -5,6 +5,7 @@ import com.kengine.context.useContext
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
 import com.kengine.time.getCurrentTimestampMilliseconds
+import kotlinx.cinterop.ExperimentalForeignApi
 import sdl2.SDL_BUTTON_LEFT
 import sdl2.SDL_BUTTON_MIDDLE
 import sdl2.SDL_BUTTON_RIGHT
@@ -13,6 +14,7 @@ import sdl2.SDL_MOUSEBUTTONDOWN
 import sdl2.SDL_MOUSEBUTTONUP
 import sdl2.SDL_MOUSEMOTION
 
+@OptIn(ExperimentalForeignApi::class)
 class MouseInputEventSubscriber {
     private val buttonStates = mutableMapOf<Int, ButtonState>()
     private var mouseCursor: Vec2 = Vec2()

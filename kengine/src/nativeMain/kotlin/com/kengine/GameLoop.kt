@@ -2,9 +2,11 @@ package com.kengine
 
 import com.kengine.context.useContext
 import com.kengine.log.Logger
+import com.kengine.time.getCurrentTimestampMilliseconds
+import kotlinx.cinterop.ExperimentalForeignApi
 import sdl2.SDL_Delay
-import sdl2.SDL_GetTicks
 
+@OptIn(ExperimentalForeignApi::class)
 class GameLoop(
     frameRate: Int,
     update: (elapsedSeconds: Double) -> Unit
@@ -12,28 +14,26 @@ class GameLoop(
 
     init {
         val targetFrameTime = 1000.0 / frameRate
-        var lastFrameTime = SDL_GetTicks().toDouble()
-        val gameContext = GameContext.get()
+        var lastFrameTime = getCurrentTimestampMilliseconds().toDouble()
 
-        while (gameContext.isRunning) {
-            val currentFrameTime = SDL_GetTicks().toDouble()
-            val elapsedSeconds = (currentFrameTime - lastFrameTime) / 1000.0
-            lastFrameTime = currentFrameTime
+        useContext(GameContext.get(), cleanup = true) {
+            while (isRunning) {
+                val currentFrameTime = getCurrentTimestampMilliseconds().toDouble()
+                val elapsedSeconds = (currentFrameTime - lastFrameTime) / 1000.0
+                lastFrameTime = currentFrameTime
 
-            useContext(GameContext.get()) {
                 events.pollEvents()
                 actions.update(elapsedSeconds)
-            }
 
-            update(elapsedSeconds)
+                update(elapsedSeconds)
 
-            val frameTime = SDL_GetTicks().toDouble() - currentFrameTime
-            if (frameTime < targetFrameTime) {
-                SDL_Delay((targetFrameTime - frameTime).toUInt())
+                val frameTime = getCurrentTimestampMilliseconds().toDouble() - currentFrameTime
+                if (frameTime < targetFrameTime) {
+                    SDL_Delay((targetFrameTime - frameTime).toUInt())
+                }
             }
         }
-        Logger.info { "Game loop exited cleanly."}
-        GameContext.get().cleanup()
+        Logger.info { "Game loop exited cleanly." }
     }
 
     companion object {
