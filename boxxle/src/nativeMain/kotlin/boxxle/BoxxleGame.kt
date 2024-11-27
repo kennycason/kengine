@@ -23,7 +23,9 @@ class BoxxleGame : Game {
             manager.setSound(Sounds.MAIN, Sound(Sounds.MAIN_WAV))
             manager.setSound(Sounds.TITLE, Sound(Sounds.TITLE_WAV))
             mainSound = manager.getSound(Sounds.MAIN)
+                .also { it.setVolume(50) }
             finishSound = manager.getSound(Sounds.FINISH)
+                .also { it.setVolume(50) }
         }
     }
 
@@ -69,6 +71,14 @@ class BoxxleGame : Game {
                 if (keyboard.isSpacePressed() && getCurrentTimestampMilliseconds() - timeSinceOptionChange > 300) {
                     timeSinceOptionChange = getCurrentTimestampMilliseconds()
                     loadLevel((level.levelNumber - 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
+                }
+                if (keyboard.isTPressed()) {
+                    mainSound.setVolume(mainSound.getVolume() + 1)
+                    finishSound.setVolume(finishSound.getVolume() + 1) // TODO global sound volumes?
+                }
+                if (keyboard.isGPressed()) {
+                    mainSound.setVolume(mainSound.getVolume() - 1)
+                    finishSound.setVolume(finishSound.getVolume() - 1)
                 }
             }
 
