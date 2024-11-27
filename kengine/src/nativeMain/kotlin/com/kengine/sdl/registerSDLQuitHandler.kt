@@ -6,7 +6,7 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import sdl2.SDL_Event
 
 @OptIn(ExperimentalForeignApi::class)
-fun useSDLQuitEventSubscriber() {
+fun registerSDLQuitHandler() {
     fun handleSDLQuitEvent(sdlEvent: SDL_Event) {
         Logger.info { "Exiting game" }
         GameContext.get().isRunning = false

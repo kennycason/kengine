@@ -1,4 +1,4 @@
-package com.kengine
+package com.kengine.time
 
 import com.kengine.context.Context
 
@@ -24,20 +24,6 @@ data class ClockContext private constructor(
      */
     var deltaTimeSec: Double = 0.0
 ) : Context() {
-    /**
-     * A convenience function for entities to track time since some timestamp.
-     * e.g. if (keyboard.isSpacePressed() && timeSince(spaceLastPressedMs) > 200) { }
-     */
-    fun timeSince(timeMs: Long): Long {
-        return totalTimeMs - timeMs
-    }
-    /**
-     * A convenience function for entities to track time since some timestamp.
-     * e.g. if (keyboard.isSpacePressed() && timeSince(spaceLastPressedSec) > 0.2) { }
-     */
-    fun timeSince(timeSec: Double): Double {
-        return totalTimeSec - timeSec
-    }
 
     override fun cleanup() {
         totalTimeMs = 0L

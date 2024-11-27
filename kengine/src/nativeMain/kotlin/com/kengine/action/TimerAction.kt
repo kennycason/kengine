@@ -2,6 +2,7 @@
 package com.kengine.action
 
 import com.kengine.GameContext
+import com.kengine.time.timeSince
 
 data class TimerAction(
     val delayMs: Long,
@@ -11,7 +12,7 @@ data class TimerAction(
     private val startTimeMs = clock.totalTimeMs
 
     override fun update(): Boolean {
-        if (clock.totalTimeMs - startTimeMs > delayMs) {
+        if (timeSince(startTimeMs) > delayMs) {
             onComplete?.invoke()
             return true
         }

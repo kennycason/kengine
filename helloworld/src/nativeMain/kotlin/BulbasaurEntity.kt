@@ -1,5 +1,5 @@
 
-import com.kengine.ClockContext
+import com.kengine.time.ClockContext
 import com.kengine.context.useContext
 import com.kengine.entity.SpriteEntity
 import com.kengine.event.EventContext

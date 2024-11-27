@@ -8,6 +8,7 @@ import com.kengine.sdl.SDLContext
 import com.kengine.sound.Sound
 import com.kengine.sound.SoundContext
 import com.kengine.time.getCurrentTimestampMilliseconds
+import com.kengine.time.timeSince
 
 class BoxxleGame : Game {
     enum class State {
@@ -23,9 +24,9 @@ class BoxxleGame : Game {
             manager.setSound(Sounds.MAIN, Sound(Sounds.MAIN_WAV))
             manager.setSound(Sounds.TITLE, Sound(Sounds.TITLE_WAV))
             mainSound = manager.getSound(Sounds.MAIN)
-                .also { it.setVolume(50) }
+                .also { it.setVolume(20) }
             finishSound = manager.getSound(Sounds.FINISH)
-                .also { it.setVolume(50) }
+                .also { it.setVolume(20) }
         }
     }
 
@@ -60,15 +61,15 @@ class BoxxleGame : Game {
             player.update()
 
             useContext(KeyboardContext.get()) {
-                if ((keyboard.isRPressed()) && getCurrentTimestampMilliseconds() - timeSinceOptionChange > 300) {
+                if ((keyboard.isRPressed()) && timeSince(timeSinceOptionChange) > 300) {
                     timeSinceOptionChange = getCurrentTimestampMilliseconds()
                     reloadLevel()
                 }
-                if (keyboard.isReturnPressed() && getCurrentTimestampMilliseconds() - timeSinceOptionChange > 300) {
+                if (keyboard.isReturnPressed() && timeSince(timeSinceOptionChange) > 300) {
                     timeSinceOptionChange = getCurrentTimestampMilliseconds()
                     loadLevel((level.levelNumber + 1) % LEVEL_DATA.size)
                 }
-                if (keyboard.isSpacePressed() && getCurrentTimestampMilliseconds() - timeSinceOptionChange > 300) {
+                if (keyboard.isSpacePressed() && timeSince(timeSinceOptionChange) > 300) {
                     timeSinceOptionChange = getCurrentTimestampMilliseconds()
                     loadLevel((level.levelNumber - 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
                 }

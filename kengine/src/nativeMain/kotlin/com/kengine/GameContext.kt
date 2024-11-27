@@ -11,8 +11,9 @@ import com.kengine.input.MouseContext
 import com.kengine.log.Logger
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
-import com.kengine.sdl.useSDLQuitEventSubscriber
+import com.kengine.sdl.registerSDLQuitHandler
 import com.kengine.sound.SoundContext
+import com.kengine.time.ClockContext
 
 class GameContext private constructor(
     val sdl: SDLContext,
@@ -30,7 +31,7 @@ class GameContext private constructor(
     var isRunning = true
 
     init {
-        useSDLQuitEventSubscriber()
+        registerSDLQuitHandler()
     }
 
     companion object {

@@ -2,6 +2,7 @@ package com.kengine
 
 import com.kengine.context.useContext
 import com.kengine.log.Logger
+import com.kengine.time.ClockContext
 import com.kengine.time.getCurrentTimestampMilliseconds
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl2.SDL_Delay

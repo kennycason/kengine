@@ -7,6 +7,7 @@ import com.kengine.graphics.SpriteContext
 import com.kengine.input.KeyboardContext
 import com.kengine.math.Vec2
 import com.kengine.time.getCurrentTimestampMilliseconds
+import com.kengine.time.timeSince
 
 private enum class Direction {
     UP, DOWN, LEFT, RIGHT
@@ -34,7 +35,7 @@ class Player(
 
     override fun update() {
         useContext(KeyboardContext.get()) {
-            if (!isMoving && getCurrentTimestampMilliseconds() - lastMovedMs > 300) {
+            if (!isMoving && timeSince(lastMovedMs) > 300) {
                 if (keyboard.isLeftPressed() || keyboard.isAPressed()) {
                     face = Direction.LEFT
                     tryMove(Vec2(-1.0, 0.0))
