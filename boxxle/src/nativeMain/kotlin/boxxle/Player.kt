@@ -1,5 +1,6 @@
 package boxxle
 
+import com.kengine.GameContext
 import com.kengine.action.ActionsContext
 import com.kengine.context.useContext
 import com.kengine.entity.Entity
@@ -51,6 +52,11 @@ class Player(
                 if (keyboard.isDownPressed() || keyboard.isSPressed()) {
                     face = Direction.DOWN
                     tryMove(Vec2(0.0, 1.0))
+                }
+                if (keyboard.isEscapePressed()) {
+                    useContext(GameContext.get()) {
+                        isRunning = false
+                    }
                 }
             }
         }

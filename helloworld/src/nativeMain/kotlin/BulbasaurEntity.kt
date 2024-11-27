@@ -1,13 +1,14 @@
 
-import com.kengine.time.ClockContext
 import com.kengine.context.useContext
 import com.kengine.entity.SpriteEntity
 import com.kengine.event.EventContext
+import com.kengine.graphics.FlipMode
 import com.kengine.graphics.Sprite
 import com.kengine.input.KeyboardContext
 import com.kengine.input.MouseContext
 import com.kengine.log.Logger
 import com.kengine.sdl.SDLContext
+import com.kengine.time.ClockContext
 
 class BulbasaurEntity : SpriteEntity(
     sprite = Sprite("assets/sprites/bulbasaur.bmp")
@@ -35,15 +36,23 @@ class BulbasaurEntity : SpriteEntity(
         useContext(KeyboardContext.get()) {
             if (keyboard.isLeftPressed() || keyboard.isAPressed()) {
                 v.x = -speed * clock.deltaTimeSec
+                flipMode = FlipMode.NONE
             }
             if (keyboard.isRightPressed() || keyboard.isDPressed()) {
                 v.x = speed * clock.deltaTimeSec
+                flipMode = FlipMode.HORIZONTAL
             }
             if (keyboard.isUpPressed() || keyboard.isWPressed()) {
                 v.y = -speed * clock.deltaTimeSec
             }
             if (keyboard.isDownPressed() || keyboard.isSPressed()) {
                 v.y = speed * clock.deltaTimeSec
+            }
+            if (keyboard.isRPressed()) {
+                rotation += 1.0
+            }
+            if (keyboard.isFPressed()) {
+                rotation -= 1.0
             }
             if (keyboard.isSpacePressed()) {
                 Logger.info { "Bulbasaur ROARED!" }
@@ -56,11 +65,12 @@ class BulbasaurEntity : SpriteEntity(
             if (mouse.isLeftPressed() || mouse.isRightPressed()) {
                 p.x = mouse.getCursor().x - width / 2
                 p.y = mouse.getCursor().y - height / 2
-                Logger.info { "Move Bulbasaur to mouse cursor $p" }
             }
         }
         p.x += v.x
         p.y += v.y
+
+        sprite.rotation += 1.0
     }
 
     private fun init() {
