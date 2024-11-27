@@ -1,6 +1,6 @@
 package com.kengine.graphics
 
-import com.kengine.Vec2
+import com.kengine.math.Vec2
 import com.kengine.context.useContext
 import com.kengine.sdl.SDLContext
 import kotlinx.cinterop.ExperimentalForeignApi

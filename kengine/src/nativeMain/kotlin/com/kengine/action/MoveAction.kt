@@ -1,7 +1,7 @@
 
 package com.kengine.action
 
-import com.kengine.Vec2
+import com.kengine.math.Vec2
 import com.kengine.entity.Entity
 import com.kengine.log.Logger
 import com.kengine.time.getCurrentTimestampMilliseconds

@@ -1,6 +1,6 @@
 package com.kengine.action
 
-import com.kengine.Vec2
+import com.kengine.math.Vec2
 import com.kengine.context.Context
 import com.kengine.entity.Entity
 

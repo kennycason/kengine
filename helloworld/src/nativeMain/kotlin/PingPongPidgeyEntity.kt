@@ -1,18 +1,15 @@
-import com.kengine.Vec2
+
 import com.kengine.context.useContext
-import com.kengine.entity.Entity
+import com.kengine.entity.SpriteEntity
 import com.kengine.event.EventContext
 import com.kengine.graphics.Sprite
 import com.kengine.log.Logger
 import com.kengine.sdl.SDLContext
 import kotlin.random.Random
 
-class PingPongPidgeyEntity : Entity {
-    private val pidgeySprite = Sprite("assets/sprites/pidgey.bmp")
-    override val p: Vec2 = Vec2()
-    override val v: Vec2 = Vec2()
-    override val width = pidgeySprite.width
-    override val height = pidgeySprite.height
+class PingPongPidgeyEntity : SpriteEntity(
+    sprite = Sprite("assets/sprites/pidgey.bmp")
+) {
     private var state = State.INIT
 
     private enum class State {
@@ -38,8 +35,8 @@ class PingPongPidgeyEntity : Entity {
             }
         }
         useContext(SDLContext.get()) {
-            p.x = Random.nextInt(0, screenWidth - pidgeySprite.width).toDouble()
-            p.y = Random.nextInt(0, screenHeight - pidgeySprite.height).toDouble()
+            p.x = Random.nextInt(0, screenWidth - width).toDouble()
+            p.y = Random.nextInt(0, screenHeight - height).toDouble()
             v.x = Random.nextInt(1, 30).toDouble() * if (Random.nextBoolean()) 1 else -1
             v.y = Random.nextInt(1, 30).toDouble() * if (Random.nextBoolean()) 1 else -1
         }
@@ -56,14 +53,6 @@ class PingPongPidgeyEntity : Entity {
                 v.y *= -1
             }
         }
-    }
-
-    override fun draw(elapsedSeconds: Double) {
-        pidgeySprite.draw(p.x, p.y)
-    }
-
-    override fun cleanup() {
-        pidgeySprite.cleanup()
     }
 
 }

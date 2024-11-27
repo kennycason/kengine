@@ -1,18 +1,17 @@
 package boxxle
 
-import com.kengine.Vec2
 import com.kengine.context.useContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.TextureContext
+import com.kengine.math.Vec2
 
 class Box(
-    override val p: Vec2 = Vec2(),
-    override val v: Vec2 = Vec2(),
-    override val width: Int = 32,
-    override val height: Int = 32,
+    p: Vec2,
     var scale: Double = 1.0
-): Entity {
+): Entity(
+    p = p, width = 32, height = 32
+) {
     private val spriteSheet = SpriteContext.get().manager.getSpriteSheet(Sprites.BOXXLE_SHEET)
     private val box = spriteSheet.getTile(1, 0)
     private val boxPlaced = spriteSheet.getTile(2, 0)

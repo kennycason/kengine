@@ -1,11 +1,11 @@
 package boxxle
 
-import com.kengine.Vec2
 import com.kengine.action.ActionsContext
 import com.kengine.context.useContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
 import com.kengine.input.KeyboardContext
+import com.kengine.math.Vec2
 import com.kengine.time.getCurrentTimestampMilliseconds
 
 private enum class Direction {
@@ -13,12 +13,11 @@ private enum class Direction {
 }
 
 class Player(
-    override val p: Vec2 = Vec2(),
-    override val v: Vec2 = Vec2(),
-    override val width: Int = 32,
-    override val height: Int = 32,
+    p: Vec2,
     private var scale: Double = 1.0
-) : Entity {
+) : Entity(
+    p = p, width = 32, height = 32,
+) {
     private val spriteSheet = SpriteContext.get().manager.getSpriteSheet(Sprites.BOXXLE_SHEET)
     private val playerSpriteUp = spriteSheet.getTile(0, 1)
     private val playerSpriteDown = spriteSheet.getTile(1, 1)
@@ -36,14 +35,22 @@ class Player(
     override fun update(elapsedSeconds: Double) {
         useContext(KeyboardContext.get()) {
             if (!isMoving && getCurrentTimestampMilliseconds() - lastMovedMs > 300) {
-                val delta = when {
-                    keyboard.isLeftPressed() -> Vec2(-1.0, 0.0).also { face = Direction.LEFT }
-                    keyboard.isRightPressed() -> Vec2(1.0, 0.0).also { face = Direction.RIGHT }
-                    keyboard.isUpPressed() -> Vec2(0.0, -1.0).also { face = Direction.UP }
-                    keyboard.isDownPressed() -> Vec2(0.0, 1.0).also { face = Direction.DOWN }
-                    else -> null
+                if (keyboard.isLeftPressed() || keyboard.isAPressed()) {
+                    face = Direction.LEFT
+                    tryMove(Vec2(-1.0, 0.0))
                 }
-                delta?.let { tryMove(it) }
+                if (keyboard.isRightPressed() || keyboard.isDPressed()) {
+                    face = Direction.RIGHT
+                    tryMove(Vec2(1.0, 0.0))
+                }
+                if (keyboard.isUpPressed() || keyboard.isWPressed()) {
+                    face = Direction.UP
+                    tryMove(Vec2(0.0, -1.0))
+                }
+                if (keyboard.isDownPressed() || keyboard.isSPressed()) {
+                    face = Direction.DOWN
+                    tryMove(Vec2(0.0, 1.0))
+                }
             }
         }
     }
@@ -53,7 +60,7 @@ class Player(
             val newP = p + delta
 
             // is a brick blocking the player?
-            if (level.tiles.getOrNull(newP.y.toInt())?.getOrNull(newP.x.toInt()) == Tiles.BRICK) return
+            if (level.tiles[newP.y.toInt()][newP.x.toInt()]== Tiles.BRICK) return
 
             // is player pushing box
             for (box in level.boxes) {

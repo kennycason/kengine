@@ -1,14 +1,14 @@
 package boxxle
 
-import com.kengine.Vec2
 import com.kengine.graphics.SpriteContext
+import com.kengine.math.Vec2
 
 object Tiles {
     const val EMPTY = 0
     const val BRICK = 1
 }
 
-class Level(val levelNumber: Int,) {
+class Level(val levelNumber: Int) {
     private val spriteSheet = SpriteContext.get().manager.getSpriteSheet(Sprites.BOXXLE_SHEET)
     private val brickSprite = spriteSheet.getTile(0, 0)
     private val goalSprite = spriteSheet.getTile(3, 0)
@@ -29,10 +29,6 @@ class Level(val levelNumber: Int,) {
         start = Vec2(x = data.start[0].toDouble(), y = data.start[1].toDouble())
         brickSprite.scale.set(data.scale)
         goalSprite.scale.set(data.scale)
-    }
-
-    fun update(elapsedSeconds: Double) {
-
     }
 
     fun draw(elapsedSeconds: Double) {

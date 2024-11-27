@@ -1,4 +1,4 @@
-package com.kengine
+package com.kengine.math
 
 import kotlin.math.sqrt
 

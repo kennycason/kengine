@@ -58,7 +58,7 @@ class BoxxleGame : Game {
             player.update(elapsedSeconds)
 
             useContext(KeyboardContext.get()) {
-                if (keyboard.isRPressed() && getCurrentTimestampMilliseconds() - timeSinceOptionChange > 300) {
+                if ((keyboard.isRPressed()) && getCurrentTimestampMilliseconds() - timeSinceOptionChange > 300) {
                     timeSinceOptionChange = getCurrentTimestampMilliseconds()
                     reloadLevel()
                 }

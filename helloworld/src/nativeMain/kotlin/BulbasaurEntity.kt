@@ -31,16 +31,16 @@ class BulbasaurEntity : SpriteEntity(
         v.x *= 0.9
         v.y *= 0.9
         useContext(KeyboardContext.get()) {
-            if (keyboard.isLeftPressed()) {
+            if (keyboard.isLeftPressed() || keyboard.isAPressed()) {
                 v.x = -speed * elapsedSeconds
             }
-            if (keyboard.isRightPressed()) {
+            if (keyboard.isRightPressed() || keyboard.isDPressed()) {
                 v.x = speed * elapsedSeconds
             }
-            if (keyboard.isUpPressed()) {
+            if (keyboard.isUpPressed() || keyboard.isWPressed()) {
                 v.y = -speed * elapsedSeconds
             }
-            if (keyboard.isDownPressed()) {
+            if (keyboard.isDownPressed() || keyboard.isSPressed()) {
                 v.y = speed * elapsedSeconds
             }
             if (keyboard.isSpacePressed()) {

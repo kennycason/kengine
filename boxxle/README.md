@@ -2,7 +2,7 @@
 
 ## Controls
 
-- **Arrows:** Movement
+- **WASD or Arrows:** Movement
 - **R:** Reset level
 - **Return:** Next level
 - **Space:** Previous level
