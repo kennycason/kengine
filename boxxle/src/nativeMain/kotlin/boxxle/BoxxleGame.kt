@@ -8,9 +8,6 @@ import com.kengine.sdl.SDLContext
 import com.kengine.sound.Sound
 import com.kengine.sound.SoundContext
 import com.kengine.time.getCurrentTimestampMilliseconds
-import sdl2.SDLK_RETURN
-import sdl2.SDLK_SPACE
-import sdl2.SDLK_r
 
 class BoxxleGame : Game {
     enum class State {
@@ -61,15 +58,15 @@ class BoxxleGame : Game {
             player.update(elapsedSeconds)
 
             useContext(KeyboardContext.get()) {
-                if (keyboard.isKeyPressed(SDLK_r) && getCurrentTimestampMilliseconds() - timeSinceOptionChange > 300) {
+                if (keyboard.isRPressed() && getCurrentTimestampMilliseconds() - timeSinceOptionChange > 300) {
                     timeSinceOptionChange = getCurrentTimestampMilliseconds()
                     reloadLevel()
                 }
-                if (keyboard.isKeyPressed(SDLK_RETURN) && getCurrentTimestampMilliseconds() - timeSinceOptionChange > 300) {
+                if (keyboard.isReturnPressed() && getCurrentTimestampMilliseconds() - timeSinceOptionChange > 300) {
                     timeSinceOptionChange = getCurrentTimestampMilliseconds()
                     loadLevel((level.levelNumber + 1) % LEVEL_DATA.size)
                 }
-                if (keyboard.isKeyPressed(SDLK_SPACE) && getCurrentTimestampMilliseconds() - timeSinceOptionChange > 300) {
+                if (keyboard.isSpacePressed() && getCurrentTimestampMilliseconds() - timeSinceOptionChange > 300) {
                     timeSinceOptionChange = getCurrentTimestampMilliseconds()
                     loadLevel((level.levelNumber - 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
                 }

@@ -43,12 +43,12 @@ class Player(
                     keyboard.isDownPressed() -> Vec2(0.0, 1.0).also { face = Direction.DOWN }
                     else -> null
                 }
-                delta?.let { tryMove(it, elapsedSeconds) }
+                delta?.let { tryMove(it) }
             }
         }
     }
 
-    private fun tryMove(delta: Vec2, elapsedSeconds: Double) {
+    private fun tryMove(delta: Vec2) {
         useContext(BoxxleContext.get()) {
             val newP = p + delta
 
@@ -61,10 +61,11 @@ class Player(
                     if (canMoveBox(box.p + delta)) {
                         // move both the player and the box
                         isMoving = true
-                        ActionsContext.get().moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
-                        ActionsContext.get().moveTo(box, box.p + delta, speed, onComplete = { box.afterPush() })
                         lastMovedMs = getCurrentTimestampMilliseconds()
-                        return
+                        return useContext(ActionsContext.get()) {
+                            moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
+                            moveTo(box, box.p + delta, speed, onComplete = { box.afterPush() })
+                        }
                     }
                     return // player can't move if the box can't be pushed
                 }

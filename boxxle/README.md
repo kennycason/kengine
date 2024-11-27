@@ -2,12 +2,12 @@
 
 ## Controls
 
-- **WASD or Arrows:** Movement
+- **Arrows:** Movement
 - **R:** Reset level
 - **Return:** Next level
 - **Space:** Previous level
 
-There are 40 levels total.
+There are 41 levels total
 
 <img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/boxxle/screenshot.png" />
 

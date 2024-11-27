@@ -7,7 +7,6 @@ import com.kengine.input.KeyboardContext
 import com.kengine.input.MouseContext
 import com.kengine.log.Logger
 import com.kengine.sdl.SDLContext
-import sdl2.SDLK_SPACE
 
 class BulbasaurEntity : SpriteEntity(
     sprite = Sprite("assets/sprites/bulbasaur.bmp")
@@ -44,7 +43,7 @@ class BulbasaurEntity : SpriteEntity(
             if (keyboard.isDownPressed()) {
                 v.y = speed * elapsedSeconds
             }
-            if (keyboard.isKeyPressed(SDLK_SPACE)) {
+            if (keyboard.isSpacePressed()) {
                 Logger.info { "Bulbasaur ROARED!" }
                 useContext(EventContext.get()) {
                     publish(Events.BULBASAUR_ROAR, BulbasaurRoarEvent(decibels = 90.0))

@@ -81,7 +81,7 @@ useContext(KeyboardContext.get()) {
     if (keyboard.isLeftPressed()) {
         Logger.info { "pressed left" }
     }
-    if (keyboard.isKeyPressed(SDLK_SPACE)) {
+    if (keyboard.isSpacePressed()) {
         Logger.info { "pressed space" }
     }
 }
