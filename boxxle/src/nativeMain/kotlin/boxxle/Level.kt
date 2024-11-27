@@ -31,7 +31,7 @@ class Level(val levelNumber: Int) {
         goalSprite.scale.set(data.scale)
     }
 
-    fun draw(elapsedSeconds: Double) {
+    fun draw() {
         tiles.forEachIndexed { y, row ->
             row.forEachIndexed { x, tileType ->
                 when (tileType) {
@@ -47,7 +47,7 @@ class Level(val levelNumber: Int) {
         }
 
         for (box in boxes) {
-            box.draw(elapsedSeconds)
+            box.draw()
         }
     }
 }

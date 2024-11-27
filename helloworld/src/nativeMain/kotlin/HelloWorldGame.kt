@@ -8,14 +8,14 @@ class HelloWorldGame : Game {
     private val bulbasaur = BulbasaurEntity()
     private val pokeballs = List(size = 25) { PingPongPidgeyEntity() }
 
-    override fun update(elapsedSeconds: Double) {
+    override fun update() {
         pokeballs.forEach {
-            it.update(elapsedSeconds)
+            it.update()
         }
-        bulbasaur.update(elapsedSeconds)
+        bulbasaur.update()
     }
 
-    override fun draw(elapsedSeconds: Double) {
+    override fun draw() {
         useContext(SDLContext.get()) {
             // clear screen
             fillScreen(0u, 0u, 0u)
@@ -51,9 +51,9 @@ class HelloWorldGame : Game {
 
             // draw sprite entities
             pokeballs.forEach {
-                it.draw(elapsedSeconds)
+                it.draw()
             }
-            bulbasaur.draw(elapsedSeconds)
+            bulbasaur.draw()
 
             flipScreen()
         }

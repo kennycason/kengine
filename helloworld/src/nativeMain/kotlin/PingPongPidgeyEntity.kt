@@ -1,4 +1,5 @@
 
+import com.kengine.ClockContext
 import com.kengine.context.useContext
 import com.kengine.entity.SpriteEntity
 import com.kengine.event.EventContext
@@ -10,6 +11,7 @@ import kotlin.random.Random
 class PingPongPidgeyEntity : SpriteEntity(
     sprite = Sprite("assets/sprites/pidgey.bmp")
 ) {
+
     private var state = State.INIT
 
     private enum class State {
@@ -20,10 +22,10 @@ class PingPongPidgeyEntity : SpriteEntity(
     /**
      * Demo useContext() pattern + state pattern
      */
-    override fun update(elapsedSeconds: Double) {
+    override fun update() {
         when (state) {
             State.INIT -> init()
-            State.BOUNCE -> bounce(elapsedSeconds)
+            State.BOUNCE -> bounce()
         }
     }
 
@@ -43,9 +45,9 @@ class PingPongPidgeyEntity : SpriteEntity(
         state = State.BOUNCE
     }
 
-    private fun bounce(elapsedSeconds: Double) {
+    private fun bounce() {
         useContext(SDLContext.get()) {
-            p += v * elapsedSeconds
+            p += v * ClockContext.get().deltaTimeSec
             if (p.x < 0 || p.x > screenWidth - width) {
                 v.x *= -1
             }

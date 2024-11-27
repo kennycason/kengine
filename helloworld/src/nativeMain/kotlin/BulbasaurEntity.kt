@@ -1,4 +1,5 @@
 
+import com.kengine.ClockContext
 import com.kengine.context.useContext
 import com.kengine.entity.SpriteEntity
 import com.kengine.event.EventContext
@@ -19,29 +20,30 @@ class BulbasaurEntity : SpriteEntity(
         READY
     }
 
-    override fun update(elapsedSeconds: Double) {
-        super.update(elapsedSeconds)
+    override fun update() {
+        super.update()
         when (state) {
             State.INIT -> init()
-            State.READY -> ready(elapsedSeconds)
+            State.READY -> ready()
         }
     }
 
-    private fun ready(elapsedSeconds: Double) {
+    private fun ready() {
         v.x *= 0.9
         v.y *= 0.9
+        val clock = ClockContext.get()
         useContext(KeyboardContext.get()) {
             if (keyboard.isLeftPressed() || keyboard.isAPressed()) {
-                v.x = -speed * elapsedSeconds
+                v.x = -speed * clock.deltaTimeSec
             }
             if (keyboard.isRightPressed() || keyboard.isDPressed()) {
-                v.x = speed * elapsedSeconds
+                v.x = speed * clock.deltaTimeSec
             }
             if (keyboard.isUpPressed() || keyboard.isWPressed()) {
-                v.y = -speed * elapsedSeconds
+                v.y = -speed * clock.deltaTimeSec
             }
             if (keyboard.isDownPressed() || keyboard.isSPressed()) {
-                v.y = speed * elapsedSeconds
+                v.y = speed * clock.deltaTimeSec
             }
             if (keyboard.isSpacePressed()) {
                 Logger.info { "Bulbasaur ROARED!" }

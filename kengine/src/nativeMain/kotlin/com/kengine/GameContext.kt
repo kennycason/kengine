@@ -24,7 +24,8 @@ class GameContext private constructor(
     val sprites: SpriteContext,
     val geometry: GeometryContext,
     val sounds: SoundContext,
-    val actions: ActionsContext
+    val actions: ActionsContext,
+    val clock: ClockContext,
 ) : Context() {
     var isRunning = true
 
@@ -53,7 +54,8 @@ class GameContext private constructor(
                 sprites = SpriteContext.get(),
                 sounds = SoundContext.get(),
                 geometry = GeometryContext.get(),
-                actions = ActionsContext.get()
+                actions = ActionsContext.get(),
+                clock = ClockContext.get()
             )
             return currentContext!!
         }
@@ -61,13 +63,13 @@ class GameContext private constructor(
         fun get(): GameContext {
             return currentContext ?: throw IllegalStateException("AppContext has not been created. Call create() first.")
         }
-
     }
 
     override fun cleanup() {
         Logger.info { "Cleaning up game resources" }
         actions.cleanup()
         sdlEvents.cleanup()
+        events.cleanup()
         keyboard.cleanup()
         mouse.cleanup()
         textures.cleanup()
@@ -75,6 +77,9 @@ class GameContext private constructor(
         geometry.cleanup()
         sounds.cleanup()
         sdl.cleanup()
+        clock.cleanup()
     }
 
 }
+
+

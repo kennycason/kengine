@@ -29,21 +29,21 @@ class BoxxleGame : Game {
         }
     }
 
-    override fun update(elapsedSeconds: Double) {
+    override fun update() {
         when (state) {
             State.BEGIN_PLAY -> beginPlay()
-            State.PLAY -> play(elapsedSeconds)
+            State.PLAY -> play()
             State.WAIT_FOR_FINISH_MUSIC_TO_FINISH -> {}
         }
     }
 
-    override fun draw(elapsedSeconds: Double) {
+    override fun draw() {
         useContext(SDLContext.get()) {
             fillScreen(255u, 255u, 255u, 255u)
 
             useContext(BoxxleContext.get()) {
-                level.draw(elapsedSeconds)
-                player.draw(elapsedSeconds)
+                level.draw()
+                player.draw()
             }
 
             flipScreen()
@@ -55,9 +55,9 @@ class BoxxleGame : Game {
         state = State.PLAY
     }
 
-    private fun play(elapsedSeconds: Double) {
+    private fun play() {
         useContext(BoxxleContext.get()) {
-            player.update(elapsedSeconds)
+            player.update()
 
             useContext(KeyboardContext.get()) {
                 if ((keyboard.isRPressed()) && getCurrentTimestampMilliseconds() - timeSinceOptionChange > 300) {

@@ -22,10 +22,10 @@ class Box(
         boxPlaced.scale.set(scale)
     }
 
-    override fun update(elapsedSeconds: Double) {
+    override fun update() {
     }
 
-    override fun draw(elapsedSeconds: Double) {
+    override fun draw() {
         useContext(TextureContext.get()) {
             if (isPlaced) boxPlaced.draw(p.x * 32, p.y * 32)
             else box.draw(p.x * 32, p.y * 32)

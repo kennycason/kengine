@@ -32,7 +32,7 @@ class Player(
         setScale(scale)
     }
 
-    override fun update(elapsedSeconds: Double) {
+    override fun update() {
         useContext(KeyboardContext.get()) {
             if (!isMoving && getCurrentTimestampMilliseconds() - lastMovedMs > 300) {
                 if (keyboard.isLeftPressed() || keyboard.isAPressed()) {
@@ -106,7 +106,7 @@ class Player(
         }
     }
 
-    override fun draw(elapsedSeconds: Double) {
+    override fun draw() {
         useContext(SpriteContext.get()) {
             when (face) {
                 Direction.UP -> playerSpriteUp.draw(p.x * 32, p.y * 32)

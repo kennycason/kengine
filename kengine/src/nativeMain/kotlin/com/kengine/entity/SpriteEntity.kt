@@ -8,8 +8,8 @@ open class SpriteEntity(
     width = sprite.width,
     height = sprite.height
 ) {
-    override fun update(elapsedSeconds: Double) {}
-    override fun draw(elapsedSeconds: Double) {
+    override fun update() {}
+    override fun draw() {
         sprite.draw(p.x, p.y)
     }
     override fun cleanup() {

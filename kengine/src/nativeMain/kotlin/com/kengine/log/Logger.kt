@@ -17,15 +17,15 @@ object Logger {
 
     private var logLevel: Level = INFO
 
-    fun debug(message: () -> String) = log(DEBUG, message())
-    fun info(message: () -> String) = log(INFO, message())
-    fun warn(message: () -> String) = log(WARN, message())
-    fun error(message: () -> String) = log(ERROR, message())
+    fun debug(message: () -> String?) = log(DEBUG, message())
+    fun info(message: () -> String?) = log(INFO, message())
+    fun warn(message: () -> String?) = log(WARN, message())
+    fun error(message: () -> String?) = log(ERROR, message())
 
-    fun debug(message: String) = log(DEBUG, message)
-    fun info(message: String) = log(INFO, message)
-    fun warn(message: String) = log(WARN, message)
-    fun error(message: String) = log(ERROR, message)
+    fun debug(message: String?) = log(DEBUG, message)
+    fun info(message: String?) = log(INFO, message)
+    fun warn(message: String?) = log(WARN, message)
+    fun error(message: String?) = log(ERROR, message)
 
     // special exception helpers
     fun debug(e: Exception) = log(DEBUG, exceptionToString(e))
@@ -46,7 +46,7 @@ object Logger {
     /**
      * Logs a message with the specified level.
      */
-    private fun log(level: Level, message: String) {
+    private fun log(level: Level, message: String?) {
         if (level.ordinal >= logLevel.ordinal) {
             val timestamp = getCurrentTimestampMilliseconds()
             println("[$timestamp] [${level.name}] $message")

@@ -9,27 +9,31 @@ import sdl2.SDL_Delay
 @OptIn(ExperimentalForeignApi::class)
 class GameLoop(
     frameRate: Int,
-    update: (elapsedSeconds: Double) -> Unit
+    update: () -> Unit
 ) {
 
     init {
         val targetFrameTime = 1000.0 / frameRate
-        var lastFrameTime = getCurrentTimestampMilliseconds().toDouble()
+        var lastFrameTimeMs = getCurrentTimestampMilliseconds()
 
         useContext(GameContext.get(), cleanup = true) {
             while (isRunning) {
-                val currentFrameTime = getCurrentTimestampMilliseconds().toDouble()
-                val elapsedSeconds = (currentFrameTime - lastFrameTime) / 1000.0
-                lastFrameTime = currentFrameTime
+                useContext(ClockContext.get()) {
+                    totalTimeMs = getCurrentTimestampMilliseconds()
+                    deltaTimeMs = totalTimeMs - lastFrameTimeMs
+                    totalTimeSec = totalTimeMs / 1000.0
+                    deltaTimeSec = deltaTimeMs / 1000.0
+                    lastFrameTimeMs = totalTimeMs
+                }
 
                 sdlEvents.pollEvents()
-                actions.update(elapsedSeconds)
+                actions.update()
 
-                update(elapsedSeconds)
+                update()
 
-                val frameTime = getCurrentTimestampMilliseconds().toDouble() - currentFrameTime
-                if (frameTime < targetFrameTime) {
-                    SDL_Delay((targetFrameTime - frameTime).toUInt())
+                val frameTimeMs = getCurrentTimestampMilliseconds() - clock.totalTimeMs
+                if (frameTimeMs < targetFrameTime) {
+                    SDL_Delay((targetFrameTime - frameTimeMs).toUInt())
                 }
             }
         }

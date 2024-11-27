@@ -1,8 +1,8 @@
 package com.kengine.action
 
-import com.kengine.math.Vec2
 import com.kengine.context.Context
 import com.kengine.entity.Entity
+import com.kengine.math.Vec2
 
 class ActionsContext: Context() {
     private val actions = ArrayDeque<Action>()
@@ -15,11 +15,11 @@ class ActionsContext: Context() {
         actions.add(TimerAction(delayMs, onComplete))
     }
 
-    fun update(deltaTime: Double) {
+    fun update() {
         val iterator = actions.iterator()
         while (iterator.hasNext()) {
             val action = iterator.next()
-            if (action.update(deltaTime)) {
+            if (action.update()) {
                 iterator.remove()
             }
         }

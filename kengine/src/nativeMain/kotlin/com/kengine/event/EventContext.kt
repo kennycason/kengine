@@ -4,12 +4,13 @@ import com.kengine.context.Context
 import com.kengine.log.Logger
 
 
-data class Event<M>(
-    val type: String, // TODO I tried <T : Enum<T>, M>, but clean instantiation of context without a defined T became difficult
-    val message: M
-)
 
 class EventContext : Context() {
+    private data class Event<M>(
+        val type: String, // TODO I tried <T : Enum<T>, M>, but clean instantiation of context without a defined T became difficult
+        val message: M
+    )
+
     private val subscribers = mutableMapOf<String, MutableList<(Any) -> Unit>>()
 
     companion object {
@@ -28,6 +29,7 @@ class EventContext : Context() {
         val handlers = subscribers.getOrPut(eventType) { mutableListOf() }
         handlers.add { message ->
             try {
+                @Suppress("UNCHECKED_CAST")
                 handler(message as M)
             } catch (e: ClassCastException) {
                 Logger.error { "Failed to cast message: ${e.message}" }

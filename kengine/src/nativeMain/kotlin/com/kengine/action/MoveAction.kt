@@ -1,10 +1,10 @@
 
 package com.kengine.action
 
-import com.kengine.math.Vec2
+import com.kengine.GameContext
 import com.kengine.entity.Entity
 import com.kengine.log.Logger
-import com.kengine.time.getCurrentTimestampMilliseconds
+import com.kengine.math.Vec2
 
 data class MoveAction(
     val entity: Entity,
@@ -12,12 +12,13 @@ data class MoveAction(
     val speed: Double,
     val onComplete: (() -> Unit)? = null
 ) : Action {
-    private val startTimeMs = getCurrentTimestampMilliseconds()
-    private val expireIn = 5_000L
+    private val clock = GameContext.get().clock
+    private val startTimeMs = clock.totalTimeMs
+    private val expireInMs = 5000L
 
-    override fun update(deltaTime: Double): Boolean {
-        if (getCurrentTimestampMilliseconds() - startTimeMs > expireIn) {
-            Logger.warn { "expiring move action: ${entity::class.simpleName} to $deltaTime" }
+    override fun update(): Boolean {
+        if (clock.totalTimeMs - startTimeMs > expireInMs) {
+            Logger.warn { "expiring move action: ${entity::class.simpleName} after ${expireInMs}ms" }
             return true
         }
 
@@ -25,10 +26,8 @@ data class MoveAction(
         val direction = destination - entity.p
         val distance = direction.magnitude()
 
-//        Logger.info { "move: $distance" }
-
         if (distance > 0.1) { // continue moving if not close enough
-            val moveDistance = (speed * deltaTime).coerceAtMost(distance)
+            val moveDistance = (speed * clock.deltaTimeSec).coerceAtMost(distance)
             val normalizedDirection = direction.normalized()
             entity.p += normalizedDirection * moveDistance
         }

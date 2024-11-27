@@ -50,35 +50,35 @@ data class Vec2(
     operator fun div(other: Double): Vec2 {
         return Vec2(this.x / other, this.y / other)
     }
-    operator fun plusAssign(other: Vec2): Unit {
+    operator fun plusAssign(other: Vec2) {
         this.x += other.x
         this.y += other.y
     }
-    operator fun minusAssign(other: Vec2): Unit {
+    operator fun minusAssign(other: Vec2) {
         this.x -= other.x
         this.y -= other.y
     }
-    operator fun timesAssign(other: Vec2): Unit {
+    operator fun timesAssign(other: Vec2) {
         this.x *= other.x
         this.y *= other.y
     }
-    operator fun divAssign(other: Vec2): Unit {
+    operator fun divAssign(other: Vec2) {
         this.x /= other.x
         this.y /= other.y
     }
-    operator fun plusAssign(other: Double): Unit {
+    operator fun plusAssign(other: Double) {
         this.x += other
         this.y += other
     }
-    operator fun minusAssign(other: Double): Unit {
+    operator fun minusAssign(other: Double) {
         this.x -= other
         this.y -= other
     }
-    operator fun timesAssign(other: Double): Unit {
+    operator fun timesAssign(other: Double) {
         this.x *= other
         this.y *= other
     }
-    operator fun divAssign(other: Double): Unit {
+    operator fun divAssign(other: Double) {
         this.x /= other
         this.y /= other
     }

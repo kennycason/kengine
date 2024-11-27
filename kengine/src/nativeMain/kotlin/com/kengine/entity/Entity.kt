@@ -10,8 +10,8 @@ abstract class Entity(
     val height: Int,
     val active: Boolean = true
 ) {
-    abstract fun update(elapsedSeconds: Double)
-    abstract fun draw(elapsedSeconds: Double)
+    abstract fun update()
+    abstract fun draw()
     open fun overlaps(entity: Entity): Boolean = false
     abstract fun cleanup()
 }

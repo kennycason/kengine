@@ -11,9 +11,9 @@ class GameRunner(
         var game: Game? = null
         try {
             game = gameBuilder()
-            GameLoop(frameRate) { elapsedSeconds ->
-                game.update(elapsedSeconds)
-                game.draw(elapsedSeconds)
+            GameLoop(frameRate) {
+                game.update()
+                game.draw()
             }
         } catch (e: Exception) {
             handleException(e)
