@@ -21,19 +21,19 @@ object Logger {
     fun info(message: () -> String) = log(INFO, message())
     fun warn(message: () -> String) = log(WARN, message())
     fun error(message: () -> String) = log(ERROR, message())
-    fun debug(message: () -> Any) = log(DEBUG, message().toString())
-    fun info(message: () -> Any) = log(INFO, message().toString())
-    fun warn(message: () -> Any) = log(WARN, message().toString())
-    fun error(message: () -> Any) = log(ERROR, message().toString())
 
     fun debug(message: String) = log(DEBUG, message)
     fun info(message: String) = log(INFO, message)
     fun warn(message: String) = log(WARN, message)
     fun error(message: String) = log(ERROR, message)
-    fun debug(message: Any) = log(DEBUG, message.toString())
-    fun info(message: Any) = log(INFO, message.toString())
-    fun warn(message: Any) = log(WARN, message.toString())
-    fun error(message: Any) = log(ERROR, message.toString())
+
+    // special exception helpers
+    fun debug(e: Exception) = log(DEBUG, exceptionToString(e))
+    fun info(e: Exception) = log(INFO, exceptionToString(e))
+    fun warn(e: Exception) = log(WARN, exceptionToString(e))
+    fun error(e: Exception) = log(ERROR, exceptionToString(e))
+
+    private fun exceptionToString(e: Exception) = "${e.message}\n${e.stackTraceToString()}"
 
     /**
      * Sets the global log level.

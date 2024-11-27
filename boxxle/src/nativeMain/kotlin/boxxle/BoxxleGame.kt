@@ -51,12 +51,12 @@ class BoxxleGame : Game {
         }
     }
 
-    fun beginPlay() {
+    private fun beginPlay() {
         mainSound.loop()
         state = State.PLAY
     }
 
-    fun play(elapsedSeconds: Double) {
+    private fun play(elapsedSeconds: Double) {
         useContext(BoxxleContext.get()) {
             player.update(elapsedSeconds)
 

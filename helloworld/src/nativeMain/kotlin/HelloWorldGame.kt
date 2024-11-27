@@ -6,7 +6,7 @@ import com.kengine.sdl.SDLContext
 
 class HelloWorldGame : Game {
     private val bulbasaur = BulbasaurEntity()
-    private val pokeballs = List(size = 25) { BouncingPokeballEntity() }
+    private val pokeballs = List(size = 25) { PingPongPidgeyEntity() }
 
     override fun update(elapsedSeconds: Double) {
         pokeballs.forEach {

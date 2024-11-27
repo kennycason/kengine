@@ -22,7 +22,7 @@ class GameLoop(
                 val elapsedSeconds = (currentFrameTime - lastFrameTime) / 1000.0
                 lastFrameTime = currentFrameTime
 
-                events.pollEvents()
+                sdlEvents.pollEvents()
                 actions.update(elapsedSeconds)
 
                 update(elapsedSeconds)
