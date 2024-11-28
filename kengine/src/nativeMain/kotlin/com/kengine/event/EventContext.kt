@@ -4,13 +4,7 @@ import com.kengine.context.Context
 import com.kengine.log.Logger
 
 
-
 class EventContext : Context() {
-    private data class Event<M>(
-        val type: String, // TODO I tried <T : Enum<T>, M>, but clean instantiation of context without a defined T became difficult
-        val message: M
-    )
-
     private val subscribers = mutableMapOf<String, MutableList<(Any) -> Unit>>()
 
     companion object {
