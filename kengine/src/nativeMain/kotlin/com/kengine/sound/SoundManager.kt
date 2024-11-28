@@ -3,7 +3,7 @@ package com.kengine.sound
 class SoundManager {
     private val sounds = mutableMapOf<String, Sound>()
 
-    fun setSound(name: String, sound: Sound) {
+    fun addSound(name: String, sound: Sound) {
         sounds[name] = sound
     }
 

@@ -31,41 +31,44 @@ class TextureManager {
 
     fun getTexture(texturePath: String): Texture {
         useContext(SDLContext.get()) {
-
-        if (texturePath in textureCache) {
-            Logger.debug { "Loading texture $texturePath from cache" }
-            return textureCache[texturePath]!!
-        }
-
-        Logger.debug { "Loading texture $texturePath to cache" }
-
-        val surface = SDL_LoadBMP(texturePath)
-            ?: throw IllegalStateException("Error loading image: ${SDL_GetError()?.toKString()}")
-        val texture = SDL_CreateTextureFromSurface(renderer, surface)
-            ?: throw IllegalStateException("Error creating texture from surface: ${SDL_GetError()?.toKString()}")
-        SDL_FreeSurface(surface)
-
-        memScoped {
-            val w = alloc<IntVar>()
-            val h = alloc<IntVar>()
-            val format = alloc<UIntVar>()
-            val access = alloc<IntVar>()
-
-            if (SDL_QueryTexture(texture, format.ptr, access.ptr, w.ptr, h.ptr) != 0) {
-                throw IllegalStateException("Error querying texture: ${SDL_GetError()?.toKString()}")
+            if (texturePath in textureCache) {
+                Logger.debug { "Loading texture $texturePath from cache" }
+                return textureCache[texturePath]!!
             }
-
-            textureCache[texturePath] = Texture(
-                texture = texture,
-                width = w.value,
-                height = h.value,
-                format = format.value,
-                access = access.value
-            )
         }
+        return addTexture(texturePath)
+    }
 
+    fun addTexture(texturePath: String): Texture {
+        useContext(SDLContext.get()) {
+            Logger.debug { "Loading texture $texturePath to cache" }
+
+            val surface = SDL_LoadBMP(texturePath)
+                ?: throw IllegalStateException("Error loading image: ${SDL_GetError()?.toKString()}")
+            val texture = SDL_CreateTextureFromSurface(renderer, surface)
+                ?: throw IllegalStateException("Error creating texture from surface: ${SDL_GetError()?.toKString()}")
+            SDL_FreeSurface(surface)
+
+            memScoped {
+                val w = alloc<IntVar>()
+                val h = alloc<IntVar>()
+                val format = alloc<UIntVar>()
+                val access = alloc<IntVar>()
+
+                if (SDL_QueryTexture(texture, format.ptr, access.ptr, w.ptr, h.ptr) != 0) {
+                    throw IllegalStateException("Error querying texture: ${SDL_GetError()?.toKString()}")
+                }
+
+                textureCache[texturePath] = Texture(
+                    texture = texture,
+                    width = w.value,
+                    height = h.value,
+                    format = format.value,
+                    access = access.value
+                )
+            }
+        }
         return textureCache[texturePath]!!
-            }
     }
 
     fun copyTexture(texturePath: String): Texture {

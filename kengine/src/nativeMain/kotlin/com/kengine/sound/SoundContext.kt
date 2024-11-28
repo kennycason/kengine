@@ -14,8 +14,16 @@ import sdl2.mixer.Mix_OpenAudio
 
 @OptIn(ExperimentalForeignApi::class)
 class SoundContext private constructor(
-    val manager: SoundManager
+    private val manager: SoundManager
 ) : Context() {
+
+    fun addSound(name: String, sound: Sound) {
+        manager.addSound(name, sound)
+    }
+
+    fun getSound(name: String): Sound {
+        return manager.getSound(name)
+    }
 
     companion object {
         private var currentContext: SoundContext? = null

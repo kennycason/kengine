@@ -7,7 +7,7 @@ class SpriteManager {
     private val sprites = mutableMapOf<String, Sprite>()
     private val spriteSheets = mutableMapOf<String, SpriteSheet>()
 
-    fun setSprite(name: String, sprite: Sprite) {
+    fun addSprite(name: String, sprite: Sprite) {
         sprites[name] = sprite
     }
 
@@ -15,7 +15,7 @@ class SpriteManager {
        return sprites[name]!!
     }
 
-    fun setSpriteSheet(name: String, spriteSheet: SpriteSheet) {
+    fun addSpriteSheet(name: String, spriteSheet: SpriteSheet) {
         spriteSheets[name] = spriteSheet
     }
 

@@ -20,12 +20,12 @@ class BoxxleGame : Game {
     private lateinit var finishSound: Sound
     init {
         useContext(SoundContext.get()) {
-            manager.setSound(Sounds.FINISH, Sound(Sounds.FINISH_WAV))
-            manager.setSound(Sounds.MAIN, Sound(Sounds.MAIN_WAV))
-            manager.setSound(Sounds.TITLE, Sound(Sounds.TITLE_WAV))
-            mainSound = manager.getSound(Sounds.MAIN)
+            addSound(Sounds.FINISH, Sound(Sounds.FINISH_WAV))
+            addSound(Sounds.MAIN, Sound(Sounds.MAIN_WAV))
+            addSound(Sounds.TITLE, Sound(Sounds.TITLE_WAV))
+            mainSound = getSound(Sounds.MAIN)
                 .also { it.setVolume(20) }
-            finishSound = manager.getSound(Sounds.FINISH)
+            finishSound = getSound(Sounds.FINISH)
                 .also { it.setVolume(20) }
         }
     }

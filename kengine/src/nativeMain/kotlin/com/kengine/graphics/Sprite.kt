@@ -19,7 +19,7 @@ import sdl2.SDL_RenderCopyEx
 // TODO object pools or locally storing SDL_Rects so I don't have to keep allocating them
 @OptIn(ExperimentalForeignApi::class)
 class Sprite private constructor(
-    private val texture: Texture,
+    val texture: Texture,
     private val clip: IntRect? = null,
     val scale: Vec2 = Vec2(1.0, 1.0),
     var rotation: Double = 0.0
@@ -79,17 +79,15 @@ class Sprite private constructor(
     companion object {
         fun fromFilePath(filePath: String, clip: IntRect? = null): Sprite {
             return useContext(TextureContext.get()) {
-                val texture = manager.getTexture(filePath)
+                val texture = getTexture(filePath)
                 Sprite(texture, clip)
             }
         }
-
         fun fromTexture(texture: Texture, clip: IntRect? = null): Sprite {
             return useContext(TextureContext.get()) {
                 Sprite(texture, clip)
             }
         }
-
     }
 
 }

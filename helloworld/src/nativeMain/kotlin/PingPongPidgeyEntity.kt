@@ -57,8 +57,6 @@ class PingPongPidgeyEntity : SpriteEntity(
             }
         }
 
-        Logger.info { "${v}" }
-
         if (v.x < 0) {
             flipMode = FlipMode.NONE
         } else {

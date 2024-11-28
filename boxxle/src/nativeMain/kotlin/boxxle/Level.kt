@@ -9,7 +9,7 @@ object Tiles {
 }
 
 class Level(val levelNumber: Int) {
-    private val spriteSheet = SpriteContext.get().manager.getSpriteSheet(Sprites.BOXXLE_SHEET)
+    private val spriteSheet = SpriteContext.get().getSpriteSheet(Sprites.BOXXLE_SHEET)
     private val brickSprite = spriteSheet.getTile(0, 0)
     private val goalSprite = spriteSheet.getTile(3, 0)
 

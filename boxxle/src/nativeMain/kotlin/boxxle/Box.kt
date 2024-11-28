@@ -12,7 +12,7 @@ class Box(
 ): Entity(
     p = p, width = 32, height = 32
 ) {
-    private val spriteSheet = SpriteContext.get().manager.getSpriteSheet(Sprites.BOXXLE_SHEET)
+    private val spriteSheet = SpriteContext.get().getSpriteSheet(Sprites.BOXXLE_SHEET)
     private val box = spriteSheet.getTile(1, 0)
     private val boxPlaced = spriteSheet.getTile(2, 0)
     private var isPlaced = false

@@ -7,11 +7,13 @@ import com.kengine.sdl.SDLContext
 class HelloWorldGame : Game {
     private val bulbasaur = BulbasaurEntity()
     private val pokeballs = List(size = 25) { PingPongPidgeyEntity() }
+    private val scytherEntity = ScytherEntity()
 
     override fun update() {
         pokeballs.forEach {
             it.update()
         }
+        scytherEntity.update()
         bulbasaur.update()
     }
 
@@ -53,6 +55,7 @@ class HelloWorldGame : Game {
             pokeballs.forEach {
                 it.draw()
             }
+            scytherEntity.draw()
             bulbasaur.draw()
 
             flipScreen()

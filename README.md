@@ -68,7 +68,7 @@ useContext(SDLContext.get()) {
         drawLine(160, 150, 310, 20, 0x57u, 0x23u, 0x5Eu, 0xFFu)
     }
 
-    sprite.draw(elapsedSeconds)
+    sprite.draw()
 
     flipScreen()
 }

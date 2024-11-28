@@ -29,6 +29,8 @@ class ActionsContext: Context() {
         actions.clear()
     }
 
+    fun size() = actions.size
+
     companion object {
         private val instance = ActionsContext()
         fun get(): ActionsContext = instance

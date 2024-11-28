@@ -20,7 +20,7 @@ class Player(
 ) : Entity(
     p = p, width = 32, height = 32,
 ) {
-    private val spriteSheet = SpriteContext.get().manager.getSpriteSheet(Sprites.BOXXLE_SHEET)
+    private val spriteSheet = SpriteContext.get().getSpriteSheet(Sprites.BOXXLE_SHEET)
     private val playerSpriteUp = spriteSheet.getTile(0, 1)
     private val playerSpriteDown = spriteSheet.getTile(1, 1)
     private val playerSpriteLeft = spriteSheet.getTile(2, 1)
@@ -41,19 +41,19 @@ class Player(
                     face = Direction.LEFT
                     tryMove(Vec2(-1.0, 0.0))
                 }
-                if (keyboard.isRightPressed() || keyboard.isDPressed()) {
+                else if (keyboard.isRightPressed() || keyboard.isDPressed()) {
                     face = Direction.RIGHT
                     tryMove(Vec2(1.0, 0.0))
                 }
-                if (keyboard.isUpPressed() || keyboard.isWPressed()) {
+                else if (keyboard.isUpPressed() || keyboard.isWPressed()) {
                     face = Direction.UP
                     tryMove(Vec2(0.0, -1.0))
                 }
-                if (keyboard.isDownPressed() || keyboard.isSPressed()) {
+                else if (keyboard.isDownPressed() || keyboard.isSPressed()) {
                     face = Direction.DOWN
                     tryMove(Vec2(0.0, 1.0))
                 }
-                if (keyboard.isEscapePressed()) {
+                else if (keyboard.isEscapePressed()) {
                     useContext(GameContext.get()) {
                         isRunning = false
                     }
@@ -67,7 +67,7 @@ class Player(
             val newP = p + delta
 
             // is a brick blocking the player?
-            if (level.tiles[newP.y.toInt()][newP.x.toInt()]== Tiles.BRICK) return
+            if (level.tiles[newP.y.toInt()][newP.x.toInt()] == Tiles.BRICK) return
 
             // is player pushing box
             for (box in level.boxes) {
