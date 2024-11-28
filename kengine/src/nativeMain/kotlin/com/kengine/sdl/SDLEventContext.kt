@@ -88,7 +88,7 @@ class SDLEventContext private constructor() : Context() {
                 Logger.warn { "No subscribers for event type: $eventType" }
             }
         } else {
-            Logger.warn { "Unsupported event type: ${event.type}" }
+            Logger.debug { "Unsupported event type: ${event.type}" }
         }
     }
 
