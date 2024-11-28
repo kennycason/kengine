@@ -23,9 +23,7 @@ class GameRunner(
     }
 
     private fun handleException(e: Exception) {
-        Logger.error { "Unhandled exception in GameLoop: ${e.message}" }
-        Logger.error { "Stacktrace: ${e.stackTraceToString()}" }
-        e.printStackTrace()
+        Logger.error(e) { "Unhandled exception in GameLoop" }
     }
 
 }

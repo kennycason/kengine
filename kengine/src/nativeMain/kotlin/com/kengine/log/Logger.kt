@@ -32,6 +32,10 @@ object Logger {
     fun info(e: Exception) = log(INFO, exceptionToString(e))
     fun warn(e: Exception) = log(WARN, exceptionToString(e))
     fun error(e: Exception) = log(ERROR, exceptionToString(e))
+    fun debug(e: Exception, message: () -> String?) = debug(message).also { debug(exceptionToString(e)) }
+    fun info(e: Exception, message: () -> String?) = info(message).also { info(exceptionToString(e)) }
+    fun warn(e: Exception, message: () -> String?) = warn(message).also { warn(exceptionToString(e)) }
+    fun error(e: Exception, message: () -> String?) = error(message).also { error(exceptionToString(e)) }
 
     private fun exceptionToString(e: Exception) = "${e.message}\n${e.stackTraceToString()}"
 

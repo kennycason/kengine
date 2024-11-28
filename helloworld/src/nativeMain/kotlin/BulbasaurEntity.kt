@@ -8,7 +8,6 @@ import com.kengine.graphics.Sprite
 import com.kengine.input.KeyboardContext
 import com.kengine.input.MouseContext
 import com.kengine.log.Logger
-import com.kengine.sdl.SDLContext
 import com.kengine.sdl.useSDLContext
 import com.kengine.time.ClockContext
 
