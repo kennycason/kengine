@@ -1,5 +1,6 @@
 package boxxle
 
+import boxxle.context.useBoxxleContext
 import com.kengine.GameContext
 import com.kengine.action.ActionContext
 import com.kengine.action.useActionContext
