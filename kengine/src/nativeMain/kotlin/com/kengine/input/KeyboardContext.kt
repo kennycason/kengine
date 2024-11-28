@@ -21,4 +21,8 @@ class KeyboardContext private constructor(
 
     override fun cleanup() {
     }
+
+    fun init() {
+        keyboard.init()
+    }
 }

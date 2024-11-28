@@ -1,5 +1,6 @@
 package boxxle
 
+import com.kengine.context.getContext
 import com.kengine.context.useContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
@@ -12,7 +13,7 @@ class Box(
 ): Entity(
     p = p, width = 32, height = 32
 ) {
-    private val spriteSheet = SpriteContext.get().getSpriteSheet(Sprites.BOXXLE_SHEET)
+    private val spriteSheet = getContext<SpriteContext>().getSpriteSheet(Sprites.BOXXLE_SHEET)
     private val box = spriteSheet.getTile(1, 0)
     private val boxPlaced = spriteSheet.getTile(2, 0)
     private var isPlaced = false
@@ -26,7 +27,7 @@ class Box(
     }
 
     override fun draw() {
-        useContext(TextureContext.get()) {
+        useContext<TextureContext> {
             if (isPlaced) boxPlaced.draw(p.x * 32, p.y * 32)
             else box.draw(p.x * 32, p.y * 32)
         }
@@ -36,7 +37,7 @@ class Box(
     }
 
     fun afterPush() {
-        useContext(BoxxleContext.get()) {
+        useContext<BoxxleContext> {
             isPlaced = level.goals.any { goal -> goal.x == p.x && goal.y == p.y }
         }
     }

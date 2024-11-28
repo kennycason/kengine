@@ -28,7 +28,7 @@ class BoxxleContext private constructor(
         }
 
         private fun loadSprites() {
-            useContext(SpriteContext.get()) {
+            useContext<SpriteContext> {
                 addSpriteSheet(
                     Sprites.BOXXLE_SHEET,
                     SpriteSheet.fromFilePath(Sprites.BOXXLE_SHEET_BMP, 32, 32)

@@ -18,13 +18,14 @@ class KeyboardInputEventSubscriber {
         var lastPressed: Long = 0L
     )
 
-    init {
-        useContext(SDLContext.get()) {
-            events.subscribe(SDLEventContext.EventType.KEYBOARD, ::handleKeyboardEvent)
+    // must be called
+    fun init() {
+        useContext<SDLContext> {
+            sdlEvents.subscribe(SDLEventContext.EventType.KEYBOARD, ::handleKeyboardEvent)
         }
     }
 
-    private fun handleKeyboardEvent(event: SDL_Event) {
+    fun handleKeyboardEvent(event: SDL_Event) {
         when (event.type) {
             SDL_KEYDOWN -> {
                 val key = event.key.keysym.sym
@@ -36,6 +37,7 @@ class KeyboardInputEventSubscriber {
                     lastPressed = getCurrentTimestampMilliseconds()
                 }
             }
+
             SDL_KEYUP -> {
                 val key = event.key.keysym.sym
                 keyStates[key]?.isPressed = false

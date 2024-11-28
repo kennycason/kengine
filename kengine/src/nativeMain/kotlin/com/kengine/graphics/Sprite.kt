@@ -1,5 +1,6 @@
 package com.kengine.graphics
 
+import com.kengine.context.getContext
 import com.kengine.context.useContext
 import com.kengine.log.Logger
 import com.kengine.math.IntRect
@@ -30,7 +31,7 @@ class Sprite private constructor(
     fun draw(p: Vec2, flip: FlipMode = FlipMode.NONE) = draw(p.x, p.y, flip)
 
     fun draw(x: Double, y: Double, flip: FlipMode = FlipMode.NONE) {
-        useContext(SDLContext.get()) {
+        useContext<SDLContext> {
             memScoped {
                 val clipRect = if (clip == null) null
                 else alloc<SDL_Rect>().apply {
@@ -78,15 +79,12 @@ class Sprite private constructor(
 
     companion object {
         fun fromFilePath(filePath: String, clip: IntRect? = null): Sprite {
-            return useContext(TextureContext.get()) {
-                val texture = getTexture(filePath)
-                Sprite(texture, clip)
-            }
+            val texture = getContext<TextureContext>().getTexture(filePath)
+            return Sprite(texture, clip)
         }
+
         fun fromTexture(texture: Texture, clip: IntRect? = null): Sprite {
-            return useContext(TextureContext.get()) {
-                Sprite(texture, clip)
-            }
+            return Sprite(texture, clip)
         }
     }
 

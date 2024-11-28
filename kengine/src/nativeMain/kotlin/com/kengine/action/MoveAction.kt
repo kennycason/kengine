@@ -2,10 +2,11 @@
 package com.kengine.action
 
 import com.kengine.GameContext
+import com.kengine.context.getContext
 import com.kengine.entity.Entity
 import com.kengine.log.Logger
 import com.kengine.math.Vec2
-import com.kengine.time.timeSince
+import com.kengine.time.timeSinceMs
 
 data class MoveAction(
     val entity: Entity,
@@ -13,12 +14,12 @@ data class MoveAction(
     val speed: Double,
     val onComplete: (() -> Unit)? = null
 ) : Action {
-    private val clock = GameContext.get().clock
+    private val clock = getContext<GameContext>().clock
     private val startTimeMs = clock.totalTimeMs
     private val expireInMs = 5000L
 
     override fun update(): Boolean {
-        if (timeSince(startTimeMs) > expireInMs) {
+        if (timeSinceMs(startTimeMs) > expireInMs) {
             Logger.warn { "expiring move action: ${entity::class.simpleName} after ${expireInMs}ms" }
             return true
         }

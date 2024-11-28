@@ -2,13 +2,14 @@ package boxxle
 
 import com.kengine.GameContext
 import com.kengine.action.ActionsContext
+import com.kengine.context.getContext
 import com.kengine.context.useContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
 import com.kengine.input.KeyboardContext
 import com.kengine.math.Vec2
 import com.kengine.time.getCurrentTimestampMilliseconds
-import com.kengine.time.timeSince
+import com.kengine.time.timeSinceMs
 
 private enum class Direction {
     UP, DOWN, LEFT, RIGHT
@@ -35,8 +36,8 @@ class Player(
     }
 
     override fun update() {
-        useContext(KeyboardContext.get()) {
-            if (!isMoving && timeSince(lastMovedMs) > 300) {
+        useContext<KeyboardContext> {
+            if (!isMoving && timeSinceMs(lastMovedMs) > 300) {
                 if (keyboard.isLeftPressed() || keyboard.isAPressed()) {
                     face = Direction.LEFT
                     tryMove(Vec2(-1.0, 0.0))
@@ -54,7 +55,7 @@ class Player(
                     tryMove(Vec2(0.0, 1.0))
                 }
                 else if (keyboard.isEscapePressed()) {
-                    useContext(GameContext.get()) {
+                    useContext<GameContext> {
                         isRunning = false
                     }
                 }
@@ -63,7 +64,7 @@ class Player(
     }
 
     private fun tryMove(delta: Vec2) {
-        useContext(BoxxleContext.get()) {
+        useContext<BoxxleContext> {
             val newP = p + delta
 
             // is a brick blocking the player?
@@ -76,7 +77,7 @@ class Player(
                         // move both the player and the box
                         isMoving = true
                         lastMovedMs = getCurrentTimestampMilliseconds()
-                        return useContext(ActionsContext.get()) {
+                        return useContext<ActionsContext> {
                             moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
                             moveTo(box, box.p + delta, speed, onComplete = { box.afterPush() })
                         }
@@ -87,7 +88,7 @@ class Player(
 
             // if no box is being pushed, just move the player
             isMoving = true
-            ActionsContext.get().moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
+            getContext<ActionsContext>().moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
             lastMovedMs = getCurrentTimestampMilliseconds()
         }
     }
@@ -114,7 +115,7 @@ class Player(
     }
 
     override fun draw() {
-        useContext(SpriteContext.get()) {
+        useContext<SpriteContext> {
             when (face) {
                 Direction.UP -> playerSpriteUp.draw(p.x * 32, p.y * 32)
                 Direction.DOWN -> playerSpriteDown.draw(p.x * 32, p.y * 32)

@@ -1,25 +1,30 @@
 package boxxle
 
 import com.kengine.Game
+import com.kengine.GameContext
 import com.kengine.action.ActionsContext
+import com.kengine.context.getContext
 import com.kengine.context.useContext
 import com.kengine.input.KeyboardContext
 import com.kengine.sdl.SDLContext
 import com.kengine.sound.Sound
 import com.kengine.sound.SoundContext
 import com.kengine.time.getCurrentTimestampMilliseconds
-import com.kengine.time.timeSince
+import com.kengine.time.timeSinceMs
 
 class BoxxleGame : Game {
     enum class State {
         BEGIN_PLAY, PLAY, WAIT_FOR_FINISH_MUSIC_TO_FINISH
     }
+
     private var state = State.BEGIN_PLAY
     private var timeSinceOptionChange = 0L // TODO fix keyboard.timeSinceKeyPressed function
     private lateinit var mainSound: Sound
     private lateinit var finishSound: Sound
+
     init {
-        useContext(SoundContext.get()) {
+        getContext<GameContext>().registerContext(BoxxleContext.get())
+        useContext<SoundContext> {
             addSound(Sounds.FINISH, Sound(Sounds.FINISH_WAV))
             addSound(Sounds.MAIN, Sound(Sounds.MAIN_WAV))
             addSound(Sounds.TITLE, Sound(Sounds.TITLE_WAV))
@@ -39,10 +44,10 @@ class BoxxleGame : Game {
     }
 
     override fun draw() {
-        useContext(SDLContext.get()) {
+        useContext<SDLContext> {
             fillScreen(255u, 255u, 255u, 255u)
 
-            useContext(BoxxleContext.get()) {
+            useContext<BoxxleContext> {
                 level.draw()
                 player.draw()
             }
@@ -57,19 +62,19 @@ class BoxxleGame : Game {
     }
 
     private fun play() {
-        useContext(BoxxleContext.get()) {
+        useContext<BoxxleContext> {
             player.update()
 
-            useContext(KeyboardContext.get()) {
-                if ((keyboard.isRPressed()) && timeSince(timeSinceOptionChange) > 300) {
+            useContext<KeyboardContext> {
+                if ((keyboard.isRPressed()) && timeSinceMs(timeSinceOptionChange) > 300) {
                     timeSinceOptionChange = getCurrentTimestampMilliseconds()
                     reloadLevel()
                 }
-                if (keyboard.isReturnPressed() && timeSince(timeSinceOptionChange) > 300) {
+                if (keyboard.isReturnPressed() && timeSinceMs(timeSinceOptionChange) > 300) {
                     timeSinceOptionChange = getCurrentTimestampMilliseconds()
                     loadLevel((level.levelNumber + 1) % LEVEL_DATA.size)
                 }
-                if (keyboard.isSpacePressed() && timeSince(timeSinceOptionChange) > 300) {
+                if (keyboard.isSpacePressed() && timeSinceMs(timeSinceOptionChange) > 300) {
                     timeSinceOptionChange = getCurrentTimestampMilliseconds()
                     loadLevel((level.levelNumber - 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
                 }
@@ -86,7 +91,7 @@ class BoxxleGame : Game {
             if (isLevelComplete()) {
                 mainSound.stop()
                 finishSound.play()
-                ActionsContext.get().timer(6000) {
+                getContext<ActionsContext>().timer(6000) {
                     state = State.BEGIN_PLAY
                     loadLevel((level.levelNumber + 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
                 }
@@ -96,13 +101,13 @@ class BoxxleGame : Game {
     }
 
     private fun reloadLevel() {
-        useContext(BoxxleContext.get()) {
+        useContext<BoxxleContext> {
             loadLevel(level.levelNumber)
         }
     }
 
     private fun loadLevel(levelNumber: Int) {
-        useContext(BoxxleContext.get()) {
+        useContext<BoxxleContext> {
             level = Level(levelNumber)
             player.p.set(level.start)
             player.setScale(level.data.scale)
@@ -113,14 +118,14 @@ class BoxxleGame : Game {
     }
 
     private fun isLevelComplete(): Boolean {
-        useContext(BoxxleContext.get()) {
-            for (goal in level.goals) {
-                if (!level.boxes.any { it.p == goal }) {
-                    return false // a goal doesn't have a box on it
-                }
+        val level = getContext<BoxxleContext>().level
+        for (goal in level.goals) {
+            if (!level.boxes.any { it.p == goal }) {
+                return false // a goal doesn't have a box on it
             }
-            return true // all goals must have boxes
         }
+        return true // all goals must have boxes
+
     }
 
 }

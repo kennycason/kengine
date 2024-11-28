@@ -1,5 +1,6 @@
 package com.kengine.graphics
 
+import com.kengine.context.getContext
 import com.kengine.math.Vec2
 import com.kengine.time.ClockContext
 
@@ -35,7 +36,7 @@ class AnimatedSprite private constructor(
     }
 
     private fun updateFrame() {
-        elapsedTime += ClockContext.get().deltaTimeMs
+        elapsedTime += getContext<ClockContext>().deltaTimeMs
         if (elapsedTime >= frameDurationMs) {
             elapsedTime -= frameDurationMs
             when (loopMode) {

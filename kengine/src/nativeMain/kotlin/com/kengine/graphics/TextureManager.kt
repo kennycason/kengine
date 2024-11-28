@@ -30,7 +30,7 @@ class TextureManager {
     private val textureCache = mutableMapOf<String, Texture>()
 
     fun getTexture(texturePath: String): Texture {
-        useContext(SDLContext.get()) {
+        useContext<SDLContext> {
             if (texturePath in textureCache) {
                 Logger.debug { "Loading texture $texturePath from cache" }
                 return textureCache[texturePath]!!
@@ -40,7 +40,7 @@ class TextureManager {
     }
 
     fun addTexture(texturePath: String): Texture {
-        useContext(SDLContext.get()) {
+        useContext<SDLContext> {
             Logger.debug { "Loading texture $texturePath to cache" }
 
             val surface = SDL_LoadBMP(texturePath)

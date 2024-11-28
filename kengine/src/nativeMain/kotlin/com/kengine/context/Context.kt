@@ -1,5 +1,6 @@
 package com.kengine.context
 
 abstract class Context {
-    open fun cleanup() { }
+    open fun create() {}
+    open fun cleanup() {}
 }

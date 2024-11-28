@@ -1,6 +1,7 @@
 package com.kengine.sdl
 
 import com.kengine.GameContext
+import com.kengine.context.getContext
 import com.kengine.log.Logger
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl2.SDL_Event
@@ -9,7 +10,7 @@ import sdl2.SDL_Event
 fun registerSDLQuitHandler() {
     fun handleSDLQuitEvent(sdlEvent: SDL_Event) {
         Logger.info { "Exiting game" }
-        GameContext.get().isRunning = false
+        getContext<GameContext>().isRunning = false
     }
 
     SDLEventContext.get()

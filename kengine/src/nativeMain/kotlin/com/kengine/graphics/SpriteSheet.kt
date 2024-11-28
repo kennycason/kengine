@@ -1,6 +1,6 @@
 package com.kengine.graphics
 
-import com.kengine.context.useContext
+import com.kengine.context.getContext
 import com.kengine.log.Logger
 import com.kengine.math.IntRect
 
@@ -43,11 +43,10 @@ class SpriteSheet private constructor(
             dx: Int = 0, // spacing between tiles
             dy: Int = 0  // spacing between tiles
         ): SpriteSheet {
-            return useContext(TextureContext.get()) {
-                val texture = getTexture(filePath)
-                SpriteSheet(texture, tileWidth, tileHeight, offsetX, offsetY, dx, dy)
-            }
+            val texture = getContext<TextureContext>().getTexture(filePath)
+            return SpriteSheet(texture, tileWidth, tileHeight, offsetX, offsetY, dx, dy)
         }
+
         fun fromTexture(
             texture: Texture,
             tileWidth: Int,
@@ -57,10 +56,9 @@ class SpriteSheet private constructor(
             dx: Int = 0, // spacing between tiles
             dy: Int = 0  // spacing between tiles
         ): SpriteSheet {
-            return useContext(TextureContext.get()) {
-                SpriteSheet(texture, tileWidth, tileHeight, offsetX, offsetY, dx, dy)
-            }
+            return SpriteSheet(texture, tileWidth, tileHeight, offsetX, offsetY, dx, dy)
         }
+
         fun fromSprite(
             sprite: Sprite,
             tileWidth: Int,
@@ -70,9 +68,7 @@ class SpriteSheet private constructor(
             dx: Int = 0, // spacing between tiles
             dy: Int = 0  // spacing between tiles
         ): SpriteSheet {
-            return useContext(TextureContext.get()) {
-                SpriteSheet(sprite.texture, tileWidth, tileHeight, offsetX, offsetY, dx, dy)
-            }
+            return SpriteSheet(sprite.texture, tileWidth, tileHeight, offsetX, offsetY, dx, dy)
         }
     }
 

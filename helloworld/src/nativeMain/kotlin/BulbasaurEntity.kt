@@ -1,4 +1,5 @@
 
+import com.kengine.context.getContext
 import com.kengine.context.useContext
 import com.kengine.entity.SpriteEntity
 import com.kengine.event.EventContext
@@ -32,8 +33,8 @@ class BulbasaurEntity : SpriteEntity(
     private fun ready() {
         v.x *= 0.9
         v.y *= 0.9
-        val clock = ClockContext.get()
-        useContext(KeyboardContext.get()) {
+        val clock = getContext<ClockContext>()
+        useContext<KeyboardContext> {
             if (keyboard.isLeftPressed() || keyboard.isAPressed()) {
                 v.x = -speed * clock.deltaTimeSec
                 flipMode = FlipMode.NONE
@@ -56,12 +57,12 @@ class BulbasaurEntity : SpriteEntity(
             }
             if (keyboard.isSpacePressed()) {
                 Logger.info { "Bulbasaur ROARED!" }
-                useContext(EventContext.get()) {
+                useContext<EventContext> {
                     publish(Events.BULBASAUR_ROAR, BulbasaurRoarEvent(decibels = 90.0))
                 }
             }
         }
-        useContext(MouseContext.get()) {
+        useContext<MouseContext> {
             if (mouse.isLeftPressed() || mouse.isRightPressed()) {
                 p.x = mouse.getCursor().x - width / 2
                 p.y = mouse.getCursor().y - height / 2
@@ -74,7 +75,7 @@ class BulbasaurEntity : SpriteEntity(
     }
 
     private fun init() {
-        useContext(SDLContext.get()) {
+        useContext<SDLContext> {
             p.x = screenWidth / 2.0 - width / 2.0
             p.y = screenHeight / 2.0 - height / 2.0
         }

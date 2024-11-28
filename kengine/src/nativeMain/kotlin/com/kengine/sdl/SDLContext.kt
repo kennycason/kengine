@@ -27,7 +27,7 @@ class SDLContext private constructor(
     val screenHeight: Int,
     private val window: CValuesRef<cnames.structs.SDL_Window>,
     val renderer: CValuesRef<cnames.structs.SDL_Renderer>,
-    val events: SDLEventContext
+    val sdlEvents: SDLEventContext
 ) : Context() {
 
     companion object {

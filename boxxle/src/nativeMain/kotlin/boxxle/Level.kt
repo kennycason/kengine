@@ -1,5 +1,6 @@
 package boxxle
 
+import com.kengine.context.getContext
 import com.kengine.graphics.SpriteContext
 import com.kengine.math.Vec2
 
@@ -9,7 +10,7 @@ object Tiles {
 }
 
 class Level(val levelNumber: Int) {
-    private val spriteSheet = SpriteContext.get().getSpriteSheet(Sprites.BOXXLE_SHEET)
+    private val spriteSheet = getContext<SpriteContext>().getSpriteSheet(Sprites.BOXXLE_SHEET)
     private val brickSprite = spriteSheet.getTile(0, 0)
     private val goalSprite = spriteSheet.getTile(3, 0)
 

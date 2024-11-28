@@ -18,11 +18,11 @@ class HelloWorldGame : Game {
     }
 
     override fun draw() {
-        useContext(SDLContext.get()) {
+        useContext<SDLContext> {
             // clear screen
             fillScreen(0u, 0u, 0u)
 
-            useContext(GeometryContext.get()) {
+            useContext<GeometryContext> {
                 // basic shapes
                 drawRectangle(16, 16, 16, 16, 0xFFu, 0xFFu, 0xFFu, 0xFFu)
                 fillRectangle(16 + 32, 16, 16, 16, 0xFFu, 0x00u, 0x00u, 0xFFu)

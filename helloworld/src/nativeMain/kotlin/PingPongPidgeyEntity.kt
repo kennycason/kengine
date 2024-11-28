@@ -1,4 +1,5 @@
 
+import com.kengine.context.getContext
 import com.kengine.context.useContext
 import com.kengine.entity.SpriteEntity
 import com.kengine.event.EventContext
@@ -31,13 +32,13 @@ class PingPongPidgeyEntity : SpriteEntity(
     }
 
     private fun init() {
-        useContext(EventContext.get()) {
+        useContext<EventContext> {
             subscribe(Events.BULBASAUR_ROAR) { e: BulbasaurRoarEvent ->
                 Logger.info { "Pidgey heard bulbasaur's roar of ${e.decibels}dB" }
                 v *= 1.05 // 5% increase in velocity
             }
         }
-        useContext(SDLContext.get()) {
+        useContext<SDLContext> {
             p.x = Random.nextInt(0, screenWidth - width).toDouble()
             p.y = Random.nextInt(0, screenHeight - height).toDouble()
             v.x = Random.nextInt(10, 60).toDouble() * if (Random.nextBoolean()) 1 else -1
@@ -47,8 +48,8 @@ class PingPongPidgeyEntity : SpriteEntity(
     }
 
     private fun bounce() {
-        useContext(SDLContext.get()) {
-            p += v * ClockContext.get().deltaTimeSec
+        useContext<SDLContext> {
+            p += v * getContext<ClockContext>().deltaTimeSec
             if (p.x < 0 || p.x > screenWidth - width) {
                 v.x *= -1
             }

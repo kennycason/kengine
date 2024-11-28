@@ -17,9 +17,9 @@ class GameLoop(
         val targetFrameTime = 1000.0 / frameRate
         var lastFrameTimeMs = getCurrentTimestampMilliseconds()
 
-        useContext(GameContext.get(), cleanup = true) {
+        useContext<GameContext>(cleanup = true) {
             while (isRunning) {
-                useContext(ClockContext.get()) {
+                useContext<ClockContext> {
                     totalTimeMs = getCurrentTimestampMilliseconds()
                     deltaTimeMs = totalTimeMs - lastFrameTimeMs
                     totalTimeSec = totalTimeMs / 1000.0

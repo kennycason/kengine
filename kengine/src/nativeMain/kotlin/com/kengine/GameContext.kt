@@ -2,6 +2,8 @@ package com.kengine
 
 import com.kengine.action.ActionsContext
 import com.kengine.context.Context
+import com.kengine.context.ContextRegistry
+import com.kengine.context.getContext
 import com.kengine.event.EventContext
 import com.kengine.geometry.GeometryContext
 import com.kengine.graphics.SpriteContext
@@ -32,6 +34,23 @@ class GameContext private constructor(
 
     init {
         registerSDLQuitHandler()
+        ContextRegistry.register(sdl)
+        ContextRegistry.register(sdlEvents)
+        ContextRegistry.register(events)
+        ContextRegistry.register(keyboard)
+        ContextRegistry.register(mouse)
+        ContextRegistry.register(textures)
+        ContextRegistry.register(sprites)
+        ContextRegistry.register(geometry)
+        ContextRegistry.register(sounds)
+        ContextRegistry.register(actions)
+        ContextRegistry.register(clock)
+        getContext<KeyboardContext>().keyboard.init()
+        getContext<MouseContext>().mouse.init()
+    }
+
+    fun registerContext(context: Context) {
+        ContextRegistry.register(context)
     }
 
     companion object {
@@ -45,6 +64,7 @@ class GameContext private constructor(
             if (currentContext != null) {
                 throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
             }
+            // TODO order matters, i.e. there are dependencies
             currentContext = GameContext(
                 sdl = SDLContext.create(title, width, height),
                 events = EventContext.get(),
@@ -79,6 +99,7 @@ class GameContext private constructor(
         sounds.cleanup()
         sdl.cleanup()
         clock.cleanup()
+        ContextRegistry.clearAll()
     }
 
 }

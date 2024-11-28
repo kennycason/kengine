@@ -21,4 +21,8 @@ class MouseContext private constructor(
 
     override fun cleanup() {
     }
+
+    fun init() {
+        mouse.init()
+    }
 }

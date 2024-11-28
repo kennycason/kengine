@@ -1,7 +1,7 @@
 package com.kengine.input
 
-import com.kengine.math.Vec2
 import com.kengine.context.useContext
+import com.kengine.math.Vec2
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
 import com.kengine.time.getCurrentTimestampMilliseconds
@@ -24,13 +24,14 @@ class MouseInputEventSubscriber {
         var lastPressedTime: Long = 0
     )
 
-    init {
-        useContext(SDLContext.get()) {
-            events.subscribe(SDLEventContext.EventType.MOUSE, ::handleMouseEvent)
+    // must be called
+    fun init() {
+        useContext <SDLContext> {
+            sdlEvents.subscribe(SDLEventContext.EventType.MOUSE, ::handleMouseEvent)
         }
     }
 
-    private fun handleMouseEvent(event: SDL_Event) {
+    fun handleMouseEvent(event: SDL_Event) {
         when (event.type) {
             SDL_MOUSEBUTTONDOWN -> {
                 val button = event.button.button.toInt()
