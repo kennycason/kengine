@@ -1,8 +1,7 @@
 package com.kengine.input
 
-import com.kengine.context.useContext
-import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
+import com.kengine.sdl.useSDLContext
 import com.kengine.time.getCurrentTimestampMilliseconds
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl2.SDL_Event
@@ -20,7 +19,7 @@ class KeyboardInputEventSubscriber {
 
     // must be called
     fun init() {
-        useContext<SDLContext> {
+        useSDLContext {
             sdlEvents.subscribe(SDLEventContext.EventType.KEYBOARD, ::handleKeyboardEvent)
         }
     }

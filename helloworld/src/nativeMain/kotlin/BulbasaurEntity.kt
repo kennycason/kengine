@@ -9,6 +9,7 @@ import com.kengine.input.KeyboardContext
 import com.kengine.input.MouseContext
 import com.kengine.log.Logger
 import com.kengine.sdl.SDLContext
+import com.kengine.sdl.useSDLContext
 import com.kengine.time.ClockContext
 
 class BulbasaurEntity : SpriteEntity(
@@ -75,7 +76,7 @@ class BulbasaurEntity : SpriteEntity(
     }
 
     private fun init() {
-        useContext<SDLContext> {
+        useSDLContext {
             p.x = screenWidth / 2.0 - width / 2.0
             p.y = screenHeight / 2.0 - height / 2.0
         }

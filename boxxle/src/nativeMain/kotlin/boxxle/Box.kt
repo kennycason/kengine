@@ -5,6 +5,7 @@ import com.kengine.context.useContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.TextureContext
+import com.kengine.graphics.useTextureContext
 import com.kengine.math.Vec2
 
 class Box(
@@ -27,7 +28,7 @@ class Box(
     }
 
     override fun draw() {
-        useContext<TextureContext> {
+        useTextureContext {
             if (isPlaced) boxPlaced.draw(p.x * 32, p.y * 32)
             else box.draw(p.x * 32, p.y * 32)
         }
@@ -37,7 +38,7 @@ class Box(
     }
 
     fun afterPush() {
-        useContext<BoxxleContext> {
+        useBoxxleContext {
             isPlaced = level.goals.any { goal -> goal.x == p.x && goal.y == p.y }
         }
     }

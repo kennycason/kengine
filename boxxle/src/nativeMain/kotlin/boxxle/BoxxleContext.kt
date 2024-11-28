@@ -1,9 +1,8 @@
 package boxxle
 
 import com.kengine.context.Context
-import com.kengine.context.useContext
-import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.SpriteSheet
+import com.kengine.graphics.useSpriteContext
 
 class BoxxleContext private constructor(
     var level: Level,
@@ -28,7 +27,7 @@ class BoxxleContext private constructor(
         }
 
         private fun loadSprites() {
-            useContext<SpriteContext> {
+            useSpriteContext {
                 addSpriteSheet(
                     Sprites.BOXXLE_SHEET,
                     SpriteSheet.fromFilePath(Sprites.BOXXLE_SHEET_BMP, 32, 32)

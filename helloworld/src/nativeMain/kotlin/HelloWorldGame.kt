@@ -1,8 +1,7 @@
 
 import com.kengine.Game
-import com.kengine.context.useContext
-import com.kengine.geometry.GeometryContext
-import com.kengine.sdl.SDLContext
+import com.kengine.geometry.useGeometryContext
+import com.kengine.sdl.useSDLContext
 
 class HelloWorldGame : Game {
     private val bulbasaur = BulbasaurEntity()
@@ -18,11 +17,11 @@ class HelloWorldGame : Game {
     }
 
     override fun draw() {
-        useContext<SDLContext> {
+        useSDLContext {
             // clear screen
             fillScreen(0u, 0u, 0u)
 
-            useContext<GeometryContext> {
+            useGeometryContext {
                 // basic shapes
                 drawRectangle(16, 16, 16, 16, 0xFFu, 0xFFu, 0xFFu, 0xFFu)
                 fillRectangle(16 + 32, 16, 16, 16, 0xFFu, 0x00u, 0x00u, 0xFFu)

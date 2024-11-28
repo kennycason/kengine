@@ -44,11 +44,11 @@ View `GameLauncher.kt` and `BoxxleGame` or `DemoGame` for more examples.
 
 ```kotlin
 private val sprite = Sprite("sprites/bulbasaur.bmp")
-useContext <SDLContext> {
+useSDLContext {
     // clear screen
     fillScreen(0u, 0u, 0u)
 
-    useContext<GeometryContext> {
+    useGeometryContext {
         // basic shapes, color format rgba
         drawRectangle(10, 10, 10, 10, 0xFFu, 0xFFu, 0xFFu, 0xFFu)
         fillRectangle(20, 20, 10, 10, 0xFFu, 0x00u, 0x00u, 0xFFu)
@@ -77,7 +77,7 @@ useContext <SDLContext> {
 ## Reading Keyboard & Mouse Events
 
 ```kotlin
-useContext<KeyboardContext> {
+useKeyboardContext {
     if (keyboard.isLeftPressed()) {
         Logger.info { "pressed left" }
     }
@@ -85,7 +85,7 @@ useContext<KeyboardContext> {
         Logger.info { "pressed space" }
     }
 }
-useContext<MouseContext> {
+useMouseContext {
     if (mouse.isLeftPressed() || mouse.isRightPressed()) {
         Logger.info { "Clicked mouse @ (${mouse.getCursor().x}, ${mouse.getCursor().y})" }
     }

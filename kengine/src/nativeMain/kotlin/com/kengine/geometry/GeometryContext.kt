@@ -1,9 +1,8 @@
 package com.kengine.geometry
 
 import com.kengine.context.Context
-import com.kengine.context.useContext
 import com.kengine.log.Logger
-import com.kengine.sdl.SDLContext
+import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -31,7 +30,7 @@ class GeometryContext private constructor() : Context() {
         radius: Int,
         r: UByte, g: UByte, b: UByte, a: UByte
     ) {
-        useContext<SDLContext> {
+        useSDLContext {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
             val result = circleRGBA(renderer, centerX.toShort(), centerY.toShort(), radius.toShort(), r, g, b, a)
             if (result != 0) {
@@ -45,7 +44,7 @@ class GeometryContext private constructor() : Context() {
         radius: Int,
         r: UByte, g: UByte, b: UByte, a: UByte
     ) {
-        useContext<SDLContext> {
+        useSDLContext {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
             val result = filledCircleRGBA(renderer, centerX.toShort(), centerY.toShort(), radius.toShort(), r, g, b, a)
             if (result != 0) {
@@ -67,7 +66,7 @@ class GeometryContext private constructor() : Context() {
         width: Int, height: Int,
         r: UByte, g: UByte, b: UByte, a: UByte
     ) {
-        useContext<SDLContext> {
+        useSDLContext {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
             memScoped {
                 val rect = alloc<SDL_Rect>().apply {
@@ -97,7 +96,7 @@ class GeometryContext private constructor() : Context() {
         width: Int, height: Int,
         r: UByte, g: UByte, b: UByte, a: UByte
     ) {
-        useContext<SDLContext> {
+        useSDLContext {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
             memScoped {
                 val rect = alloc<SDL_Rect>()
@@ -119,7 +118,7 @@ class GeometryContext private constructor() : Context() {
         endX: Int, endY: Int,
         r: UByte, g: UByte, b: UByte, a: UByte
     ) {
-        useContext<SDLContext> {
+        useSDLContext {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
             val result = SDL_RenderDrawLine(renderer, startX, startY, endX, endY)
             if (result != 0) {
@@ -129,7 +128,7 @@ class GeometryContext private constructor() : Context() {
     }
 
     fun drawPixel(x: Int, y: Int, rgba: UInt) {
-        useContext<SDLContext> {
+        useSDLContext {
             val r = ((rgba shr 24) and 0xFFu).toUByte()
             val g = ((rgba shr 16) and 0xFFu).toUByte()
             val b = ((rgba shr 8) and 0xFFu).toUByte()
@@ -143,7 +142,7 @@ class GeometryContext private constructor() : Context() {
     }
 
     fun drawPixel(x: Int, y: Int, r: UByte, g: UByte, b: UByte, a: UByte) {
-        useContext<SDLContext> {
+        useSDLContext {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
             val result = SDL_RenderDrawPoint(renderer, x, y)
             if (result != 0) {

@@ -1,14 +1,13 @@
 package boxxle
 
 import com.kengine.Game
-import com.kengine.GameContext
-import com.kengine.action.ActionsContext
+import com.kengine.action.ActionContext
 import com.kengine.context.getContext
-import com.kengine.context.useContext
-import com.kengine.input.KeyboardContext
-import com.kengine.sdl.SDLContext
+import com.kengine.getGameContext
+import com.kengine.input.useKeyboardContext
+import com.kengine.sdl.useSDLContext
 import com.kengine.sound.Sound
-import com.kengine.sound.SoundContext
+import com.kengine.sound.useSoundContext
 import com.kengine.time.getCurrentTimestampMilliseconds
 import com.kengine.time.timeSinceMs
 
@@ -23,8 +22,8 @@ class BoxxleGame : Game {
     private lateinit var finishSound: Sound
 
     init {
-        getContext<GameContext>().registerContext(BoxxleContext.get())
-        useContext<SoundContext> {
+        getGameContext().registerContext(BoxxleContext.get())
+        useSoundContext {
             addSound(Sounds.FINISH, Sound(Sounds.FINISH_WAV))
             addSound(Sounds.MAIN, Sound(Sounds.MAIN_WAV))
             addSound(Sounds.TITLE, Sound(Sounds.TITLE_WAV))
@@ -44,10 +43,10 @@ class BoxxleGame : Game {
     }
 
     override fun draw() {
-        useContext<SDLContext> {
+        useSDLContext {
             fillScreen(255u, 255u, 255u, 255u)
 
-            useContext<BoxxleContext> {
+            useBoxxleContext {
                 level.draw()
                 player.draw()
             }
@@ -62,10 +61,10 @@ class BoxxleGame : Game {
     }
 
     private fun play() {
-        useContext<BoxxleContext> {
+        useBoxxleContext {
             player.update()
 
-            useContext<KeyboardContext> {
+            useKeyboardContext {
                 if ((keyboard.isRPressed()) && timeSinceMs(timeSinceOptionChange) > 300) {
                     timeSinceOptionChange = getCurrentTimestampMilliseconds()
                     reloadLevel()
@@ -91,7 +90,7 @@ class BoxxleGame : Game {
             if (isLevelComplete()) {
                 mainSound.stop()
                 finishSound.play()
-                getContext<ActionsContext>().timer(6000) {
+                getContext<ActionContext>().timer(6000) {
                     state = State.BEGIN_PLAY
                     loadLevel((level.levelNumber + 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
                 }
@@ -101,13 +100,13 @@ class BoxxleGame : Game {
     }
 
     private fun reloadLevel() {
-        useContext<BoxxleContext> {
+        useBoxxleContext {
             loadLevel(level.levelNumber)
         }
     }
 
     private fun loadLevel(levelNumber: Int) {
-        useContext<BoxxleContext> {
+        useBoxxleContext {
             level = Level(levelNumber)
             player.p.set(level.start)
             player.setScale(level.data.scale)

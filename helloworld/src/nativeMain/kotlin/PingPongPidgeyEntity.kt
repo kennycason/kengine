@@ -1,12 +1,11 @@
 
 import com.kengine.context.getContext
-import com.kengine.context.useContext
 import com.kengine.entity.SpriteEntity
-import com.kengine.event.EventContext
+import com.kengine.event.useEventContext
 import com.kengine.graphics.FlipMode
 import com.kengine.graphics.Sprite
 import com.kengine.log.Logger
-import com.kengine.sdl.SDLContext
+import com.kengine.sdl.useSDLContext
 import com.kengine.time.ClockContext
 import kotlin.random.Random
 
@@ -32,13 +31,13 @@ class PingPongPidgeyEntity : SpriteEntity(
     }
 
     private fun init() {
-        useContext<EventContext> {
+        useEventContext {
             subscribe(Events.BULBASAUR_ROAR) { e: BulbasaurRoarEvent ->
                 Logger.info { "Pidgey heard bulbasaur's roar of ${e.decibels}dB" }
                 v *= 1.05 // 5% increase in velocity
             }
         }
-        useContext<SDLContext> {
+        useSDLContext {
             p.x = Random.nextInt(0, screenWidth - width).toDouble()
             p.y = Random.nextInt(0, screenHeight - height).toDouble()
             v.x = Random.nextInt(10, 60).toDouble() * if (Random.nextBoolean()) 1 else -1
@@ -48,7 +47,7 @@ class PingPongPidgeyEntity : SpriteEntity(
     }
 
     private fun bounce() {
-        useContext<SDLContext> {
+        useSDLContext {
             p += v * getContext<ClockContext>().deltaTimeSec
             if (p.x < 0 || p.x > screenWidth - width) {
                 v.x *= -1

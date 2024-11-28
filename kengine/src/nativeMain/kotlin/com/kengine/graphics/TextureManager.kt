@@ -4,6 +4,7 @@ import com.kengine.context.useContext
 import com.kengine.log.Logger
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDL_LoadBMP
+import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.CValuesRef
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.IntVar
@@ -30,7 +31,7 @@ class TextureManager {
     private val textureCache = mutableMapOf<String, Texture>()
 
     fun getTexture(texturePath: String): Texture {
-        useContext<SDLContext> {
+        useSDLContext {
             if (texturePath in textureCache) {
                 Logger.debug { "Loading texture $texturePath from cache" }
                 return textureCache[texturePath]!!
@@ -40,7 +41,7 @@ class TextureManager {
     }
 
     fun addTexture(texturePath: String): Texture {
-        useContext<SDLContext> {
+        useSDLContext {
             Logger.debug { "Loading texture $texturePath to cache" }
 
             val surface = SDL_LoadBMP(texturePath)
@@ -77,7 +78,7 @@ class TextureManager {
     }
 
     fun copyTexture(source: CValuesRef<cnames.structs.SDL_Texture>): CValuesRef<cnames.structs.SDL_Texture> {
-        useContext(SDLContext.get()) {
+        useSDLContext {
             memScoped {
                 val w = alloc<IntVar>()
                 val h = alloc<IntVar>()

@@ -1,11 +1,10 @@
 package com.kengine.graphics
 
 import com.kengine.context.getContext
-import com.kengine.context.useContext
 import com.kengine.log.Logger
 import com.kengine.math.IntRect
 import com.kengine.math.Vec2
-import com.kengine.sdl.SDLContext
+import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -31,7 +30,7 @@ class Sprite private constructor(
     fun draw(p: Vec2, flip: FlipMode = FlipMode.NONE) = draw(p.x, p.y, flip)
 
     fun draw(x: Double, y: Double, flip: FlipMode = FlipMode.NONE) {
-        useContext<SDLContext> {
+        useSDLContext {
             memScoped {
                 val clipRect = if (clip == null) null
                 else alloc<SDL_Rect>().apply {

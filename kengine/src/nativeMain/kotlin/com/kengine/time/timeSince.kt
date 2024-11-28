@@ -7,7 +7,7 @@ import com.kengine.context.useContext
  * e.g. if (keyboard.isSpacePressed() && timeSince(spaceLastPressedMs) > 200) { }
  */
 fun timeSinceMs(timeMs: Long): Long {
-    useContext(ClockContext.get()) {
+    useClockContext {
         return totalTimeMs - timeMs
     }
 }
@@ -17,7 +17,7 @@ fun timeSinceMs(timeMs: Long): Long {
  * e.g. if (keyboard.isSpacePressed() && timeSince(spaceLastPressedSec) > 0.2) { }
  */
 fun timeSinceSec(timeSec: Double): Double {
-    useContext(ClockContext.get()) {
+    useClockContext {
         return totalTimeSec - timeSec
     }
 }

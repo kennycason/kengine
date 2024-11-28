@@ -1,12 +1,14 @@
 package boxxle
 
 import com.kengine.GameContext
-import com.kengine.action.ActionsContext
+import com.kengine.action.ActionContext
+import com.kengine.action.useActionContext
 import com.kengine.context.getContext
 import com.kengine.context.useContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
-import com.kengine.input.KeyboardContext
+import com.kengine.graphics.useSpriteContext
+import com.kengine.input.useKeyboardContext
 import com.kengine.math.Vec2
 import com.kengine.time.getCurrentTimestampMilliseconds
 import com.kengine.time.timeSinceMs
@@ -36,7 +38,7 @@ class Player(
     }
 
     override fun update() {
-        useContext<KeyboardContext> {
+        useKeyboardContext {
             if (!isMoving && timeSinceMs(lastMovedMs) > 300) {
                 if (keyboard.isLeftPressed() || keyboard.isAPressed()) {
                     face = Direction.LEFT
@@ -64,7 +66,7 @@ class Player(
     }
 
     private fun tryMove(delta: Vec2) {
-        useContext<BoxxleContext> {
+        useBoxxleContext {
             val newP = p + delta
 
             // is a brick blocking the player?
@@ -77,7 +79,7 @@ class Player(
                         // move both the player and the box
                         isMoving = true
                         lastMovedMs = getCurrentTimestampMilliseconds()
-                        return useContext<ActionsContext> {
+                        return useActionContext {
                             moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
                             moveTo(box, box.p + delta, speed, onComplete = { box.afterPush() })
                         }
@@ -88,13 +90,13 @@ class Player(
 
             // if no box is being pushed, just move the player
             isMoving = true
-            getContext<ActionsContext>().moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
+            getContext<ActionContext>().moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
             lastMovedMs = getCurrentTimestampMilliseconds()
         }
     }
 
     private fun canMoveBox(newP: Vec2): Boolean {
-        useContext(BoxxleContext.get()) {
+        useBoxxleContext {
             // is new position is within bounds
             if (!isWithinBounds(newP)) return false
 
@@ -109,13 +111,13 @@ class Player(
     }
 
     private fun isWithinBounds(p: Vec2): Boolean {
-        useContext(BoxxleContext.get()) {
+        useBoxxleContext {
             return p.x >= 0 && p.y >= 0 && p.x < level.tiles[0].size && p.y < level.tiles.size
         }
     }
 
     override fun draw() {
-        useContext<SpriteContext> {
+        useSpriteContext {
             when (face) {
                 Direction.UP -> playerSpriteUp.draw(p.x * 32, p.y * 32)
                 Direction.DOWN -> playerSpriteDown.draw(p.x * 32, p.y * 32)

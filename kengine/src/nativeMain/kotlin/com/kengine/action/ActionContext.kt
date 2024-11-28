@@ -4,7 +4,7 @@ import com.kengine.context.Context
 import com.kengine.entity.Entity
 import com.kengine.math.Vec2
 
-class ActionsContext: Context() {
+class ActionContext: Context() {
     private val actions = ArrayDeque<Action>()
 
     fun moveTo(entity: Entity, destination: Vec2, speed: Double, onComplete: (() -> Unit)? = null) {
@@ -32,7 +32,7 @@ class ActionsContext: Context() {
     fun size() = actions.size
 
     companion object {
-        private val instance = ActionsContext()
-        fun get(): ActionsContext = instance
+        private val instance = ActionContext()
+        fun get(): ActionContext = instance
     }
 }

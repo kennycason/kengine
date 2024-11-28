@@ -1,6 +1,6 @@
 package com.kengine
 
-import com.kengine.action.ActionsContext
+import com.kengine.action.ActionContext
 import com.kengine.context.Context
 import com.kengine.context.ContextRegistry
 import com.kengine.context.getContext
@@ -27,7 +27,7 @@ class GameContext private constructor(
     val sprites: SpriteContext,
     val geometry: GeometryContext,
     val sounds: SoundContext,
-    val actions: ActionsContext,
+    val actions: ActionContext,
     val clock: ClockContext,
 ) : Context() {
     var isRunning = true
@@ -75,7 +75,7 @@ class GameContext private constructor(
                 sprites = SpriteContext.get(),
                 sounds = SoundContext.get(),
                 geometry = GeometryContext.get(),
-                actions = ActionsContext.get(),
+                actions = ActionContext.get(),
                 clock = ClockContext.get()
             )
             return currentContext!!
