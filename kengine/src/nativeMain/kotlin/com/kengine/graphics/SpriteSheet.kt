@@ -1,13 +1,10 @@
 package com.kengine.graphics
 
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
-import sdl2.SDL_Rect
+import com.kengine.log.Logger
+import com.kengine.math.IntRect
 
-@OptIn(ExperimentalForeignApi::class)
 class SpriteSheet(
-    private val sprite: Sprite,
+    private val texture: Texture,
     val tileWidth: Int,
     val tileHeight: Int,
     private val offsetX: Int = 0,
@@ -19,23 +16,18 @@ class SpriteSheet(
     /**
      * Get a specific tile as a ClippedSprite based on its grid position (x, y).
      */
-    fun getTile(x: Int, y: Int): ClippedSprite {
-        memScoped {
-            val clipRect = alloc<SDL_Rect>().apply {
-                this.x = offsetX + x * (tileWidth + dx)
-                this.y = offsetY + y * (tileHeight + dy)
-                this.w = tileWidth
-                this.h = tileHeight
-            }
-            return ClippedSprite(sprite,
-                clipX = clipRect.x,
-                clipY = clipRect.y,
-                clipWidth = clipRect.w,
-                clipHeight = clipRect.h
-            )
-        }
+    fun getTile(x: Int, y: Int): Sprite {
+        val clip = IntRect(
+            x = offsetX + x * (tileWidth + dx),
+            y = offsetY + y * (tileHeight + dy),
+            w = tileWidth,
+            h = tileHeight
+        )
+        Logger.debug { "Loading tile from ($x,$y) -> [(${clip.x},${clip.y}) ${clip.w}${clip.h}" }
+        return Sprite.fromTexture(texture, clip)
     }
 
     fun cleanup() {
     }
+
 }

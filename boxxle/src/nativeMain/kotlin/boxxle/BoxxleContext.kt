@@ -2,9 +2,9 @@ package boxxle
 
 import com.kengine.context.Context
 import com.kengine.context.useContext
-import com.kengine.graphics.Sprite
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.SpriteSheet
+import com.kengine.graphics.TextureContext
 
 class BoxxleContext private constructor(
     var level: Level,
@@ -29,10 +29,14 @@ class BoxxleContext private constructor(
         }
 
         private fun loadSprites() {
-            useContext(SpriteContext.get()) {
-                val spriteSheet = SpriteSheet(Sprite(Sprites.BOXXLE_SHEET_BMP), 32, 32)
-                manager.setSpriteSheet(Sprites.BOXXLE_SHEET, spriteSheet)
-            }
+                useContext(SpriteContext.get()) {
+                    val boxxleTexture = useContext(TextureContext.get()) {
+                        manager.getTexture(Sprites.BOXXLE_SHEET_BMP)
+                    }
+                    val spriteSheet = SpriteSheet(boxxleTexture, 32, 32)
+                    manager.setSpriteSheet(Sprites.BOXXLE_SHEET, spriteSheet)
+                }
+
         }
     }
 

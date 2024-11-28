@@ -10,7 +10,7 @@ import com.kengine.time.ClockContext
 import kotlin.random.Random
 
 class PingPongPidgeyEntity : SpriteEntity(
-    sprite = Sprite("assets/sprites/pidgey.bmp")
+    sprite = Sprite.fromFilePath("assets/sprites/pidgey.bmp")
 ) {
 
     private var state = State.INIT

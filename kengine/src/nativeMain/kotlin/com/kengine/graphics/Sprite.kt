@@ -2,6 +2,7 @@ package com.kengine.graphics
 
 import com.kengine.context.useContext
 import com.kengine.log.Logger
+import com.kengine.math.IntRect
 import com.kengine.math.Vec2
 import com.kengine.sdl.SDLContext
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -15,44 +16,39 @@ import sdl2.SDL_Rect
 import sdl2.SDL_RenderCopy
 import sdl2.SDL_RenderCopyEx
 
+// TODO object pools or locally storing SDL_Rects so I don't have to keep allocating them
 @OptIn(ExperimentalForeignApi::class)
-class Sprite {
-    lateinit var texture: Texture
-    val width: Int by lazy { texture.width }
-    val height: Int by lazy { texture.height }
-    val scale = Vec2(1.0, 1.0)
+class Sprite private constructor(
+    private val texture: Texture,
+    private val clip: IntRect? = null,
+    val scale: Vec2 = Vec2(1.0, 1.0),
     var rotation: Double = 0.0
-
-    /**
-     * Create a sprite from an image file path.
-     */
-    constructor(imagePath: String) {
-        useContext(TextureContext.get()) {
-            texture = manager.getTexture(imagePath)
-        }
-    }
-
-    /**
-     * Create a sprite directly from a texture.
-     */
-    constructor(texture: Texture) {
-        this.texture = texture
-    }
+) {
+    val width: Int = clip?.w ?: texture.width
+    val height: Int = clip?.h ?: texture.height
 
     fun draw(p: Vec2, flip: FlipMode = FlipMode.NONE) = draw(p.x, p.y, flip)
 
     fun draw(x: Double, y: Double, flip: FlipMode = FlipMode.NONE) {
         useContext(SDLContext.get()) {
-            // define destination rectangle for rendering
             memScoped {
+                val clipRect = if (clip == null) null
+                else alloc<SDL_Rect>().apply {
+                    this.x = clip.x
+                    this.y = clip.y
+                    this.w = clip.w
+                    this.h = clip.h
+                }
+
                 val destRect = alloc<SDL_Rect>().apply {
                     this.x = (x * scale.x).toInt()
                     this.y = (y * scale.y).toInt()
-                    this.w = (width * scale.x).toInt()
-                    this.h = (height * scale.y).toInt()
+                    this.w = ((clipRect?.w ?: texture.width) * scale.x).toInt()
+                    this.h = ((clipRect?.h ?: texture.height) * scale.y).toInt()
                 }
+
                 if (rotation == 0.0 && flip == FlipMode.NONE) {
-                    SDL_RenderCopy(renderer, texture.texture, null, destRect.ptr)
+                    SDL_RenderCopy(renderer, texture.texture, clipRect?.ptr, destRect.ptr)
                 } else {
                     val center = alloc<SDL_Point>().apply {
                         this.x = destRect.w / 2
@@ -61,7 +57,7 @@ class Sprite {
                     val result = SDL_RenderCopyEx(
                         renderer = renderer,
                         texture = texture.texture,
-                        srcrect = null,
+                        srcrect = clipRect?.ptr,
                         dstrect = destRect.ptr,
                         angle = rotation,
                         center = center.ptr,
@@ -78,6 +74,22 @@ class Sprite {
 
     fun cleanup() {
         // TextureManager handles texture cleanup
+    }
+
+    companion object {
+        fun fromFilePath(filePath: String, clip: IntRect? = null): Sprite {
+            return useContext(TextureContext.get()) {
+                val texture = manager.getTexture(filePath)
+                Sprite(texture, clip)
+            }
+        }
+
+        fun fromTexture(texture: Texture, clip: IntRect? = null): Sprite {
+            return useContext(TextureContext.get()) {
+                Sprite(texture, clip)
+            }
+        }
+
     }
 
 }

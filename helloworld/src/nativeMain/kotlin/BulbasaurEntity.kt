@@ -11,7 +11,7 @@ import com.kengine.sdl.SDLContext
 import com.kengine.time.ClockContext
 
 class BulbasaurEntity : SpriteEntity(
-    sprite = Sprite("assets/sprites/bulbasaur.bmp")
+    sprite = Sprite.fromFilePath("assets/sprites/bulbasaur.bmp")
 ) {
     private val speed = 100.0
     private var state = State.INIT
