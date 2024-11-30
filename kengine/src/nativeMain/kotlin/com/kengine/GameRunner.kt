@@ -1,11 +1,11 @@
 package com.kengine
 
-import com.kengine.log.Logger
+import com.kengine.log.Logging
 
 class GameRunner(
     frameRate: Int = 60,
     gameBuilder: () -> Game
-) {
+) : Logging {
 
     init {
         var game: Game? = null
@@ -23,7 +23,7 @@ class GameRunner(
     }
 
     private fun handleException(e: Exception) {
-        Logger.error(e) { "Unhandled exception in GameLoop" }
+        logger.error(e) { "Unhandled exception in GameLoop" }
     }
 
 }

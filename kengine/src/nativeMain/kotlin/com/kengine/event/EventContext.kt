@@ -1,23 +1,11 @@
 package com.kengine.event
 
 import com.kengine.context.Context
-import com.kengine.log.Logger
+import com.kengine.log.Logging
 
 
-class EventContext : Context() {
+class EventContext : Context(), Logging {
     private val subscribers = mutableMapOf<String, MutableList<(Any) -> Unit>>()
-
-    companion object {
-        private var currentContext: EventContext? = null
-
-        fun get(): EventContext {
-            if (currentContext == null) {
-                currentContext = EventContext()
-
-            }
-            return currentContext ?: throw IllegalStateException("Failed to create EventContext")
-        }
-    }
 
     fun <M> subscribe(eventType: String, handler: (M) -> Unit) {
         val handlers = subscribers.getOrPut(eventType) { mutableListOf() }
@@ -26,8 +14,8 @@ class EventContext : Context() {
                 @Suppress("UNCHECKED_CAST")
                 handler(message as M)
             } catch (e: ClassCastException) {
-                Logger.error { "Failed to cast message: ${e.message}" }
-                Logger.debug(e)
+                logger.error { "Failed to cast message: ${e.message}" }
+                logger.debug(e)
             }
         }
     }
@@ -48,6 +36,18 @@ class EventContext : Context() {
 
     override fun cleanup() {
         clearAll()
+    }
+
+    companion object {
+        private var currentContext: EventContext? = null
+
+        fun get(): EventContext {
+            if (currentContext == null) {
+                currentContext = EventContext()
+
+            }
+            return currentContext ?: throw IllegalStateException("Failed to create EventContext")
+        }
     }
 
 }

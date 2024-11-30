@@ -1,7 +1,7 @@
 package com.kengine.graphics
 
 import com.kengine.context.getContext
-import com.kengine.log.Logger
+import com.kengine.log.Logging
 import com.kengine.math.IntRect
 import com.kengine.math.Vec2
 import com.kengine.sdl.useSDLContext
@@ -23,7 +23,7 @@ class Sprite private constructor(
     private val clip: IntRect? = null,
     val scale: Vec2 = Vec2(1.0, 1.0),
     var rotation: Double = 0.0
-) {
+) : Logging {
     val width: Int = clip?.w ?: texture.width
     val height: Int = clip?.h ?: texture.height
 
@@ -64,7 +64,7 @@ class Sprite private constructor(
                         flip = flip.flag
                     )
                     if (result != 0) {
-                        Logger.error("Error drawing sprite: ${SDL_GetError()?.toKString()}")
+                        logger.error("Error drawing sprite: ${SDL_GetError()?.toKString()}")
                     }
                     return
                 }

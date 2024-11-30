@@ -1,7 +1,7 @@
 package com.kengine.graphics
 
 import com.kengine.context.getContext
-import com.kengine.log.Logger
+import com.kengine.log.Logging
 import com.kengine.math.IntRect
 
 class SpriteSheet private constructor(
@@ -12,7 +12,7 @@ class SpriteSheet private constructor(
     private val offsetY: Int = 0,
     private val dx: Int = 0, // spacing between tiles
     private val dy: Int = 0  // spacing between tiles
-) {
+) : Logging {
     val width = texture.width / tileWidth
     val height = texture.height / tileHeight
 
@@ -26,7 +26,7 @@ class SpriteSheet private constructor(
             w = tileWidth,
             h = tileHeight
         )
-        Logger.debug { "Loading tile from ($x,$y) -> [(${clip.x},${clip.y}) ${clip.w}${clip.h}" }
+        logger.debug { "Loading tile from ($x,$y) -> [(${clip.x},${clip.y}) ${clip.w}${clip.h}" }
         return Sprite.fromTexture(texture, clip)
     }
 

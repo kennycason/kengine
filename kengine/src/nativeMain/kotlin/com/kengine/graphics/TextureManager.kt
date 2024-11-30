@@ -1,8 +1,6 @@
 package com.kengine.graphics
 
-import com.kengine.context.useContext
-import com.kengine.log.Logger
-import com.kengine.sdl.SDLContext
+import com.kengine.log.Logging
 import com.kengine.sdl.SDL_LoadBMP
 import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.CValuesRef
@@ -27,13 +25,13 @@ import sdl2.SDL_SetRenderTarget
  * A centralized texture manager to help with caching for faster, more efficient texture loading.
  */
 @OptIn(ExperimentalForeignApi::class)
-class TextureManager {
+class TextureManager : Logging {
     private val textureCache = mutableMapOf<String, Texture>()
 
     fun getTexture(texturePath: String): Texture {
         useSDLContext {
             if (texturePath in textureCache) {
-                Logger.debug { "Loading texture $texturePath from cache" }
+                logger.debug { "Loading texture $texturePath from cache" }
                 return textureCache[texturePath]!!
             }
         }
@@ -42,7 +40,7 @@ class TextureManager {
 
     fun addTexture(texturePath: String): Texture {
         useSDLContext {
-            Logger.debug { "Loading texture $texturePath to cache" }
+            logger.debug { "Loading texture $texturePath to cache" }
 
             val surface = SDL_LoadBMP(texturePath)
                 ?: throw IllegalStateException("Error loading image: ${SDL_GetError()?.toKString()}")

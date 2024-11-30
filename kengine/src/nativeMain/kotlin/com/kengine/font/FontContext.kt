@@ -1,7 +1,7 @@
 package com.kengine.font
 
 import com.kengine.context.Context
-import com.kengine.log.Logger
+import com.kengine.log.Logging
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
@@ -13,7 +13,7 @@ import sdl2.ttf.TTF_OpenFont
 import sdl2.ttf.TTF_Quit
 
 @OptIn(ExperimentalForeignApi::class)
-class FontContext : Context() {
+class FontContext : Context(), Logging {
     private val fontCache = mutableMapOf<String, Font>()
     private val surfaceCache = mutableMapOf<String, CPointer<SDL_Surface>>()
 
@@ -25,7 +25,7 @@ class FontContext : Context() {
 
     fun addFont(fontName: String, fontFilePath: String, fontSize: Int): Font {
         val key = "$fontName:$fontSize"
-        Logger.info { "adding font $key" }
+        logger.info { "adding font $key" }
         return fontCache.getOrPut(key) {
             Font(
                 name = fontName,

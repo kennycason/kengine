@@ -25,7 +25,14 @@ class SoundContext private constructor(
         return manager.getSound(name)
     }
 
+    override fun cleanup() {
+        manager.cleanup()
+        Mix_CloseAudio()
+        currentContext = null
+    }
+
     companion object {
+        private val logger = Logger.get(SoundContext::class)
         private var currentContext: SoundContext? = null
 
         fun get(): SoundContext {
@@ -36,7 +43,7 @@ class SoundContext private constructor(
 
                 // Initialize SDL_mixer
                 if (SDL_Init(SDL_INIT_AUDIO) != 0) {
-                    Logger.error("Error initializing SDL Audio: ${SDL_GetError()?.toKString()}")
+                    logger.error("Error initializing SDL Audio: ${SDL_GetError()?.toKString()}")
                     exit(1)
                 }
 
@@ -48,8 +55,4 @@ class SoundContext private constructor(
         }
     }
 
-    override fun cleanup() {
-        manager.cleanup()
-        Mix_CloseAudio()
-    }
 }

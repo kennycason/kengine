@@ -4,14 +4,14 @@ import com.kengine.entity.SpriteEntity
 import com.kengine.event.useEventContext
 import com.kengine.graphics.FlipMode
 import com.kengine.graphics.Sprite
-import com.kengine.log.Logger
+import com.kengine.log.Logging
 import com.kengine.sdl.useSDLContext
 import com.kengine.time.ClockContext
 import kotlin.random.Random
 
 class PingPongPidgeyEntity : SpriteEntity(
     sprite = Sprite.fromFilePath("assets/sprites/pidgey.bmp")
-) {
+), Logging {
 
     private var state = State.INIT
 
@@ -33,7 +33,7 @@ class PingPongPidgeyEntity : SpriteEntity(
     private fun init() {
         useEventContext {
             subscribe(Events.BULBASAUR_ROAR) { e: BulbasaurRoarEvent ->
-                Logger.info { "Pidgey heard bulbasaur's roar of ${e.decibels}dB" }
+                logger.info { "Pidgey heard bulbasaur's roar of ${e.decibels}dB" }
                 v *= 1.05 // 5% increase in velocity
             }
         }

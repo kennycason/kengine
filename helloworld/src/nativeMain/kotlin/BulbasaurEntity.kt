@@ -8,7 +8,7 @@ import com.kengine.graphics.FlipMode
 import com.kengine.graphics.Sprite
 import com.kengine.input.KeyboardContext
 import com.kengine.input.MouseContext
-import com.kengine.log.Logger
+import com.kengine.log.getLogger
 import com.kengine.sdl.useSDLContext
 import com.kengine.time.ClockContext
 
@@ -57,7 +57,7 @@ class BulbasaurEntity : SpriteEntity(
                 rotation -= 1.0
             }
             if (keyboard.isSpacePressed()) {
-                Logger.info { "Bulbasaur ROARED!" }
+                getLogger(this::class).info { "Bulbasaur ROARED!" }
                 useContext<EventContext> {
                     publish(Events.BULBASAUR_ROAR, BulbasaurRoarEvent(decibels = 90.0))
                 }

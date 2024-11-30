@@ -11,7 +11,7 @@ import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.TextureContext
 import com.kengine.input.KeyboardContext
 import com.kengine.input.MouseContext
-import com.kengine.log.Logger
+import com.kengine.log.Logging
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
 import com.kengine.sdl.registerSDLQuitHandler
@@ -31,7 +31,7 @@ class GameContext private constructor(
     val sound: SoundContext,
     val action: ActionContext,
     val clock: ClockContext,
-) : Context() {
+) : Context(), Logging {
     var isRunning = true
 
     init {
@@ -91,7 +91,7 @@ class GameContext private constructor(
     }
 
     override fun cleanup() {
-        Logger.info { "Cleaning up game resources" }
+        logger.info { "Cleaning up game resources" }
         action.cleanup()
         sdlEvent.cleanup()
         events.cleanup()

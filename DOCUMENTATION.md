@@ -45,7 +45,7 @@ class BallSpriteEntity : SpriteEntity(
     sprite = Sprite.fromFilePath("assets/sprites/ball.bmp"),
     p = Vec2(400.0, 300.0),  // initial position
     v = Vec2(30.0, 30.0) // initial velocity (pixels/sec)
-) {
+), Logging {
     private var bounceCounter = 0
     
     override fun update() {
@@ -68,13 +68,13 @@ class BallSpriteEntity : SpriteEntity(
         
         useKeyboardContext {
             if (keyboard.isRPressed()) {
-                Logger.info { "Reset ball" }
+                logger.info { "Reset ball" }
                 p.set(400.0, 300.0)
                 p.set(30.0, 30.0)
             }
         }
 
-        Logger.info { "Wall bounces: $bounceCounter" }
+        logger.info { "Wall bounces: $bounceCounter" }
     }
 }
 ```
@@ -156,8 +156,8 @@ Example: Using the `ClockContext`
 
 ```kotlin
 useClockContext {
-    Logger.info { "Total Time: $totalTimeSec seconds" }
-    Logger.info { "Delta Time: $deltaTimeSec seconds" }
+    logger.info { "Total Time: $totalTimeSec seconds" }
+    logger.info { "Delta Time: $deltaTimeSec seconds" }
 }
 ```
 
@@ -194,7 +194,7 @@ Example: Publishing and Subscribing to Events
 ```kotlin
 useEventContext {
     subscribe("player_died") { data: String ->
-        Logger.info { "Player died because: $data" }
+        logger.info { "Player died because: $data" }
     }
     publish("player_died", "Fell off a cliff")
 }
@@ -209,9 +209,9 @@ The Logger provides utility functions for debugging and monitoring game state.
 Example:
 
 ```kotlin
-Logger.info { "Game started!" }
-Logger.error { "An error occurred." }
-Logger.error(e) { "An error occurred." }
+logger.info { "Game started!" }
+logger.error { "An error occurred." }
+logger.error(e) { "An error occurred." }
 ```
 
 #### Actions
@@ -223,7 +223,7 @@ Example: Moving an Entity
 ```kotlin
 useActionContext {
     moveTo(entity, Vec2(200.0, 300.0), speed = 100.0) {
-        Logger.info { "Entity reached its destination!" }
+        logger.info { "Entity reached its destination!" }
     }
 }
 ```
@@ -238,6 +238,6 @@ Example: Using Vectors
 val position = Vec2(10.0, 20.0)
 val direction = Vec2(1.0, 0.0)
 val newPosition = position + direction * 5.0
-Logger.info { "New Position: $newPosition" }
+logger.info { "New Position: $newPosition" }
 ```
 

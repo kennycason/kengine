@@ -79,15 +79,15 @@ useSDLContext {
 ```kotlin
 useKeyboardContext {
     if (keyboard.isLeftPressed()) {
-        Logger.info { "pressed left" }
+        logger.info { "pressed left" }
     }
     if (keyboard.isSpacePressed()) {
-        Logger.info { "pressed space" }
+        logger.info { "pressed space" }
     }
 }
 useMouseContext {
     if (mouse.isLeftPressed() || mouse.isRightPressed()) {
-        Logger.info { "Clicked mouse @ (${mouse.getCursor().x}, ${mouse.getCursor().y})" }
+        logger.info { "Clicked mouse @ (${mouse.getCursor().x}, ${mouse.getCursor().y})" }
     }
 }
 ```

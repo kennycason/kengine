@@ -1,7 +1,7 @@
 package com.kengine
 
 import com.kengine.context.useContext
-import com.kengine.log.Logger
+import com.kengine.log.Logging
 import com.kengine.time.ClockContext
 import com.kengine.time.getCurrentTimestampMilliseconds
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -11,7 +11,7 @@ import sdl2.SDL_Delay
 class GameLoop(
     frameRate: Int,
     update: () -> Unit
-) {
+) : Logging {
 
     init {
         val targetFrameTime = 1000.0 / frameRate
@@ -38,7 +38,7 @@ class GameLoop(
                 }
             }
         }
-        Logger.info { "Game loop exited cleanly." }
+        logger.info { "Game loop exited cleanly." }
     }
 
     companion object {

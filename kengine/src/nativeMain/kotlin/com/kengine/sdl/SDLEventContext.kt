@@ -1,6 +1,6 @@
 package com.kengine.sdl
 import com.kengine.context.Context
-import com.kengine.log.Logger
+import com.kengine.log.Logging
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -15,7 +15,7 @@ import sdl2.SDL_PollEvent
 import sdl2.SDL_QUIT
 
 @OptIn(ExperimentalForeignApi::class)
-class SDLEventContext private constructor() : Context() {
+class SDLEventContext private constructor() : Context(), Logging {
     private val events = mutableListOf<SDL_Event>()
     private val subscribers = mutableMapOf<EventType, MutableList<(SDL_Event) -> Unit>>()
 
@@ -81,14 +81,14 @@ class SDLEventContext private constructor() : Context() {
                     try {
                         handler(event)
                     } catch (e: Exception) {
-                        Logger.error { "Error handling event: ${e.message}" }
+                        logger.error { "Error handling event: ${e.message}" }
                     }
                 }
             } else {
-                Logger.warn { "No subscribers for event type: $eventType" }
+                logger.warn { "No subscribers for event type: $eventType" }
             }
         } else {
-            Logger.debug { "Unsupported event type: ${event.type}" }
+            logger.debug { "Unsupported event type: ${event.type}" }
         }
     }
 

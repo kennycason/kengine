@@ -5,7 +5,7 @@ import com.kengine.graphics.alphaFromRGBA
 import com.kengine.graphics.blueFromRGBA
 import com.kengine.graphics.greenFromRGBA
 import com.kengine.graphics.redFromRGBA
-import com.kengine.log.Logger
+import com.kengine.log.Logging
 import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
@@ -27,7 +27,7 @@ import sdl2gfx.filledCircleRGBA
  * TODO better handle Int to Short cast
  */
 @OptIn(ExperimentalForeignApi::class)
-class GeometryContext private constructor() : Context() {
+class GeometryContext private constructor() : Context(), Logging {
 
     fun drawCircle(
         centerX: Int, centerY: Int,
@@ -50,7 +50,7 @@ class GeometryContext private constructor() : Context() {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
             val result = circleRGBA(renderer, centerX.toShort(), centerY.toShort(), radius.toShort(), r, g, b, a)
             if (result != 0) {
-                Logger.error("Error drawing circle: ${SDL_GetError()?.toKString()}")
+                logger.error("Error drawing circle: ${SDL_GetError()?.toKString()}")
             }
         }
     }
@@ -76,7 +76,7 @@ class GeometryContext private constructor() : Context() {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
             val result = filledCircleRGBA(renderer, centerX.toShort(), centerY.toShort(), radius.toShort(), r, g, b, a)
             if (result != 0) {
-                Logger.error("Error filling circle: ${SDL_GetError()?.toKString()}")
+                logger.error("Error filling circle: ${SDL_GetError()?.toKString()}")
             }
         }
     }
@@ -149,7 +149,7 @@ class GeometryContext private constructor() : Context() {
                 }
                 val result = SDL_RenderDrawRect(renderer, rect.ptr)
                 if (result != 0) {
-                    Logger.error("Error drawing rectangle: ${SDL_GetError()?.toKString()}")
+                    logger.error("Error drawing rectangle: ${SDL_GetError()?.toKString()}")
                 }
             }
         }
@@ -182,7 +182,7 @@ class GeometryContext private constructor() : Context() {
                 rect.h = height
                 val result = SDL_RenderFillRect(renderer, rect.ptr)
                 if (result != 0) {
-                    Logger.error("Error filling rectangle: ${SDL_GetError()?.toKString()}")
+                    logger.error("Error filling rectangle: ${SDL_GetError()?.toKString()}")
                 }
             }
         }
@@ -209,7 +209,7 @@ class GeometryContext private constructor() : Context() {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
             val result = SDL_RenderDrawLine(renderer, startX, startY, endX, endY)
             if (result != 0) {
-                Logger.error("Error drawing line: ${SDL_GetError()?.toKString()}")
+                logger.error("Error drawing line: ${SDL_GetError()?.toKString()}")
             }
         }
     }
@@ -228,7 +228,7 @@ class GeometryContext private constructor() : Context() {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
             val result = SDL_RenderDrawPoint(renderer, x, y)
             if (result != 0) {
-                Logger.error("Error drawing pixel: ${SDL_GetError()?.toKString()}")
+                logger.error("Error drawing pixel: ${SDL_GetError()?.toKString()}")
             }
         }
     }
@@ -245,6 +245,7 @@ class GeometryContext private constructor() : Context() {
     }
 
     override fun cleanup() {
+        currentContext = null
     }
 
 }

@@ -5,7 +5,7 @@ import com.kengine.graphics.alphaFromRGBA
 import com.kengine.graphics.blueFromRGBA
 import com.kengine.graphics.greenFromRGBA
 import com.kengine.graphics.redFromRGBA
-import com.kengine.log.Logger
+import com.kengine.log.Logging
 import com.kengine.sdl.SDLContext
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CValue
@@ -34,7 +34,7 @@ class Font(
     val name: String,
     val font: CPointer<TTF_Font>,
     val fontSize: Int
-) {
+) : Logging {
     private val surfaceCache = mutableMapOf<String, CPointer<SDL_Surface>>()
 
     fun drawText(
@@ -63,7 +63,7 @@ class Font(
         val cacheKey = if (caching) "${text.hashCode()}:$name:$fontSize:$r:$g:$b:$a" else ""
         val surface = if (caching) {
             surfaceCache.getOrPut(cacheKey) {
-                Logger.debug { "Storing text surface: [$text]" }
+                logger.debug { "Storing text surface: [$text]" }
                 renderTextToSurface(text, font, r, g, b, a)
             }
         } else {

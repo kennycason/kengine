@@ -5,12 +5,22 @@ import com.kengine.log.Logger.Level.ERROR
 import com.kengine.log.Logger.Level.INFO
 import com.kengine.log.Logger.Level.WARN
 import com.kengine.time.getCurrentTimestampMilliseconds
+import kotlin.reflect.KClass
 
 /**
  * A simple logger
  * TODO add file logger support
  */
-object Logger {
+class Logger {
+    private val className: String
+
+    constructor(className: String) {
+        this.className = className
+    }
+
+    constructor(klass: KClass<*>)
+            : this(klass.simpleName ?: "Unknown")
+
     enum class Level {
         DEBUG, INFO, WARN, ERROR
     }
@@ -53,8 +63,15 @@ object Logger {
     private fun log(level: Level, message: String?) {
         if (level.ordinal >= logLevel.ordinal) {
             val timestamp = getCurrentTimestampMilliseconds()
-            println("[$timestamp] [${level.name}] $message")
+            println("[${level.name}][$className][$timestamp] $message")
         }
+    }
+
+    companion object {
+        /**
+         * helper for creating loggers for static classes
+         */
+        fun get(klass: KClass<*>) = cachedLoggerOf(klass)
     }
 
 }
