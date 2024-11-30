@@ -33,11 +33,11 @@ class Font(
 ) {
     private val surfaceCache = mutableMapOf<String, CPointer<SDL_Surface>>()
 
-    fun draw(
+    fun drawText(
         text: String,
         x: Int,
         y: Int,
-        r: UByte, g: UByte, b: UByte, a: UByte,
+        r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu,
         caching: Boolean = false
     ) {
         val cacheKey = if (caching) "${text.hashCode()}:$name:$fontSize:$r:$g:$b:$a" else ""

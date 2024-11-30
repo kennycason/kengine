@@ -1,10 +1,13 @@
 package boxxle
 
 import boxxle.context.BoxxleContext
+import boxxle.context.getBoxxleContext
 import boxxle.context.useBoxxleContext
 import com.kengine.Game
 import com.kengine.action.ActionContext
 import com.kengine.context.getContext
+import com.kengine.font.Font
+import com.kengine.font.getFontContext
 import com.kengine.font.useFontContext
 import com.kengine.getGameContext
 import com.kengine.input.useKeyboardContext
@@ -23,6 +26,9 @@ class BoxxleGame : Game {
     private var timeSinceOptionChange = 0L // TODO fix keyboard.timeSinceKeyPressed function
     private lateinit var mainSound: Sound
     private lateinit var finishSound: Sound
+    private val menuFont: Font by lazy {
+        getFontContext().getFont(Fonts.ARCADE_CLASSIC, 32)
+    }
 
     init {
         getGameContext().registerContext(BoxxleContext.get())
@@ -57,14 +63,8 @@ class BoxxleGame : Game {
                 player.draw()
             }
 
-            useBoxxleContext {
-                useFontContext {
-                    drawText(
-                        Fonts.ARCADE_CLASSIC, "LVL ${level.levelNumber}", 690, 560,
-                        r = 0x33u, g = 0x33u, b = 0x33u, a = 0xFFu, fontSize = 32
-                    )
-                }
-            }
+            val level = getBoxxleContext().level
+            menuFont.drawText("LVL ${level.levelNumber}", 690, 560, r = 0x33u, g = 0x33u, b = 0x33u, a = 0xFFu)
 
             flipScreen()
         }

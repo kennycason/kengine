@@ -44,16 +44,14 @@ class FontContext : Context() {
     }
 
     fun drawText(
-        fontName: String,
+        font: Font,
         text: String,
         x: Int,
         y: Int,
-        r: UByte, g: UByte, b: UByte, a: UByte,
-        fontSize: Int,
+        r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu,
         caching: Boolean = false
     ) {
-        getFont(fontName, fontSize)
-            .draw(text, x, y, r, g, b, a, caching)
+        font.drawText(text, x, y, r, g, b, a)
     }
 
     fun clearCache() {
