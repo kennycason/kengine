@@ -1,6 +1,10 @@
 package com.kengine.geometry
 
 import com.kengine.context.Context
+import com.kengine.graphics.alphaFromRGBA
+import com.kengine.graphics.blueFromRGBA
+import com.kengine.graphics.greenFromRGBA
+import com.kengine.graphics.redFromRGBA
 import com.kengine.log.Logger
 import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -28,6 +32,18 @@ class GeometryContext private constructor() : Context() {
     fun drawCircle(
         centerX: Int, centerY: Int,
         radius: Int,
+        rgba: UInt
+    ) = drawCircle(
+        centerX, centerY, radius,
+        r = redFromRGBA(rgba),
+        g = greenFromRGBA(rgba),
+        b = blueFromRGBA(rgba),
+        a = alphaFromRGBA(rgba)
+    )
+
+    fun drawCircle(
+        centerX: Int, centerY: Int,
+        radius: Int,
         r: UByte, g: UByte, b: UByte, a: UByte
     ) {
         useSDLContext {
@@ -38,6 +54,18 @@ class GeometryContext private constructor() : Context() {
             }
         }
     }
+
+    fun fillCircle(
+        centerX: Int, centerY: Int,
+        radius: Int,
+        rgba: UInt
+    ) = fillCircle(
+        centerX, centerY, radius,
+        r = redFromRGBA(rgba),
+        g = greenFromRGBA(rgba),
+        b = blueFromRGBA(rgba),
+        a = alphaFromRGBA(rgba)
+    )
 
     fun fillCircle(
         centerX: Int, centerY: Int,
@@ -56,10 +84,54 @@ class GeometryContext private constructor() : Context() {
     fun drawSquare(
         x: Int, y: Int,
         size: Int,
+        rgba: UInt
+    ) = drawSquare(
+        x, y, size,
+        r = redFromRGBA(rgba),
+        g = greenFromRGBA(rgba),
+        b = blueFromRGBA(rgba),
+        a = alphaFromRGBA(rgba)
+    )
+
+    fun drawSquare(
+        x: Int, y: Int,
+        size: Int,
         r: UByte, g: UByte, b: UByte, a: UByte
     ) {
         drawRectangle(x, y, size, size, r, g, b, a)
     }
+
+    fun fillSquare(
+        x: Int, y: Int,
+        size: Int,
+        rgba: UInt
+    ) = fillSquare(
+        x, y, size,
+        r = redFromRGBA(rgba),
+        g = greenFromRGBA(rgba),
+        b = blueFromRGBA(rgba),
+        a = alphaFromRGBA(rgba)
+    )
+
+    fun fillSquare(
+        x: Int, y: Int,
+        size: Int,
+        r: UByte, g: UByte, b: UByte, a: UByte
+    ) {
+        fillRectangle(x, y, size, size, r, g, b, a)
+    }
+
+    fun drawRectangle(
+        x: Int, y: Int,
+        width: Int, height: Int,
+        rgba: UInt
+    ) = drawRectangle(
+        x, y, width, height,
+        r = redFromRGBA(rgba),
+        g = greenFromRGBA(rgba),
+        b = blueFromRGBA(rgba),
+        a = alphaFromRGBA(rgba)
+    )
 
     fun drawRectangle(
         x: Int, y: Int,
@@ -83,13 +155,17 @@ class GeometryContext private constructor() : Context() {
         }
     }
 
-    fun fillSquare(
+    fun fillRectangle(
         x: Int, y: Int,
-        size: Int,
-        r: UByte, g: UByte, b: UByte, a: UByte
-    ) {
-        fillRectangle(x, y, size, size, r, g, b, a)
-    }
+        width: Int, height: Int,
+        rgba: UInt
+    ) = fillRectangle(
+        x, y, width, height,
+        r = redFromRGBA(rgba),
+        g = greenFromRGBA(rgba),
+        b = blueFromRGBA(rgba),
+        a = alphaFromRGBA(rgba)
+    )
 
     fun fillRectangle(
         x: Int, y: Int,
@@ -112,6 +188,17 @@ class GeometryContext private constructor() : Context() {
         }
     }
 
+    fun drawLine(
+        startX: Int, startY: Int,
+        endX: Int, endY: Int,
+        rgba: UInt
+    ) = drawLine(
+        startX, startY, endX, endY,
+        r = redFromRGBA(rgba),
+        g = greenFromRGBA(rgba),
+        b = blueFromRGBA(rgba),
+        a = alphaFromRGBA(rgba)
+    )
 
     fun drawLine(
         startX: Int, startY: Int,
@@ -127,19 +214,14 @@ class GeometryContext private constructor() : Context() {
         }
     }
 
-    fun drawPixel(x: Int, y: Int, rgba: UInt) {
-        useSDLContext {
-            val r = ((rgba shr 24) and 0xFFu).toUByte()
-            val g = ((rgba shr 16) and 0xFFu).toUByte()
-            val b = ((rgba shr 8) and 0xFFu).toUByte()
-            val a = (rgba and 0xFFu).toUByte()
-            SDL_SetRenderDrawColor(renderer, r, g, b, a)
-            val result = SDL_RenderDrawPoint(renderer, x, y)
-            if (result != 0) {
-                Logger.error("Error drawing pixel: ${SDL_GetError()?.toKString()}")
-            }
-        }
-    }
+    fun drawPixel(x: Int, y: Int, rgba: UInt) =
+        drawPixel(
+            x, y,
+            r = redFromRGBA(rgba),
+            g = greenFromRGBA(rgba),
+            b = blueFromRGBA(rgba),
+            a = alphaFromRGBA(rgba)
+        )
 
     fun drawPixel(x: Int, y: Int, r: UByte, g: UByte, b: UByte, a: UByte) {
         useSDLContext {

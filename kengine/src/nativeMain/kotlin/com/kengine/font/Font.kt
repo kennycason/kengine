@@ -1,6 +1,10 @@
 package com.kengine.font
 
 import com.kengine.context.useContext
+import com.kengine.graphics.alphaFromRGBA
+import com.kengine.graphics.blueFromRGBA
+import com.kengine.graphics.greenFromRGBA
+import com.kengine.graphics.redFromRGBA
 import com.kengine.log.Logger
 import com.kengine.sdl.SDLContext
 import kotlinx.cinterop.CPointer
@@ -32,6 +36,22 @@ class Font(
     val fontSize: Int
 ) {
     private val surfaceCache = mutableMapOf<String, CPointer<SDL_Surface>>()
+
+    fun drawText(
+        text: String,
+        x: Int,
+        y: Int,
+        rgba: UInt,
+        caching: Boolean = false
+    ) {
+        return drawText(text, x, y,
+            r = redFromRGBA(rgba),
+            g = greenFromRGBA(rgba),
+            b = blueFromRGBA(rgba),
+            a = alphaFromRGBA(rgba),
+            caching
+        )
+    }
 
     fun drawText(
         text: String,

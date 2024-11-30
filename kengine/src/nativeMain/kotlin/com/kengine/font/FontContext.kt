@@ -49,7 +49,6 @@ class FontContext : Context() {
         x: Int,
         y: Int,
         r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu,
-        caching: Boolean = false
     ) {
         font.drawText(text, x, y, r, g, b, a)
     }

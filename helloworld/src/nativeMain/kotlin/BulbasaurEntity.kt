@@ -1,4 +1,5 @@
 
+import com.kengine.GameContext
 import com.kengine.context.getContext
 import com.kengine.context.useContext
 import com.kengine.entity.SpriteEntity
@@ -59,6 +60,11 @@ class BulbasaurEntity : SpriteEntity(
                 Logger.info { "Bulbasaur ROARED!" }
                 useContext<EventContext> {
                     publish(Events.BULBASAUR_ROAR, BulbasaurRoarEvent(decibels = 90.0))
+                }
+            }
+            if (keyboard.isEscapePressed()) {
+                useContext<GameContext> {
+                    isRunning = false
                 }
             }
         }

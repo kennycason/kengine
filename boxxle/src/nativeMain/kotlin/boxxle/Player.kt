@@ -2,9 +2,8 @@ package boxxle
 
 import boxxle.context.useBoxxleContext
 import com.kengine.GameContext
-import com.kengine.action.ActionContext
+import com.kengine.action.getActionContext
 import com.kengine.action.useActionContext
-import com.kengine.context.getContext
 import com.kengine.context.useContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
@@ -57,7 +56,8 @@ class Player(
                     face = Direction.DOWN
                     tryMove(Vec2(0.0, 1.0))
                 }
-                else if (keyboard.isEscapePressed()) {
+
+                if (keyboard.isEscapePressed()) {
                     useContext<GameContext> {
                         isRunning = false
                     }
@@ -91,7 +91,7 @@ class Player(
 
             // if no box is being pushed, just move the player
             isMoving = true
-            getContext<ActionContext>().moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
+            getActionContext().moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
             lastMovedMs = getCurrentTimestampMilliseconds()
         }
     }

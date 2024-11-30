@@ -1,6 +1,10 @@
 package com.kengine.sdl
 
 import com.kengine.context.Context
+import com.kengine.graphics.alphaFromRGBA
+import com.kengine.graphics.blueFromRGBA
+import com.kengine.graphics.greenFromRGBA
+import com.kengine.graphics.redFromRGBA
 import com.kengine.log.Logger
 import kotlinx.cinterop.CValuesRef
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -81,6 +85,25 @@ class SDLContext private constructor(
 
     fun fillScreen(r: UInt, g: UInt, b: UInt, a: UInt = 0xFFu) {
         SDL_SetRenderDrawColor(renderer, r.toUByte(), g.toUByte(), b.toUByte(), a.toUByte())
+        SDL_RenderClear(renderer)
+    }
+
+    fun fillScreenRGB(rgb: UInt) {
+        val r = redFromRGBA(rgb)
+        val g = greenFromRGBA(rgb)
+        val b = blueFromRGBA(rgb)
+
+        SDL_SetRenderDrawColor(renderer, r, g, b, 0xFFu)
+        SDL_RenderClear(renderer)
+    }
+
+    fun fillScreen(rgba: UInt) {
+        val r = redFromRGBA(rgba)
+        val g = greenFromRGBA(rgba)
+        val b = blueFromRGBA(rgba)
+        val a = alphaFromRGBA(rgba)
+
+        SDL_SetRenderDrawColor(renderer, r, g, b, a)
         SDL_RenderClear(renderer)
     }
 

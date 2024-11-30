@@ -56,7 +56,7 @@ class BoxxleGame : Game {
 
     override fun draw() {
         useSDLContext {
-            fillScreen(255u, 255u, 255u, 255u)
+            fillScreen(255u, 255u, 255u)
 
             useBoxxleContext {
                 level.draw()
