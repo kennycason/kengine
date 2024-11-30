@@ -125,6 +125,7 @@ class Player(
                 Direction.LEFT -> playerSpriteLeft.draw(p.x * 32, p.y * 32)
                 Direction.RIGHT -> playerSpriteRight.draw(p.x * 32, p.y * 32)
             }
+
         }
     }
 

@@ -1,0 +1,4 @@
+headers = SDL_ttf.h
+package = sdl2.ttf
+compilerOpts = -I/opt/homebrew/include/SDL2
+linkerOpts = -L/opt/homebrew/lib -lSDL2_ttf

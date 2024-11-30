@@ -27,8 +27,8 @@ class GameLoop(
                     lastFrameTimeMs = totalTimeMs
                 }
 
-                sdlEvents.pollEvents()
-                actions.update()
+                sdlEvent.pollEvents()
+                action.update()
 
                 update()
 

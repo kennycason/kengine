@@ -5,6 +5,7 @@ import com.kengine.context.Context
 import com.kengine.context.ContextRegistry
 import com.kengine.context.getContext
 import com.kengine.event.EventContext
+import com.kengine.font.FontContext
 import com.kengine.geometry.GeometryContext
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.TextureContext
@@ -19,15 +20,16 @@ import com.kengine.time.ClockContext
 
 class GameContext private constructor(
     val sdl: SDLContext,
-    val sdlEvents: SDLEventContext,
+    val sdlEvent: SDLEventContext,
     val events: EventContext,
     val keyboard: KeyboardContext,
     val mouse: MouseContext,
-    val textures: TextureContext,
-    val sprites: SpriteContext,
+    val texture: TextureContext,
+    val sprite: SpriteContext,
     val geometry: GeometryContext,
-    val sounds: SoundContext,
-    val actions: ActionContext,
+    val font: FontContext,
+    val sound: SoundContext,
+    val action: ActionContext,
     val clock: ClockContext,
 ) : Context() {
     var isRunning = true
@@ -35,15 +37,16 @@ class GameContext private constructor(
     init {
         registerSDLQuitHandler()
         ContextRegistry.register(sdl)
-        ContextRegistry.register(sdlEvents)
+        ContextRegistry.register(sdlEvent)
         ContextRegistry.register(events)
         ContextRegistry.register(keyboard)
         ContextRegistry.register(mouse)
-        ContextRegistry.register(textures)
-        ContextRegistry.register(sprites)
+        ContextRegistry.register(texture)
+        ContextRegistry.register(sprite)
         ContextRegistry.register(geometry)
-        ContextRegistry.register(sounds)
-        ContextRegistry.register(actions)
+        ContextRegistry.register(font)
+        ContextRegistry.register(sound)
+        ContextRegistry.register(action)
         ContextRegistry.register(clock)
         getContext<KeyboardContext>().keyboard.init()
         getContext<MouseContext>().mouse.init()
@@ -68,14 +71,15 @@ class GameContext private constructor(
             currentContext = GameContext(
                 sdl = SDLContext.create(title, width, height),
                 events = EventContext.get(),
-                sdlEvents = SDLEventContext.get(),
+                sdlEvent = SDLEventContext.get(),
                 keyboard = KeyboardContext.get(),
                 mouse = MouseContext.get(),
-                textures = TextureContext.get(),
-                sprites = SpriteContext.get(),
-                sounds = SoundContext.get(),
+                texture = TextureContext.get(),
+                sprite = SpriteContext.get(),
+                font = FontContext.get(),
+                sound = SoundContext.get(),
                 geometry = GeometryContext.get(),
-                actions = ActionContext.get(),
+                action = ActionContext.get(),
                 clock = ClockContext.get()
             )
             return currentContext!!
@@ -88,15 +92,15 @@ class GameContext private constructor(
 
     override fun cleanup() {
         Logger.info { "Cleaning up game resources" }
-        actions.cleanup()
-        sdlEvents.cleanup()
+        action.cleanup()
+        sdlEvent.cleanup()
         events.cleanup()
         keyboard.cleanup()
         mouse.cleanup()
-        textures.cleanup()
-        sprites.cleanup()
+        texture.cleanup()
+        sprite.cleanup()
         geometry.cleanup()
-        sounds.cleanup()
+        sound.cleanup()
         sdl.cleanup()
         clock.cleanup()
         ContextRegistry.clearAll()

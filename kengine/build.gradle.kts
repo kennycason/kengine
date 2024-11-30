@@ -31,7 +31,7 @@ kotlin {
         binaries {
             sharedLib {
                 baseName = "kengine" // generates libkengine.dylib, .so, .dll
-                linkerOpts("-L/opt/homebrew/lib", "-lSDL2", "-lSDL2_mixer")
+                linkerOpts("-L/opt/homebrew/lib", "-lSDL2", "-lSDL2_mixer", "-lSDL2_ttf")
             }
         }
         compilations["main"].cinterops {
@@ -43,6 +43,9 @@ kotlin {
             }
             val sdl2gfx by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl2_gfx.def")
+            }
+            val sdl2ttf by creating {
+                defFile = file("src/nativeInterop/cinterop/sdl2_ttf.def")
             }
         }
         compilations.all {

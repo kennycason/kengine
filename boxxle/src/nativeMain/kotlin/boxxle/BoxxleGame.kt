@@ -5,6 +5,7 @@ import boxxle.context.useBoxxleContext
 import com.kengine.Game
 import com.kengine.action.ActionContext
 import com.kengine.context.getContext
+import com.kengine.font.useFontContext
 import com.kengine.getGameContext
 import com.kengine.input.useKeyboardContext
 import com.kengine.sdl.useSDLContext
@@ -34,6 +35,9 @@ class BoxxleGame : Game {
             finishSound = getSound(Sounds.FINISH)
                 .also { it.setVolume(20) }
         }
+        useFontContext {
+            addFont(Fonts.ARCADE_CLASSIC, Fonts.ARCADE_CLASSIC_TTF, fontSize = 32)
+        }
     }
 
     override fun update() {
@@ -51,6 +55,15 @@ class BoxxleGame : Game {
             useBoxxleContext {
                 level.draw()
                 player.draw()
+            }
+
+            useBoxxleContext {
+                useFontContext {
+                    drawText(
+                        Fonts.ARCADE_CLASSIC, "LVL ${level.levelNumber}", 690, 560,
+                        r = 0x33u, g = 0x33u, b = 0x33u, a = 0xFFu, fontSize = 32
+                    )
+                }
             }
 
             flipScreen()
