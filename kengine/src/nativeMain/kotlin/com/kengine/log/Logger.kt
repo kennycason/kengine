@@ -37,6 +37,11 @@ class Logger {
     fun warn(message: String?) = log(WARN, message)
     fun error(message: String?) = log(ERROR, message)
 
+    fun infoStream() = LogStreamBuilder(INFO, this)
+    fun debugStream() = LogStreamBuilder(DEBUG, this)
+    fun warnStream() = LogStreamBuilder(WARN, this)
+    fun errorStream() = LogStreamBuilder(ERROR, this)
+
     // special exception helpers
     fun debug(e: Exception) = log(DEBUG, exceptionToString(e))
     fun info(e: Exception) = log(INFO, exceptionToString(e))
@@ -60,10 +65,16 @@ class Logger {
     /**
      * Logs a message with the specified level.
      */
-    private fun log(level: Level, message: String?) {
+    fun log(level: Level, message: String?) {
         if (level.ordinal >= logLevel.ordinal) {
             val timestamp = getCurrentTimestampMilliseconds()
             println("[${level.name}][$className][$timestamp] $message")
+        }
+    }
+
+    fun log(level: Level, message: () -> String?) {
+        if (level.ordinal >= logLevel.ordinal) {
+            log(level, message())
         }
     }
 

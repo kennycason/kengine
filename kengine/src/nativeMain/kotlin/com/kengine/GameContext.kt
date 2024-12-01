@@ -35,7 +35,6 @@ class GameContext private constructor(
     var isRunning = true
 
     init {
-        registerSDLQuitHandler()
         ContextRegistry.register(sdl)
         ContextRegistry.register(sdlEvent)
         ContextRegistry.register(events)
@@ -50,6 +49,7 @@ class GameContext private constructor(
         ContextRegistry.register(clock)
         getContext<KeyboardContext>().keyboard.init()
         getContext<MouseContext>().mouse.init()
+        registerSDLQuitHandler()
     }
 
     fun registerContext(context: Context) {
