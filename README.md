@@ -24,12 +24,10 @@ There are 40 levels total.
 
 ```kotlin
 fun main() {
-    useContext(
-        GameContext.create(
-            title = "Boxxle",
-            width = 800,
-            height = 600
-        )
+    createGameContext(
+        title = "Boxxle",
+        width = 800,
+        height = 600
     ) {
         GameRunner(frameRate = 60) {
             BoxxleGame()

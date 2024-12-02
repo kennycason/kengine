@@ -10,29 +10,19 @@ class LogStreamBuilder(private val level: Logger.Level, private val logger: Logg
         return this
     }
 
-    fun write(part: () -> Any): LogStreamBuilder {
-        if (level.ordinal >= level.ordinal) {
-            write(part())
-        }
-        return this
-    }
-
     fun write(part: String?): LogStreamBuilder {
         messageBuilder.append(part)
         return this
     }
 
-    fun write(part: Any): LogStreamBuilder {
-        messageBuilder.append(part)
-        return this
-    }
-
-    fun writeLn(part: String?): LogStreamBuilder {
-        messageBuilder.append(part)
+    fun writeLn(part: () -> String?): LogStreamBuilder {
+        if (level.ordinal >= level.ordinal) {
+            write(part())
+        }
         return ln()
     }
 
-    fun writeLn(part: Any): LogStreamBuilder {
+    fun writeLn(part: String?): LogStreamBuilder {
         messageBuilder.append(part)
         return ln()
     }

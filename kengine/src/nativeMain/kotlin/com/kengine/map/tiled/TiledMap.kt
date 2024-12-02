@@ -4,6 +4,7 @@ import com.kengine.graphics.Sprite
 import com.kengine.graphics.SpriteSheet
 import com.kengine.log.Logging
 import com.kengine.math.IntVec2
+import com.kengine.math.Vec2
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -23,6 +24,8 @@ class TiledMap(
     val infinite: Boolean = false
 ) : Logging {
 
+    val p by lazy { Vec2() }
+
     private data class TilesetAndSpriteSheet(
         val tileset: Tileset,
         val spriteSheet: SpriteSheet
@@ -33,7 +36,7 @@ class TiledMap(
             TilesetAndSpriteSheet(
                 tileset = it,
                 spriteSheet = SpriteSheet.fromSprite(
-                    sprite = Sprite.fromFilePath(it.image),
+                    sprite = Sprite.fromFilePath(adjustAssetPath("assets", it.image)),
                     tileWidth = it.tileWidth,
                     tileHeight = it.tileHeight
                 )
@@ -42,20 +45,20 @@ class TiledMap(
     }
 
     init {
-        val logStreamBuilder = logger
+        val logStream = logger
             .infoStream()
             .writeLn { "Loading Map." }
             .writeLn { "Map: ${width}x${height}" }
             .writeLn { "Tile Dim: ${tileWidth}x${tileHeight}" }
             .writeLn { "Layers: ${layers.size}" }
-
         layers.forEach {
-            logStreamBuilder.writeLn { it.toString() }
+            logStream.writeLn { it.toString() }
         }
-        logStreamBuilder.writeLn { "Tilesets: ${tilesets.size}" }
+        logStream.writeLn { "Tilesets: ${tilesets.size}" }
         tilesets.forEach {
-            logStreamBuilder.writeLn { it.toString() }
+            logStream.writeLn { it.toString() }
         }
+        logStream.flush()
     }
 
     fun draw() {
@@ -70,12 +73,13 @@ class TiledMap(
         for (x in 0 until layer.width) {
             for (y in 0 until layer.height) {
                 val tileId = layer.getTileAt(x, y)
-                val tilePosition = getTilePosition(tileId, tilesetsWithSprites.first().tileset)
-//                logger.info { "${tilePosition.x}x${tilePosition.y} -> ${tileId}" }
-                val sprite = tilesetsWithSprites
-                    .first()
-                    .spriteSheet.getTile(tilePosition.x, tilePosition.y)
-                sprite.draw((x * tileWidth).toDouble(), (y * tileHeight).toDouble())
+                if (tileId > 0) {
+                    val tilePosition = getTilePosition(tileId, tilesetsWithSprites.first().tileset)
+                    val sprite = tilesetsWithSprites
+                        .first()
+                        .spriteSheet.getTile(tilePosition.x / tileWidth, tilePosition.y / tileHeight)
+                    sprite.draw(p.x + (x * tileWidth).toDouble(), p.y + (y * tileHeight).toDouble())
+                }
             }
         }
     }
@@ -85,6 +89,11 @@ class TiledMap(
         val tileX = (localId % tileset.columns) * (tileset.tileWidth + tileset.spacing) + tileset.margin
         val tileY = (localId / tileset.columns) * (tileset.tileHeight + tileset.spacing) + tileset.margin
         return IntVec2(tileX, tileY)
+    }
+
+    fun adjustAssetPath(basePath: String, relativePath: String): String {
+        val baseDir = basePath.substringBeforeLast("/")
+        return "$baseDir/$relativePath".replace("../", "")
     }
 
     override fun toString(): String {
@@ -98,7 +107,6 @@ class TiledMap(
                 "infinite=$infinite\n" +
                 ")"
     }
-
 
 }
 

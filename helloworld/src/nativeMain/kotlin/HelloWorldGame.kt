@@ -1,4 +1,3 @@
-
 import com.kengine.Game
 import com.kengine.geometry.useGeometryContext
 import com.kengine.map.tiled.TiledMapLoader
@@ -9,6 +8,7 @@ class HelloWorldGame : Game {
     private val pokeballs = List(size = 25) { PingPongPidgeyEntity() }
     private val scytherEntity = ScytherEntity()
     private val tiledMap = TiledMapLoader().loadMap("assets/maps/simple_map.tmj")
+        .also { it.p.set(480.0, 0.0) }
 
     override fun update() {
         pokeballs.forEach {
@@ -21,7 +21,7 @@ class HelloWorldGame : Game {
     override fun draw() {
         useSDLContext {
             // clear screen
-            fillScreen(0u, 0u, 0u)
+            fillScreen(0xFFu, 0xFFu, 0xFFu)
 
             tiledMap.draw()
 
