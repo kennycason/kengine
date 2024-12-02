@@ -1,4 +1,4 @@
-ds# Boxxle - Clone of the Gameboy classic
+# Boxxle - Clone of the Gameboy classic
 
 ## Controls
 

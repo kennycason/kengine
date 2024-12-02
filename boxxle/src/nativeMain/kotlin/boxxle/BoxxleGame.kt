@@ -23,7 +23,7 @@ class BoxxleGame : Game {
     }
 
     private var state = State.BEGIN_PLAY
-    private var timeSinceOptionChange = 0L // TODO fix keyboard.timeSinceKeyPressed function
+    private var timeSinceOptionChangeMs = 0L
     private lateinit var mainSound: Sound
     private lateinit var finishSound: Sound
     private val menuFont: Font by lazy {
@@ -80,21 +80,21 @@ class BoxxleGame : Game {
             player.update()
 
             useKeyboardContext {
-                if ((keyboard.isRPressed()) && timeSinceMs(timeSinceOptionChange) > 300) {
-                    timeSinceOptionChange = getCurrentTimestampMilliseconds()
+                if ((keyboard.isRPressed()) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                    timeSinceOptionChangeMs = getCurrentTimestampMilliseconds()
                     reloadLevel()
                 }
-                if (keyboard.isReturnPressed() && timeSinceMs(timeSinceOptionChange) > 300) {
-                    timeSinceOptionChange = getCurrentTimestampMilliseconds()
+                if (keyboard.isReturnPressed() && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                    timeSinceOptionChangeMs = getCurrentTimestampMilliseconds()
                     loadLevel((level.levelNumber + 1) % LEVEL_DATA.size)
                 }
-                if (keyboard.isSpacePressed() && timeSinceMs(timeSinceOptionChange) > 300) {
-                    timeSinceOptionChange = getCurrentTimestampMilliseconds()
+                if (keyboard.isSpacePressed() && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                    timeSinceOptionChangeMs = getCurrentTimestampMilliseconds()
                     loadLevel((level.levelNumber - 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
                 }
                 if (keyboard.isTPressed()) {
                     mainSound.setVolume(mainSound.getVolume() + 1)
-                    finishSound.setVolume(finishSound.getVolume() + 1) // TODO global sound volumes?
+                    finishSound.setVolume(finishSound.getVolume() + 1) // TODO global sound volumes
                 }
                 if (keyboard.isGPressed()) {
                     mainSound.setVolume(mainSound.getVolume() - 1)
