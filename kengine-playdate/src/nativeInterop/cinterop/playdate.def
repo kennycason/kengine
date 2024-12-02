@@ -1,3 +1,4 @@
 headers = playdate_bridge.h
-package = "playdate"
-headerFilter = *
+package = playdate.api
+headerFilter = pd_api.h pd_api/* playdate_bridge.h
+compilerOpts = -I${PLAYDATE_SDK_PATH}/C_API -I.

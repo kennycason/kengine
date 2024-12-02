@@ -76,10 +76,6 @@ kotlin {
                 implementation(project(":kengine"))
             }
         }
-//        val nativeMain by creating { // Create 'nativeMain' source set
-//            dependsOn(commonMain)
-//            // Optionally, you can specify additional dependencies or configurations here
-//        }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
@@ -87,57 +83,15 @@ kotlin {
         }
     }
 }
-//
-//fun KotlinNativeTarget.configureLibraryTarget() {
-//    binaries {
-//        sharedLib {
-//            baseName = "kengine-playdate" // generates libkengine-playdate.dylib/.so/.dll
-//            linkerOpts(
-//                "-L/opt/homebrew/lib",
-//                "-lSDL2",
-//                "-lSDL2_mixer",
-//                "-lSDL2_ttf"
-//            )
-//        }
-//    }
-//
-//    compilations["main"].cinterops {
-//        val playdate by creating {
-//            defFile = file("src/nativeInterop/cinterop/playdate.def")
-//
-//            // ensure PLAYDATE_SDK_PATH is set
-//            val sdkPath = System.getenv("PLAYDATE_SDK_PATH")
-//                ?: throw GradleException("Environment variable PLAYDATE_SDK_PATH is not set.")
-//
-//            // add compiler options for cinterop
-//            compilerOpts(
-//                "-I${sdkPath}/C_API",
-//                "-I${project.file("src/nativeInterop/cinterop").absolutePath}", // Include bridge headers
-//                "-DTARGET_PLAYDATE=1", // Define macros as per common.mk
-//                "-DTARGET_EXTENSION=1",
-//                "-mfloat-abi=hard",
-//                "-mfpu=fpv5-sp-d16",
-//                "-D__FPU_USED=1",
-//                "-g", // enable debug symbols
-//                "-ea" // enable assertions
-//            )
-//        }
-//    }
-//
-//    compilations.all {
-//        compileTaskProvider.configure {
-//            compilerOptions {
-//                freeCompilerArgs.addAll(
-//                    listOf(
-//                        "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
-//                        "-opt-in=kotlin.ExperimentalStdlibApi",
-//                        "-g", // enable debug symbols
-//                        "-ea" // enable assertions
-//                    )
-//                )
-//            }
-//        }
-//    }
-//}
 
-// pd_api.h pd_api/*
+tasks.register("findGeneratedInterop") {
+    doLast {
+        val buildDir = project.buildDir
+        println("Looking in: $buildDir")
+        buildDir.walk().forEach {
+            if (it.name.contains("playdate")) {
+                println("Found: ${it.absolutePath}")
+            }
+        }
+    }
+}
