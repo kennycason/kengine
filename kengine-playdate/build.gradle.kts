@@ -35,9 +35,7 @@ kotlin {
                     "-L/opt/homebrew/lib",
                     "-lSDL2",
                     "-lSDL2_mixer",
-                    "-lSDL2_ttf",
-                    "-I${sdkPath}/C_API",
-                    "-I${project.file("src/nativeInterop/cinterop").absolutePath}" // Include bridge headers
+                    "-lSDL2_ttf"
                 )
             }
         }
