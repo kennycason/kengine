@@ -1,0 +1,6 @@
+name=Kengine Playdate
+author=Kenny Cason
+description=A simple demo game running on Playdate.
+bundleID=kengine.playdate
+version=1.0
+buildNumber=1

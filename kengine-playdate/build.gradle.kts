@@ -28,15 +28,15 @@ kotlin {
             sharedLib {
                 baseName = "kengine-playdate" // Generates libkengine-playdate.dylib/.so/.dll
 
-                val sdkPath = System.getenv("PLAYDATE_SDK_PATH")
-                    ?: throw GradleException("Environment variable PLAYDATE_SDK_PATH is not set.")
-
                 linkerOpts(
                     "-L/opt/homebrew/lib",
                     "-lSDL2",
                     "-lSDL2_mixer",
                     "-lSDL2_ttf"
                 )
+            }
+            staticLib {
+                baseName = "kengine_playdate"
             }
         }
         compilations["main"].cinterops {

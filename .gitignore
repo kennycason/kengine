@@ -19,3 +19,6 @@ build/
 .kotlin/
 .kotlin/metadata/kotlinCInteropLibraries/*
 kotlin-js-store/
+
+KenginePlaydate/Source/libkengine_playdate.a
+KenginePlaydate/Source/libkengine_playdate.dylib
