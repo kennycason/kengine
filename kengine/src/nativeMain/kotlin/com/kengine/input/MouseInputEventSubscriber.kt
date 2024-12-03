@@ -4,7 +4,7 @@ import com.kengine.context.useContext
 import com.kengine.math.Vec2
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
-import com.kengine.time.getCurrentTimestampMilliseconds
+import com.kengine.time.getCurrentMilliseconds
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl2.SDL_BUTTON_LEFT
 import sdl2.SDL_BUTTON_MIDDLE
@@ -40,7 +40,7 @@ class MouseInputEventSubscriber {
                 }
                 buttonStates[button]?.apply {
                     isPressed = true
-                    lastPressedTime = getCurrentTimestampMilliseconds()
+                    lastPressedTime = getCurrentMilliseconds()
                 }
             }
             SDL_MOUSEBUTTONUP -> {
@@ -70,7 +70,7 @@ class MouseInputEventSubscriber {
      * Check how much time has passed since a button was last pressed.
      */
     fun timeSinceButtonPressed(buttonCode: Int): Long {
-        val currentTime = getCurrentTimestampMilliseconds()
+        val currentTime = getCurrentMilliseconds()
         return buttonStates[buttonCode]?.let {
             if (it.isPressed) 0L else currentTime - it.lastPressedTime
         } ?: Long.MAX_VALUE

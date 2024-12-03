@@ -14,7 +14,7 @@ import com.kengine.input.useKeyboardContext
 import com.kengine.sdl.useSDLContext
 import com.kengine.sound.Sound
 import com.kengine.sound.useSoundContext
-import com.kengine.time.getCurrentTimestampMilliseconds
+import com.kengine.time.getCurrentMilliseconds
 import com.kengine.time.timeSinceMs
 
 class BoxxleGame : Game {
@@ -81,15 +81,15 @@ class BoxxleGame : Game {
 
             useKeyboardContext {
                 if ((keyboard.isRPressed()) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
-                    timeSinceOptionChangeMs = getCurrentTimestampMilliseconds()
+                    timeSinceOptionChangeMs = getCurrentMilliseconds()
                     reloadLevel()
                 }
                 if (keyboard.isReturnPressed() && timeSinceMs(timeSinceOptionChangeMs) > 300) {
-                    timeSinceOptionChangeMs = getCurrentTimestampMilliseconds()
+                    timeSinceOptionChangeMs = getCurrentMilliseconds()
                     loadLevel((level.levelNumber + 1) % LEVEL_DATA.size)
                 }
                 if (keyboard.isSpacePressed() && timeSinceMs(timeSinceOptionChangeMs) > 300) {
-                    timeSinceOptionChangeMs = getCurrentTimestampMilliseconds()
+                    timeSinceOptionChangeMs = getCurrentMilliseconds()
                     loadLevel((level.levelNumber - 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
                 }
                 if (keyboard.isTPressed()) {

@@ -2,7 +2,7 @@ package com.kengine.input
 
 import com.kengine.sdl.SDLEventContext
 import com.kengine.sdl.useSDLContext
-import com.kengine.time.getCurrentTimestampMilliseconds
+import com.kengine.time.getCurrentMilliseconds
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl2.SDL_Event
 import sdl2.SDL_KEYDOWN
@@ -33,7 +33,7 @@ class KeyboardInputEventSubscriber {
                 }
                 keyStates[key]?.apply {
                     isPressed = true
-                    lastPressed = getCurrentTimestampMilliseconds()
+                    lastPressed = getCurrentMilliseconds()
                 }
             }
 
@@ -56,7 +56,7 @@ class KeyboardInputEventSubscriber {
      * TODO remove
      */
     fun timeSincePressed(keyCode: UInt): Long {
-        val currentTime = getCurrentTimestampMilliseconds()
+        val currentTime = getCurrentMilliseconds()
         return keyStates[keyCode.toInt()]?.let {
             if (it.isPressed) 0L else currentTime - it.lastPressed
         } ?: Long.MAX_VALUE

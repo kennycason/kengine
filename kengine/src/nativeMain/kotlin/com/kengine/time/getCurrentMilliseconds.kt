@@ -11,6 +11,7 @@ import sdl2.SDL_GetTicks
  * }
  */
 @OptIn(ExperimentalForeignApi::class)
-fun getCurrentTimestampMilliseconds(): Long {
+fun getCurrentMilliseconds(): Long {
     return SDL_GetTicks().toLong()
 }
+
