@@ -17,37 +17,33 @@ endif
 SRC = Source/main.c
 
 # Include paths
-UINCDIR = -I./Source
+UINCDIR = -I./Source -I$(SDK)/C_API
 
 # Libraries to link
 ULIBDIR = ./Source
+ULIBS = -lkengine_playdate
 
 # Compiler and linker flags
-LDFLAGS += $(ULIBDIR) -lkengine_playdate
+LDFLAGS += $(ULIBDIR) $(ULIBS)
 
 # Include common rules from the SDK
 include $(SDK)/C_API/buildsupport/common.mk
 
-# Ensure `main.c` is linked into pdex.elf
+# Ensure main.pdz is created
 device_bin: $(OBJDIR)/pdex.elf
-	@echo "Creating pdex.elf with main.c"
+	@echo "Creating pdex.bin from pdex.elf..."
 	cp $(OBJDIR)/pdex.elf Source/main.pdz
 
-# Package `.pdx`
+# Package the .pdx
 build/KenginePlaydate.pdx: device_bin
 	@echo "Packaging KenginePlaydate.pdx..."
 	mkdir -p build/KenginePlaydate.pdx
 	cp Source/main.pdz build/KenginePlaydate.pdx/pdex.bin
-	cp pdxinfo build/KenginePlaydate.pdx/pdxinfo
+	cp pdxinfo build/KenginePlaydate.pdx/
 	$(SDK)/bin/pdc -v build/KenginePlaydate.pdx build/KenginePlaydate.pdx
 
 # Run in Simulator
 run: build/KenginePlaydate.pdx
 	open -a "Playdate Simulator" $(PRODUCT)
-
-## Clean build directory
-#clean:
-#	rm -rf build
-#	rm -f Source/pdex.elf
 
 .PHONY: all clean run
