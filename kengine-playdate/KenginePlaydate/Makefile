@@ -24,7 +24,7 @@ ULIBDIR = ./Source ../build/bin/playdate/kenginePlaydateReleaseStatic
 ULIBS = -lkengine_playdate
 
 # Compiler and linker flags
-LDFLAGS += $(ULIBDIR) $(ULIBS)
+LDFLAGS += $(addprefix -L, $(ULIBDIR)) $(ULIBS)
 
 # Include common rules from the SDK
 include $(SDK)/C_API/buildsupport/common.mk
