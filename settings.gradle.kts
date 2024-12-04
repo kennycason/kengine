@@ -7,4 +7,10 @@ pluginManagement {
 
 rootProject.name = "kengine"
 
-include("kengine", "kengine-playdate", "boxxle", "helloworld")
+val isPlaydateEnabled = true
+val modules = mutableListOf("kengine", "boxxle", "helloworld")
+if (isPlaydateEnabled) {
+    modules.add("isPlaydateEnabled")
+}
+
+include(modules)
