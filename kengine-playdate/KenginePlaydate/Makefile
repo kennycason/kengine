@@ -20,7 +20,7 @@ SRC = Source/main.c
 UINCDIR = -I./Source -I$(SDK)/C_API
 
 # Libraries to link
-ULIBDIR = ./Source
+ULIBDIR = ./Source ../build/bin/playdate/kenginePlaydateReleaseStatic
 ULIBS = -lkengine_playdate
 
 # Compiler and linker flags
@@ -38,13 +38,12 @@ device_bin: copy_libkengine $(OBJDIR)/pdex.elf
 	@echo "Creating pdex.bin from pdex.elf..."
 	cp $(OBJDIR)/pdex.elf Source/main.pdz
 
-#build/KenginePlaydate.pdx: device_bin
-#	@echo "Packaging KenginePlaydate.pdx..."
-#	mkdir -p build/KenginePlaydate.pdx
-#	cp Source/main.pdz build/KenginePlaydate.pdx/pdex.bin
-#	$(SDK)/bin/pdc -v build/KenginePlaydate.pdx build/KenginePlaydate.pdx
-#	@echo "Copying custom pdxinfo..."
-#	cp custom_pdxinfo build/KenginePlaydate.pdx/pdxinfo
+build/KenginePlaydate.pdx: device_bin
+	@echo "Packaging KenginePlaydate.pdx..."
+	mkdir -p build/KenginePlaydate.pdx
+	cp Source/main.pdz build/KenginePlaydate.pdx/pdex.bin
+	cp pdxinfo build/KenginePlaydate.pdx/
+	$(SDK)/bin/pdc -k build/KenginePlaydate.pdx build/KenginePlaydate.pdx
 
 post_pdx: build/KenginePlaydate.pdx
 	@echo "post pdx"

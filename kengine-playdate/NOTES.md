@@ -8,6 +8,7 @@ Build & RUn
 ./gradlew build
 cd kengine-playdate
 make clean && make
+make post_pdx
 make run 
 ```
 
