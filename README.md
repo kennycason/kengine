@@ -129,21 +129,20 @@ Build the project
 ```
 
 ## Roadmap
-
 - Embed data files in executable binary
 - Animated Sprites
 - GameLoop updates (improve handling of delta timestamps, decouple update/draw calls)
 - Documentation
-- TiledMapLoader
+- TiledMapLoader (WIP)
 - Logger -> File
 - Menu system
 - GUI
 - Box2D
 - Networking
-- fix -Wno-c99-designator
 - fix @OptIn(ExperimentalForeignApi::class) (-opt-in being ignored by compiler in multi-module project in IJ)
 - Add Vec2 versions of functions that take (x,y) parameters, ditto for Rect2 and (x,y,w,h)
 - Redesign font handling + caching/config
+- Playdate integration
 
 
 
