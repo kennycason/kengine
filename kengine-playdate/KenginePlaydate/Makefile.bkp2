@@ -1,0 +1,66 @@
+HEAP_SIZE      = 8388208
+STACK_SIZE     = 61800
+
+PRODUCT = build/KenginePlaydate.pdx
+
+# Locate the SDK
+SDK = ${PLAYDATE_SDK_PATH}
+ifeq ($(SDK),)
+SDK = $(shell egrep '^\s*SDKRoot' ~/.Playdate/config | head -n 1 | cut -c9-)
+endif
+
+ifeq ($(SDK),)
+$(error SDK path not found; set ENV value PLAYDATE_SDK_PATH)
+endif
+
+# List C source files here
+SRC = Source/main.c
+
+# Include paths for headers
+UINCDIR = -I./Source
+
+# Additional library search paths
+ULIBDIR = ./Source
+
+# List all user libraries here
+ULIBS = -lkengine_playdate
+
+# Compiler and linker flags
+LDFLAGS += $(ULIBS)
+
+include $(SDK)/C_API/buildsupport/common.mk
+
+# Ensure proper dependencies for the build process
+all: $(PRODUCT)
+
+# build/main.pdz: build/pdex.elf
+# 	@echo "Building main.pdz..."
+# 	cp build/pdex.elf build/main.pdz
+#
+# build/KenginePlaydate.pdx: build/main.pdz
+# 	@echo "Packaging KenginePlaydate.pdx..."
+# 	mkdir -p build/KenginePlaydate.pdx
+# 	cp build/main.pdz build/KenginePlaydate.pdx/pdex.bin
+# 	cp pdxinfo build/KenginePlaydate.pdx/
+# 	$(SDK)/bin/pdc -v build/KenginePlaydate.pdx build/KenginePlaydate.pdx
+#
+# build/pdex.dylib: Source/main.c $(SDK)/C_API/buildsupport/setup.c
+# 	@echo "Building pdex.dylib..."
+# 	clang -g -dynamiclib -rdynamic -lm -DTARGET_SIMULATOR=1 -DTARGET_EXTENSION=1 \
+# 	    -I . -I $(SDK)/C_API -I ./Source \
+# 	    -o build/pdex.dylib Source/main.c $(SDK)/C_API/buildsupport/setup.c
+#
+# .PHONY: buildPdexdylib
+# buildPdexdylib:
+# 	@echo "Building pdex.dylib..."
+# 	clang -g -dynamiclib -rdynamic -lm -DTARGET_SIMULATOR=1 -DTARGET_EXTENSION=1 \
+# 	    -I . -I $(SDK)/C_API -I ./Source \
+# 	    -o build/pdex.dylib Source/main.c $(SDK)/C_API/buildsupport/setup.c
+
+# Run in Simulator
+run: $(PRODUCT)
+	open -a "Playdate Simulator" $(PRODUCT)
+
+
+# .PHONY declarations
+.PHONY: all clean run
