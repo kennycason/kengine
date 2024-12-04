@@ -13,21 +13,17 @@ export PATH=$PATH:$PLAYDATE_SDK_PATH/bin
 ./gradlew build     # in project root
 cd kengine-playdate/KenginePlaydate
 make clean && make
-make post_pdx       # maybe optional, same error with or without
-make run 
+# normally you'd just run make run, however there are some issues, so do the below
+cp pdxinfo build/KenginePlaydate.pdx/ 
+open -a "Playdate Simulator" build/KenginePlaydate.pdx
 ```
 
-Current errors from `make run`:
-```
-Kengine Playdate game started!
-wrong file type: no header
-```
-or
+Simulator errors:
 ```
 Event handler invoked.
-pdxinfo file not found.
-pdxinfo file not found.
-...
+Event handler invoked.
+Handling kEventInit...
+Kengine Playdate game started!
+Game initialization complete.
+<game_incompatible>
 ```
-
-pdxinfo file not found.

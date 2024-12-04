@@ -45,10 +45,10 @@ build/KenginePlaydate.pdx: device_bin
 	cp pdxinfo build/KenginePlaydate.pdx/
 	$(SDK)/bin/pdc -k build/KenginePlaydate.pdx build/KenginePlaydate.pdx
 
-post_pdx: build/KenginePlaydate.pdx
-	@echo "post pdx"
-	cp pdxinfo build/KenginePlaydate.pdx/
-	cat build/KenginePlaydate.pdx/pdxinfo
+#post_pdx: build/KenginePlaydate.pdx
+#	@echo "post pdx"
+#	cp pdxinfo build/KenginePlaydate.pdx/
+#	cat build/KenginePlaydate.pdx/pdxinfo
 
 # Run in Simulator
 run: build/KenginePlaydate.pdx

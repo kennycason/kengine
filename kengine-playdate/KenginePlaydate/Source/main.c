@@ -16,9 +16,9 @@ int _startKengineGame(PlaydateAPI* playdate) {
 
 int eventHandler(PlaydateAPI* playdate, PDSystemEvent event, uint32_t arg) {
     playdate->system->logToConsole("Event handler invoked.");
-   // if (event == kEventInit) {
+    if (event == kEventInit) {
         playdate->system->logToConsole("Handling kEventInit...");
         return _startKengineGame(playdate);
-   // }
+    }
     return 0;
 }
