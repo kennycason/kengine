@@ -9,6 +9,7 @@ import kotlin.experimental.ExperimentalNativeApi
 @OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
 @CName("_startKengineGame")
 fun startKengineGame(playdate: CPointer<PlaydateAPI>): Int {
+    println("Kotlin bridge success!")
     val game = KenginePlaydateGame()
     while (true) {
         game.update()

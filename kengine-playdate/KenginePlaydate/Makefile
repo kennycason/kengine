@@ -29,18 +29,27 @@ LDFLAGS += $(ULIBDIR) $(ULIBS)
 # Include common rules from the SDK
 include $(SDK)/C_API/buildsupport/common.mk
 
+copy_libkengine:
+	@echo "Copying libkengine_playdate.a to ./Source..."
+	cp ../build/bin/playdate/kenginePlaydateReleaseStatic/libkengine_playdate.a ./Source
+
 # Ensure main.pdz is created
-device_bin: $(OBJDIR)/pdex.elf
+device_bin: copy_libkengine $(OBJDIR)/pdex.elf
 	@echo "Creating pdex.bin from pdex.elf..."
 	cp $(OBJDIR)/pdex.elf Source/main.pdz
 
-# Package the .pdx
-build/KenginePlaydate.pdx: device_bin
-	@echo "Packaging KenginePlaydate.pdx..."
-	mkdir -p build/KenginePlaydate.pdx
-	cp Source/main.pdz build/KenginePlaydate.pdx/pdex.bin
+#build/KenginePlaydate.pdx: device_bin
+#	@echo "Packaging KenginePlaydate.pdx..."
+#	mkdir -p build/KenginePlaydate.pdx
+#	cp Source/main.pdz build/KenginePlaydate.pdx/pdex.bin
+#	$(SDK)/bin/pdc -v build/KenginePlaydate.pdx build/KenginePlaydate.pdx
+#	@echo "Copying custom pdxinfo..."
+#	cp custom_pdxinfo build/KenginePlaydate.pdx/pdxinfo
+
+post_pdx: build/KenginePlaydate.pdx
+	@echo "post pdx"
 	cp pdxinfo build/KenginePlaydate.pdx/
-	$(SDK)/bin/pdc -v build/KenginePlaydate.pdx build/KenginePlaydate.pdx
+	cat build/KenginePlaydate.pdx/pdxinfo
 
 # Run in Simulator
 run: build/KenginePlaydate.pdx

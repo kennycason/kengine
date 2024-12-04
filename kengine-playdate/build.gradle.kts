@@ -43,35 +43,6 @@ kotlin {
         }
     }
 }
-//kotlin {
-//    linuxArm32Hfp("playdate") {
-//        binaries {
-//            staticLib("kenginePlaydate") {
-//                baseName = "kengine_playdate"
-//                linkerOpts(
-//                    "-nostartfiles",
-//                    "-nostdlib++",
-//                    "-fno-exceptions",
-//                    "-fno-rtti",
-//                    "-specs=nosys.specs"
-//                )
-//            }
-//        }
-//        compilations["main"].cinterops {
-//            val playdate by creating {
-//                definitionFile = file("src/nativeInterop/cinterop/playdate.def")
-//                val cinteropDir = project.file("src/nativeInterop/cinterop").absolutePath
-//
-//                compilerOpts(
-//                    "-I${System.getenv("PLAYDATE_SDK_PATH")}/C_API",
-//                    "-I$cinteropDir",
-//                    "-fno-exceptions",
-//                    "-fno-rtti"
-//                )
-//            }
-//        }
-//    }
-//}
 
 tasks.register("checkBridgeFile") {
     doLast {
