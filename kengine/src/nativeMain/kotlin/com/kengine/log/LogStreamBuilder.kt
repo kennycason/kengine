@@ -15,6 +15,16 @@ class LogStreamBuilder(private val level: Logger.Level, private val logger: Logg
         return this
     }
 
+    fun <R> write(parts: Iterable<R>, toString: (R) -> String?): LogStreamBuilder {
+        parts.forEach { write(toString(it)) }
+        return this
+    }
+
+    fun <R> write(parts: Iterable<R>): LogStreamBuilder {
+        parts.forEach { write(it.toString()) }
+        return this
+    }
+
     fun writeLn(part: () -> String?): LogStreamBuilder {
         if (level.ordinal >= level.ordinal) {
             write(part())
@@ -25,6 +35,16 @@ class LogStreamBuilder(private val level: Logger.Level, private val logger: Logg
     fun writeLn(part: String?): LogStreamBuilder {
         messageBuilder.append(part)
         return ln()
+    }
+
+    fun <R> writeLn(parts: Iterable<R>, toString: (R) -> String?): LogStreamBuilder {
+        parts.forEach { writeLn(toString(it)) }
+        return this
+    }
+
+    fun <R> writeLn(parts: Iterable<R>): LogStreamBuilder {
+        parts.forEach { writeLn(it.toString()) }
+        return this
     }
 
     fun tab(): LogStreamBuilder {

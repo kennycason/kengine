@@ -4,7 +4,7 @@ import com.kengine.log.Logger.Level.DEBUG
 import com.kengine.log.Logger.Level.ERROR
 import com.kengine.log.Logger.Level.INFO
 import com.kengine.log.Logger.Level.WARN
-import com.kengine.time.getCurrentTimestampMilliseconds
+import com.kengine.time.getCurrentMilliseconds
 import kotlin.reflect.KClass
 
 /**
@@ -67,7 +67,7 @@ class Logger {
      */
     fun log(level: Level, message: String?) {
         if (level.ordinal >= logLevel.ordinal) {
-            val timestamp = getCurrentTimestampMilliseconds()
+            val timestamp = getCurrentMilliseconds()
             println("[${level.name}][$className][$timestamp] $message")
         }
     }

@@ -45,20 +45,16 @@ class TiledMap(
     }
 
     init {
-        val logStream = logger
+        logger
             .infoStream()
             .writeLn { "Loading Map." }
             .writeLn { "Map: ${width}x${height}" }
             .writeLn { "Tile Dim: ${tileWidth}x${tileHeight}" }
             .writeLn { "Layers: ${layers.size}" }
-        layers.forEach {
-            logStream.writeLn { it.toString() }
-        }
-        logStream.writeLn { "Tilesets: ${tilesets.size}" }
-        tilesets.forEach {
-            logStream.writeLn { it.toString() }
-        }
-        logStream.flush()
+            .writeLn(layers)
+            .writeLn { "Tilesets: ${tilesets.size}" }
+            .writeLn(tilesets)
+            .flush()
     }
 
     fun draw() {

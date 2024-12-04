@@ -10,7 +10,7 @@ import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.useSpriteContext
 import com.kengine.input.useKeyboardContext
 import com.kengine.math.Vec2
-import com.kengine.time.getCurrentTimestampMilliseconds
+import com.kengine.time.getCurrentMilliseconds
 import com.kengine.time.timeSinceMs
 
 private enum class Direction {
@@ -79,7 +79,7 @@ class Player(
                     if (canMoveBox(box.p + delta)) {
                         // move both the player and the box
                         isMoving = true
-                        lastMovedMs = getCurrentTimestampMilliseconds()
+                        lastMovedMs = getCurrentMilliseconds()
                         return useActionContext {
                             moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
                             moveTo(box, box.p + delta, speed, onComplete = { box.afterPush() })
@@ -92,7 +92,7 @@ class Player(
             // if no box is being pushed, just move the player
             isMoving = true
             getActionContext().moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
-            lastMovedMs = getCurrentTimestampMilliseconds()
+            lastMovedMs = getCurrentMilliseconds()
         }
     }
 

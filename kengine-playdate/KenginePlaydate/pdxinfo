@@ -1,0 +1,7 @@
+name=Kengine Playdate
+author=Kenny Cason
+description=Kotlin Native + Playdate Integration
+bundleID=com.kengine.playdate
+version=1.0
+buildNumber=1
+entry=entryPoint

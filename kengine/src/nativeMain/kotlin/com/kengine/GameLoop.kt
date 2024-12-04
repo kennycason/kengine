@@ -3,7 +3,7 @@ package com.kengine
 import com.kengine.context.useContext
 import com.kengine.log.Logging
 import com.kengine.time.ClockContext
-import com.kengine.time.getCurrentTimestampMilliseconds
+import com.kengine.time.getCurrentMilliseconds
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl2.SDL_Delay
 
@@ -15,12 +15,12 @@ class GameLoop(
 
     init {
         val targetFrameTime = 1000.0 / frameRate
-        var lastFrameTimeMs = getCurrentTimestampMilliseconds()
+        var lastFrameTimeMs = getCurrentMilliseconds()
 
         useContext<GameContext>(cleanup = true) {
             while (isRunning) {
                 useContext<ClockContext> {
-                    totalTimeMs = getCurrentTimestampMilliseconds()
+                    totalTimeMs = getCurrentMilliseconds()
                     deltaTimeMs = totalTimeMs - lastFrameTimeMs
                     totalTimeSec = totalTimeMs / 1000.0
                     deltaTimeSec = deltaTimeMs / 1000.0
@@ -32,7 +32,7 @@ class GameLoop(
 
                 update()
 
-                val frameTimeMs = getCurrentTimestampMilliseconds() - clock.totalTimeMs
+                val frameTimeMs = getCurrentMilliseconds() - clock.totalTimeMs
                 if (frameTimeMs < targetFrameTime) {
                     SDL_Delay((targetFrameTime - frameTimeMs).toUInt())
                 }
