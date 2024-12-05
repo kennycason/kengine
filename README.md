@@ -88,6 +88,14 @@ useMouseContext {
         logger.info { "Clicked mouse @ (${mouse.getCursor().x}, ${mouse.getCursor().y})" }
     }
 }
+useControllerContext {
+    if (controller.isButtonPressed(Buttons.DPAD_LEFT)) {
+        logger.info { "pressed left" }
+    }
+    if (controller.isButtonPressed(Buttons.DPAD_RIGHT)) {
+        logger.info { "pressed space" }
+    }
+}
 ```
 
 ## Project structure

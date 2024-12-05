@@ -1,4 +1,4 @@
-package com.kengine.input
+package com.kengine.input.mouse
 
 import com.kengine.context.useContext
 import com.kengine.math.Vec2

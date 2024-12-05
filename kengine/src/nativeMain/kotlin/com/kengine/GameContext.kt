@@ -3,14 +3,17 @@ package com.kengine
 import com.kengine.action.ActionContext
 import com.kengine.context.Context
 import com.kengine.context.ContextRegistry
-import com.kengine.context.getContext
 import com.kengine.event.EventContext
 import com.kengine.font.FontContext
 import com.kengine.geometry.GeometryContext
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.TextureContext
-import com.kengine.input.KeyboardContext
-import com.kengine.input.MouseContext
+import com.kengine.input.controller.ControllerContext
+import com.kengine.input.controller.getControllerContext
+import com.kengine.input.keyboard.KeyboardContext
+import com.kengine.input.keyboard.getKeyboardContext
+import com.kengine.input.mouse.MouseContext
+import com.kengine.input.mouse.getMouseContext
 import com.kengine.log.Logging
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
@@ -24,6 +27,7 @@ class GameContext private constructor(
     val events: EventContext,
     val keyboard: KeyboardContext,
     val mouse: MouseContext,
+    val controller: ControllerContext,
     val texture: TextureContext,
     val sprite: SpriteContext,
     val geometry: GeometryContext,
@@ -40,6 +44,7 @@ class GameContext private constructor(
         ContextRegistry.register(events)
         ContextRegistry.register(keyboard)
         ContextRegistry.register(mouse)
+        ContextRegistry.register(controller)
         ContextRegistry.register(texture)
         ContextRegistry.register(sprite)
         ContextRegistry.register(geometry)
@@ -47,8 +52,9 @@ class GameContext private constructor(
         ContextRegistry.register(sound)
         ContextRegistry.register(action)
         ContextRegistry.register(clock)
-        getContext<KeyboardContext>().keyboard.init()
-        getContext<MouseContext>().mouse.init()
+        getKeyboardContext().init()
+        getMouseContext().init()
+        getControllerContext().init()
         registerSDLQuitHandler()
     }
 
@@ -74,6 +80,7 @@ class GameContext private constructor(
                 sdlEvent = SDLEventContext.get(),
                 keyboard = KeyboardContext.get(),
                 mouse = MouseContext.get(),
+                controller = ControllerContext.get(),
                 texture = TextureContext.get(),
                 sprite = SpriteContext.get(),
                 font = FontContext.get(),
@@ -97,6 +104,7 @@ class GameContext private constructor(
         events.cleanup()
         keyboard.cleanup()
         mouse.cleanup()
+        controller.cleanup()
         texture.cleanup()
         sprite.cleanup()
         geometry.cleanup()

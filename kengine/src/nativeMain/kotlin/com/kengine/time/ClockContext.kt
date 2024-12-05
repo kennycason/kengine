@@ -6,6 +6,7 @@ import com.kengine.context.Context
  * These values are updated each update within GameLoop.
  * It supports both milliseconds(long) and seconds(double) for convenience
  */
+@ConsistentCopyVisibility
 data class ClockContext private constructor(
     /**
      * The total time the game has been running in milliseconds.

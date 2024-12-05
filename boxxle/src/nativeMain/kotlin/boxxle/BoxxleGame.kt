@@ -10,19 +10,21 @@ import com.kengine.font.Font
 import com.kengine.font.getFontContext
 import com.kengine.font.useFontContext
 import com.kengine.getGameContext
-import com.kengine.input.useKeyboardContext
+import com.kengine.input.controller.useControllerContext
+import com.kengine.input.keyboard.useKeyboardContext
+import com.kengine.log.Logging
 import com.kengine.sdl.useSDLContext
 import com.kengine.sound.Sound
 import com.kengine.sound.useSoundContext
 import com.kengine.time.getCurrentMilliseconds
 import com.kengine.time.timeSinceMs
 
-class BoxxleGame : Game {
+class BoxxleGame : Game, Logging {
     enum class State {
-        BEGIN_PLAY, PLAY, WAIT_FOR_FINISH_MUSIC_TO_FINISH
+        INIT, PLAY, WAIT_FOR_FINISH_MUSIC_TO_FINISH
     }
 
-    private var state = State.BEGIN_PLAY
+    private var state = State.INIT
     private var timeSinceOptionChangeMs = 0L
     private lateinit var mainSound: Sound
     private lateinit var finishSound: Sound
@@ -48,7 +50,7 @@ class BoxxleGame : Game {
 
     override fun update() {
         when (state) {
-            State.BEGIN_PLAY -> beginPlay()
+            State.INIT -> init()
             State.PLAY -> play()
             State.WAIT_FOR_FINISH_MUSIC_TO_FINISH -> {}
         }
@@ -70,7 +72,7 @@ class BoxxleGame : Game {
         }
     }
 
-    private fun beginPlay() {
+    private fun init() {
         mainSound.loop()
         state = State.PLAY
     }
@@ -102,11 +104,34 @@ class BoxxleGame : Game {
                 }
             }
 
+            useControllerContext {
+                if (controller.isButtonPressed(Playstation4.TRIANGLE) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                    timeSinceOptionChangeMs = getCurrentMilliseconds()
+                    reloadLevel()
+                }
+                if (controller.isButtonPressed(Playstation4.R1) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                    timeSinceOptionChangeMs = getCurrentMilliseconds()
+                    loadLevel((level.levelNumber + 1) % LEVEL_DATA.size)
+                }
+                if (controller.isButtonPressed(Playstation4.L1) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                    timeSinceOptionChangeMs = getCurrentMilliseconds()
+                    loadLevel((level.levelNumber - 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
+                }
+                if (controller.isButtonPressed(Playstation4.R3)) {
+                    mainSound.setVolume(mainSound.getVolume() + 1)
+                    finishSound.setVolume(finishSound.getVolume() + 1)
+                }
+                if (controller.isButtonPressed(Playstation4.L3)) {
+                    mainSound.setVolume(mainSound.getVolume() - 1)
+                    finishSound.setVolume(finishSound.getVolume() - 1)
+                }
+            }
+
             if (isLevelComplete()) {
                 mainSound.stop()
                 finishSound.play()
                 getContext<ActionContext>().timer(6000) {
-                    state = State.BEGIN_PLAY
+                    state = State.INIT
                     loadLevel((level.levelNumber + 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
                 }
                 state = State.WAIT_FOR_FINISH_MUSIC_TO_FINISH

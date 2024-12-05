@@ -6,6 +6,13 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import sdl2.SDL_Event
+import sdl2.SDL_JOYAXISMOTION
+import sdl2.SDL_JOYBALLMOTION
+import sdl2.SDL_JOYBUTTONDOWN
+import sdl2.SDL_JOYBUTTONUP
+import sdl2.SDL_JOYDEVICEADDED
+import sdl2.SDL_JOYDEVICEREMOVED
+import sdl2.SDL_JOYHATMOTION
 import sdl2.SDL_KEYDOWN
 import sdl2.SDL_KEYUP
 import sdl2.SDL_MOUSEBUTTONDOWN
@@ -20,7 +27,7 @@ class SDLEventContext private constructor() : Context(), Logging {
     private val subscribers = mutableMapOf<EventType, MutableList<(SDL_Event) -> Unit>>()
 
     enum class EventType {
-        KEYBOARD, QUIT, MOUSE
+        QUIT, KEYBOARD, MOUSE, CONTROLLER
     }
 
     companion object {
@@ -70,6 +77,13 @@ class SDLEventContext private constructor() : Context(), Logging {
             SDL_MOUSEBUTTONDOWN,
             SDL_MOUSEBUTTONUP,
             SDL_MOUSEMOTION -> EventType.MOUSE
+            SDL_JOYBUTTONDOWN,
+            SDL_JOYBUTTONUP,
+            SDL_JOYAXISMOTION,
+            SDL_JOYBALLMOTION,
+            SDL_JOYHATMOTION,
+            SDL_JOYDEVICEADDED,
+            SDL_JOYDEVICEREMOVED -> EventType.CONTROLLER
             SDL_QUIT -> EventType.QUIT
             else -> null
         }

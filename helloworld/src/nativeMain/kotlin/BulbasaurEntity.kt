@@ -6,8 +6,8 @@ import com.kengine.entity.SpriteEntity
 import com.kengine.event.EventContext
 import com.kengine.graphics.FlipMode
 import com.kengine.graphics.Sprite
-import com.kengine.input.KeyboardContext
-import com.kengine.input.MouseContext
+import com.kengine.input.keyboard.KeyboardContext
+import com.kengine.input.mouse.MouseContext
 import com.kengine.log.getLogger
 import com.kengine.sdl.useSDLContext
 import com.kengine.time.ClockContext

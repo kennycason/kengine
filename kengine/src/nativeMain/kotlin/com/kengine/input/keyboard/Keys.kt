@@ -1,4 +1,4 @@
-package com.kengine.input
+package com.kengine.input.keyboard
 
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl2.SDLK_0

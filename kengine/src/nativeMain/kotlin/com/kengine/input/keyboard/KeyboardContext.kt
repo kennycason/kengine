@@ -1,4 +1,4 @@
-package com.kengine.input
+package com.kengine.input.keyboard
 
 import com.kengine.context.Context
 
