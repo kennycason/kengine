@@ -7,6 +7,18 @@ make clean && make
 make run
 ```
 
+Current errors:
+
+```shell
+Event handler invoked.
+Event handler invoked.
+Handling kEventInit...
+Event handler invoked.
+wrong file type: no header
+```
+
+The Kotlin Native gradle produced `libkengine_playdate.a` is for `Tag_CPU_arch: v4` instead of `Tag_CPU_arch: v7E-M`.
+
 
 ## Dev Notes
 
@@ -84,6 +96,6 @@ File Attributes
 ```
 
 
-### Generate Stubs
+### Generate Stubs (Not used)
 
 `python3 generate_stubs.py linker_errors.log`
