@@ -11,23 +11,6 @@ repositories {
 
 kotlin {
     linuxArm32Hfp("playdate") {
-        binaries {
-            staticLib("kenginePlaydate") {
-                baseName = "kengine_playdate"
-                linkerOpts(
-                    "-nostartfiles",
-                    "-nostdlib++",
-                    "-fno-exceptions",
-                    "-fno-rtti",
-                    "-specs=nosys.specs",
-                    "-T${System.getenv("PLAYDATE_SDK_PATH")}/C_API/buildsupport/link_map.ld",
-                    "-mcpu=cortex-m7",
-                    "-mthumb",
-                    "-mfpu=fpv5-sp-d16",
-                    "-mfloat-abi=hard"
-                )
-            }
-        }
         compilations["main"].cinterops {
             val playdate by creating {
                 definitionFile = file("src/nativeInterop/cinterop/playdate.def")
@@ -36,8 +19,33 @@ kotlin {
                     "-I${project.file("src/nativeInterop/cinterop").absolutePath}",
                     "-DTARGET_PLAYDATE=1",
                     "-DTARGET_EXTENSION=1",
+                    "-mcpu=cortex-m7",
+                    "-mthumb",
+                    "-mfpu=fpv5-sp-d16",
+                    "-mfloat-abi=hard",
+                    "-nostartfiles",
+                    "-nostdlib++",
                     "-fno-exceptions",
-                    "-fno-rtti"
+                    "-fno-rtti",
+                    "-specs=nosys.specs"
+                )
+            }
+        }
+        binaries {
+            staticLib("kenginePlaydate") {
+                baseName = "kengine_playdate"
+                outputDirectory = file("${layout.buildDirectory.get()}/bin/playdate")
+                linkerOpts(
+                    "-T${System.getenv("PLAYDATE_SDK_PATH")}/C_API/buildsupport/link_map.ld",
+                    "-mcpu=cortex-m7",
+                    "-mthumb",
+                    "-mfpu=fpv5-sp-d16",
+                    "-mfloat-abi=hard",
+                    "-nostartfiles",
+                    "-nostdlib++",
+                    "-fno-exceptions",
+                    "-fno-rtti",
+                    "-specs=nosys.specs"
                 )
             }
         }

@@ -8,7 +8,10 @@ compilerOpts = -I${PLAYDATE_SDK_PATH}/C_API \
     -target arm-none-eabi \
     -mcpu=cortex-m7 \
     -mthumb \
-    -mfloat-abi=hard \
     -mfpu=fpv5-sp-d16 \
+    -mfloat-abi=hard \
+    -nostartfiles \
+    -nostdlib++ \
     -fno-exceptions \
-    -fno-rtti
+    -fno-rtti \
+    -specs=nosys.specs
