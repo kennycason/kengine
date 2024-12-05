@@ -128,6 +128,14 @@ Build the project
 ./gradlew clean build
 ```
 
+Misc Gradle cache/refresh dependencies
+```shell
+rm -rf ~/.gradle/caches
+rm -rf ~/.gradle/wrapper
+./gradlew wrapper --refresh-dependencies
+./gradlew clean build --refresh-dependencies
+```
+
 ## Roadmap
 - Embed data files in executable binary
 - Animated Sprites

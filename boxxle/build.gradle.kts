@@ -58,7 +58,6 @@ fun KotlinNativeTarget.configureTarget() {
                     "-g", // enable debug symbols
                     "-ea" // enable assertions
                 ) + includeBinariesArgs
-                println("clang compiler args: $compilerArgs") // TODO assets not being added to final kexe
                 freeCompilerArgs.addAll(compilerArgs)
             }
         }
