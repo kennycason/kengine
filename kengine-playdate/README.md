@@ -27,3 +27,12 @@ Kengine Playdate game started!
 Game initialization complete.
 <game_incompatible>
 ```
+
+
+### Misc Notes
+
+
+```shell
+arm-none-eabi-gcc -c -mcpu=cortex-m7 -mthumb -mfpu=fpv5-sp-d16 -mfloat-abi=hard -O2 -ffreestanding -nostdlib <source_file>.c -o <object_file>.o
+arm-none-eabi-ar rcs libkengine_playdate.a <object_file>.o
+```

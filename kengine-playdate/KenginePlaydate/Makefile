@@ -119,7 +119,7 @@ CFLAGS          += -MD -MP -MF $(DEPDIR)/$(@F).d
 # ========================================
 # Default Target
 # ========================================
-all: copy_libkengine device_bin
+all: copy_libkengine device_bin $(PRODUCT)
 
 # ========================================
 # Debug Target
@@ -159,6 +159,11 @@ device: device_bin
 device_bin: $(OBJDIR)/pdex.elf
 	cp $(OBJDIR)/pdex.elf Source
 
+$(PRODUCT): device_bin
+	@echo "Generating .pdx bundle..."
+	$(PDC) Source $(PDX_DIR)
+	@cp pdxinfo $(PDX_DIR)/
+
 # ========================================
 # Compilation Rules
 # ========================================
@@ -189,6 +194,7 @@ $(OBJDIR)/pdex.hex: $(OBJDIR)/pdex.elf
 $(OBJDIR)/pdex.bin: $(OBJDIR)/pdex.elf
 	$(BIN) $< $@
 
+
 # ========================================
 # Clean Target
 # ========================================
@@ -212,10 +218,11 @@ clean:
 # Stub Generation
 # ========================================
 generate_stubs:
-	@echo "Generating stubs for missing symbols..."
-	@python3 generate_stubs.py linker_errors.log
-	@rm linker_errors.log
-	@echo "Stubs generated. Rebuilding..."
-	@make
+	@echo "Generating stubs disabled, do so manually"
+#	@echo "Generating stubs for missing symbols..."
+#	@python3 generate_stubs.py linker_errors.log
+#	@rm linker_errors.log
+#	@echo "Stubs generated. Rebuilding..."
+	@#make
 
 # *** EOF ***

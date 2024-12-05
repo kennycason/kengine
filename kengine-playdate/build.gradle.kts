@@ -19,6 +19,7 @@ kotlin {
                     "-I${project.file("src/nativeInterop/cinterop").absolutePath}",
                     "-DTARGET_PLAYDATE=1",
                     "-DTARGET_EXTENSION=1",
+                    "-march=armv7e-m",
                     "-mcpu=cortex-m7",
                     "-mthumb",
                     "-mfpu=fpv5-sp-d16",
@@ -37,6 +38,7 @@ kotlin {
                 outputDirectory = file("${layout.buildDirectory.get()}/bin/playdate")
                 linkerOpts(
                     "-T${System.getenv("PLAYDATE_SDK_PATH")}/C_API/buildsupport/link_map.ld",
+                    "-march=armv7e-m",
                     "-mcpu=cortex-m7",
                     "-mthumb",
                     "-mfpu=fpv5-sp-d16",
@@ -45,7 +47,8 @@ kotlin {
                     "-nostdlib++",
                     "-fno-exceptions",
                     "-fno-rtti",
-                    "-specs=nosys.specs"
+                    "-specs=nosys.specs",
+                    "-target arm-none-eabi"
                 )
             }
         }
