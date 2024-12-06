@@ -128,7 +128,7 @@ Install OpenJDK 17.0
 
 Install SDL via Brew (on Mac)
 ```shell
-brew install sdl2 sdl2_mixer sdl2_ttf
+brew install sdl2 sdl2_mixer sdl2_ttf sdl2_net
 ```
 
 Build the project

@@ -1,7 +1,7 @@
 package com.kengine.graphics
 
 import com.kengine.log.Logging
-import com.kengine.sdl.SDL_LoadBMP
+import com.kengine.sdl.cinterop.SDL_LoadBMP
 import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.CValuesRef
 import kotlinx.cinterop.ExperimentalForeignApi
