@@ -1,6 +1,7 @@
 package com.kengine.network
 
-import com.kengine.sdl.cinterop.SDLNet_UDPsocket
+import cnames.structs.SDLNet_TCPsocket
+import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
@@ -9,19 +10,37 @@ import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
-import sdl2.net.IPaddress
 import sdl2.net.SDLNet_AllocPacket
 import sdl2.net.SDLNet_FreePacket
+import sdl2.net.SDLNet_GetError
 import sdl2.net.SDLNet_UDP_Close
+import sdl2.net.SDLNet_UDP_Open
 import sdl2.net.SDLNet_UDP_Recv
 import sdl2.net.SDLNet_UDP_Send
 
 @OptIn(ExperimentalForeignApi::class)
 class UdpConnection(
-    override val id: Int,
-    private val socket: SDLNet_UDPsocket,
-    private val address: IPaddress
+    private val address: IPAddress
 ) : NetworkConnection {
+
+    private var udpSocket: CPointer<SDLNet_TCPsocket>? = null
+
+    override val id: String
+        get() = "${address.host}:${address.port}"
+
+    override fun connect() {
+        val port = address.port.convert<UShort>()
+        udpSocket = SDLNet_UDP_Open(port)?.reinterpret() ?: throw Exception(
+            "Failed to open UDP connection on port $port: ${SDLNet_GetError()}"
+        )
+    }
+
+    override fun close() {
+        udpSocket?.reinterpret<cnames.structs._UDPsocket>()?.let { socket ->
+            SDLNet_UDP_Close(socket)
+            udpSocket = null
+        }
+    }
 
     override fun publish(data: ByteArray) {
         val packet = SDLNet_AllocPacket(data.size.convert()) ?: throw Exception("Failed to allocate packet")
@@ -29,10 +48,13 @@ class UdpConnection(
             packet.pointed.len = data.size.convert()
 
             // create a copy of the address to assign TODO better way to do this>
-            val ipAddress = address.reinterpret<IPaddress>()
-            packet.pointed.address.host = ipAddress.host
-            packet.pointed.address.port = ipAddress.port
-            SDLNet_UDP_Send(socket, -1, packet)
+            val ipAddress = address.toSDL()
+            packet.pointed.address.host = ipAddress.pointed.host
+            packet.pointed.address.port = ipAddress.pointed.port
+
+            udpSocket?.reinterpret<cnames.structs._UDPsocket>()?.let { socket ->
+                SDLNet_UDP_Send(socket, -1, packet)
+            }
         } finally {
             SDLNet_FreePacket(packet)
         }
@@ -55,14 +77,24 @@ class UdpConnection(
         memScoped {
             val packet = SDLNet_AllocPacket(1024.convert()) ?: throw Exception("Failed to allocate packet")
             try {
-                while (true) {
-                    val received = SDLNet_UDP_Recv(socket, packet)
-                    if (received > 0) {
-                        onReceive(packet.pointed.data!!.readBytes(packet.pointed.len.convert()))
+                var shouldContinue = true
+
+                while (shouldContinue) {
+                    // could probably just double bang this since it shouldn't be null...
+                    udpSocket?.reinterpret<cnames.structs._UDPsocket>()?.let { socket ->
+                        val received = SDLNet_UDP_Recv(socket, packet)
+                        if (received > 0) {
+                            val data = packet.pointed.data!!.readBytes(packet.pointed.len.convert())
+                            onReceive(data)
+                        } else {
+                            shouldContinue = false // stop if no data is received
+                        }
+                    } ?: run {
+                        shouldContinue = false // stop if udpSocket is null
                     }
                 }
             } finally {
-                SDLNet_FreePacket(packet)
+                SDLNet_FreePacket(packet) // ensure the packet is always freed
             }
         }
     }
@@ -86,7 +118,4 @@ class UdpConnection(
         }
     }
 
-    override fun close() {
-        SDLNet_UDP_Close(socket)
-    }
 }

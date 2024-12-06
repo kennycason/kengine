@@ -14,7 +14,7 @@ class ColorTest {
             a = 255.toUByte()
         )
 
-        val packedColor = color.toUInt32()
+        val packedColor = color.toUInt()
         val expectedUInt32: UInt = 0xFF8040FFu
 
         assertEquals(expectedUInt32, packedColor)
@@ -40,7 +40,7 @@ class ColorTest {
             a = 250.toUByte()
         )
 
-        val packedColor = originalColor.toUInt32()
+        val packedColor = originalColor.toUInt()
         val unpackedColor = Color.fromUInt32(packedColor)
 
         assertEquals(originalColor, unpackedColor, "Color should remain the same after toUInt32() and fromUInt32()")

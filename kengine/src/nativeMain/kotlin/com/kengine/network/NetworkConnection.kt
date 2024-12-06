@@ -3,7 +3,9 @@ package com.kengine.network
 import kotlinx.serialization.KSerializer
 
 interface NetworkConnection {
-    val id: Int
+    val id: String
+    fun connect()
+    fun close()
     fun publish(data: UByteArray)
     fun publish(data: ByteArray)
     fun publish(data: String)
@@ -12,5 +14,4 @@ interface NetworkConnection {
     fun subscribe(onReceive: (ByteArray) -> Unit)
     fun subscribe(onReceive: (String) -> Unit)
     fun <T> subscribe(onReceive: (T) -> Unit, serializer: KSerializer<T>)
-    fun close()
 }
