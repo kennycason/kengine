@@ -8,13 +8,15 @@ import com.kengine.graphics.FlipMode
 import com.kengine.graphics.Sprite
 import com.kengine.input.keyboard.KeyboardContext
 import com.kengine.input.mouse.MouseContext
-import com.kengine.log.getLogger
+import com.kengine.log.Logging
+import com.kengine.network.IPAddress
+import com.kengine.network.useNetworkContext
 import com.kengine.sdl.useSDLContext
 import com.kengine.time.ClockContext
 
 class BulbasaurEntity : SpriteEntity(
     sprite = Sprite.fromFilePath("assets/sprites/bulbasaur.bmp")
-) {
+), Logging {
     private val speed = 100.0
     private var state = State.INIT
 
@@ -57,7 +59,7 @@ class BulbasaurEntity : SpriteEntity(
                 rotation -= 1.0
             }
             if (keyboard.isSpacePressed()) {
-                getLogger(this::class).info { "Bulbasaur ROARED!" }
+                logger.info { "Bulbasaur ROARED!" }
                 useContext<EventContext> {
                     publish(Events.BULBASAUR_ROAR, BulbasaurRoarEvent(decibels = 90.0))
                 }
@@ -65,6 +67,14 @@ class BulbasaurEntity : SpriteEntity(
             if (keyboard.isEscapePressed()) {
                 useContext<GameContext> {
                     isRunning = false
+                }
+            }
+            if (keyboard.isNPressed()) {
+                logger.info { "Preparing to send message over UDP"}
+                useNetworkContext {
+                    val ipAddress = IPAddress("127.0.0.1", 12345)
+                    val connection = getConnection(ipAddress)
+                    connection.publish("Hello over UDP, from Bulbasaur!")
                 }
             }
         }

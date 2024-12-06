@@ -2,6 +2,8 @@
 import com.kengine.Game
 import com.kengine.geometry.useGeometryContext
 import com.kengine.map.tiled.TiledMapLoader
+import com.kengine.network.IPAddress
+import com.kengine.network.NetworkConnection
 import com.kengine.network.useNetworkContext
 import com.kengine.sdl.useSDLContext
 
@@ -11,16 +13,17 @@ class HelloWorldGame : Game {
     private val scytherEntity = ScytherEntity()
     private val tiledMap = TiledMapLoader().loadMap("assets/maps/simple_map.tmj")
         .also { it.p.set(480.0, 0.0) }
+    private lateinit var connection: NetworkConnection
 
     init {
         useNetworkContext {
-//            val ipAddress = IPAddress("127.0.0.1", 12345)
+            val ipAddress = IPAddress("127.0.0.1", 12345)
 //            val connection = connectTcp(ipAddress)
-//            connection.subscribe { message: String ->
-//                println("Received message: $message")
-//            }
-//            connection.publish("Hello, server!")
-//            connection.close()
+            connection = connectUdp(ipAddress)
+            connection.subscribe { message: String ->
+                println("Received message: $message")
+            }
+            connection.publish("Hello, server!")
         }
     }
 
@@ -82,6 +85,7 @@ class HelloWorldGame : Game {
     override fun cleanup() {
         bulbasaur.cleanup()
         pokeballs.forEach { it.cleanup() }
+        connection.close()
     }
 
 }

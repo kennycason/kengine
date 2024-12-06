@@ -23,6 +23,11 @@ data class IPAddress(val host: String, val port: Int) {
         }.ptr
     }
 
+    override fun toString(): String {
+        return "${host}:${port}"
+    }
+
+
     /**
      * Helper functions to format a UInt <> a dotted IP string.
      */

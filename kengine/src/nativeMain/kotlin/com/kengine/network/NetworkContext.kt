@@ -22,6 +22,10 @@ class NetworkContext : Context(), Logging {
         return connection
     }
 
+    fun getConnection(ipAddress: IPAddress): NetworkConnection {
+        return connections[ipAddress.toString()]!!
+    }
+
     fun getConnection(id: String): NetworkConnection {
         return connections[id]!!
     }
