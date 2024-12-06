@@ -1,4 +1,4 @@
-package com.kengine.sdl
+package com.kengine.sdl.cinterop
 
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
