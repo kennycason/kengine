@@ -1,4 +1,5 @@
 
+import com.kengine.log.Logging
 import com.kengine.network.IPAddress
 import com.kengine.network.NetworkConnection
 import com.kengine.sdl.cinterop.SDLNet_TCPsocket
@@ -15,10 +16,11 @@ import sdl2.net.SDLNet_TCP_Open
 import sdl2.net.SDLNet_TCP_Recv
 import sdl2.net.SDLNet_TCP_Send
 
+// TODO cleanup null handling
 @OptIn(ExperimentalForeignApi::class)
 class TcpConnection(
     private val address: IPAddress
-) : NetworkConnection {
+) : NetworkConnection, Logging {
 
     private var tcpSocket: CPointer<SDLNet_TCPsocket>? = null
 
@@ -26,13 +28,16 @@ class TcpConnection(
         get() = "${address.host}:${address.port}"
 
     override fun connect() {
+        logger.info { "TCP connection started: $address" }
         val sdlIpAddress = address.toSDL()
         tcpSocket = SDLNet_TCP_Open(sdlIpAddress) ?: throw Exception(
             "Failed to open TCP connection to ${address.host}:${address.port}: ${SDLNet_GetError()}"
         )
+        logger.info { "TCP connection success: $id" }
     }
 
     override fun close() {
+        logger.info { "TCP connection closed: $id" }
         tcpSocket?.reinterpret<cnames.structs._TCPsocket>()?.let { socket ->
             SDLNet_TCP_Close(socket)
             tcpSocket = null

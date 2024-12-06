@@ -1,5 +1,6 @@
 package com.kengine.network
 
+import com.kengine.log.Logging
 import com.kengine.sdl.cinterop.SDLNet_UDPsocket
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -22,7 +23,7 @@ import sdl2.net.SDLNet_UDP_Send
 @OptIn(ExperimentalForeignApi::class)
 class UdpConnection(
     private val address: IPAddress
-) : NetworkConnection {
+) : NetworkConnection, Logging {
 
     private var udpSocket: CPointer<SDLNet_UDPsocket>? = null
 
@@ -30,13 +31,16 @@ class UdpConnection(
         get() = "${address.host}:${address.port}"
 
     override fun connect() {
+        logger.info { "UDP connection started: $address" }
         val port = address.port.convert<UShort>()
         udpSocket = SDLNet_UDP_Open(port)?.reinterpret() ?: throw Exception(
             "Failed to open UDP connection on port $port: ${SDLNet_GetError()}"
         )
+        logger.info { "UDP connection success: $id" }
     }
 
     override fun close() {
+        logger.info { "UDP connection closed: $id" }
         udpSocket?.reinterpret<cnames.structs._UDPsocket>()?.let { socket ->
             SDLNet_UDP_Close(socket)
             udpSocket = null

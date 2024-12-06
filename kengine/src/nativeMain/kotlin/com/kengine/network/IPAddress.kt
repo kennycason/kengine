@@ -9,7 +9,7 @@ import kotlinx.cinterop.ptr
 import sdl2.net.IPaddress
 
 @OptIn(ExperimentalForeignApi::class)
-class IPAddress(val host: String, val port: Int) {
+data class IPAddress(val host: String, val port: Int) {
 
     /**
      * Converts the host and port into an SDL-compatible IPaddress structure.
