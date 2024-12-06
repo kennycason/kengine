@@ -1,6 +1,7 @@
 
 import com.kengine.network.IPAddress
 import com.kengine.network.NetworkConnection
+import com.kengine.sdl.cinterop.SDLNet_TCPsocket
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.memScoped
@@ -19,14 +20,14 @@ class TcpConnection(
     private val address: IPAddress
 ) : NetworkConnection {
 
-    private var tcpSocket: CPointer<cnames.structs.SDLNet_TCPsocket>? = null
+    private var tcpSocket: CPointer<SDLNet_TCPsocket>? = null
 
     override val id: String
         get() = "${address.host}:${address.port}"
 
     override fun connect() {
         val sdlIpAddress = address.toSDL()
-        tcpSocket = SDLNet_TCP_Open(sdlIpAddress)?.reinterpret() ?: throw Exception(
+        tcpSocket = SDLNet_TCP_Open(sdlIpAddress) ?: throw Exception(
             "Failed to open TCP connection to ${address.host}:${address.port}: ${SDLNet_GetError()}"
         )
     }

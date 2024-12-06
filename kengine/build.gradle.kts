@@ -58,8 +58,8 @@ kotlin {
                         listOf(
                             "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
                             "-opt-in=kotlin.ExperimentalStdlibApi",
-                            "-g", // enable debug symbols
-                            "-ea" // enable assertions
+                            "-g",  // enable debug symbols
+                            "-ea", // enable assertions
                         )
                     )
                 }
@@ -84,7 +84,6 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(libs.kotlinxSerializationJson)
-//                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
             }
         }
         val commonTest by getting {

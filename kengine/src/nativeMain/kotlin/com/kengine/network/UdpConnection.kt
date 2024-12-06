@@ -1,6 +1,6 @@
 package com.kengine.network
 
-import cnames.structs.SDLNet_TCPsocket
+import com.kengine.sdl.cinterop.SDLNet_UDPsocket
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.convert
@@ -18,12 +18,13 @@ import sdl2.net.SDLNet_UDP_Open
 import sdl2.net.SDLNet_UDP_Recv
 import sdl2.net.SDLNet_UDP_Send
 
+// TODO cleanup null handling
 @OptIn(ExperimentalForeignApi::class)
 class UdpConnection(
     private val address: IPAddress
 ) : NetworkConnection {
 
-    private var udpSocket: CPointer<SDLNet_TCPsocket>? = null
+    private var udpSocket: CPointer<SDLNet_UDPsocket>? = null
 
     override val id: String
         get() = "${address.host}:${address.port}"
@@ -47,7 +48,6 @@ class UdpConnection(
         try {
             packet.pointed.len = data.size.convert()
 
-            // create a copy of the address to assign TODO better way to do this>
             val ipAddress = address.toSDL()
             packet.pointed.address.host = ipAddress.pointed.host
             packet.pointed.address.port = ipAddress.pointed.port
