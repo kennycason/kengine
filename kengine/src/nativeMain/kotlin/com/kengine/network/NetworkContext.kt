@@ -1,6 +1,5 @@
 package com.kengine.network
 
-import TcpConnection
 import com.kengine.context.Context
 import com.kengine.log.Logging
 
@@ -37,6 +36,11 @@ class NetworkContext : Context(), Logging {
     fun closeConnection(id: String) {
         connections[id]?.close()
         connections.remove(id)
+    }
+
+    fun closeConnection(connection: NetworkConnection) {
+        connections[connection.id]?.close()
+        connections.remove(connection.id)
     }
 
     fun closeAllConnections() {

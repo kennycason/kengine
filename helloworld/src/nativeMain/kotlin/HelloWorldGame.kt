@@ -17,7 +17,7 @@ class HelloWorldGame : Game {
 
     init {
         useNetworkContext {
-            val ipAddress = IPAddress("127.0.0.1", 12345)
+            val ipAddress = IPAddress("127.0.0.1", 12345u)
 //            val connection = connectTcp(ipAddress)
             connection = connectUdp(ipAddress)
             connection.subscribe { message: String ->

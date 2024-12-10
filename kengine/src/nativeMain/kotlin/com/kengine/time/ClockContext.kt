@@ -23,8 +23,18 @@ data class ClockContext private constructor(
     /**
      * The time in seconds since the last time update() was called within GameLoop
      */
-    var deltaTimeSec: Double = 0.0
+    var deltaTimeSec: Double = 0.0,
+
+    var lastFrameTimeMs: Long = getCurrentMilliseconds() // TODO, should this be zero'd?
 ) : Context() {
+
+    fun update() {
+        totalTimeMs = getCurrentMilliseconds()
+        deltaTimeMs = totalTimeMs - lastFrameTimeMs
+        totalTimeSec = totalTimeMs / 1000.0
+        deltaTimeSec = deltaTimeMs / 1000.0
+        lastFrameTimeMs = totalTimeMs
+    }
 
     override fun cleanup() {
         totalTimeMs = 0L
