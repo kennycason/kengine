@@ -72,7 +72,7 @@ class BulbasaurEntity : SpriteEntity(
             if (keyboard.isNPressed()) {
                 logger.info { "Preparing to send message over UDP"}
                 useNetworkContext {
-                    val ipAddress = IPAddress("127.0.0.1", 12345)
+                    val ipAddress = IPAddress("127.0.0.1", 12345u)
                     val connection = getConnection(ipAddress)
                     connection.publish("Hello over UDP, from Bulbasaur!")
                 }

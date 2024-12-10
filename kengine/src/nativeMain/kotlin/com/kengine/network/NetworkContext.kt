@@ -1,6 +1,5 @@
 package com.kengine.network
 
-import TcpConnection
 import com.kengine.context.Context
 import com.kengine.log.Logging
 
