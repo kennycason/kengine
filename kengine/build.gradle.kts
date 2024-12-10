@@ -84,6 +84,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(libs.kotlinxSerializationJson)
+                implementation(libs.kotlinxCoroutinesCore)
             }
         }
         val commonTest by getting {

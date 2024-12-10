@@ -39,6 +39,11 @@ class NetworkContext : Context(), Logging {
         connections.remove(id)
     }
 
+    fun closeConnection(connection: NetworkConnection) {
+        connections[connection.id]?.close()
+        connections.remove(connection.id)
+    }
+
     fun closeAllConnections() {
         connections.values.forEach { it.close() }
         connections.clear()

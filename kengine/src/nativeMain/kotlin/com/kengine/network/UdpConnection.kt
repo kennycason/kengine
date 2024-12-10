@@ -9,6 +9,12 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import sdl2.net.SDLNet_AllocPacket
@@ -19,86 +25,101 @@ import sdl2.net.SDLNet_UDP_Open
 import sdl2.net.SDLNet_UDP_Recv
 import sdl2.net.SDLNet_UDP_Send
 
-// TODO cleanup null handling
 @OptIn(ExperimentalForeignApi::class)
 class UdpConnection(
     private val address: IPAddress
 ) : NetworkConnection, Logging {
 
     private var udpSocket: CPointer<SDLNet_UDPsocket>? = null
+    private var receiveJob: Job? = null
+    private val coroutineScope = CoroutineScope(Dispatchers.Default)
 
     override val id: String
         get() = "${address.host}:${address.port}"
 
     override fun connect() {
-        logger.info { "UDP connection started: $address" }
-        val port = address.port.convert<UShort>()
-        udpSocket = SDLNet_UDP_Open(port)?.reinterpret() ?: throw Exception(
-            "Failed to open UDP connection on port $port: ${SDLNet_GetError()}"
+        logger.info { "UDP connection started on ${address.host}:${address.port}" }
+        udpSocket = SDLNet_UDP_Open(address.port.convert())?.reinterpret() ?: throw Exception(
+            "Failed to open UDP connection on port ${address.port}: ${SDLNet_GetError()}"
         )
         logger.info { "UDP connection success: $id" }
     }
 
     override fun close() {
         logger.info { "UDP connection closed: $id" }
+        receiveJob?.cancel()
         udpSocket?.reinterpret<cnames.structs._UDPsocket>()?.let { socket ->
             SDLNet_UDP_Close(socket)
             udpSocket = null
         }
     }
 
-    override fun publish(data: ByteArray) {
+    /**
+     * Sends data to the specified remote address.
+     */
+    fun send(data: ByteArray, remoteAddress: IPAddress) {
         val packet = SDLNet_AllocPacket(data.size.convert()) ?: throw Exception("Failed to allocate packet")
         try {
             packet.pointed.len = data.size.convert()
 
-            val ipAddress = address.toSDL()
-            packet.pointed.address.host = ipAddress.pointed.host
-            packet.pointed.address.port = ipAddress.pointed.port
+            // Set the remote address for the packet
+            val sdlRemoteAddr = remoteAddress.toSDL()
+            packet.pointed.address.host = sdlRemoteAddr.pointed.host
+            packet.pointed.address.port = sdlRemoteAddr.pointed.port
 
             udpSocket?.reinterpret<cnames.structs._UDPsocket>()?.let { socket ->
-                SDLNet_UDP_Send(socket, -1, packet)
-            }
+                val sent = SDLNet_UDP_Send(socket, -1, packet)
+                if (sent == 0) {
+                    logger.error { "Failed to send UDP packet: ${SDLNet_GetError()}" }
+                } else {
+                    logger.info { "Sent ${data.size} bytes to ${remoteAddress.host}:${remoteAddress.port}" }
+                }
+            } ?: throw Exception("UDP socket is not open")
         } finally {
             SDLNet_FreePacket(packet)
         }
     }
 
+    override fun publish(data: ByteArray) {
+        TODO()
+    }
+
     override fun publish(data: UByteArray) {
-        publish(data.map { it.toByte() }.toByteArray())
+        TODO()
     }
 
     override fun publish(data: String) {
-        publish(data.encodeToByteArray())
+        TODO()
     }
 
     override fun <T> publish(data: T, serializer: KSerializer<T>) {
-        val json = Json.encodeToString(serializer, data)
-        publish(json.encodeToByteArray())
+        TODO()
     }
 
+    /**
+     * Subscribes to incoming UDP packets.
+     * @param onReceive Callback invoked with the received data.
+     */
     override fun subscribe(onReceive: (ByteArray) -> Unit) {
-        memScoped {
-            val packet = SDLNet_AllocPacket(1024.convert()) ?: throw Exception("Failed to allocate packet")
-            try {
-                var shouldContinue = true
-
-                while (shouldContinue) {
-                    // could probably just double bang this since it shouldn't be null...
-                    udpSocket?.reinterpret<cnames.structs._UDPsocket>()?.let { socket ->
-                        val received = SDLNet_UDP_Recv(socket, packet)
-                        if (received > 0) {
-                            val data = packet.pointed.data!!.readBytes(packet.pointed.len.convert())
-                            onReceive(data)
-                        } else {
-                            shouldContinue = false // stop if no data is received
-                        }
-                    } ?: run {
-                        shouldContinue = false // stop if udpSocket is null
+        receiveJob = coroutineScope.launch {
+            memScoped {
+                val packet = SDLNet_AllocPacket(1024.convert()) ?: throw Exception("Failed to allocate packet")
+                try {
+                    while (isActive) {
+                        udpSocket?.reinterpret<cnames.structs._UDPsocket>()?.let { socket ->
+                            val received = SDLNet_UDP_Recv(socket, packet)
+                            if (received > 0) {
+                                val data = packet.pointed.data!!.readBytes(packet.pointed.len.convert())
+                                onReceive(data)
+                            } else {
+                                // No data received, delay to prevent busy waiting
+                                delay(10)
+                            }
+                        } ?: break
                     }
+                } finally {
+                    SDLNet_FreePacket(packet)
                 }
-            } finally {
-                SDLNet_FreePacket(packet) // ensure the packet is always freed
             }
         }
     }
@@ -121,5 +142,4 @@ class UdpConnection(
             onReceive(Json.decodeFromString(serializer, json))
         }
     }
-
 }
