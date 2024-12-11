@@ -18,8 +18,8 @@ From within IntelliJ, run the `main` function within `BoxxleLauncher.kt`.
 From the terminal:
 
 ```shell
-./gradlew clean build
-./boxxle/build/bin/native/releaseExecutable/boxxle.kexe
+./gradlew :games:boxxle:clean :games:boxxle:build
+./games/boxxle/build/bin/native/releaseExecutable/boxxle.kexe
 ```
 
 
