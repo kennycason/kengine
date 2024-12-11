@@ -9,8 +9,6 @@ import com.kengine.graphics.Sprite
 import com.kengine.input.keyboard.KeyboardContext
 import com.kengine.input.mouse.MouseContext
 import com.kengine.log.Logging
-import com.kengine.network.IPAddress
-import com.kengine.network.useNetworkContext
 import com.kengine.sdl.useSDLContext
 import com.kengine.time.ClockContext
 
@@ -67,14 +65,6 @@ class BulbasaurEntity : SpriteEntity(
             if (keyboard.isEscapePressed()) {
                 useContext<GameContext> {
                     isRunning = false
-                }
-            }
-            if (keyboard.isNPressed()) {
-                logger.info { "Preparing to send message over UDP"}
-                useNetworkContext {
-                    val ipAddress = IPAddress("127.0.0.1", 12345u)
-                    val connection = getConnection(ipAddress)
-                    connection.publish("Hello over UDP, from Bulbasaur!")
                 }
             }
         }

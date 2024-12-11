@@ -9,8 +9,7 @@ rootProject.name = "kengine"
 
 val isPlaydateEnabled = System.getenv("PLAYDATE_SDK_PATH") != null
 println("Playdate enabled: $isPlaydateEnabled")
-
-val modules = mutableListOf("kengine", "boxxle", "helloworld")
+val modules = mutableListOf("kengine", "boxxle", "helloworld", "image-shuffle")
 if (isPlaydateEnabled) {
     modules.add("kengine-playdate")
 }
