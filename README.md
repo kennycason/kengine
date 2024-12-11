@@ -122,7 +122,7 @@ kengine/
     └── test/                      // Unit and integration tests
 ```
 
-## Installation 
+## Dev & Installation 
 
 Install OpenJDK 17.0
 
@@ -134,6 +134,11 @@ brew install sdl2 sdl2_mixer sdl2_ttf sdl2_net
 Build the project
 ```shell
 ./gradlew clean build
+```
+
+Install `cmake` in order to compile Box2D
+```shell
+brew install cmake
 ```
 
 Misc Gradle cache/refresh dependencies
