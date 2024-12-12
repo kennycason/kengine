@@ -245,7 +245,6 @@ class GeometryContext private constructor() : Context(), Logging {
     }
 
     override fun cleanup() {
-        currentContext = null
     }
 
 }
