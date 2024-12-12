@@ -67,7 +67,6 @@ class SDLContext private constructor(
         SDL_DestroyRenderer(renderer)
         SDL_DestroyWindow(window)
         SDL_Quit()
-        currentContext = null
     }
 
     companion object {

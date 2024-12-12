@@ -14,6 +14,13 @@ val modules = mutableListOf("kengine")
 if (isPlaydateEnabled) {
     modules.add("kengine-playdate")
 }
-modules.addAll(listOf("games:boxxle", "games:helloworld", "games:image-shuffle"))
+modules.addAll(
+    listOf(
+        "games:boxxle",
+        "games:helloworld",
+        "games:image-shuffle",
+        "games:physics-demo"
+    )
+)
 
 include(modules)

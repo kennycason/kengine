@@ -28,7 +28,6 @@ class SoundContext private constructor(
     override fun cleanup() {
         manager.cleanup()
         Mix_CloseAudio()
-        currentContext = null
     }
 
     companion object {

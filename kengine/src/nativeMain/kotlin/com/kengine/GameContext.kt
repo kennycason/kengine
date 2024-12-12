@@ -16,6 +16,7 @@ import com.kengine.input.mouse.MouseContext
 import com.kengine.input.mouse.getMouseContext
 import com.kengine.log.Logging
 import com.kengine.network.NetworkContext
+import com.kengine.physics.PhysicsContext
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
 import com.kengine.sdl.registerSDLQuitHandler
@@ -36,6 +37,7 @@ class GameContext private constructor(
     val sound: SoundContext,
     val network: NetworkContext,
     val action: ActionContext,
+    val physics: PhysicsContext,
     val clock: ClockContext,
 ) : Context(), Logging {
     var isRunning = true
@@ -54,6 +56,7 @@ class GameContext private constructor(
         ContextRegistry.register(sound)
         ContextRegistry.register(network)
         ContextRegistry.register(action)
+        ContextRegistry.register(physics)
         ContextRegistry.register(clock)
         getKeyboardContext().init()
         getMouseContext().init()
@@ -91,6 +94,7 @@ class GameContext private constructor(
                 network = NetworkContext.get(),
                 geometry = GeometryContext.get(),
                 action = ActionContext.get(),
+                physics = PhysicsContext.get(),
                 clock = ClockContext.get()
             )
             return currentContext!!
