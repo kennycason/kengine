@@ -19,6 +19,11 @@ import kotlinx.cinterop.ExperimentalForeignApi
 
 @OptIn(ExperimentalForeignApi::class)
 sealed class Shape(internal val handle: CPointer<cnames.structs.cpShape>) {
+    init {
+        usePhysicsContext {
+            addShape(handle)
+        }
+    }
     var friction: Double
         get() = cpShapeGetFriction(handle)
         set(value) = cpShapeSetFriction(handle, value)
@@ -37,7 +42,7 @@ sealed class Shape(internal val handle: CPointer<cnames.structs.cpShape>) {
     
     class Circle(
         body: Body,
-        radius: Double,
+        val radius: Double,
         offset: Vec2 = Vec2()
     ) : Shape(cpCircleShapeNew(body.handle, radius, cpv(offset.x, offset.y))!!)
     

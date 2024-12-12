@@ -20,6 +20,11 @@ import kotlinx.cinterop.ExperimentalForeignApi
 
 @OptIn(ExperimentalForeignApi::class)
 class Body private constructor(internal val handle: CPointer<cnames.structs.cpBody>) {
+    init {
+        usePhysicsContext {
+            addBody(handle)
+        }
+    }
     var position: Vec2
         get() = cpBodyGetPosition(handle).toVec2()
         set(value) = cpBodySetPosition(handle, cpv(value.x, value.y))
