@@ -6,7 +6,7 @@ import sdl2.SDL_GetTicks
 /**
  * While this is safe to use, default to use ClockContext
  *
- * useContext<GameContext> {
+ * useGameContext {
  *     println("${clock.totalTimeMs} ${clock.deltaTimeMs}")
  * }
  */

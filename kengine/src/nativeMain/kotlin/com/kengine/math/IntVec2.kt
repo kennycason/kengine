@@ -1,6 +1,7 @@
 package com.kengine.math
 
-import kotlin.math.sqrt
+import root
+import squared
 
 data class IntVec2(
     var x: Int = 0,
@@ -19,13 +20,12 @@ data class IntVec2(
         this.y = v.y
     }
 
-    fun magnitude(): Int {
-        return sqrt((x * x + y * y).toDouble()).toInt()
+    fun magnitude(): Double {
+        return (x.squared + y.squared).root
     }
 
-    fun normalized(): IntVec2 {
-        val mag = this.magnitude()
-        return if (mag == 0) IntVec2(0, 0) else IntVec2(this.x / mag, this.y / mag)
+    fun normalized(): Vec2 {
+        return Vec2(x.toDouble(), y.toDouble()).normalized()
     }
 
     operator fun plus(other: IntVec2): IntVec2 {

@@ -1,5 +1,6 @@
 package com.kengine.math
 
+import squared
 import kotlin.math.sqrt
 
 data class Vec2(
@@ -19,7 +20,7 @@ data class Vec2(
         this.y = v.y
     }
     fun magnitude(): Double {
-        return sqrt(x * x + y * y)
+        return sqrt(x.squared + y.squared)
     }
     fun normalized(): Vec2 {
         val mag = this.magnitude()

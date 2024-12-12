@@ -21,12 +21,38 @@ data class Rect(
     }
 
     /**
+     * Checks if this rectangle overlaps with another rectangle.
+     *
+     * @param rect The other rectangle to check overlap with.
+     * @return True if the rectangles overlap, false otherwise.
+     */
+    fun overlaps(rect: IntRect): Boolean {
+        return this.x < rect.x + rect.w &&
+                this.x + this.w > rect.x &&
+                this.y < rect.y + rect.h &&
+                this.y + this.h > rect.y
+    }
+
+    /**
      * Checks if this rectangle contains a given point.
      *
      * @param point The point to check.
      * @return True if the point is inside the rectangle, false otherwise.
      */
     fun contains(point: Vec2): Boolean {
+        return point.x >= this.x &&
+                point.x <= this.x + this.w &&
+                point.y >= this.y &&
+                point.y <= this.y + this.h
+    }
+
+    /**
+     * Checks if this rectangle contains a given point.
+     *
+     * @param point The point to check.
+     * @return True if the point is inside the rectangle, false otherwise.
+     */
+    fun contains(point: IntVec2): Boolean {
         return point.x >= this.x &&
                 point.x <= this.x + this.w &&
                 point.y >= this.y &&
@@ -66,8 +92,8 @@ data class Rect(
      * @param dy The offset in the y-direction.
      */
     fun translateAssign(dx: Double, dy: Double) {
-        this.x + dx
-        this.y + dy
+        this.x += dx
+        this.y += dy
     }
 
     /**
@@ -88,8 +114,8 @@ data class Rect(
      * @param scaleY The scale factor in the y-direction.
      */
     fun scaleAssign(scaleX: Double, scaleY: Double) {
-        this.w * scaleX
-        this.h * scaleY
+        this.w *= scaleX
+        this.h *= scaleY
     }
 
     /**
