@@ -131,6 +131,11 @@ Install SDL via Brew (on Mac)
 brew install sdl2 sdl2_mixer sdl2_ttf sdl2_net
 ```
 
+Install Chipmunk2D via Brew (on Mac)
+```shell
+brew install chipmunk
+```
+
 Build the project
 ```shell
 ./gradlew clean build

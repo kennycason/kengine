@@ -50,6 +50,9 @@ kotlin {
             val sdl2ttf by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl2_ttf.def")
             }
+            val chipmunk by creating {
+                defFile = file("src/nativeInterop/cinterop/chipmunk.def")
+            }
         }
         compilations.all {
             compileTaskProvider.configure {
