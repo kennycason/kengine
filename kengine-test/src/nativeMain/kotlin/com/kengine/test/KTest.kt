@@ -1,6 +1,7 @@
 package com.kengine.test
 
 import kotlin.reflect.KClass
+import kotlin.reflect.KProperty1
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
@@ -46,6 +47,15 @@ class AssertionBuilder<T>(private val actual: T) {
             is String -> assertTrue(actual.contains(element as String),
                 "Expected string to contain $element but was $actual")
             else -> throw IllegalArgumentException("Contains assertion not supported for type ${actual!!::class}")
+        }
+        return this
+    }
+
+    fun containsKey(key: Any?): AssertionBuilder<T> {
+        when (actual) {
+            is Map<*, *> -> assertTrue(actual.containsKey(key),
+                "Expected collection to contain key $key but was $actual")
+            else -> throw IllegalArgumentException("Contains key assertion not supported for type ${actual!!::class}")
         }
         return this
     }
@@ -130,7 +140,123 @@ class AssertionBuilder<T>(private val actual: T) {
         }
         return this
     }
+
+    fun <P> property(prop: KProperty1<T, P>): PropertyAssertionBuilder<T, P> {
+        return PropertyAssertionBuilder(actual, prop, this)
+    }
+
+    fun satisfiesAll(vararg predicates: (T) -> Boolean): AssertionBuilder<T> {
+        predicates.forEachIndexed { index, predicate ->
+            assertTrue(predicate(actual),
+                "Value $actual did not satisfy predicate at index $index")
+        }
+        return this
+    }
+
+    fun transform(transform: (T) -> Any?): AssertionBuilder<Any?> {
+        return AssertionBuilder(transform(actual))
+    }
+
+    fun <R : Any> isInstanceOf(kClass: KClass<R>): AssertionBuilder<T> {
+        assertTrue(
+            kClass.isInstance(actual),
+            "Expected instance of ${kClass.simpleName} but was ${actual!!::class.simpleName}"
+        )
+        return this
+    }
+
+    fun <R : Any> isA(kClass: KClass<R>): AssertionBuilder<T> {
+        assertTrue(
+            kClass.isInstance(actual),
+            "Expected instance of ${kClass.simpleName} but was ${actual!!::class.simpleName}"
+        )
+        return this
+    }
+
+    inline fun <reified R : Any> isA(): AssertionBuilder<T> = isA(R::class)
+
+    fun isString(): AssertionBuilder<T> = isA(String::class)
+    fun isUByte(): AssertionBuilder<T> = isA(UByte::class)
+    fun isByte(): AssertionBuilder<T> = isA(Byte::class)
+    fun isUInt(): AssertionBuilder<T> = isA(UInt::class)
+    fun isInt(): AssertionBuilder<T> = isA(Int::class)
+    fun isULong(): AssertionBuilder<T> = isA(ULong::class)
+    fun isLong(): AssertionBuilder<T> = isA(Long::class)
+    fun isBoolean(): AssertionBuilder<T> = isA(Boolean::class)
+    fun isList(): AssertionBuilder<T> = isA(List::class)
+    fun isMap(): AssertionBuilder<T> = isA(Map::class)
+    fun isSet(): AssertionBuilder<T> = isA(Set::class)
+
+    fun hasToString(expected: String): AssertionBuilder<T> {
+        assertEquals(expected, actual.toString(),
+            "Expected toString() to be '$expected' but was '${actual.toString()}'")
+        return this
+    }
+
+    fun containsAll(vararg elements: Any?): AssertionBuilder<T> {
+        when (actual) {
+            is Collection<*> -> {
+                elements.forEach { element ->
+                    assertTrue(actual.contains(element),
+                        "Expected collection to contain all of ${elements.toList()} but was missing $element")
+                }
+            }
+            else -> throw IllegalArgumentException("ContainsAll assertion not supported for type ${actual!!::class}")
+        }
+        return this
+    }
+
+    fun containsExactly(vararg elements: Any?): AssertionBuilder<T> {
+        when (actual) {
+            is Collection<*> -> {
+                assertEquals(elements.size, actual.size,
+                    "Expected collection to have size ${elements.size} but was ${actual.size}")
+                elements.forEachIndexed { index, element ->
+                    assertTrue(actual.contains(element),
+                        "Expected element at position $index to be $element")
+                }
+            }
+            else -> throw IllegalArgumentException("ContainsExactly assertion not supported for type ${actual!!::class}")
+        }
+        return this
+    }
+
 }
+
+class PropertyAssertionBuilder<T, P>(
+    private val obj: T,
+    private val property: KProperty1<T, P>,
+    private val parentBuilder: AssertionBuilder<T>
+) {
+    fun isEqualTo(expected: P): AssertionBuilder<T> {
+        assertEquals(expected, property.get(obj),
+            "Expected property ${property.name} to be equal to $expected but was ${property.get(obj)}")
+        return parentBuilder
+    }
+
+    fun satisfies(message: String? = null, predicate: (P) -> Boolean): AssertionBuilder<T> {
+        assertTrue(predicate(property.get(obj)),
+            message ?: "Property ${property.name} with value ${property.get(obj)} did not satisfy the predicate")
+        return parentBuilder
+    }
+}
+
+class ObjectAssertionBuilder<T : Any>(private val actual: T) {
+    private val assertions = mutableListOf<(T) -> Unit>()
+
+    fun <P> property(prop: KProperty1<T, P>, assertion: (P) -> Boolean, message: String? = null) {
+        assertions.add { obj ->
+            val value = prop.get(obj)
+            assertTrue(assertion(value),
+                message ?: "Property ${prop.name} with value $value did not satisfy the assertion")
+        }
+    }
+
+    fun verify() {
+        assertions.forEach { it(actual) }
+    }
+}
+
 
 class ThrowsBuilder<T : Throwable> {
     private var message: String? = null
@@ -168,12 +294,18 @@ class ThrowsBuilder<T : Throwable> {
     }
 }
 
+abstract class TypeToken<T>
+
 fun <T> expectThat(actual: T): AssertionBuilder<T> = AssertionBuilder(actual)
 
 fun <T> expectThat(
     actual: T,
     lambda: AssertionBuilder<T>.() -> Unit
 ): AssertionBuilder<T> = AssertionBuilder(actual)
+
+fun <T : Any> expectObject(actual: T, block: ObjectAssertionBuilder<T>.() -> Unit) {
+    ObjectAssertionBuilder(actual).apply(block).verify()
+}
 
 inline fun <reified T : Throwable> expectThrows(noinline block: () -> Unit): ThrowsBuilder<T> {
     val builder = ThrowsBuilder<T>()

@@ -1,8 +1,7 @@
 package com.kengine.map.tiled
 
+import com.kengine.test.expectThat
 import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class TiledMapLoaderTest {
     enum class Tiles(val id: Int) {
@@ -11,38 +10,39 @@ class TiledMapLoaderTest {
         BOX(2),
         BOX_SET(3),
     }
+
     @Test
     fun `load map test`() {
         val tiledMap = TiledMapLoader()
             .loadMap("src/nativeTest/resources/simple_map.tmj")
-        assertEquals(32, tiledMap.tileWidth)
-        assertEquals(32, tiledMap.tileHeight)
-        assertEquals(4, tiledMap.width)
-        assertEquals(4, tiledMap.height)
+        expectThat(tiledMap.tileWidth).isEqualTo(32)
+        expectThat(tiledMap.tileHeight).isEqualTo(32)
+        expectThat(tiledMap.width).isEqualTo(4)
+        expectThat(tiledMap.height).isEqualTo(4)
 
         val layersByName = tiledMap.layers.associateBy { it.name }
-        assertTrue("main" in layersByName)
-        assertTrue("bg" in layersByName)
+        expectThat(layersByName).containsKey("main")
+        expectThat(layersByName).containsKey("bg")
 
         val mainLayer = layersByName["main"]!!
-        assertEquals(Tiles.BRICK.id, mainLayer.getTileAt(0, 0))
-        assertEquals(Tiles.BRICK.id, mainLayer.getTileAt(1, 0))
-        assertEquals(Tiles.BRICK.id, mainLayer.getTileAt(2, 0))
-        assertEquals(Tiles.BRICK.id, mainLayer.getTileAt(3, 0))
+        expectThat(mainLayer.getTileAt(0, 0)).isEqualTo(Tiles.BRICK.id)
+        expectThat(mainLayer.getTileAt(1, 0)).isEqualTo(Tiles.BRICK.id)
+        expectThat(mainLayer.getTileAt(2, 0)).isEqualTo(Tiles.BRICK.id)
+        expectThat(mainLayer.getTileAt(3, 0)).isEqualTo(Tiles.BRICK.id)
 
-        assertEquals(Tiles.BRICK.id, mainLayer.getTileAt(0, 1))
-        assertEquals(Tiles.BOX.id, mainLayer.getTileAt(1, 1))
-        assertEquals(Tiles.EMPTY.id, mainLayer.getTileAt(2, 1))
-        assertEquals(Tiles.BRICK.id, mainLayer.getTileAt(3, 1))
+        expectThat(mainLayer.getTileAt(0, 1)).isEqualTo(Tiles.BRICK.id)
+        expectThat(mainLayer.getTileAt(1, 1)).isEqualTo(Tiles.BOX.id)
+        expectThat(mainLayer.getTileAt(2, 1)).isEqualTo(Tiles.EMPTY.id)
+        expectThat(mainLayer.getTileAt(3, 1)).isEqualTo(Tiles.BRICK.id)
 
-        assertEquals(Tiles.BRICK.id, mainLayer.getTileAt(0, 2))
-        assertEquals(Tiles.BOX_SET.id, mainLayer.getTileAt(1, 2))
-        assertEquals(Tiles.EMPTY.id, mainLayer.getTileAt(2, 2))
-        assertEquals(Tiles.BRICK.id, mainLayer.getTileAt(3, 2))
+        expectThat(mainLayer.getTileAt(0, 2)).isEqualTo(Tiles.BRICK.id)
+        expectThat(mainLayer.getTileAt(1, 2)).isEqualTo(Tiles.BOX_SET.id)
+        expectThat(mainLayer.getTileAt(2, 2)).isEqualTo(Tiles.EMPTY.id)
+        expectThat(mainLayer.getTileAt(3, 2)).isEqualTo(Tiles.BRICK.id)
 
-        assertEquals(Tiles.BRICK.id, mainLayer.getTileAt(0, 3))
-        assertEquals(Tiles.BRICK.id, mainLayer.getTileAt(1, 3))
-        assertEquals(Tiles.BRICK.id, mainLayer.getTileAt(2, 3))
-        assertEquals(Tiles.BRICK.id, mainLayer.getTileAt(3, 3))
+        expectThat(mainLayer.getTileAt(0, 3)).isEqualTo(Tiles.BRICK.id)
+        expectThat(mainLayer.getTileAt(1, 3)).isEqualTo(Tiles.BRICK.id)
+        expectThat(mainLayer.getTileAt(2, 3)).isEqualTo(Tiles.BRICK.id)
+        expectThat(mainLayer.getTileAt(3, 3)).isEqualTo(Tiles.BRICK.id)
     }
 }
