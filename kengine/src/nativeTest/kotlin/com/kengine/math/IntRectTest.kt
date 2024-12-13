@@ -1,90 +1,86 @@
 package com.kengine.math
 
+import com.kengine.test.expectThat
 import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class IntRectTest {
 
     @Test
     fun `test default constructor`() {
         val rect = IntRect()
-        assertEquals(0, rect.x)
-        assertEquals(0, rect.y)
-        assertEquals(0, rect.w)
-        assertEquals(0, rect.h)
+        expectThat(rect.x).isEqualTo(0)
+        expectThat(rect.y).isEqualTo(0)
+        expectThat(rect.w).isEqualTo(0)
+        expectThat(rect.h).isEqualTo(0)
     }
 
     @Test
     fun `test parameterized constructor`() {
         val rect = IntRect(1, 2, 3, 4)
-        assertEquals(1, rect.x)
-        assertEquals(2, rect.y)
-        assertEquals(3, rect.w)
-        assertEquals(4, rect.h)
+        expectThat(rect.x).isEqualTo(1)
+        expectThat(rect.y).isEqualTo(2)
+        expectThat(rect.w).isEqualTo(3)
+        expectThat(rect.h).isEqualTo(4)
     }
 
     @Test
     fun `test area`() {
         val rect = IntRect(0, 0, 3, 4)
-        assertEquals(12, rect.area())
+        expectThat(rect.area()).isEqualTo(12)
     }
 
     @Test
     fun `test perimeter`() {
         val rect = IntRect(0, 0, 3, 4)
-        assertEquals(14, rect.perimeter())
+        expectThat(rect.perimeter()).isEqualTo(14)
     }
 
     @Test
     fun `test translate`() {
         val rect = IntRect(1, 2, 3, 4)
         val translated = rect.translate(2, 3)
-        assertEquals(3, translated.x)
-        assertEquals(5, translated.y)
-        assertEquals(3, translated.w)
-        assertEquals(4, translated.h)
+        expectThat(translated.x).isEqualTo(3)
+        expectThat(translated.y).isEqualTo(5)
+        expectThat(translated.w).isEqualTo(3)
+        expectThat(translated.h).isEqualTo(4)
     }
 
     @Test
     fun `test translateAssign`() {
         val rect = IntRect(1, 2, 3, 4)
         rect.translateAssign(2, 3)
-        assertEquals(3, rect.x)
-        assertEquals(5, rect.y)
+        expectThat(rect.x).isEqualTo(3)
+        expectThat(rect.y).isEqualTo(5)
     }
 
     @Test
     fun `test scale`() {
         val rect = IntRect(0, 0, 3, 4)
         val scaled = rect.scale(2, 3)
-        assertEquals(6, scaled.w)
-        assertEquals(12, scaled.h)
+        expectThat(scaled.w).isEqualTo(6)
+        expectThat(scaled.h).isEqualTo(12)
     }
 
     @Test
     fun `test scaleAssign`() {
         val rect = IntRect(0, 0, 3, 4)
         rect.scaleAssign(2, 3)
-        assertEquals(6, rect.w)
-        assertEquals(12, rect.h)
+        expectThat(rect.w).isEqualTo(6)
+        expectThat(rect.h).isEqualTo(12)
     }
 
     @Test
     fun `test contains point`() {
         val rect = IntRect(1, 1, 3, 3)
-        assertTrue(rect.contains(IntVec2(2, 2)))
-        assertFalse(rect.contains(IntVec2(0, 0)))
+        expectThat(rect.contains(IntVec2(2, 2))).isTrue()
+        expectThat(rect.contains(IntVec2(0, 0))).isFalse()
     }
 
     @Test
     fun `test contains point - vec2`() {
         val rect = IntRect(1, 1, 3, 3)
-        assertTrue(rect.contains(Vec2(2.0, 2.0)))
-        assertFalse(rect.contains(Vec2(0.0, 0.0)))
+        expectThat(rect.contains(Vec2(2.0, 2.0))).isTrue()
+        expectThat(rect.contains(Vec2(0.0, 0.0))).isFalse()
     }
 
     @Test
@@ -92,8 +88,8 @@ class IntRectTest {
         val rect1 = IntRect(0, 0, 3, 3)
         val rect2 = IntRect(2, 2, 3, 3)
         val rect3 = IntRect(4, 4, 2, 2)
-        assertTrue(rect1.overlaps(rect2))
-        assertFalse(rect1.overlaps(rect3))
+        expectThat(rect1.overlaps(rect2)).isTrue()
+        expectThat(rect1.overlaps(rect3)).isFalse()
     }
 
     @Test
@@ -101,8 +97,8 @@ class IntRectTest {
         val rect1 = IntRect(0, 0, 3, 3)
         val rect2 = Rect(2.0, 2.0, 3.0, 3.0)
         val rect3 = Rect(4.0, 4.0, 2.0, 2.0)
-        assertTrue(rect1.overlaps(rect2))
-        assertFalse(rect1.overlaps(rect3))
+        expectThat(rect1.overlaps(rect2)).isTrue()
+        expectThat(rect1.overlaps(rect3)).isFalse()
     }
 
     @Test
@@ -110,8 +106,8 @@ class IntRectTest {
         val rect1 = IntRect(0, 0, 3, 3)
         val rect2 = IntRect(2, 2, 3, 3)
         val intersection = rect1.intersection(rect2)
-        assertNotNull(intersection)
-        assertEquals(IntRect(2, 2, 1, 1), intersection)
+        expectThat(intersection).isNotNull()
+        expectThat(intersection).isEqualTo(IntRect(2, 2, 1, 1))
     }
 
     @Test
@@ -119,7 +115,7 @@ class IntRectTest {
         val rect1 = IntRect(0, 0, 2, 2)
         val rect2 = IntRect(3, 3, 2, 2)
         val intersection = rect1.intersection(rect2)
-        assertNull(intersection)
+        expectThat(intersection).isNull()
     }
 
     @Test
@@ -127,6 +123,6 @@ class IntRectTest {
         val rect1 = IntRect(0, 0, 3, 3)
         val rect2 = IntRect(2, 2, 3, 3)
         val union = rect1.union(rect2)
-        assertEquals(IntRect(0, 0, 5, 5), union)
+        expectThat(union).isEqualTo(IntRect(0, 0, 5, 5))
     }
 }

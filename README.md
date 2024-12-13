@@ -18,7 +18,7 @@ Controls:
 - **Return:** Next level
 - **Space:** Previous level
 
-There are 40 levels total. 
+There are 41 levels total. 
 
 <img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/boxxle/screenshot.png" />
 
@@ -103,8 +103,12 @@ useControllerContext {
 ```shell
 kengine/
 ├── kengine/                       // kengine core code
-├── boxxle/                        // boxxle - a more robust example game
-└── helloworld/                    // a simple example, a good starting point.
+├── kengine-test/                  // kengine test framework
+└── games/
+    ├── boxxle/                    // boxxle - clone of the Gameboy classic
+    ├── helloworld/                // a simple example, a good starting point.
+    ├── image-shuffle/             // image tile shuffle game
+    └── physics-demo/              // demonstration of physics engine (chipmunk)
 ```
 
 ## Project structure for a Kengine game
@@ -119,16 +123,17 @@ kengine/
 └── src/
     ├── nativeMain/
     │   └── kotlin/                // game-specific code
-    └── test/                      // Unit and integration tests
+    └── nativeTest/                // unit and integration tests
+        └── kotlin/                // game-specific test code
 ```
 
 ## Installation 
 
-Install OpenJDK 17.0
+Install OpenJDK 17.0+
 
 Install SDL via Brew (on Mac)
 ```shell
-brew install sdl2 sdl2_mixer sdl2_ttf sdl2_net
+brew install sdl2 sdl2_gfx sdl2_mixer sdl2_ttf sdl2_net
 ```
 
 Install Chipmunk2D via Brew (on Mac)

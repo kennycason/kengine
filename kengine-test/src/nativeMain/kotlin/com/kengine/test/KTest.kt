@@ -170,6 +170,11 @@ class ThrowsBuilder<T : Throwable> {
 
 fun <T> expectThat(actual: T): AssertionBuilder<T> = AssertionBuilder(actual)
 
+fun <T> expectThat(
+    actual: T,
+    lambda: AssertionBuilder<T>.() -> Unit
+): AssertionBuilder<T> = AssertionBuilder(actual)
+
 inline fun <reified T : Throwable> expectThrows(noinline block: () -> Unit): ThrowsBuilder<T> {
     val builder = ThrowsBuilder<T>()
     builder.verify(block, T::class)

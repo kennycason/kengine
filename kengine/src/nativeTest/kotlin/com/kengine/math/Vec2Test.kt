@@ -1,38 +1,38 @@
 package com.kengine.math
 
+import com.kengine.test.expectThat
 import kotlin.test.Test
-import kotlin.test.assertEquals
 
 class Vec2Test {
 
     @Test
     fun `test default constructor`() {
         val vec = Vec2()
-        assertEquals(0.0, vec.x)
-        assertEquals(0.0, vec.y)
+        expectThat(vec.x).isEqualTo(0.0)
+        expectThat(vec.y).isEqualTo(0.0)
     }
 
     @Test
     fun `test parameterized constructor`() {
         val vec = Vec2(3.0, 4.0)
-        assertEquals(3.0, vec.x)
-        assertEquals(4.0, vec.y)
+        expectThat(vec.x).isEqualTo(3.0)
+        expectThat(vec.y).isEqualTo(4.0)
     }
 
     @Test
     fun `test set with x and y`() {
         val vec = Vec2()
         vec.set(2.0, 3.0)
-        assertEquals(2.0, vec.x)
-        assertEquals(3.0, vec.y)
+        expectThat(vec.x).isEqualTo(2.0)
+        expectThat(vec.y).isEqualTo(3.0)
     }
 
     @Test
     fun `test set with single value`() {
         val vec = Vec2()
         vec.set(5.0)
-        assertEquals(5.0, vec.x)
-        assertEquals(5.0, vec.y)
+        expectThat(vec.x).isEqualTo(5.0)
+        expectThat(vec.y).isEqualTo(5.0)
     }
 
     @Test
@@ -40,30 +40,30 @@ class Vec2Test {
         val vec1 = Vec2(1.0, 2.0)
         val vec2 = Vec2()
         vec2.set(vec1)
-        assertEquals(1.0, vec2.x)
-        assertEquals(2.0, vec2.y)
+        expectThat(vec2.x).isEqualTo(1.0)
+        expectThat(vec2.y).isEqualTo(2.0)
     }
 
     @Test
     fun `test magnitude`() {
         val vec = Vec2(3.0, 4.0)
-        assertEquals(5.0, vec.magnitude(), 0.0001)
+        expectThat(vec.magnitude()).isEqualTo(5.0)
     }
 
     @Test
     fun `test normalized`() {
         val vec = Vec2(3.0, 4.0)
         val normalized = vec.normalized()
-        assertEquals(0.6, normalized.x, 0.0001)
-        assertEquals(0.8, normalized.y, 0.0001)
+        expectThat(normalized.x).isEqualTo(0.6)
+        expectThat(normalized.y).isEqualTo(0.8)
     }
 
     @Test
     fun `test normalized for zero vector`() {
         val vec = Vec2()
         val normalized = vec.normalized()
-        assertEquals(0.0, normalized.x)
-        assertEquals(0.0, normalized.y)
+        expectThat(normalized.x).isEqualTo(0.0)
+        expectThat(normalized.y).isEqualTo(0.0)
     }
 
     @Test
@@ -71,8 +71,8 @@ class Vec2Test {
         val vec1 = Vec2(1.0, 2.0)
         val vec2 = Vec2(3.0, 4.0)
         val result = vec1 + vec2
-        assertEquals(4.0, result.x)
-        assertEquals(6.0, result.y)
+        expectThat(result.x).isEqualTo(4.0)
+        expectThat(result.y).isEqualTo(6.0)
     }
 
     @Test
@@ -80,8 +80,8 @@ class Vec2Test {
         val vec1 = Vec2(5.0, 6.0)
         val vec2 = Vec2(3.0, 4.0)
         val result = vec1 - vec2
-        assertEquals(2.0, result.x)
-        assertEquals(2.0, result.y)
+        expectThat(result.x).isEqualTo(2.0)
+        expectThat(result.y).isEqualTo(2.0)
     }
 
     @Test
@@ -89,8 +89,8 @@ class Vec2Test {
         val vec1 = Vec2(2.0, 3.0)
         val vec2 = Vec2(4.0, 5.0)
         val result = vec1 * vec2
-        assertEquals(8.0, result.x)
-        assertEquals(15.0, result.y)
+        expectThat(result.x).isEqualTo(8.0)
+        expectThat(result.y).isEqualTo(15.0)
     }
 
     @Test
@@ -98,71 +98,71 @@ class Vec2Test {
         val vec1 = Vec2(8.0, 9.0)
         val vec2 = Vec2(2.0, 3.0)
         val result = vec1 / vec2
-        assertEquals(4.0, result.x)
-        assertEquals(3.0, result.y)
+        expectThat(result.x).isEqualTo(4.0)
+        expectThat(result.y).isEqualTo(3.0)
     }
 
     @Test
     fun `test scalar plus operator`() {
         val vec = Vec2(1.0, 2.0)
         val result = vec + 5.0
-        assertEquals(6.0, result.x)
-        assertEquals(7.0, result.y)
+        expectThat(result.x).isEqualTo(6.0)
+        expectThat(result.y).isEqualTo(7.0)
     }
 
     @Test
     fun `test scalar minus operator`() {
         val vec = Vec2(10.0, 20.0)
         val result = vec - 5.0
-        assertEquals(5.0, result.x)
-        assertEquals(15.0, result.y)
+        expectThat(result.x).isEqualTo(5.0)
+        expectThat(result.y).isEqualTo(15.0)
     }
 
     @Test
     fun `test scalar times operator`() {
         val vec = Vec2(2.0, 3.0)
         val result = vec * 4.0
-        assertEquals(8.0, result.x)
-        assertEquals(12.0, result.y)
+        expectThat(result.x).isEqualTo(8.0)
+        expectThat(result.y).isEqualTo(12.0)
     }
 
     @Test
     fun `test scalar div operator`() {
         val vec = Vec2(8.0, 16.0)
         val result = vec / 2.0
-        assertEquals(4.0, result.x)
-        assertEquals(8.0, result.y)
+        expectThat(result.x).isEqualTo(4.0)
+        expectThat(result.y).isEqualTo(8.0)
     }
 
     @Test
     fun `test plusAssign operator`() {
         val vec = Vec2(1.0, 2.0)
         vec += Vec2(3.0, 4.0)
-        assertEquals(4.0, vec.x)
-        assertEquals(6.0, vec.y)
+        expectThat(vec.x).isEqualTo(4.0)
+        expectThat(vec.y).isEqualTo(6.0)
     }
 
     @Test
     fun `test minusAssign operator`() {
         val vec = Vec2(5.0, 6.0)
         vec -= Vec2(3.0, 4.0)
-        assertEquals(2.0, vec.x)
-        assertEquals(2.0, vec.y)
+        expectThat(vec.x).isEqualTo(2.0)
+        expectThat(vec.y).isEqualTo(2.0)
     }
 
     @Test
     fun `test timesAssign operator`() {
         val vec = Vec2(2.0, 3.0)
         vec *= Vec2(4.0, 5.0)
-        assertEquals(8.0, vec.x)
-        assertEquals(15.0, vec.y)
+        expectThat(vec.x).isEqualTo(8.0)
+        expectThat(vec.y).isEqualTo(15.0)
     }
 
     @Test
     fun `test divAssign operator`() {
         val vec = Vec2(8.0, 9.0)
         vec /= Vec2(2.0, 3.0)
-        assertEquals(4.0, vec.x)
-        assertEquals(3.0, vec.y)
+        expectThat(vec.x).isEqualTo(4.0)
+        expectThat(vec.y).isEqualTo(3.0)
     }
 }

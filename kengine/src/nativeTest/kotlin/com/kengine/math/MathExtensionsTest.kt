@@ -1,6 +1,8 @@
 package com.kengine.math
 
 import abs
+import com.kengine.test.expectThat
+import com.kengine.test.expectThrows
 import cubed
 import factorial
 import isEven
@@ -9,61 +11,59 @@ import reciprocal
 import root
 import squared
 import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 
 class MathExtensionsExpandedTest {
 
     @Test
     fun `squared test`() {
-        assertEquals(4, 2.squared)
-        assertEquals(4.0, 2.0.squared)
-        assertEquals(4f, 2f.squared)
-        assertEquals(4, 2.toShort().squared)
-        assertEquals(4u, 2.toUShort().squared)
+        expectThat(2.squared).isEqualTo(4)
+        expectThat(2.0.squared).isEqualTo(4.0)
+        expectThat(2f.squared).isEqualTo(4f)
+        expectThat(2.toShort().squared).isEqualTo(4)
+        expectThat(2.toUShort().squared).isEqualTo(4u)
     }
 
     @Test
     fun `cubed test`() {
-        assertEquals(8, 2.cubed)
-        assertEquals(8.0, 2.0.cubed)
-        assertEquals(8f, 2f.cubed)
-        assertEquals(8, 2.toShort().cubed)
-        assertEquals(8u, 2.toUShort().cubed)
+        expectThat(2.cubed).isEqualTo(8)
+        expectThat(2.0.cubed).isEqualTo(8.0)
+        expectThat(2f.cubed).isEqualTo(8f)
+        expectThat(2.toShort().cubed).isEqualTo(8)
+        expectThat(2.toUShort().cubed).isEqualTo(8u)
     }
 
     @Test
     fun `root test`() {
-        assertEquals(2.0, 4.0.root, 0.0001)
-        assertEquals(2f, 4f.root, 0.0001f)
+        expectThat(4.0.root).isEqualTo(2.0)
+        expectThat(4f.root).isEqualTo(2f)
     }
 
     @Test
     fun `isEven and isOdd test`() {
-        assertEquals(true, 4.isEven)
-        assertEquals(false, 4.isOdd)
-        assertEquals(true, (-4).isEven)
-        assertEquals(false, (-4).isOdd)
+        expectThat(4.isEven).isTrue()
+        expectThat(4.isOdd).isFalse()
+        expectThat((-4).isEven).isTrue()
+        expectThat((-4).isOdd).isFalse()
     }
 
     @Test
     fun `factorial test`() {
-        assertEquals(120L, 5.factorial)
-        assertEquals(1L, 0.toShort().factorial)
-        assertFailsWith<IllegalArgumentException> { (-1).factorial }
+        expectThat(5.factorial).isEqualTo(120L)
+        expectThat(0.toShort().factorial).isEqualTo(1L)
+        expectThrows<IllegalArgumentException> { (-1).factorial }
     }
 
     @Test
     fun `reciprocal test`() {
-        assertEquals(0.5f, 2f.reciprocal)
-        assertEquals(1.0, 1.0.reciprocal)
-        assertFailsWith<ArithmeticException> { 0.0.reciprocal }
+        expectThat(2f.reciprocal).isEqualTo(0.5f)
+        expectThat(1.0.reciprocal).isEqualTo(1.0)
+        expectThrows<ArithmeticException> { 0.0.reciprocal }
     }
 
     @Test
     fun `absolute value test`() {
-        assertEquals(5, 5.abs)
-        assertEquals(5, (-5).abs)
-        assertEquals(5f, (-5f).abs)
+        expectThat(5.abs).isEqualTo(5)
+        expectThat((-5).abs).isEqualTo(5)
+        expectThat((-5f).abs).isEqualTo(5f)
     }
 }

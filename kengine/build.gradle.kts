@@ -86,6 +86,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
+                implementation(project(":kengine-test"))
                 implementation(libs.kotlinxSerializationJson)
                 implementation(libs.kotlinxCoroutinesCore)
             }
