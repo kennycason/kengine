@@ -2,7 +2,7 @@ package com.kengine.test
 
 import kotlin.test.Test
 
-class KTestTest {
+class KengineTestTest {
 
     @Test
     fun `test assertions`() {
