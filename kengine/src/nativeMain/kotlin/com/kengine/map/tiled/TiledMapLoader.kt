@@ -17,8 +17,32 @@ class TiledMapLoader : Logging {
 
     fun loadMap(filePath: String): TiledMap {
         val jsonContent = readFile(filePath)
-        return json.decodeFromString(TiledMap.serializer(), jsonContent)
-            .also { logger.info { "Tiled map:\n$it" } }
+        val map = json.decodeFromString<TiledMap>(jsonContent)
+
+        // Load external tilesets
+        map.tilesets.forEach { tilesetRef ->
+            if (tilesetRef.isExternal()) {
+                val tilesetPath = "src/nativeTest/resources/${tilesetRef.source!!.replace(".tsx", ".tsj")}"
+                val tilesetContent = readFile(tilesetPath)
+                val tilesetData = json.decodeFromString<TilesetData>(tilesetContent)
+
+                // Copy data to reference
+                tilesetRef.apply {
+                    columns = tilesetData.columns
+                    image = tilesetData.image
+                    imageHeight = tilesetData.imageHeight
+                    imageWidth = tilesetData.imageWidth
+                    margin = tilesetData.margin
+                    name = tilesetData.name
+                    spacing = tilesetData.spacing
+                    tileCount = tilesetData.tileCount
+                    tileHeight = tilesetData.tileHeight
+                    tileWidth = tilesetData.tileWidth
+                }
+            }
+        }
+
+        return map
     }
 
     private fun readFile(filePath: String): String {
@@ -37,4 +61,5 @@ class TiledMapLoader : Logging {
         return stringBuilder.toString()
             .also { logger.info { "Raw map data:\n$it" } }
     }
+
 }
