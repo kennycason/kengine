@@ -42,6 +42,19 @@ class Logger {
     fun warnStream() = LogStreamBuilder(WARN, this)
     fun errorStream() = LogStreamBuilder(ERROR, this)
 
+    fun infoStream(block: LogStreamBuilder.() -> Unit) {
+        LogStreamBuilder(INFO, this).apply(block).flush()
+    }
+    fun debugStream(block: LogStreamBuilder.() -> Unit) {
+        LogStreamBuilder(DEBUG, this).apply(block).flush()
+    }
+    fun warnStream(block: LogStreamBuilder.() -> Unit) {
+        LogStreamBuilder(WARN, this).apply(block).flush()
+    }
+    fun errorStream(block: LogStreamBuilder.() -> Unit) {
+        LogStreamBuilder(ERROR, this).apply(block).flush()
+    }
+
     // special exception helpers
     fun debug(e: Exception) = log(DEBUG, exceptionToString(e))
     fun info(e: Exception) = log(INFO, exceptionToString(e))
