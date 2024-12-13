@@ -5,7 +5,7 @@ import kotlin.reflect.KClass
 /**
  * This is what allows the below syntax:
  *
- * useContext<KeyboardContext> {
+ * useContext<KeyboardContext> { // or useKeyboardContext {
  *     if (keyboard.isReturnPressed()) { }
  * }
  */

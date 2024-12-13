@@ -10,6 +10,7 @@ import com.kengine.log.Logging
 import com.kengine.sdl.useSDLContext
 import com.kengine.time.getClockContext
 import com.kengine.time.timeSinceMs
+import com.kengine.useGameContext
 
 class ImageShuffleGame : Game, Logging {
     private val spriteSheet by lazy { loadSprites() }
@@ -63,7 +64,7 @@ class ImageShuffleGame : Game, Logging {
     override fun update() {
         useKeyboardContext {
             if (keyboard.isEscapePressed()) {
-                useContext<GameContext> {
+                useGameContext {
                     isRunning = false
                 }
             }

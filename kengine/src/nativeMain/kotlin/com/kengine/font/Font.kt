@@ -7,6 +7,7 @@ import com.kengine.graphics.greenFromRGBA
 import com.kengine.graphics.redFromRGBA
 import com.kengine.log.Logging
 import com.kengine.sdl.SDLContext
+import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -70,7 +71,7 @@ class Font(
             renderTextToSurface(text, font, r, g, b, a)
         }
 
-        useContext<SDLContext> {
+        useSDLContext {
             memScoped {
                 val dstRect = alloc<SDL_Rect>().apply {
                     this.x = x

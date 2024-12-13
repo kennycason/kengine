@@ -1,6 +1,5 @@
 package com.kengine
 
-import com.kengine.context.useContext
 import com.kengine.log.Logging
 import com.kengine.time.getClockContext
 import com.kengine.time.getCurrentMilliseconds
@@ -22,7 +21,7 @@ class GameLoop(
 
         val targetFrameTime = 1000.0 / frameRate
 
-        useContext<GameContext>(cleanup = true) {
+        useGameContext(cleanup = true) {
             while (isRunning) {
                 getClockContext().update()
 

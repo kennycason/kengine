@@ -13,6 +13,7 @@ import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.math.Vec2
 import com.kengine.time.getCurrentMilliseconds
 import com.kengine.time.timeSinceMs
+import com.kengine.useGameContext
 
 private enum class Direction {
     UP, DOWN, LEFT, RIGHT
@@ -59,7 +60,7 @@ class Player(
                 }
 
                 if (keyboard.isEscapePressed()) {
-                    useContext<GameContext> {
+                    useGameContext {
                         isRunning = false
                     }
                 }
@@ -85,7 +86,7 @@ class Player(
                 }
 
                 if (controller.isButtonPressed(Playstation4.SHARE)) {
-                    useContext<GameContext> {
+                    useGameContext {
                         isRunning = false
                     }
                 }
