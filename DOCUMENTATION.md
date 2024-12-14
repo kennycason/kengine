@@ -198,9 +198,78 @@ useEventContext {
     }
     publish("player_died", "Fell off a cliff")
 }
-
 ```
 
+
+#### useState
+
+useState is a utility for managing state in your Kengine applications. 
+It allows you to track and update values while notifying any subscribed listeners about changes. 
+This state management mechanism is designed for lightweight use cases and integrates seamlessly with the Context system for broader application state management.
+
+Creating and Using a State Variable
+
+```kotlin
+val count = useState(0)
+
+val callback = { newValue: Int ->
+    println("Count changed to $newValue")
+}
+
+count.subscribe(callback)
+count.set(1) // Output: Count changed to 1
+
+count.unsubscribe(callback)
+count.set(2) // No output
+```
+
+#### Context
+
+The Context class in your framework serves as a foundational building block for managing scoped, singleton-like components in your application. 
+Inspired by React’s Context API, it provides a flexible and extensible way to share functionality or state across different parts of your application without tightly coupling them.
+
+```kotlin
+class SimpleContext : Context() {
+    var count: Int = 1
+}
+
+val simpleContext = SimpleContext()
+ContextRegistry.register(simpleContext)
+
+useContext<SimpleContext> {
+    expectThat(count).isEqualTo(1)
+    count = 5
+    expectThat(count).isEqualTo(5)
+}
+```
+
+Context can be integrated with State to efficiently share and manage state across multiple classes.
+
+```kotlin
+class StatefulContext : Context() {
+    val count = useState(0)
+}
+
+val statefulContext = StatefulContext()
+ContextRegistry.register(statefulContext)
+
+useContext<StatefulContext> {
+    expectThat(count.get()).isEqualTo(0)
+    count.set(42)
+    expectThat(count.get()).isEqualTo(42)
+
+    var countUpdated = false
+    var countReceived = 0
+    count.subscribe {
+        countUpdated = true
+        countReceived = it
+    }
+    count.set(64)
+    expectThat(countUpdated).isTrue()
+    expectThat(count.get()).isEqualTo(64)
+    expectThat(countReceived).isEqualTo(64)
+}
+```
 
 #### Logging
 
@@ -240,4 +309,3 @@ val direction = Vec2(1.0, 0.0)
 val newPosition = position + direction * 5.0
 logger.info { "New Position: $newPosition" }
 ```
-
