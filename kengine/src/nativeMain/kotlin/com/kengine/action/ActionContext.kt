@@ -1,18 +1,22 @@
 package com.kengine.action
 
-import com.kengine.hooks.context.Context
 import com.kengine.entity.Entity
+import com.kengine.hooks.context.Context
 import com.kengine.math.Vec2
 
-class ActionContext: Context() {
+class ActionContext private constructor() : Context() {
     private val actions = ArrayDeque<Action>()
 
-    fun moveTo(entity: Entity, destination: Vec2, speed: Double, onComplete: (() -> Unit)? = null) {
+    fun moveTo(entity: Entity, destination: Vec2, speed: Double, onComplete: (() -> Unit)) {
         actions.add(MoveAction(entity, destination, speed, onComplete))
     }
 
-    fun timer(delayMs: Long, onComplete: (() -> Unit)? = null) {
+    fun timer(delayMs: Long, onComplete: (() -> Unit)) {
         actions.add(TimerAction(delayMs, onComplete))
+    }
+
+    fun interval(delayMs: Long, onComplete: (() -> Unit)) {
+        actions.add(IntervalAction(delayMs, onComplete))
     }
 
     fun update() {
