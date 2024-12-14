@@ -3,7 +3,7 @@ package com.kengine.map.tiled
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Layer(
+data class TiledMapLayer(
     val id: Int,
     val name: String,
     val type: String,
@@ -25,9 +25,8 @@ data class Layer(
 
     fun getTileAt(x: Int, y: Int): Int {
         if (type != "tilelayer" || data == null || encoding == null || width == null || height == null) {
-            return throw IllegalArgumentException("Layer [$name] is not a tile layer")
+            throw IllegalArgumentException("Layer [$name] is not a tile layer")
         }
-
         return decodedData[y * width + x]
     }
     override fun toString(): String {

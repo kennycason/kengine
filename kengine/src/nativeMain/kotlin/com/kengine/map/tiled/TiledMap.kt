@@ -16,8 +16,8 @@ class TiledMap(
     val tileWidth: Int,
     @SerialName("tileheight")
     val tileHeight: Int,
-    val layers: List<Layer>,
-    val tilesets: List<TilesetReference>,
+    val layers: List<TiledMapLayer>,
+    val tilesets: List<Tileset>,
     val orientation: String,
     @SerialName("renderorder")
     val renderOrder: String,
@@ -27,7 +27,7 @@ class TiledMap(
     val p by lazy { Vec2() }
 
     private data class TilesetAndSpriteSheet(
-        val tileset: TilesetReference,
+        val tileset: Tileset,
         val spriteSheet: SpriteSheet
     )
 
@@ -61,7 +61,7 @@ class TiledMap(
         layers.forEach { draw(it) }
     }
 
-    fun draw(layer: Layer) {
+    fun draw(layer: TiledMapLayer) {
         if (!layer.visible) return
         if (layer.type != "tilelayer") return
         if (layer.width == null || layer.height == null) return
@@ -87,7 +87,7 @@ class TiledMap(
             ?: throw IllegalStateException("No tileset found for gid: $gid")
     }
 
-    private fun getTilePosition(tileId: Int, tileset: TilesetReference): IntVec2 {
+    private fun getTilePosition(tileId: Int, tileset: Tileset): IntVec2 {
         val localId = tileId - tileset.firstgid
         val tileX = (localId % tileset.columns!!) * (tileset.tileWidth!! + tileset.spacing) + tileset.margin
         val tileY = (localId / tileset.columns!!) * (tileset.tileHeight!! + tileset.spacing) + tileset.margin

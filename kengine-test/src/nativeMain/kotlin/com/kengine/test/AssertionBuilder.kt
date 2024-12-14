@@ -53,10 +53,12 @@ class AssertionBuilder<T>(private val actual: T) {
                 actual.contains(element),
                 "Expected collection to contain $element but was $actual"
             )
+
             is String -> assertTrue(
                 actual.contains(element as String),
                 "Expected string to contain $element but was $actual"
             )
+
             else -> throw IllegalArgumentException("Contains assertion not supported for type ${actual!!::class}")
         }
         return this
@@ -68,6 +70,7 @@ class AssertionBuilder<T>(private val actual: T) {
                 actual.containsKey(key),
                 "Expected collection to contain key $key but was $actual"
             )
+
             else -> throw IllegalArgumentException("Contains key assertion not supported for type ${actual!!::class}")
         }
         return this
@@ -79,10 +82,12 @@ class AssertionBuilder<T>(private val actual: T) {
                 actual.contains(element),
                 "Expected collection to not contain $element but was $actual"
             )
+
             is String -> assertFalse(
                 actual.contains(element as String),
                 "Expected string to not contain $element but was $actual"
             )
+
             else -> throw IllegalArgumentException("Contains assertion not supported for type ${actual!!::class}")
         }
         return this
@@ -94,10 +99,12 @@ class AssertionBuilder<T>(private val actual: T) {
                 expected, actual.size,
                 "Expected collection size to be $expected but was ${actual.size}"
             )
+
             is String -> assertEquals(
                 expected, actual.length,
                 "Expected string length to be $expected but was ${actual.length}"
             )
+
             else -> throw IllegalArgumentException("Size assertion not supported for type ${actual!!::class}")
         }
         return this
@@ -109,10 +116,12 @@ class AssertionBuilder<T>(private val actual: T) {
                 actual.isEmpty(),
                 "Expected empty collection but was $actual"
             )
+
             is String -> assertTrue(
                 actual.isEmpty(),
                 "Expected empty string but was $actual"
             )
+
             else -> throw IllegalArgumentException("Empty assertion not supported for type ${actual!!::class}")
         }
         return this
@@ -124,10 +133,12 @@ class AssertionBuilder<T>(private val actual: T) {
                 actual.isNotEmpty(),
                 "Expected non-empty collection but was empty"
             )
+
             is String -> assertTrue(
                 actual.isNotEmpty(),
                 "Expected non-empty string but was empty"
             )
+
             else -> throw IllegalArgumentException("Empty assertion not supported for type ${actual!!::class}")
         }
         return this
@@ -164,6 +175,7 @@ class AssertionBuilder<T>(private val actual: T) {
                 actual.toDouble() > expected.toDouble(),
                 "Expected $actual to be greater than $expected"
             )
+
             else -> throw IllegalArgumentException("Greater than assertion not supported for type ${actual!!::class}")
         }
         return this
@@ -175,6 +187,7 @@ class AssertionBuilder<T>(private val actual: T) {
                 actual.toDouble() < expected.toDouble(),
                 "Expected $actual to be less than $expected"
             )
+
             else -> throw IllegalArgumentException("Less than assertion not supported for type ${actual!!::class}")
         }
         return this
@@ -246,6 +259,7 @@ class AssertionBuilder<T>(private val actual: T) {
                     )
                 }
             }
+
             else -> throw IllegalArgumentException("ContainsAll assertion not supported for type ${actual!!::class}")
         }
         return this
@@ -265,6 +279,7 @@ class AssertionBuilder<T>(private val actual: T) {
                     )
                 }
             }
+
             else -> throw IllegalArgumentException("ContainsExactly assertion not supported for type ${actual!!::class}")
         }
         return this

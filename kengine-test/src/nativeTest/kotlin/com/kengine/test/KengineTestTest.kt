@@ -43,7 +43,8 @@ class KengineTestTest {
         val cause = RuntimeException("root cause")
         expectThrows<IllegalArgumentException> {
             throw IllegalArgumentException("bad value", cause)
-        }.withMessage("bad value").withCause(cause)
+        }.withMessage("bad value")
+            .withCause(cause)
     }
 
     @Test
@@ -75,13 +76,14 @@ class KengineTestTest {
     @Test
     fun `test type checking`() {
         data class User(val name: String)
+
         val user = User("John")
 
         expectThat(user).isA<User>()
 
         expectThat("test").isA<String>()
         expectThat(42).isA<Int>()
-        expectThat(listOf(1,2,3)).isA<List<*>>()
+        expectThat(listOf(1, 2, 3)).isA<List<*>>()
 
         // specific helpers
         expectThat(true).isBoolean()
@@ -92,9 +94,9 @@ class KengineTestTest {
         expectThat(42u).isUInt()
         expectThat(42L).isLong()
         expectThat(42uL).isULong()
-        expectThat(listOf(1,2,3)).isList()
+        expectThat(listOf(1, 2, 3)).isList()
         expectThat(mapOf(1 to 2)).isMap()
-        expectThat(setOf(1,2,3)).isSet()
+        expectThat(setOf(1, 2, 3)).isSet()
     }
 
     @Test
@@ -107,6 +109,7 @@ class KengineTestTest {
     @Test
     fun `test property assertions`() {
         data class User(val name: String, val age: Int)
+
         val user = User("John", 25)
         expectThat(user)
             .property(User::name).isEqualTo("John")
@@ -116,6 +119,7 @@ class KengineTestTest {
     @Test
     fun `test object assertions`() {
         data class User(val name: String, val age: Int)
+
         val user = User("John", 25)
 
         expectObject(user) {
@@ -126,17 +130,18 @@ class KengineTestTest {
 
     @Test
     fun `test collections assertions`() {
-        // multiple predicates
+        expectThat(listOf(1, 2, 3, 4))
+            .containsAll(1, 2)
+            .containsExactly(1, 2, 3, 4)
+    }
+
+    @Test
+    fun `test satisfyAll with multiple predicates`() {
         expectThat(10).satisfiesAll(
             { it > 0 },
             { it % 2 == 0 },
             { it <= 10 }
         )
-
-        // collection assertions
-        expectThat(listOf(1, 2, 3, 4))
-            .containsAll(1, 2)
-            .containsExactly(1, 2, 3, 4)
     }
 
     @Test
@@ -144,6 +149,7 @@ class KengineTestTest {
         data class User(val name: String) {
             override fun toString() = "Hello $name"
         }
+
         val user = User(name = "Kenny")
         expectThat(user).hasToString("Hello Kenny")
     }

@@ -22,7 +22,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 @OptIn(ExperimentalEncodingApi::class)
 object LayerDataDecoder : Logging {
 
-    fun decode(layer: Layer): List<Int> {
+    fun decode(layer: TiledMapLayer): List<Int> {
         return when (layer.compression) {
             "zlib" -> decode(decompressZlib(layer.data!!), layer.encoding.orEmpty())
             "", null -> {

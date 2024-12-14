@@ -16,37 +16,59 @@ class TiledMapLoader : Logging {
     }
 
     fun loadMap(filePath: String): TiledMap {
+        logger.info { "Loading map from: $filePath" }
         val jsonContent = readFile(filePath)
         val map = json.decodeFromString<TiledMap>(jsonContent)
 
-        // Load external tilesets
+
+        // determine the base directory of the map file
+        val baseDirectory = filePath.substringBeforeLast("/")
+
+        // process external tilesets
         map.tilesets.forEach { tilesetRef ->
             if (tilesetRef.isExternal()) {
-                val tilesetPath = "src/nativeTest/resources/${tilesetRef.source!!.replace(".tsx", ".tsj")}"
-                val tilesetContent = readFile(tilesetPath)
-                val tilesetData = json.decodeFromString<TilesetData>(tilesetContent)
+                val sourceFile = tilesetRef.source ?: throw IllegalStateException("External tileset reference has no source file.")
 
-                // Copy data to reference
-                tilesetRef.apply {
-                    columns = tilesetData.columns
-                    image = tilesetData.image
-                    imageHeight = tilesetData.imageHeight
-                    imageWidth = tilesetData.imageWidth
-                    margin = tilesetData.margin
-                    name = tilesetData.name
-                    spacing = tilesetData.spacing
-                    tileCount = tilesetData.tileCount
-                    tileHeight = tilesetData.tileHeight
-                    tileWidth = tilesetData.tileWidth
+                // validate the file extension is .tsj
+                if (!sourceFile.endsWith(".tsj")) {
+                    throw IllegalArgumentException("Tileset file $sourceFile is not in the expected .tsj format.")
+                }
+
+                // compute the full path based on the map's directory
+                val tilesetPath = "$baseDirectory/$sourceFile"
+
+                try {
+                    val tilesetContent = readFile(tilesetPath)
+                    val tilesetData = json.decodeFromString<TilesetData>(tilesetContent)
+
+                    logger.info { "Populating external tileset data: ${tilesetData.name}" }
+                    tilesetRef.apply {
+                        columns = tilesetData.columns
+                        image = tilesetData.image
+                        imageHeight = tilesetData.imageHeight
+                        imageWidth = tilesetData.imageWidth
+                        margin = tilesetData.margin
+                        name = tilesetData.name
+                        spacing = tilesetData.spacing
+                        tileCount = tilesetData.tileCount
+                        tileHeight = tilesetData.tileHeight
+                        tileWidth = tilesetData.tileWidth
+                        tiles = tilesetData.tiles
+                    }
+                } catch (e: Exception) {
+                    logger.error { "Failed to load external tileset at $tilesetPath: ${e.message}" }
+                    throw IllegalStateException("Cannot load external tileset: $tilesetPath", e)
                 }
             }
         }
 
+        logger.info { "Map successfully loaded: ${map.width}x${map.height}, ${map.layers.size} layers, ${map.tilesets.size} tilesets." }
         return map
     }
 
     private fun readFile(filePath: String): String {
-        val file = fopen(filePath, "r") ?: throw IllegalArgumentException("Cannot open file: $filePath")
+        val file = fopen(filePath, "r")
+            ?: throw IllegalArgumentException("Cannot open file: $filePath. Please ensure the file exists and the path is correct.")
         val buffer = ByteArray(8192)
         val stringBuilder = StringBuilder()
         try {
@@ -59,7 +81,7 @@ class TiledMapLoader : Logging {
             fclose(file)
         }
         return stringBuilder.toString()
-            .also { logger.info { "Raw map data:\n$it" } }
+            .also { logger.info { "Raw map data loaded from $filePath" } }
     }
 
 }

@@ -3,9 +3,8 @@ package com.kengine.map.tiled
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// For references in the map file
 @Serializable
-data class TilesetReference(
+data class Tileset(
     val firstgid: Int,
     val source: String? = null,
     // For embedded tilesets
@@ -23,7 +22,8 @@ data class TilesetReference(
     @SerialName("tileheight")
     var tileHeight: Int? = null,
     @SerialName("tilewidth")
-    var tileWidth: Int? = null
+    var tileWidth: Int? = null,
+    var tiles: List<TileData>? = null
 ) {
     fun isExternal() = source != null
 }
@@ -61,23 +61,3 @@ data class Frame(
     val duration: Int,
     val tileid: Int
 )
-
-// for the actual tileset data in the .tsj/.tsx file
-//@Serializable
-//data class Tileset(
-//    @SerialName("tilewidth")
-//    val tileWidth: Int,
-//    @SerialName("tileheight")
-//    val tileHeight: Int,
-//    @SerialName("imagewidth")
-//    val imageWidth: Int,
-//    @SerialName("imageheight")
-//    val imageHeight: Int,
-//    val image: String,
-//    val columns: Int,
-//    @SerialName("tilecount")
-//    val tileCount: Int,
-//    val margin: Int = 0,
-//    val spacing: Int = 0,
-//    val name: String
-//)

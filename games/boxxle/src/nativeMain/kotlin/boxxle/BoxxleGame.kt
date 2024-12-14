@@ -4,7 +4,7 @@ import boxxle.context.BoxxleContext
 import boxxle.context.getBoxxleContext
 import boxxle.context.useBoxxleContext
 import com.kengine.Game
-import com.kengine.action.ActionContext
+import com.kengine.action.getActionContext
 import com.kengine.context.getContext
 import com.kengine.font.Font
 import com.kengine.font.getFontContext
@@ -130,7 +130,7 @@ class BoxxleGame : Game, Logging {
             if (isLevelComplete()) {
                 mainSound.stop()
                 finishSound.play()
-                getContext<ActionContext>().timer(6000) {
+                getActionContext().timer(6000) {
                     state = State.INIT
                     loadLevel((level.levelNumber + 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
                 }

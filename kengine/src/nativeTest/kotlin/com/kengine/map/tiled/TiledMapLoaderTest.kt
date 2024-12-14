@@ -50,20 +50,70 @@ class TiledMapLoaderTest {
     fun `load ninja turdle map`() {
         val tiledMap = TiledMapLoader()
             .loadMap("src/nativeTest/resources/ninja_turdle_stomach_0.tmj")
-        expectThat(tiledMap.tileWidth).isEqualTo(16)
-        expectThat(tiledMap.tileHeight).isEqualTo(16)
-        expectThat(tiledMap.width).isEqualTo(100)
-        expectThat(tiledMap.height).isEqualTo(17)
 
+        // Validate map properties
+        expectThat(tiledMap) {
+            property(TiledMap::tileWidth).isEqualTo(16)
+            property(TiledMap::tileHeight).isEqualTo(16)
+            property(TiledMap::width).isEqualTo(100)
+            property(TiledMap::height).isEqualTo(17)
+        }
+
+        // Validate layers exist
         val layersByName = tiledMap.layers.associateBy { it.name }
-        expectThat(layersByName).containsKey("object")
-        expectThat(layersByName).containsKey("fg")
-        expectThat(layersByName).containsKey("main")
-        expectThat(layersByName).containsKey("bg")
-        expectThat(layersByName).containsKey("parallax")
+        expectThat(layersByName.keys).containsAll("object", "fg", "main", "bg", "parallax")
 
+        // Validate main layer properties
         val mainLayer = layersByName["main"]!!
-       // expectThat(mainLayer.getTileAt(0, 0)).isEqualTo(Tiles.BRICK.id)
+        expectThat(mainLayer) {
+            property(TiledMapLayer::width).isEqualTo(100)
+            property(TiledMapLayer::height).isEqualTo(17)
+            satisfiesAll({ it.getTileAt(0, 0) == 1 }) // Check the first tile ID
+        }
 
+        // Validate object layer
+        val objectLayer = layersByName["object"]!!
+        expectThat(objectLayer.objects).isNotEmpty()
+        val doorObject = objectLayer.objects!!.find { it.name == "out_1" }!!
+        expectThat(doorObject) {
+            property(TiledObject::type).isEqualTo("door")
+            property(TiledObject::x).isEqualTo(-2.0)
+            property(TiledObject::y).isEqualTo(61.0)
+            property(TiledObject::width).isEqualTo(11.0)
+            property(TiledObject::height).isEqualTo(53.0)
+            val doorObjectProperties = doorObject.properties!!.associateBy { it.name }
+            expectThat(doorObjectProperties).containsKey("map")
+            expectThat(doorObjectProperties["map"]!!.value).isEqualTo("stomach_14")
+            expectThat(doorObjectProperties).containsKey("to")
+            expectThat(doorObjectProperties["to"]!!.value).isEqualTo("in_1")
+        }
+
+        // Validate tileset
+        expectThat(tiledMap.tilesets).hasSize(1)
+        val tileset = tiledMap.tilesets.first()
+        expectThat(tileset.isExternal()).isTrue()
+        expectThat(tileset) {
+            property(Tileset::source).isEqualTo("tiles.tsj")
+            property(Tileset::name).isEqualTo("tiles")
+            property(Tileset::image).isEqualTo("../../../ninjaturdle/ninjaturdle/core/src/main/resources/sprite_map/tiles_padded.png")
+            property(Tileset::imageWidth).isEqualTo(360)
+            property(Tileset::imageHeight).isEqualTo(846)
+            property(Tileset::tileWidth).isEqualTo(16)
+            property(Tileset::tileHeight).isEqualTo(16)
+            property(Tileset::tileCount).isEqualTo(940)
+            property(Tileset::columns).isEqualTo(20)
+        }
+
+        // Validate tileset animation
+        val animatedTile = tileset.tiles!!.find { it.id == 29 }!!
+        expectThat(animatedTile.animation).isNotEmpty()
+        expectThat(animatedTile.animation!!) {
+            hasSize(2)
+            satisfiesAll(
+                { it[0].duration == 300 },
+                { it[0].tileid == 29 },
+                { it[1].tileid == 30 }
+            )
+        }
     }
 }
