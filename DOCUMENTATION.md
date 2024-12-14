@@ -223,7 +223,7 @@ count.unsubscribe(callback)
 count.set(2) // No output
 ```
 
-#### Context
+#### useContext
 
 The Context class in your framework serves as a foundational building block for managing scoped, singleton-like components in your application. 
 Inspired by React’s Context API, it provides a flexible and extensible way to share functionality or state across different parts of your application without tightly coupling them.
@@ -269,6 +269,27 @@ useContext<StatefulContext> {
     expectThat(count.get()).isEqualTo(64)
     expectThat(countReceived).isEqualTo(64)
 }
+```
+
+#### useEffect
+
+useEffect is a utility that allows you to manage side effects in response to changes in state variables. 
+It subscribes to the provided state dependencies and automatically triggers the effect whenever any of the dependencies change. 
+The effect can also include a cleanup mechanism, which is executed when dependencies change or when the effect is removed.
+
+Simple Side Effect
+
+In this example, useEffect is used to log a message whenever the count state changes:
+
+```kotlin
+val count = useState(0)
+
+useEffect({
+    println("The count has changed: ${count.get()}")
+}, count)
+
+count.set(1)  // Logs: "The count has changed: 1"
+count.set(2)  // Logs: "The count has changed: 2"
 ```
 
 #### Logging
