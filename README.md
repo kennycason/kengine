@@ -1,6 +1,6 @@
 # Kengine
 
-A light game library in Kotlin Native + SDL
+A Reactive, Kotlin Native Game Engine
 
 ## Example Games
 
