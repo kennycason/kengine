@@ -292,6 +292,25 @@ count.set(1)  // Logs: "The count has changed: 1"
 count.set(2)  // Logs: "The count has changed: 2"
 ```
 
+#### useMemo
+
+useMemo is a utility function for caching expensive computations based on dependencies. 
+It ensures that a computed value is only recalculated when one of its dependencies changes. 
+This function is inspired by React’s useMemo hook, but tailored for Kotlin Native and integrated with Kengine’s State.
+
+```kotlin
+val count = useState(0)
+var computedValue = useMemo({ count.get() * 2 }, count)
+
+expectThat(computedValue.get()).isEqualTo(0)
+
+count.set(2) // trigger update
+computedValue = useMemo({ count.get() * 2 }, count) // retrieve updated value
+
+expectThat(computedValue.get()).isEqualTo(4)
+```
+
+
 #### Logging
 
 The Logger provides utility functions for debugging and monitoring game state.

@@ -22,6 +22,8 @@ class State<T>(initialValue: T) {
     }
 
     private fun notifySubscribers() {
-        subscribers.forEach { it(value) }
+        subscribers
+            .toList() // to prevent concurrent modification. TODO determine if this acceptable for frequent notification
+            .forEach { it(value) }
     }
 }
