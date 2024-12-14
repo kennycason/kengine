@@ -295,8 +295,7 @@ count.set(2)  // Logs: "The count has changed: 2"
 #### useMemo
 
 useMemo is a utility function for caching expensive computations based on dependencies. 
-It ensures that a computed value is only recalculated when one of its dependencies changes. 
-This function is inspired by React’s useMemo hook, but tailored for Kotlin Native and integrated with Kengine’s State.
+It ensures that a computed value is only recalculated when one of its dependencies changes.
 
 ```kotlin
 val count = useState(0)
@@ -310,6 +309,58 @@ computedValue = useMemo({ count.get() * 2 }, count) // retrieve updated value
 expectThat(computedValue.get()).isEqualTo(4)
 ```
 
+#### useReducer
+
+The useReducer hook is another great addition to the state management toolbox, especially for handling complex state logic. 
+It provides a predictable way to update state by defining actions and a reducer function.
+
+This example demonstrates using useReducer with simple String actions:
+
+```kotlin
+val (count, dispatch) = useReducer(0) { state: Int, action: String ->
+    when (action) {
+        "increment" -> state + 1
+        "decrement" -> state - 1
+        else -> state
+    }
+}
+
+expectThat(count.get()).isEqualTo(0)
+
+dispatch("increment")
+expectThat(count.get()).isEqualTo(1)
+
+dispatch("decrement")
+expectThat(count.get()).isEqualTo(0)
+```
+
+Here’s a more robust example, showcasing useReducer with object-based actions:
+
+
+```kotlin
+data class User(val name: String, val age: Int)
+abstract class UserAction
+data class UpdateName(val name: String) : UserAction()
+data class IncrementAge(val by: Int) : UserAction()
+
+val initialUser = User("John", 25)
+val (user, dispatch) = useReducer(initialUser) { state: User, action: UserAction ->
+    when (action) {
+        is UpdateName -> state.copy(name = action.name)
+        is IncrementAge -> state.copy(age = state.age + action.by)
+        else -> throw IllegalStateException()
+    }
+}
+
+expectThat(user.get().name).isEqualTo("John")
+expectThat(user.get().age).isEqualTo(25)
+
+dispatch(UpdateName("Jane"))
+expectThat(user.get().name).isEqualTo("Jane")
+
+dispatch(IncrementAge(5))
+expectThat(user.get().age).isEqualTo(30)
+```
 
 #### Logging
 
