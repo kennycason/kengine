@@ -1,6 +1,6 @@
 package com.kengine.sdl
 
-import com.kengine.context.ContextRegistry
+import com.kengine.hooks.context.ContextRegistry
 
 fun getSDLEventContext(): SDLEventContext {
     return ContextRegistry.get<SDLEventContext>()

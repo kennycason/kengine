@@ -13,7 +13,7 @@ import chipmunk.cpSpaceSetGravity
 import chipmunk.cpSpaceSetIterations
 import chipmunk.cpSpaceStep
 import chipmunk.cpv
-import com.kengine.context.Context
+import com.kengine.hooks.context.Context
 import com.kengine.log.Logging
 import com.kengine.math.Vec2
 import kotlinx.cinterop.ExperimentalForeignApi

@@ -1,6 +1,6 @@
 package com.kengine.font
 
-import com.kengine.context.Context
+import com.kengine.hooks.context.Context
 import com.kengine.log.Logging
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi

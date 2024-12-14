@@ -1,7 +1,7 @@
 package com.kengine.graphics
 
 import cnames.structs.SDL_Texture
-import com.kengine.context.Context
+import com.kengine.hooks.context.Context
 import kotlinx.cinterop.CValuesRef
 import kotlinx.cinterop.ExperimentalForeignApi
 

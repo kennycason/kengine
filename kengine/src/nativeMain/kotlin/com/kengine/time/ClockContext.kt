@@ -1,6 +1,6 @@
 package com.kengine.time
 
-import com.kengine.context.Context
+import com.kengine.hooks.context.Context
 
 /**
  * These values are updated each update within GameLoop.

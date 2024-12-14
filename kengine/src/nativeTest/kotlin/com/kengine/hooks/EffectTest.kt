@@ -1,6 +1,7 @@
-package com.kengine.effect
+package com.kengine.hooks
 
-import com.kengine.state.State
+import com.kengine.hooks.effect.Effect
+import com.kengine.hooks.state.State
 import com.kengine.test.expectThat
 import kotlin.test.Test
 

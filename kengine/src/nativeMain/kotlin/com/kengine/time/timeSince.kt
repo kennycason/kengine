@@ -1,6 +1,6 @@
 package com.kengine.time
 
-import com.kengine.context.useContext
+import com.kengine.hooks.context.useContext
 
 /**
  * A convenience function for entities to track time since some timestamp.

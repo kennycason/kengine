@@ -1,6 +1,6 @@
 package boxxle
 
-import com.kengine.context.getContext
+import com.kengine.hooks.context.getContext
 import com.kengine.graphics.SpriteContext
 import com.kengine.math.Vec2
 

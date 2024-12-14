@@ -1,4 +1,4 @@
-package com.kengine.effect
+package com.kengine.hooks.effect
 
 class EffectManager {
     private val activeEffects = mutableListOf<Effect>()

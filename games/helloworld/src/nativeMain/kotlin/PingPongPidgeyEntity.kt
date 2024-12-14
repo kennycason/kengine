@@ -1,5 +1,5 @@
 
-import com.kengine.context.getContext
+import com.kengine.hooks.context.getContext
 import com.kengine.entity.SpriteEntity
 import com.kengine.event.useEventContext
 import com.kengine.graphics.FlipMode

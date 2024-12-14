@@ -1,6 +1,6 @@
-package com.kengine.cache
+package com.kengine.memo
 
-import com.kengine.state.State
+import com.kengine.hooks.state.State
 
 data class MemoizedValue<T>(
     private val compute: () -> T,

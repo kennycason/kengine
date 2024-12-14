@@ -1,6 +1,6 @@
 package com.kengine
 
-import com.kengine.context.useContext
+import com.kengine.hooks.context.useContext
 
 inline fun <R> createGameContext(
     title: String,

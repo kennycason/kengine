@@ -1,6 +1,6 @@
 package com.kengine.geometry
 
-import com.kengine.context.Context
+import com.kengine.hooks.context.Context
 import com.kengine.graphics.alphaFromRGBA
 import com.kengine.graphics.blueFromRGBA
 import com.kengine.graphics.greenFromRGBA

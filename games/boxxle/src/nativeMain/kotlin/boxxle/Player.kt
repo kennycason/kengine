@@ -4,7 +4,7 @@ import boxxle.context.useBoxxleContext
 import com.kengine.GameContext
 import com.kengine.action.getActionContext
 import com.kengine.action.useActionContext
-import com.kengine.context.useContext
+import com.kengine.hooks.context.useContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.useSpriteContext

@@ -3,7 +3,7 @@ package boxxle.context
 import boxxle.Level
 import boxxle.Player
 import boxxle.Sprites
-import com.kengine.context.Context
+import com.kengine.hooks.context.Context
 import com.kengine.graphics.SpriteSheet
 import com.kengine.graphics.useSpriteContext
 

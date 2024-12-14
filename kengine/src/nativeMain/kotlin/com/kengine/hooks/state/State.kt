@@ -1,4 +1,4 @@
-package com.kengine.state
+package com.kengine.hooks.state
 
 class State<T>(initialValue: T) {
     private var value: T = initialValue

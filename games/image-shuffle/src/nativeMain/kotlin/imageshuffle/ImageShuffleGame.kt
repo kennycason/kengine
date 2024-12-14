@@ -2,7 +2,7 @@ package imageshuffle
 
 import com.kengine.Game
 import com.kengine.GameContext
-import com.kengine.context.useContext
+import com.kengine.hooks.context.useContext
 import com.kengine.graphics.SpriteSheet
 import com.kengine.graphics.useSpriteContext
 import com.kengine.input.keyboard.useKeyboardContext

@@ -2,7 +2,7 @@
 package com.kengine.action
 
 import com.kengine.GameContext
-import com.kengine.context.getContext
+import com.kengine.hooks.context.getContext
 import com.kengine.time.timeSinceMs
 
 data class TimerAction(

@@ -1,6 +1,6 @@
 package com.kengine.network
 
-import com.kengine.context.Context
+import com.kengine.hooks.context.Context
 import com.kengine.log.Logging
 
 class NetworkContext : Context(), Logging {

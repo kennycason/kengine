@@ -1,6 +1,6 @@
 package com.kengine.geometry
 
-import com.kengine.context.ContextRegistry
+import com.kengine.hooks.context.ContextRegistry
 
 fun getGeometryContext(): GeometryContext {
     return ContextRegistry.get<GeometryContext>()

@@ -1,6 +1,6 @@
 package com.kengine.input.mouse
 
-import com.kengine.context.Context
+import com.kengine.hooks.context.Context
 
 class MouseContext private constructor(
     val mouse: MouseInputEventSubscriber

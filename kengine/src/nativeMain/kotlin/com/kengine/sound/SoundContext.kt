@@ -1,6 +1,6 @@
 package com.kengine.sound
 
-import com.kengine.context.Context
+import com.kengine.hooks.context.Context
 import com.kengine.log.Logger
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString

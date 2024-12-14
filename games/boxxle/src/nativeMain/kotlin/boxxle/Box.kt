@@ -1,7 +1,7 @@
 package boxxle
 
 import boxxle.context.useBoxxleContext
-import com.kengine.context.getContext
+import com.kengine.hooks.context.getContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.useTextureContext

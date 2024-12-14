@@ -1,6 +1,6 @@
 package com.kengine
 
-import com.kengine.context.ContextRegistry
+import com.kengine.hooks.context.ContextRegistry
 
 fun getGameContext(): GameContext {
     return ContextRegistry.get<GameContext>()

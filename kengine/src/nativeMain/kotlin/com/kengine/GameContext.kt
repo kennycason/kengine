@@ -1,8 +1,8 @@
 package com.kengine
 
 import com.kengine.action.ActionContext
-import com.kengine.context.Context
-import com.kengine.context.ContextRegistry
+import com.kengine.hooks.context.Context
+import com.kengine.hooks.context.ContextRegistry
 import com.kengine.event.EventContext
 import com.kengine.font.FontContext
 import com.kengine.geometry.GeometryContext

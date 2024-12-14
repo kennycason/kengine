@@ -1,5 +1,6 @@
-package com.kengine.state
+package com.kengine.hooks
 
+import com.kengine.hooks.state.useState
 import com.kengine.log.Logging
 import com.kengine.test.expectThat
 import kotlin.test.Test

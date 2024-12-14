@@ -1,6 +1,6 @@
 package com.kengine.graphics
 
-import com.kengine.context.getContext
+import com.kengine.hooks.context.getContext
 import com.kengine.log.Logging
 import com.kengine.math.IntRect
 import com.kengine.math.Vec2

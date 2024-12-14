@@ -1,6 +1,6 @@
-package com.kengine.effect
+package com.kengine.hooks.effect
 
-import com.kengine.state.State
+import com.kengine.hooks.state.State
 
 data class Effect(
     private val effect: () -> Unit,

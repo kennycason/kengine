@@ -1,6 +1,6 @@
 package com.kengine.input.mouse
 
-import com.kengine.context.useContext
+import com.kengine.hooks.context.useContext
 import com.kengine.math.Vec2
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext

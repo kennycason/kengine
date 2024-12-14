@@ -1,6 +1,6 @@
 package com.kengine.input.keyboard
 
-import com.kengine.context.Context
+import com.kengine.hooks.context.Context
 
 class KeyboardContext private constructor(
     val keyboard: KeyboardInputEventSubscriber

@@ -1,11 +1,14 @@
-package com.kengine.context
+package com.kengine.hooks
 
-import com.kengine.state.useState
+import com.kengine.hooks.context.Context
+import com.kengine.hooks.context.ContextRegistry
+import com.kengine.hooks.context.useContext
+import com.kengine.hooks.state.useState
 import com.kengine.test.expectThat
 import kotlin.test.Test
 
 
-class ContextTest {
+class UseContextTest {
     @Test
     fun `context simple test EXPECT success`() {
         class SimpleContext : Context() {

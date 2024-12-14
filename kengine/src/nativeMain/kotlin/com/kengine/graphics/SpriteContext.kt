@@ -1,6 +1,6 @@
 package com.kengine.graphics
 
-import com.kengine.context.Context
+import com.kengine.hooks.context.Context
 
 class SpriteContext private constructor(
     private val manager: SpriteManager

@@ -5,7 +5,7 @@ import boxxle.context.getBoxxleContext
 import boxxle.context.useBoxxleContext
 import com.kengine.Game
 import com.kengine.action.getActionContext
-import com.kengine.context.getContext
+import com.kengine.hooks.context.getContext
 import com.kengine.font.Font
 import com.kengine.font.getFontContext
 import com.kengine.font.useFontContext

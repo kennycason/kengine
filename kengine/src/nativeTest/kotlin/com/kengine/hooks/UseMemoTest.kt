@@ -1,7 +1,8 @@
-package com.kengine.cache
+package com.kengine.hooks
 
-import com.kengine.state.State
-import com.kengine.state.useState
+import com.kengine.hooks.state.State
+import com.kengine.hooks.state.useState
+import com.kengine.memo.useMemo
 import com.kengine.test.expectThat
 import kotlin.test.Test
 

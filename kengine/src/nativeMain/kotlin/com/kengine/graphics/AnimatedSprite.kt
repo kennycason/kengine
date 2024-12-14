@@ -1,6 +1,6 @@
 package com.kengine.graphics
 
-import com.kengine.context.getContext
+import com.kengine.hooks.context.getContext
 import com.kengine.math.Vec2
 import com.kengine.time.ClockContext
 

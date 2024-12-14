@@ -1,7 +1,7 @@
-package com.kengine.effect
+package com.kengine.hooks.effect
 
-import com.kengine.context.Context
-import com.kengine.state.State
+import com.kengine.hooks.context.Context
+import com.kengine.hooks.state.State
 
 class EffectContext : Context() {
     private val effectManager = EffectManager()

@@ -1,7 +1,7 @@
-package com.kengine.effect
+package com.kengine.hooks.effect
 
-import com.kengine.context.getContext
-import com.kengine.state.State
+import com.kengine.hooks.context.getContext
+import com.kengine.hooks.state.State
 
 fun useEffect(effect: () -> Unit, vararg dependencies: State<*>) {
     val effectContext = getContext<EffectContext>() // Automatically fetch EffectContext

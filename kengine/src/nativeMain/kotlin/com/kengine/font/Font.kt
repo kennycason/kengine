@@ -1,6 +1,6 @@
 package com.kengine.font
 
-import com.kengine.context.useContext
+import com.kengine.hooks.context.useContext
 import com.kengine.graphics.alphaFromRGBA
 import com.kengine.graphics.blueFromRGBA
 import com.kengine.graphics.greenFromRGBA
