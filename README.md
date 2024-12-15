@@ -133,7 +133,7 @@ Install OpenJDK 17.0+
 
 Install SDL via Brew (on Mac)
 ```shell
-brew install sdl2 sdl2_gfx sdl2_mixer sdl2_ttf sdl2_net
+brew install sdl2 sdl2_gfx sdl2_image sdl2_mixer sdl2_net sdl2_ttf
 ```
 
 Install Chipmunk2D via Brew (on Mac)

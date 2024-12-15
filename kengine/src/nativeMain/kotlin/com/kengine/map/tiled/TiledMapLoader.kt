@@ -20,14 +20,13 @@ class TiledMapLoader : Logging {
         val jsonContent = readFile(filePath)
         val map = json.decodeFromString<TiledMap>(jsonContent)
 
-
         // determine the base directory of the map file
         val baseDirectory = filePath.substringBeforeLast("/")
 
         // process external tilesets
-        map.tilesets.forEach { tilesetRef ->
-            if (tilesetRef.isExternal()) {
-                val sourceFile = tilesetRef.source ?: throw IllegalStateException("External tileset reference has no source file.")
+        map.tilesets.forEach { tileset ->
+            if (tileset.isExternal()) {
+                val sourceFile = tileset.source ?: throw IllegalStateException("External tileset reference has no source file.")
 
                 // validate the file extension is .tsj
                 if (!sourceFile.endsWith(".tsj")) {
@@ -35,16 +34,16 @@ class TiledMapLoader : Logging {
                 }
 
                 // compute the full path based on the map's directory
-                val tilesetPath = "$baseDirectory/$sourceFile"
+                val tilesetPath = "${baseDirectory}/$sourceFile"
 
                 try {
                     val tilesetContent = readFile(tilesetPath)
                     val tilesetData = json.decodeFromString<TilesetData>(tilesetContent)
 
-                    logger.info { "Populating external tileset data: ${tilesetData.name}" }
-                    tilesetRef.apply {
+                    logger.info { "populating external tileset data: ${tilesetData.name}" }
+                    tileset.apply {
                         columns = tilesetData.columns
-                        image = tilesetData.image
+                        image = "${baseDirectory}/${tilesetData.image}"
                         imageHeight = tilesetData.imageHeight
                         imageWidth = tilesetData.imageWidth
                         margin = tilesetData.margin

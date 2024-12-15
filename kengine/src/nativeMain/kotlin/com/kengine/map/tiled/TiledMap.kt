@@ -26,6 +26,8 @@ class TiledMap(
 
     val p by lazy { Vec2() }
 
+    private val layersByName = layers.associateBy(TiledMapLayer::name)
+
     private data class TilesetAndSpriteSheet(
         val tileset: Tileset,
         val spriteSheet: SpriteSheet
@@ -36,15 +38,20 @@ class TiledMap(
             TilesetAndSpriteSheet(
                 tileset = tileset,
                 spriteSheet = SpriteSheet.fromSprite(
-                    sprite = Sprite.fromFilePath(adjustAssetPath("assets", tileset.image!!)),
+                    sprite = Sprite.fromFilePath(tileset.image!!),
                     tileWidth = tileset.tileWidth!!,
-                    tileHeight = tileset.tileHeight!!
+                    tileHeight = tileset.tileHeight!!,
+                    offsetX = tileset.margin,    // Pass margin
+                    offsetY = tileset.margin,    // Pass margin
+                    paddingX = tileset.spacing,  // Pass spacing
+                    paddingY = tileset.spacing   // Pass spacing
                 )
             )
         }
     }
 
     init {
+        tilesets.sortedBy { it.firstgid }
         logger
             .infoStream()
             .writeLn { "Loading Map." }
@@ -61,43 +68,53 @@ class TiledMap(
         layers.forEach { draw(it) }
     }
 
+    fun draw(layerName: String) {
+        draw(layersByName.getValue(layerName))
+    }
+
     fun draw(layer: TiledMapLayer) {
         if (!layer.visible) return
         if (layer.type != "tilelayer") return
-        if (layer.width == null || layer.height == null) return
 
-        for (x in 0 until layer.width) {
-            for (y in 0 until layer.height) {
+        for (x in 0 until layer.width!!) {
+            for (y in 0 until layer.height!!) {
                 val tileId = layer.getTileAt(x, y)
-                if (tileId > 0) {
-                    val tilesetWithSprite = findTilesetForGid(tileId)
-                    val tilePosition = getTilePosition(tileId, tilesetWithSprite.tileset)
-                    val sprite = tilesetWithSprite.spriteSheet.getTile(
-                        tilePosition.x / tileWidth,
-                        tilePosition.y / tileHeight
-                    )
-                    sprite.draw(p.x + (x * tileWidth).toDouble(), p.y + (y * tileHeight).toDouble())
+                if (tileId > 0) { // Skip empty tiles
+                    try {
+                        val tilesetWithSprite = findTilesetForGid(tileId)
+                        val tilePosition = getTilePosition(tileId, tilesetWithSprite.tileset)
+                        val sprite = tilesetWithSprite.spriteSheet.getTile(
+                            tilePosition.x / tilesetWithSprite.tileset.tileWidth!!,
+                            tilePosition.y / tilesetWithSprite.tileset.tileHeight!!
+                        )
+                        sprite.draw(p.x + (x * tileWidth).toDouble(), p.y + (y * tileHeight).toDouble())
+                    } catch (e: IllegalArgumentException) {
+                        logger.error("Tile rendering error for GID $tileId at ($x, $y): ${e.message}")
+                    }
                 }
             }
         }
     }
 
     private fun findTilesetForGid(gid: Int): TilesetAndSpriteSheet {
-        return tilesetsWithSprites.findLast { it.tileset.firstgid <= gid }
+        val tileset = tilesetsWithSprites.firstOrNull { gid >= it.tileset.firstgid }
             ?: throw IllegalStateException("No tileset found for gid: $gid")
+        return tileset
     }
 
     private fun getTilePosition(tileId: Int, tileset: Tileset): IntVec2 {
-        val localId = tileId - tileset.firstgid
-        val tileX = (localId % tileset.columns!!) * (tileset.tileWidth!! + tileset.spacing) + tileset.margin
-        val tileY = (localId / tileset.columns!!) * (tileset.tileHeight!! + tileset.spacing) + tileset.margin
-        return IntVec2(tileX, tileY)
+        val localId = tileId - tileset.firstgid // adjust for tileset's firstgid
+        if (localId < 0) throw IllegalArgumentException("Invalid tileId: $tileId (localId: $localId)")
+
+        val cols = tileset.columns!!
+        val x = (localId % cols) * (tileset.tileWidth!! + tileset.spacing) + tileset.margin
+        val y = (localId / cols) * (tileset.tileHeight!! + tileset.spacing) + tileset.margin
+
+        logger.debug { "GID: $tileId, LocalID: ${tileId - tileset.firstgid}, TilePos: $x,$y" }
+
+        return IntVec2(x, y)
     }
 
-    fun adjustAssetPath(basePath: String, relativePath: String): String {
-        val baseDir = basePath.substringBeforeLast("/")
-        return "$baseDir/$relativePath".replace("../", "")
-    }
 
     override fun toString(): String {
         return "TiledMap(\n" +

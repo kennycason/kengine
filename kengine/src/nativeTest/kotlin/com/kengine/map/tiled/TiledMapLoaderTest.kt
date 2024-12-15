@@ -95,7 +95,7 @@ class TiledMapLoaderTest {
         expectThat(tileset) {
             property(Tileset::source).isEqualTo("tiles.tsj")
             property(Tileset::name).isEqualTo("tiles")
-            property(Tileset::image).isEqualTo("../../../ninjaturdle/ninjaturdle/core/src/main/resources/sprite_map/tiles_padded.png")
+            property(Tileset::image).isEqualTo("tiles_padded.png")
             property(Tileset::imageWidth).isEqualTo(360)
             property(Tileset::imageHeight).isEqualTo(846)
             property(Tileset::tileWidth).isEqualTo(16)

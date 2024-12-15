@@ -1,5 +1,5 @@
 { "columns":20,
- "image":"..\/..\/..\/..\/..\/ninjaturdle\/ninjaturdle\/core\/src\/main\/resources\/sprite_map\/tiles_padded.png",
+ "image":"tiles_padded.png",
  "imageheight":846,
  "imagewidth":360,
  "margin":1,

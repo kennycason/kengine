@@ -3,7 +3,6 @@
 A simple demonstration of falling circles and boxes.
 
 
-
 <img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/physics-demo/falling_shapes.png" />
 
 ## Build and Run
@@ -19,3 +18,4 @@ cd games/physics-demo
 ```
 
 Note: Images are not bundled into the kexe yet and are included with relative paths.
+

@@ -1,10 +1,10 @@
 package com.kengine.sdl
 
-import com.kengine.hooks.context.Context
 import com.kengine.graphics.alphaFromRGBA
 import com.kengine.graphics.blueFromRGBA
 import com.kengine.graphics.greenFromRGBA
 import com.kengine.graphics.redFromRGBA
+import com.kengine.hooks.context.Context
 import com.kengine.log.Logger
 import com.kengine.log.Logging
 import kotlinx.cinterop.CValuesRef
@@ -25,6 +25,10 @@ import sdl2.SDL_RenderPresent
 import sdl2.SDL_SetRenderDrawColor
 import sdl2.SDL_WINDOWPOS_CENTERED
 import sdl2.SDL_WINDOW_SHOWN
+import sdl2.image.IMG_INIT_JPG
+import sdl2.image.IMG_INIT_PNG
+import sdl2.image.IMG_Init
+import sdl2.image.IMG_Quit
 
 @OptIn(ExperimentalForeignApi::class)
 class SDLContext private constructor(
@@ -66,6 +70,7 @@ class SDLContext private constructor(
     override fun cleanup() {
         SDL_DestroyRenderer(renderer)
         SDL_DestroyWindow(window)
+        IMG_Quit()
         SDL_Quit()
     }
 
@@ -87,6 +92,9 @@ class SDLContext private constructor(
             if (SDL_Init(SDL_INIT_VIDEO) != 0) {
                 logger.error("Error initializing SDL Video: ${SDL_GetError()?.toKString()}")
                 exit(1)
+            }
+            if (IMG_Init((IMG_INIT_PNG or IMG_INIT_JPG).toInt()) == 0) {
+                throw IllegalStateException("Failed to initialize SDL_image: ${SDL_GetError()?.toKString()}")
             }
 
             // create window + renderer

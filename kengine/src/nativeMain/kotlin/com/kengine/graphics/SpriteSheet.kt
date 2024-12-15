@@ -8,21 +8,33 @@ class SpriteSheet private constructor(
     private val texture: Texture,
     val tileWidth: Int,
     val tileHeight: Int,
-    private val offsetX: Int = 0,
-    private val offsetY: Int = 0,
-    private val dx: Int = 0, // spacing between tiles
-    private val dy: Int = 0  // spacing between tiles
+    val marginX: Int = 0, // Margin around the tileset (horizontal)
+    val marginY: Int = 0, // Margin around the tileset (vertical)
+    val spacingX: Int = 0, // Spacing between tiles (horizontal)
+    val spacingY: Int = 0  // Spacing between tiles (vertical)
 ) : Logging {
-    val width = texture.width / tileWidth
-    val height = texture.height / tileHeight
+    val columns = (texture.width - marginX + spacingX) / (tileWidth + spacingX)
+    val rows = (texture.height - marginY + spacingY) / (tileHeight + spacingY)
+
+    val width: Int = columns * tileWidth + (columns - 1) * spacingX + marginX * 2
+    val height: Int = rows * tileHeight + (rows - 1) * spacingY + marginY * 2
+
+    init {
+        logger.infoStream {
+            write("SpriteSheet initialized: ")
+            write("tile size ${tileWidth}x$tileHeight, ")
+            write("margin ($marginX,$marginY), ")
+            write("spacing ($spacingX,$spacingY)")
+        }
+    }
 
     /**
      * Get a specific tile as a ClippedSprite based on its grid position (x, y).
      */
     fun getTile(x: Int, y: Int): Sprite {
         val clip = IntRect(
-            x = offsetX + x * (tileWidth + dx),
-            y = offsetY + y * (tileHeight + dy),
+            x = marginX + x * (tileWidth + spacingX),
+            y = marginY + y * (tileHeight + spacingY),
             w = tileWidth,
             h = tileHeight
         )
@@ -40,11 +52,11 @@ class SpriteSheet private constructor(
             tileHeight: Int,
             offsetX: Int = 0,
             offsetY: Int = 0,
-            dx: Int = 0, // spacing between tiles
-            dy: Int = 0  // spacing between tiles
+            paddingX: Int = 0,
+            paddingY: Int = 0
         ): SpriteSheet {
             val texture = getContext<TextureContext>().getTexture(filePath)
-            return SpriteSheet(texture, tileWidth, tileHeight, offsetX, offsetY, dx, dy)
+            return SpriteSheet(texture, tileWidth, tileHeight, offsetX, offsetY, paddingX, paddingY)
         }
 
         fun fromTexture(
@@ -53,10 +65,10 @@ class SpriteSheet private constructor(
             tileHeight: Int,
             offsetX: Int = 0,
             offsetY: Int = 0,
-            dx: Int = 0, // spacing between tiles
-            dy: Int = 0  // spacing between tiles
+            paddingX: Int = 0,
+            paddingY: Int = 0
         ): SpriteSheet {
-            return SpriteSheet(texture, tileWidth, tileHeight, offsetX, offsetY, dx, dy)
+            return SpriteSheet(texture, tileWidth, tileHeight, offsetX, offsetY, paddingX, paddingY)
         }
 
         fun fromSprite(
@@ -65,10 +77,10 @@ class SpriteSheet private constructor(
             tileHeight: Int,
             offsetX: Int = 0,
             offsetY: Int = 0,
-            dx: Int = 0, // spacing between tiles
-            dy: Int = 0  // spacing between tiles
+            paddingX: Int = 0,
+            paddingY: Int = 0
         ): SpriteSheet {
-            return SpriteSheet(sprite.texture, tileWidth, tileHeight, offsetX, offsetY, dx, dy)
+            return SpriteSheet(sprite.texture, tileWidth, tileHeight, offsetX, offsetY, paddingX, paddingY)
         }
     }
 

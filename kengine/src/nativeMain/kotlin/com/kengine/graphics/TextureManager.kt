@@ -1,7 +1,6 @@
 package com.kengine.graphics
 
 import com.kengine.log.Logging
-import com.kengine.sdl.cinterop.SDL_LoadBMP
 import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.CValuesRef
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -13,13 +12,14 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.value
 import sdl2.SDL_CreateTexture
-import sdl2.SDL_CreateTextureFromSurface
 import sdl2.SDL_DestroyTexture
-import sdl2.SDL_FreeSurface
 import sdl2.SDL_GetError
 import sdl2.SDL_QueryTexture
 import sdl2.SDL_RenderCopy
 import sdl2.SDL_SetRenderTarget
+import sdl2.image.IMG_Load
+import sdl2.image.SDL_CreateTextureFromSurface
+import sdl2.image.SDL_FreeSurface
 
 /**
  * A centralized texture manager to help with caching for faster, more efficient texture loading.
@@ -42,7 +42,7 @@ class TextureManager : Logging {
         useSDLContext {
             logger.debug { "Loading texture $texturePath to cache" }
 
-            val surface = SDL_LoadBMP(texturePath)
+            val surface = IMG_Load(texturePath)
                 ?: throw IllegalStateException("Error loading image: ${SDL_GetError()?.toKString()}")
             val texture = SDL_CreateTextureFromSurface(renderer, surface)
                 ?: throw IllegalStateException("Error creating texture from surface: ${SDL_GetError()?.toKString()}")

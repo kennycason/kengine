@@ -24,11 +24,17 @@ data class TiledMapLayer(
     val decodedData = LayerDataDecoder.decode(this)
 
     fun getTileAt(x: Int, y: Int): Int {
-        if (type != "tilelayer" || data == null || encoding == null || width == null || height == null) {
-            throw IllegalArgumentException("Layer [$name] is not a tile layer")
+        require(type == "tilelayer") { "Layer [$name] is not a tile layer." }
+        require(data != null && encoding != null) { "Layer [$name] does not have encoded data." }
+        require(width != null && height != null) { "Layer [$name] must have width and height." }
+
+        require(x in 0 until width && y in 0 until height) {
+            "Tile coordinates ($x, $y) out of bounds. Width: $width, Height: $height."
         }
+
         return decodedData[y * width + x]
     }
+
     override fun toString(): String {
         return "Layer(id=$id, name='$name', type='$type', visible=$visible, width=$width, height=$height, data='$data', encoding='$encoding', opacity=$opacity, x=$x, y=$y, decodedData=$decodedData)"
     }

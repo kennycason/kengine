@@ -1,19 +1,12 @@
 
-import com.kengine.GameContext
-import com.kengine.hooks.context.getContext
-import com.kengine.hooks.context.useContext
 import com.kengine.entity.SpriteEntity
-import com.kengine.event.EventContext
 import com.kengine.event.useEventContext
 import com.kengine.graphics.FlipMode
 import com.kengine.graphics.Sprite
-import com.kengine.input.keyboard.KeyboardContext
 import com.kengine.input.keyboard.useKeyboardContext
-import com.kengine.input.mouse.MouseContext
 import com.kengine.input.mouse.useMouseContext
 import com.kengine.log.Logging
 import com.kengine.sdl.useSDLContext
-import com.kengine.time.ClockContext
 import com.kengine.time.getClockContext
 import com.kengine.useGameContext
 

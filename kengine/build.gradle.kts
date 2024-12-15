@@ -38,11 +38,14 @@ kotlin {
             val sdl2 by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl2.def")
             }
-            val sdl2Mixer by creating {
-                defFile = file("src/nativeInterop/cinterop/sdl2_mixer.def")
-            }
             val sdl2gfx by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl2_gfx.def")
+            }
+            val sdl2image by creating {
+                defFile = file("src/nativeInterop/cinterop/sdl2_image.def")
+            }
+            val sdl2mixer by creating {
+                defFile = file("src/nativeInterop/cinterop/sdl2_mixer.def")
             }
             val sdl2net by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl2_net.def")
