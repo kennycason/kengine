@@ -45,7 +45,7 @@ class SpriteSheet private constructor(
             "Tile coordinates ($x,$y) out of bounds. Sheet size: ${columns}x$rows"
         }
 
-        logger.debug {
+        logger.trace {
             val pixelX = marginX + x * (tileWidth + spacingX)
             val pixelY = marginY + y * (tileHeight + spacingY)
             "getTile($x,$y) -> pixel($pixelX,$pixelY), tileSize=${tileWidth}x${tileHeight}, " +

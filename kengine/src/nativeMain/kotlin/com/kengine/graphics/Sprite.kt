@@ -20,7 +20,7 @@ import sdl2.SDL_RenderCopyEx
 @OptIn(ExperimentalForeignApi::class)
 class Sprite private constructor(
     val texture: Texture,
-    private val clip: IntRect? = null,
+    val clip: IntRect? = null,
     val scale: Vec2 = Vec2(1.0, 1.0),
 ) : Logging {
     val width: Int = clip?.w ?: texture.width

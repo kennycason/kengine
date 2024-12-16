@@ -3,6 +3,7 @@ package com.kengine.log
 import com.kengine.log.Logger.Level.DEBUG
 import com.kengine.log.Logger.Level.ERROR
 import com.kengine.log.Logger.Level.INFO
+import com.kengine.log.Logger.Level.TRACE
 import com.kengine.log.Logger.Level.WARN
 import com.kengine.time.getCurrentMilliseconds
 import kotlin.reflect.KClass
@@ -22,42 +23,59 @@ class Logger {
             : this(klass.simpleName ?: "Unknown")
 
     enum class Level {
-        DEBUG, INFO, WARN, ERROR
+        TRACE, // ideal for expensive debugging that may affect fps, such as per-tile logging in map rendering
+        DEBUG,
+        INFO,
+        WARN,
+        ERROR
     }
 
+    fun trace(message: () -> String?) = log(TRACE, message())
     fun debug(message: () -> String?) = log(DEBUG, message())
     fun info(message: () -> String?) = log(INFO, message())
     fun warn(message: () -> String?) = log(WARN, message())
     fun error(message: () -> String?) = log(ERROR, message())
 
+    fun trace(message: String?) = log(TRACE, message)
     fun debug(message: String?) = log(DEBUG, message)
     fun info(message: String?) = log(INFO, message)
     fun warn(message: String?) = log(WARN, message)
     fun error(message: String?) = log(ERROR, message)
 
-    fun infoStream() = LogStreamBuilder(INFO, this)
+    fun traceStream() = LogStreamBuilder(TRACE, this)
     fun debugStream() = LogStreamBuilder(DEBUG, this)
+    fun infoStream() = LogStreamBuilder(INFO, this)
     fun warnStream() = LogStreamBuilder(WARN, this)
     fun errorStream() = LogStreamBuilder(ERROR, this)
+
+    fun traceStream(block: LogStreamBuilder.() -> Unit) {
+        LogStreamBuilder(TRACE, this).apply(block).flush()
+    }
+
+    fun debugStream(block: LogStreamBuilder.() -> Unit) {
+        LogStreamBuilder(DEBUG, this).apply(block).flush()
+    }
 
     fun infoStream(block: LogStreamBuilder.() -> Unit) {
         LogStreamBuilder(INFO, this).apply(block).flush()
     }
-    fun debugStream(block: LogStreamBuilder.() -> Unit) {
-        LogStreamBuilder(DEBUG, this).apply(block).flush()
-    }
+
     fun warnStream(block: LogStreamBuilder.() -> Unit) {
         LogStreamBuilder(WARN, this).apply(block).flush()
     }
+
     fun errorStream(block: LogStreamBuilder.() -> Unit) {
         LogStreamBuilder(ERROR, this).apply(block).flush()
     }
 
     // special exception helpers
+    fun trace(e: Exception) = log(TRACE, exceptionToString(e))
     fun debug(e: Exception) = log(DEBUG, exceptionToString(e))
     fun info(e: Exception) = log(INFO, exceptionToString(e))
     fun warn(e: Exception) = log(WARN, exceptionToString(e))
     fun error(e: Exception) = log(ERROR, exceptionToString(e))
+
+    fun trace(e: Exception, message: () -> String?) = trace(message).also { trace(exceptionToString(e)) }
     fun debug(e: Exception, message: () -> String?) = debug(message).also { debug(exceptionToString(e)) }
     fun info(e: Exception, message: () -> String?) = info(message).also { info(exceptionToString(e)) }
     fun warn(e: Exception, message: () -> String?) = warn(message).also { warn(exceptionToString(e)) }

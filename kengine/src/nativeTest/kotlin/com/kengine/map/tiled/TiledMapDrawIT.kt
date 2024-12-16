@@ -25,7 +25,7 @@ class TiledMapDrawIT {
             title = "Tile Map Test",
             width = 800,
             height = 600,
-            logLevel = Logger.Level.INFO
+            logLevel = Logger.Level.DEBUG
         ) {
             GameRunner(frameRate = 60) {
                 object : Game {

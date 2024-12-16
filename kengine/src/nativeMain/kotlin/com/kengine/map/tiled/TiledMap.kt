@@ -3,6 +3,7 @@ package com.kengine.map.tiled
 import com.kengine.graphics.FlipMode
 import com.kengine.graphics.Sprite
 import com.kengine.graphics.SpriteSheet
+import com.kengine.graphics.getSpriteContext
 import com.kengine.log.Logging
 import com.kengine.math.Vec2
 import com.kengine.sdl.getSDLContext
@@ -101,6 +102,7 @@ class TiledMap(
         val startY = (screenTop / tileHeight).toInt().coerceAtLeast(0)
         val endY = (screenBottom / tileHeight).toInt().coerceAtMost(layer.height!! - 1)
 
+        getSpriteContext().spriteBatch.begin()
         for (y in startY..endY) {
             for (x in startX..endX) {
                 val rawGid = layer.getTileAt(x, y)
@@ -108,7 +110,7 @@ class TiledMap(
 
                 val decoded = decodeTileGid(rawGid)
 
-                logger.debug {
+                logger.trace() {
                     "Tile at ($x, $y): rawGid=$rawGid -> tileId=${decoded.tileId}, " +
                             "flipH=${decoded.flipH}, flipV=${decoded.flipV}, flipD=${decoded.flipD}"
                 }
@@ -120,7 +122,7 @@ class TiledMap(
 
                 val tilesetWithSprite = findTilesetForGid(decoded.tileId)
                 val (tilePx, tilePy) = getTilePosition(decoded.tileId, tilesetWithSprite.tileset)
-                logger.debug {
+                logger.trace {
                     "Tile ($x,$y): Using tileset '${tilesetWithSprite.tileset.name}', " +
                             "tilePos=($tilePx,$tilePy), firstgid=${tilesetWithSprite.tileset.firstgid}, " +
                             "tileCount=${tilesetWithSprite.tileset.tileCount}, columns=${tilesetWithSprite.tileset.columns}"
@@ -130,6 +132,7 @@ class TiledMap(
                 drawSprite(x, y, sprite, decoded)
             }
         }
+        getSpriteContext().spriteBatch.end()
     }
 
     private fun drawSprite(x: Int, y: Int, sprite: Sprite, decoded: DecodedTile) {
@@ -161,12 +164,13 @@ class TiledMap(
             else -> Pair(0.0, FlipMode.NONE)
         }
 
-        sprite.draw(
-            x = p.x + (x * tileWidth),
-            y = p.y + (y * tileHeight),
-            flip = flip,
-            angle = angle
-        )
+        getSpriteContext().spriteBatch.draw(sprite, p.x + (x * tileWidth), p.y + (y * tileHeight), flip, angle)
+//        sprite.draw(
+//            x = p.x + (x * tileWidth),
+//            y = p.y + (y * tileHeight),
+//            flip = flip,
+//            angle = angle
+//        )
     }
 
     private fun findTilesetForGid(gid: UInt): TilesetAndSpriteSheet {
@@ -192,7 +196,7 @@ class TiledMap(
         val gridX = localId % cols.toUInt()
         val gridY = localId / cols.toUInt()
 
-        logger.debug {
+        logger.trace {
             "getTilePosition(tileId=$tileId): firstgid=${tileset.firstgid}, localId=$localId, cols=$cols, grid=($gridX,$gridY)"
         }
 
@@ -205,7 +209,7 @@ class TiledMap(
         val flipD = (gid and GID_DIAGONAL_FLAG) != 0u
         val tileId = gid and TILE_INDEX_MASK
 
-        logger.debugStream {
+        logger.traceStream {
             writeLn("Decoding GID: ${gid.toString(2).padStart(32, '0')} (${gid})")
             writeLn("H FLAG:       ${GID_HORIZONTAL_FLAG.toString(2).padStart(32, '0')}")
             writeLn("V FLAG:       ${GID_VERTICAL_FLAG.toString(2).padStart(32, '0')}")
