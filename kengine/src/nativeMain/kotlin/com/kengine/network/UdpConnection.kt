@@ -143,7 +143,9 @@ class UdpConnection(
                         udpSocket?.reinterpret<cnames.structs._UDPsocket>()?.let { socket ->
                             if (SDLNet_UDP_Recv(socket, packet) > 0) {
                                 val data = packet.pointed.data!!.readBytes(packet.pointed.len.convert())
-                                logger.debug { "Received ${data.size} bytes from ${packet.pointed.address.host}:${packet.pointed.address.port}" }
+                                if (logger.isDebugEnabled()) {
+                                    logger.debug { "Received ${data.size} bytes from ${packet.pointed.address.host}:${packet.pointed.address.port}" }
+                                }
 
                                 launch(Dispatchers.Default) {
                                     try {

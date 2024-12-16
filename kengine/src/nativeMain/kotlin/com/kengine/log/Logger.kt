@@ -30,6 +30,12 @@ class Logger {
         ERROR
     }
 
+    fun isTraceEnabled() = logLevel == TRACE
+    fun isDebugEnabled() = logLevel == DEBUG
+    fun isInfoEnabled() = logLevel == INFO
+    fun isWarnEnabled() = logLevel == WARN
+    fun isErrorEnabled() = logLevel == ERROR
+
     fun trace(message: () -> String?) = log(TRACE, message())
     fun debug(message: () -> String?) = log(DEBUG, message())
     fun info(message: () -> String?) = log(INFO, message())

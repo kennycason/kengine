@@ -86,7 +86,9 @@ open class TcpConnection(
                 if (sent < data.size) {
                     throw Exception("Failed to send TCP data: ${SDLNet_GetError()}")
                 }
-                logger.debug { "Sent ${data.size} bytes" }
+                if (logger.isDebugEnabled()) {
+                    logger.debug { "Sent ${data.size} bytes" }
+                }
             }
         } ?: throw IllegalStateException("TCP socket is not open")
     }
@@ -120,7 +122,9 @@ open class TcpConnection(
                                 when {
                                     received > 0 -> {
                                         val data = buffer.copyOf(received)
-                                        logger.debug { "Received $received bytes" }
+                                        if (logger.isDebugEnabled()) {
+                                            logger.debug { "Received $received bytes" }
+                                        }
 
                                         launch(Dispatchers.Default) {
                                             try {

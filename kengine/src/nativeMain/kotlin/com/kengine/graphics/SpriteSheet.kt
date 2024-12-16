@@ -3,6 +3,7 @@ package com.kengine.graphics
 import com.kengine.hooks.context.getContext
 import com.kengine.log.Logging
 import com.kengine.math.IntRect
+import com.kengine.math.Vec2
 
 class SpriteSheet private constructor(
     private val texture: Texture,
@@ -18,12 +19,22 @@ class SpriteSheet private constructor(
     val columns = (width + spacingX) / (tileWidth + spacingX)
     val rows = (height + spacingY) / (tileHeight + spacingY)
 
-    // Cache of pre-created sprites
-    private val sprites: Array<Array<Sprite>> = Array(rows) { y ->
+    // cache of pre-created sprites + views
+    private val tileSprites: Array<Array<Sprite>> = Array(rows) { y ->
         Array(columns) { x ->
             val pixelX = marginX + x * (tileWidth + spacingX)
             val pixelY = marginY + y * (tileHeight + spacingY)
             Sprite.fromTexture(
+                texture,
+                IntRect(x = pixelX, y = pixelY, w = tileWidth, h = tileHeight)
+            )
+        }
+    }
+    private val tileViews: Array<Array<TileView>> = Array(rows) { y ->
+        Array(columns) { x ->
+            val pixelX = marginX + x * (tileWidth + spacingX)
+            val pixelY = marginY + y * (tileHeight + spacingY)
+            TileView(
                 texture,
                 IntRect(x = pixelX, y = pixelY, w = tileWidth, h = tileHeight)
             )
@@ -41,22 +52,41 @@ class SpriteSheet private constructor(
     }
 
     fun getTile(x: Int, y: Int): Sprite {
-        require(x in 0 until columns && y in 0 until rows) {
-            "Tile coordinates ($x,$y) out of bounds. Sheet size: ${columns}x$rows"
-        }
+//        require(x in 0 until columns && y in 0 until rows) {
+//            "Tile coordinates ($x,$y) out of bounds. Sheet size: ${columns}x$rows"
+//        }
 
-        logger.trace {
-            val pixelX = marginX + x * (tileWidth + spacingX)
-            val pixelY = marginY + y * (tileHeight + spacingY)
-            "getTile($x,$y) -> pixel($pixelX,$pixelY), tileSize=${tileWidth}x${tileHeight}, " +
-                    "textureSize=${texture.width}x${texture.height}, margin=($marginX,$marginY), spacing=($spacingX,$spacingY)"
-        }
+//        if (logger.isTraceEnabled()) {
+//            logger.trace {
+//                val pixelX = marginX + x * (tileWidth + spacingX)
+//                val pixelY = marginY + y * (tileHeight + spacingY)
+//                "getTile($x,$y) -> pixel($pixelX,$pixelY), tileSize=${tileWidth}x${tileHeight}, " +
+//                        "textureSize=${texture.width}x${texture.height}, margin=($marginX,$marginY), spacing=($spacingX,$spacingY)"
+//            }
+//        }
 
-        return sprites[y][x]
+        return tileSprites[y][x]
+    }
+
+    fun getTileView(x: Int, y: Int): TileView {
+//        require(x in 0 until columns && y in 0 until rows) {
+//            "Tile coordinates ($x,$y) out of bounds. Sheet size: ${columns}x$rows"
+//        }
+//
+//        if (logger.isTraceEnabled()) {
+//            logger.trace {
+//                val pixelX = marginX + x * (tileWidth + spacingX)
+//                val pixelY = marginY + y * (tileHeight + spacingY)
+//                "getTile($x,$y) -> pixel($pixelX,$pixelY), tileSize=${tileWidth}x${tileHeight}, " +
+//                        "textureSize=${texture.width}x${texture.height}, margin=($marginX,$marginY), spacing=($spacingX,$spacingY)"
+//            }
+//        }
+
+        return tileViews[y][x]
     }
 
     fun cleanup() {
-        sprites.forEach { row ->
+        tileSprites.forEach { row ->
             row.forEach { sprite ->
                 sprite.cleanup()
             }
@@ -101,5 +131,11 @@ class SpriteSheet private constructor(
             return SpriteSheet(sprite.texture, tileWidth, tileHeight, offsetX, offsetY, paddingX, paddingY)
         }
     }
+
+    data class TileView(
+        val texture: Texture,
+        val clip: IntRect,
+        val scale: Vec2 = Vec2(1.0, 1.0)
+    )
 
 }

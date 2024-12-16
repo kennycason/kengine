@@ -7,6 +7,7 @@ import com.kengine.graphics.getSpriteContext
 import com.kengine.log.Logging
 import com.kengine.math.Vec2
 import com.kengine.sdl.getSDLContext
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -29,9 +30,9 @@ class TiledMap(
 
     companion object {
         val GID_HORIZONTAL_FLAG = 0x80000000u  // bit 31 (1000...)
-        val GID_VERTICAL_FLAG   = 0x40000000u  // bit 30 (0100...)
-        val GID_DIAGONAL_FLAG   = 0x20000000u  // bit 29 (0010...)
-        val TILE_INDEX_MASK     = 0x1FFFFFFFu  // bottom 29 bits for tile id
+        val GID_VERTICAL_FLAG = 0x40000000u  // bit 30 (0100...)
+        val GID_DIAGONAL_FLAG = 0x20000000u  // bit 29 (0010...)
+        val TILE_INDEX_MASK = 0x1FFFFFFFu  // bottom 29 bits for tile id
     }
 
     // position offset for rendering
@@ -83,94 +84,73 @@ class TiledMap(
         draw(layersByName.getValue(layerName))
     }
 
+    @OptIn(ExperimentalForeignApi::class)
     private fun draw(layer: TiledMapLayer) {
-        if (!layer.visible || layer.type != "tilelayer") {
-            logger.debug { "Skipping layer ${layer.name}: visible=${layer.visible}, type=${layer.type}" }
-            return
-        }
-        logger.debug { "Drawing tilelayer: ${layer.name}" }
+        if (!layer.visible || layer.type != "tilelayer") return
 
-        // calculate visible area based on screen dimensions and position
+        // calculate the screen and tile coordinates to draw
         val screenLeft = -p.x
         val screenRight = screenLeft + getSDLContext().screenWidth
         val screenTop = -p.y
         val screenBottom = screenTop + getSDLContext().screenHeight
 
-        // convert to tile coordinates
         val startX = (screenLeft / tileWidth).toInt().coerceAtLeast(0)
         val endX = (screenRight / tileWidth).toInt().coerceAtMost(layer.width!! - 1)
         val startY = (screenTop / tileHeight).toInt().coerceAtLeast(0)
         val endY = (screenBottom / tileHeight).toInt().coerceAtMost(layer.height!! - 1)
 
-        getSpriteContext().spriteBatch.begin()
+        val batch = getSpriteContext().spriteBatch
+        batch.begin()
+
         for (y in startY..endY) {
             for (x in startX..endX) {
                 val rawGid = layer.getTileAt(x, y)
-                if (rawGid == 0u) continue  // compare with 0u for UInt
+                if (rawGid == 0u) continue  // empty tile
 
                 val decoded = decodeTileGid(rawGid)
+                if (decoded.tileId <= 0u) continue
 
-                logger.trace() {
-                    "Tile at ($x, $y): rawGid=$rawGid -> tileId=${decoded.tileId}, " +
-                            "flipH=${decoded.flipH}, flipV=${decoded.flipV}, flipD=${decoded.flipD}"
-                }
-
-                if (decoded.tileId <= 0u) {
-                    logger.debug { "Tile at ($x, $y) has tileId <= 0 after decoding, skipping." }
-                    continue
-                }
-
+                // find the tileset and tile position in the sheet
                 val tilesetWithSprite = findTilesetForGid(decoded.tileId)
                 val (tilePx, tilePy) = getTilePosition(decoded.tileId, tilesetWithSprite.tileset)
-                logger.trace {
-                    "Tile ($x,$y): Using tileset '${tilesetWithSprite.tileset.name}', " +
-                            "tilePos=($tilePx,$tilePy), firstgid=${tilesetWithSprite.tileset.firstgid}, " +
-                            "tileCount=${tilesetWithSprite.tileset.tileCount}, columns=${tilesetWithSprite.tileset.columns}"
+
+                // get a tile view directly (no full Sprite object)
+                val tileView = tilesetWithSprite.spriteSheet.getTileView(tilePx.toInt(), tilePy.toInt())
+
+                // compute flipping/rotation if needed
+                val flipMode = when {
+                    decoded.flipH && decoded.flipV -> FlipMode.BOTH
+                    decoded.flipH -> FlipMode.HORIZONTAL
+                    decoded.flipV -> FlipMode.VERTICAL
+                    else -> FlipMode.NONE
                 }
 
-                val sprite = tilesetWithSprite.spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
-                drawSprite(x, y, sprite, decoded)
+                val angle = if (decoded.flipD) 90.0 else 0.0
+
+                // tileView.clip holds the sub-rect of the texture
+                // tileView.texture is the shared texture
+                val srcX = tileView.clip!!.x
+                val srcY = tileView.clip.y
+                val srcW = tileView.clip.w
+                val srcH = tileView.clip.h
+
+                val drawX = (x * tileWidth + p.x).toInt()
+                val drawY = (y * tileHeight + p.y).toInt()
+
+                batch.draw(
+                    texture = tileView.texture.texture,
+                    srcX = srcX, srcY = srcY, srcW = srcW, srcH = srcH,
+                    dstX = drawX, dstY = drawY,
+                    dstW = (srcW * tileView.scale.x).toInt(),
+                    dstH = (srcH * tileView.scale.y).toInt(),
+                    angle = angle,
+                    flip = flipMode
+                )
+
             }
         }
-        getSpriteContext().spriteBatch.end()
-    }
 
-    private fun drawSprite(x: Int, y: Int, sprite: Sprite, decoded: DecodedTile) {
-        val (angle, flip) = when {
-            // no flags
-            !decoded.flipH && !decoded.flipV && !decoded.flipD ->
-                Pair(0.0, FlipMode.NONE)
-
-            // single flags
-            decoded.flipH && !decoded.flipV && !decoded.flipD -> // H
-                Pair(0.0, FlipMode.HORIZONTAL)
-            !decoded.flipH && decoded.flipV && !decoded.flipD -> // V
-                Pair(0.0, FlipMode.VERTICAL)
-            !decoded.flipH && !decoded.flipV && decoded.flipD -> // D
-                Pair(90.0, FlipMode.VERTICAL)
-
-            // double flags
-            decoded.flipH && !decoded.flipV && decoded.flipD -> // HD
-                Pair(90.0, FlipMode.NONE)
-            decoded.flipH && decoded.flipV && !decoded.flipD -> // HV
-                Pair(0.0, FlipMode.BOTH)
-            !decoded.flipH && decoded.flipV && decoded.flipD -> // VD
-                Pair(270.0, FlipMode.NONE)
-
-            // triple flags
-            decoded.flipH && decoded.flipV && decoded.flipD ->
-                Pair(90.0, FlipMode.HORIZONTAL)
-
-            else -> Pair(0.0, FlipMode.NONE)
-        }
-
-        getSpriteContext().spriteBatch.draw(sprite, p.x + (x * tileWidth), p.y + (y * tileHeight), flip, angle)
-//        sprite.draw(
-//            x = p.x + (x * tileWidth),
-//            y = p.y + (y * tileHeight),
-//            flip = flip,
-//            angle = angle
-//        )
+        batch.end()
     }
 
     private fun findTilesetForGid(gid: UInt): TilesetAndSpriteSheet {
@@ -196,9 +176,11 @@ class TiledMap(
         val gridX = localId % cols.toUInt()
         val gridY = localId / cols.toUInt()
 
-        logger.trace {
-            "getTilePosition(tileId=$tileId): firstgid=${tileset.firstgid}, localId=$localId, cols=$cols, grid=($gridX,$gridY)"
-        }
+//        if (logger.isTraceEnabled()) {
+//            logger.trace {
+//                "getTilePosition(tileId=$tileId): firstgid=${tileset.firstgid}, localId=$localId, cols=$cols, grid=($gridX,$gridY)"
+//            }
+//        }
 
         return Pair(gridX, gridY)
     }
@@ -209,12 +191,14 @@ class TiledMap(
         val flipD = (gid and GID_DIAGONAL_FLAG) != 0u
         val tileId = gid and TILE_INDEX_MASK
 
-        logger.traceStream {
-            writeLn("Decoding GID: ${gid.toString(2).padStart(32, '0')} (${gid})")
-            writeLn("H FLAG:       ${GID_HORIZONTAL_FLAG.toString(2).padStart(32, '0')}")
-            writeLn("V FLAG:       ${GID_VERTICAL_FLAG.toString(2).padStart(32, '0')}")
-            writeLn("D FLAG:       ${GID_DIAGONAL_FLAG.toString(2).padStart(32, '0')}")
-        }
+//        if (logger.isTraceEnabled()) {
+//            logger.traceStream {
+//                writeLn("Decoding GID: ${gid.toString(2).padStart(32, '0')} (${gid})")
+//                writeLn("H FLAG:       ${GID_HORIZONTAL_FLAG.toString(2).padStart(32, '0')}")
+//                writeLn("V FLAG:       ${GID_VERTICAL_FLAG.toString(2).padStart(32, '0')}")
+//                writeLn("D FLAG:       ${GID_DIAGONAL_FLAG.toString(2).padStart(32, '0')}")
+//            }
+//        }
 
         return DecodedTile(tileId, flipH, flipV, flipD)
     }

@@ -13,6 +13,9 @@ import sdl2.SDL_Rect
 import sdl2.SDL_RenderCopy
 import sdl2.SDL_RenderCopyEx
 
+/**
+ * NOTE SDL2 does not support batch.
+ */
 @OptIn(ExperimentalForeignApi::class)
 class SpriteBatch : Logging {
     private val maxSprites = 1000
@@ -46,39 +49,40 @@ class SpriteBatch : Logging {
         batch.clear()
     }
 
+
+    /**
+     * Draw a portion of a texture (or entire if src parameters are null) to the screen.
+     * If the current batch texture differs from the given texture, or we reached maxSprites,
+     * we flush before adding the new item.
+     */
     fun draw(
-        sprite: Sprite,
-        x: Double,
-        y: Double,
-        flip: FlipMode = FlipMode.NONE,
-        angle: Double = 0.0
+        texture: CValuesRef<SDL_Texture>,
+        srcX: Int? = null,
+        srcY: Int? = null,
+        srcW: Int? = null,
+        srcH: Int? = null,
+        dstX: Int,
+        dstY: Int,
+        dstW: Int,
+        dstH: Int,
+        angle: Double = 0.0,
+        flip: FlipMode = FlipMode.NONE
     ) {
         if (!drawing) throw IllegalStateException("SpriteBatch.begin() must be called before draw()")
 
-        // if texture changes or we're at capacity, flush the current batch
-        if (currentTexture != sprite.texture.texture || spriteCount >= maxSprites) {
+        // If texture changes or we reached capacity, flush
+        if (currentTexture != texture || spriteCount >= maxSprites) {
             flush()
-            currentTexture = sprite.texture.texture
+            currentTexture = texture
         }
-
-        val clip = sprite.clip
-        val srcX = clip?.x
-        val srcY = clip?.y
-        val srcW = clip?.w
-        val srcH = clip?.h
-
-        // Compute destination rect sizes (ensure they are non-negative)
-        val scaledW = ((srcW ?: sprite.texture.width) * sprite.scale.x).toInt().coerceAtLeast(1)
-        val scaledH = ((srcH ?: sprite.texture.height) * sprite.scale.y).toInt().coerceAtLeast(1)
 
         batch.add(
             BatchItem(
-                texture = sprite.texture.texture,
-                srcX = srcX, srcY = srcY, srcW = srcW, srcH = srcH,
-                dstX = (x * sprite.scale.x).toInt(),
-                dstY = (y * sprite.scale.y).toInt(),
-                dstW = scaledW,
-                dstH = scaledH,
+                texture = texture,
+                srcX = srcX, srcY = srcY,
+                srcW = srcW, srcH = srcH,
+                dstX = dstX, dstY = dstY,
+                dstW = dstW, dstH = dstH,
                 angle = angle,
                 flip = flip
             )
@@ -89,7 +93,9 @@ class SpriteBatch : Logging {
     private fun flush() {
         if (spriteCount == 0) return
 
-        logger.debug { "Flushing ${batch.size} sprites." }
+        if (logger.isDebugEnabled()) {
+            logger.debug { "Flushing ${batch.size} sprites." }
+        }
 
         useSDLContext {
             memScoped {
