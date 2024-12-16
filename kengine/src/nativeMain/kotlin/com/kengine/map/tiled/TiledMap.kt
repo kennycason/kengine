@@ -118,14 +118,64 @@ class TiledMap(
                 val tileView = tilesetWithSprite.spriteSheet.getTileView(tilePx.toInt(), tilePy.toInt())
 
                 // compute flipping/rotation if needed
-                val flipMode = when {
-                    decoded.flipH && decoded.flipV -> FlipMode.BOTH
-                    decoded.flipH -> FlipMode.HORIZONTAL
-                    decoded.flipV -> FlipMode.VERTICAL
-                    else -> FlipMode.NONE
-                }
+//                val flipMode = when {
+//                    decoded.flipH && decoded.flipV -> FlipMode.BOTH
+//                    decoded.flipH -> FlipMode.HORIZONTAL
+//                    decoded.flipV -> FlipMode.VERTICAL
+//                    else -> FlipMode.NONE
+//                }
+//
+//                val angle = if (decoded.flipD) 90.0 else 0.0
 
-                val angle = if (decoded.flipD) 90.0 else 0.0
+                val angle: Double
+                val flipMode: FlipMode
+                when {
+                    // no flags
+                    !decoded.flipH && !decoded.flipV && !decoded.flipD -> {
+                        angle = 0.0
+                        flipMode = FlipMode.NONE
+                    }
+                    // single flags
+                    decoded.flipH && !decoded.flipV && !decoded.flipD -> { // H
+                        angle = 0.0
+                        flipMode = FlipMode.HORIZONTAL
+                    }
+
+                    !decoded.flipH && decoded.flipV && !decoded.flipD -> { // V
+                        angle = 0.0
+                        flipMode = FlipMode.VERTICAL
+                    }
+
+                    !decoded.flipH && !decoded.flipV && decoded.flipD -> { // D
+                        angle = 90.0
+                        flipMode = FlipMode.VERTICAL
+                    }
+                    // double flags
+                    decoded.flipH && !decoded.flipV && decoded.flipD -> { // HD
+                        angle = 90.0
+                        flipMode = FlipMode.NONE
+                    }
+
+                    decoded.flipH && decoded.flipV && !decoded.flipD -> { // HV
+                        angle = 0.0
+                        flipMode = FlipMode.BOTH
+                    }
+
+                    !decoded.flipH && decoded.flipV && decoded.flipD -> { // VD
+                        angle = 270.0
+                        flipMode = FlipMode.NONE
+                    }
+                    // triple flags
+                    decoded.flipH && decoded.flipV && decoded.flipD -> {
+                        angle = 90.0
+                        flipMode = FlipMode.HORIZONTAL
+                    }
+
+                    else -> {
+                        angle = 0.0
+                        flipMode = FlipMode.NONE
+                    }
+                }
 
                 // tileView.clip holds the sub-rect of the texture
                 // tileView.texture is the shared texture
