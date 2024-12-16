@@ -1,12 +1,13 @@
 package com.kengine.map.tiled
 
+import com.kengine.graphics.FlipMode
 import com.kengine.graphics.Sprite
 import com.kengine.graphics.SpriteSheet
 import com.kengine.log.Logging
-import com.kengine.math.IntVec2
 import com.kengine.math.Vec2
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+
 
 @Serializable
 class TiledMap(
@@ -24,6 +25,14 @@ class TiledMap(
     val infinite: Boolean = false,
 ) : Logging {
 
+    companion object {
+        val GID_HORIZONTAL_FLAG = 0x80000000u  // bit 31 (1000...)
+        val GID_VERTICAL_FLAG   = 0x40000000u  // bit 30 (0100...)
+        val GID_DIAGONAL_FLAG   = 0x20000000u  // bit 29 (0010...)
+        val TILE_INDEX_MASK     = 0x1FFFFFFFu  // bottom 29 bits for tile id
+    }
+
+    // position offset for rendering
     val p by lazy { Vec2() }
 
     private val layersByName = layers.associateBy(TiledMapLayer::name)
@@ -41,10 +50,10 @@ class TiledMap(
                     sprite = Sprite.fromFilePath(tileset.image!!),
                     tileWidth = tileset.tileWidth!!,
                     tileHeight = tileset.tileHeight!!,
-                    offsetX = tileset.margin,    // Pass margin
-                    offsetY = tileset.margin,    // Pass margin
-                    paddingX = tileset.spacing,  // Pass spacing
-                    paddingY = tileset.spacing   // Pass spacing
+                    offsetX = tileset.margin,
+                    offsetY = tileset.margin,
+                    paddingX = tileset.spacing,
+                    paddingY = tileset.spacing
                 )
             )
         }
@@ -72,49 +81,133 @@ class TiledMap(
         draw(layersByName.getValue(layerName))
     }
 
-    fun draw(layer: TiledMapLayer) {
-        if (!layer.visible) return
-        if (layer.type != "tilelayer") return
+    private fun draw(layer: TiledMapLayer) {
+        if (!layer.visible || layer.type != "tilelayer") {
+            logger.debug { "Skipping layer ${layer.name}: visible=${layer.visible}, type=${layer.type}" }
+            return
+        }
 
-        for (x in 0 until layer.width!!) {
-            for (y in 0 until layer.height!!) {
-                val tileId = layer.getTileAt(x, y)
-                if (tileId > 0) { // Skip empty tiles
-                    try {
-                        val tilesetWithSprite = findTilesetForGid(tileId)
-                        val tilePosition = getTilePosition(tileId, tilesetWithSprite.tileset)
-                        val sprite = tilesetWithSprite.spriteSheet.getTile(
-                            tilePosition.x / tilesetWithSprite.tileset.tileWidth!!,
-                            tilePosition.y / tilesetWithSprite.tileset.tileHeight!!
-                        )
-                        sprite.draw(p.x + (x * tileWidth).toDouble(), p.y + (y * tileHeight).toDouble())
-                    } catch (e: IllegalArgumentException) {
-                        logger.error("Tile rendering error for GID $tileId at ($x, $y): ${e.message}")
-                    }
+        logger.debug { "Drawing tilelayer: ${layer.name}" }
+        for (y in 0 until layer.height!!) {
+            for (x in 0 until layer.width!!) {
+                val rawGid = layer.getTileAt(x, y)
+                if (rawGid == 0u) continue  // compare with 0u for UInt
+
+                val decoded = decodeTileGid(rawGid)
+
+                logger.debug {
+                    "Tile at ($x, $y): rawGid=$rawGid -> tileId=${decoded.tileId}, " +
+                            "flipH=${decoded.flipH}, flipV=${decoded.flipV}, flipD=${decoded.flipD}"
                 }
+
+                if (decoded.tileId <= 0u) {
+                    logger.debug { "Tile at ($x, $y) has tileId <= 0 after decoding, skipping." }
+                    continue
+                }
+
+                val tilesetWithSprite = findTilesetForGid(decoded.tileId)
+                val (tilePx, tilePy) = getTilePosition(decoded.tileId, tilesetWithSprite.tileset)
+                logger.debug {
+                    "Tile ($x,$y): Using tileset '${tilesetWithSprite.tileset.name}', " +
+                            "tilePos=($tilePx,$tilePy), firstgid=${tilesetWithSprite.tileset.firstgid}, " +
+                            "tileCount=${tilesetWithSprite.tileset.tileCount}, columns=${tilesetWithSprite.tileset.columns}"
+                }
+
+                val sprite = tilesetWithSprite.spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
+                drawSprite(x, y, sprite, decoded)
             }
         }
     }
 
-    private fun findTilesetForGid(gid: Int): TilesetAndSpriteSheet {
-        val tileset = tilesetsWithSprites.firstOrNull { gid >= it.tileset.firstgid }
+    private fun drawSprite(x: Int, y: Int, sprite: Sprite, decoded: DecodedTile) {
+        val (angle, flip) = when {
+            // no flags
+            !decoded.flipH && !decoded.flipV && !decoded.flipD ->
+                Pair(0.0, FlipMode.NONE)
+
+            // single flags
+            decoded.flipH && !decoded.flipV && !decoded.flipD -> // H
+                Pair(0.0, FlipMode.HORIZONTAL)
+            !decoded.flipH && decoded.flipV && !decoded.flipD -> // V
+                Pair(0.0, FlipMode.VERTICAL)
+            !decoded.flipH && !decoded.flipV && decoded.flipD -> // D
+                Pair(90.0, FlipMode.VERTICAL)
+
+            // double flags
+            decoded.flipH && !decoded.flipV && decoded.flipD -> // HD
+                Pair(90.0, FlipMode.NONE)
+            decoded.flipH && decoded.flipV && !decoded.flipD -> // HV
+                Pair(0.0, FlipMode.BOTH)
+            !decoded.flipH && decoded.flipV && decoded.flipD -> // VD
+                Pair(270.0, FlipMode.NONE)
+
+            // triple flags
+            decoded.flipH && decoded.flipV && decoded.flipD ->
+                Pair(90.0, FlipMode.HORIZONTAL)
+
+            else -> Pair(0.0, FlipMode.NONE)
+        }
+
+        sprite.draw(
+            x = p.x + (x * tileWidth),
+            y = p.y + (y * tileHeight),
+            flip = flip,
+            angle = angle
+        )
+    }
+
+    private fun findTilesetForGid(gid: UInt): TilesetAndSpriteSheet {
+        val tileset = tilesetsWithSprites
+            .filter { gid >= it.tileset.firstgid }
+            .maxByOrNull { it.tileset.firstgid }
             ?: throw IllegalStateException("No tileset found for gid: $gid")
+
+        val lastGidInTileset = tileset.tileset.firstgid + tileset.tileset.tileCount!!.toUInt() - 1u
+        if (gid > lastGidInTileset) {
+            logger.warn {
+                "GID $gid is outside of tileset '${tileset.tileset.name}' range [${tileset.tileset.firstgid}, $lastGidInTileset]. " +
+                        "This may cause rendering issues."
+            }
+        }
         return tileset
     }
 
-    private fun getTilePosition(tileId: Int, tileset: Tileset): IntVec2 {
-        val localId = tileId - tileset.firstgid // adjust for tileset's firstgid
-        if (localId < 0) throw IllegalArgumentException("Invalid tileId: $tileId (localId: $localId)")
+    private fun getTilePosition(tileId: UInt, tileset: Tileset): Pair<UInt, UInt> {
+        val localId = tileId - tileset.firstgid
+        val cols = tileset.columns ?: throw IllegalArgumentException("Tileset '${tileset.name}' must have defined columns.")
 
-        val cols = tileset.columns!!
-        val x = (localId % cols) * (tileset.tileWidth!! + tileset.spacing) + tileset.margin
-        val y = (localId / cols) * (tileset.tileHeight!! + tileset.spacing) + tileset.margin
+        val gridX = localId % cols.toUInt()
+        val gridY = localId / cols.toUInt()
 
-        logger.debug { "GID: $tileId, LocalID: ${tileId - tileset.firstgid}, TilePos: $x,$y" }
+        logger.debug {
+            "getTilePosition(tileId=$tileId): firstgid=${tileset.firstgid}, localId=$localId, cols=$cols, grid=($gridX,$gridY)"
+        }
 
-        return IntVec2(x, y)
+        return Pair(gridX, gridY)
     }
 
+    private fun decodeTileGid(gid: UInt): DecodedTile {
+        val flipH = (gid and GID_HORIZONTAL_FLAG) != 0u
+        val flipV = (gid and GID_VERTICAL_FLAG) != 0u
+        val flipD = (gid and GID_DIAGONAL_FLAG) != 0u
+        val tileId = gid and TILE_INDEX_MASK
+
+        logger.debugStream {
+            writeLn("Decoding GID: ${gid.toString(2).padStart(32, '0')} (${gid})")
+            writeLn("H FLAG:       ${GID_HORIZONTAL_FLAG.toString(2).padStart(32, '0')}")
+            writeLn("V FLAG:       ${GID_VERTICAL_FLAG.toString(2).padStart(32, '0')}")
+            writeLn("D FLAG:       ${GID_DIAGONAL_FLAG.toString(2).padStart(32, '0')}")
+        }
+
+        return DecodedTile(tileId, flipH, flipV, flipD)
+    }
+
+    data class DecodedTile(
+        val tileId: UInt,
+        val flipH: Boolean,
+        val flipV: Boolean,
+        val flipD: Boolean
+    )
 
     override fun toString(): String {
         return "TiledMap(\n" +
@@ -128,4 +221,3 @@ class TiledMap(
                 ")"
     }
 }
-

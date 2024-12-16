@@ -22,14 +22,13 @@ class Sprite private constructor(
     val texture: Texture,
     private val clip: IntRect? = null,
     val scale: Vec2 = Vec2(1.0, 1.0),
-    var rotation: Double = 0.0
 ) : Logging {
     val width: Int = clip?.w ?: texture.width
     val height: Int = clip?.h ?: texture.height
 
     fun draw(p: Vec2, flip: FlipMode = FlipMode.NONE) = draw(p.x, p.y, flip)
 
-    fun draw(x: Double, y: Double, flip: FlipMode = FlipMode.NONE) {
+    fun draw(x: Double, y: Double, flip: FlipMode = FlipMode.NONE, angle: Double = 0.0) {
         useSDLContext {
             memScoped {
                 val clipRect = if (clip == null) null
@@ -47,7 +46,7 @@ class Sprite private constructor(
                     this.h = ((clipRect?.h ?: texture.height) * scale.y).toInt()
                 }
 
-                if (rotation == 0.0 && flip == FlipMode.NONE) {
+                if (angle == 0.0 && flip == FlipMode.NONE) {
                     SDL_RenderCopy(renderer, texture.texture, clipRect?.ptr, destRect.ptr)
                 } else {
                     val center = alloc<SDL_Point>().apply {
@@ -59,7 +58,7 @@ class Sprite private constructor(
                         texture = texture.texture,
                         srcrect = clipRect?.ptr,
                         dstrect = destRect.ptr,
-                        angle = rotation,
+                        angle = angle,
                         center = center.ptr,
                         flip = flip.flag
                     )

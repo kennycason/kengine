@@ -22,7 +22,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 @OptIn(ExperimentalEncodingApi::class)
 object LayerDataDecoder : Logging {
 
-    fun decode(layer: TiledMapLayer): List<Int> {
+    fun decode(layer: TiledMapLayer): List<UInt> {
         return when (layer.compression) {
             "zlib" -> decode(decompressZlib(layer.data!!), layer.encoding.orEmpty())
             "", null -> {
@@ -33,18 +33,21 @@ object LayerDataDecoder : Logging {
         }
     }
 
-    fun decode(data: String, encoding: String): List<Int> {
+    fun decode(data: String, encoding: String): List<UInt> {
         if (encoding != "base64") {
             throw IllegalArgumentException("Unsupported encoding: $encoding")
         }
 
         val decoded = Base64.decode(data)
-        return bytesToInts(decoded)
+        return bytesToUInts(decoded)  // Renamed to indicate UInt return type
     }
 
-    private fun bytesToInts(bytes: ByteArray): List<Int> {
+    private fun bytesToUInts(bytes: ByteArray): List<UInt> {
         return List(bytes.size / 4) { index ->
-            bytes[index * 4].toInt() and 0xFF or ((bytes[index * 4 + 1].toInt() and 0xFF) shl 8) or ((bytes[index * 4 + 2].toInt() and 0xFF) shl 16) or ((bytes[index * 4 + 3].toInt() and 0xFF) shl 24)
+            (bytes[index * 4].toUInt() and 0xFFu) or
+                    ((bytes[index * 4 + 1].toUInt() and 0xFFu) shl 8) or
+                    ((bytes[index * 4 + 2].toUInt() and 0xFFu) shl 16) or
+                    ((bytes[index * 4 + 3].toUInt() and 0xFFu) shl 24)
         }
     }
 

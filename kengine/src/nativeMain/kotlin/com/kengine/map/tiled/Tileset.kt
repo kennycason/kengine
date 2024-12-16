@@ -3,11 +3,11 @@ package com.kengine.map.tiled
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+// TODO add documentation/comments
 @Serializable
 data class Tileset(
-    val firstgid: Int,
+    val firstgid: UInt,
     val source: String? = null,
-    // For embedded tilesets
     var columns: Int? = null,
     var image: String? = null,
     @SerialName("imageheight")

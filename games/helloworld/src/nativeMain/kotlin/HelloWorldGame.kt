@@ -6,13 +6,13 @@ import com.kengine.sdl.useSDLContext
 
 class HelloWorldGame : Game {
     private val bulbasaur = BulbasaurEntity()
-    private val pokeballs = List(size = 25) { PingPongPidgeyEntity() }
+    private val pidgies = List(size = 25) { PingPongPidgeyEntity() }
     private val scytherEntity = ScytherEntity()
     private val tiledMap = TiledMapLoader().loadMap("assets/maps/simple_map.tmj")
         .also { it.p.set(480.0, 0.0) }
 
     override fun update() {
-        pokeballs.forEach {
+        pidgies.forEach {
             it.update()
         }
         scytherEntity.update()
@@ -56,7 +56,7 @@ class HelloWorldGame : Game {
             }
 
             // draw sprite entities
-            pokeballs.forEach {
+            pidgies.forEach {
                 it.draw()
             }
             scytherEntity.draw()
@@ -68,7 +68,7 @@ class HelloWorldGame : Game {
 
     override fun cleanup() {
         bulbasaur.cleanup()
-        pokeballs.forEach { it.cleanup() }
+        pidgies.forEach { it.cleanup() }
     }
 
 }

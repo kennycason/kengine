@@ -4,14 +4,16 @@ class LogStreamBuilder(private val level: Logger.Level, private val logger: Logg
     private val messageBuilder = StringBuilder()
 
     fun write(part: () -> String?): LogStreamBuilder {
-        if (level.ordinal >= level.ordinal) {
+        if (level.ordinal >= level.ordinal) { // check before eval'ing lambda
             write(part())
         }
         return this
     }
 
     fun write(part: String?): LogStreamBuilder {
-        messageBuilder.append(part)
+        if (level.ordinal >= level.ordinal) {
+            messageBuilder.append(part)
+        }
         return this
     }
 
@@ -25,15 +27,31 @@ class LogStreamBuilder(private val level: Logger.Level, private val logger: Logg
         return this
     }
 
-    fun writeLn(part: () -> String?): LogStreamBuilder {
+    fun write(part: Any?): LogStreamBuilder {
         if (level.ordinal >= level.ordinal) {
+            messageBuilder.append(part)
+        }
+        return this
+    }
+
+    fun writeLn(part: () -> String?): LogStreamBuilder {
+        if (level.ordinal >= level.ordinal) { // check before eval'ing lambda
             write(part())
         }
         return ln()
     }
 
     fun writeLn(part: String?): LogStreamBuilder {
-        messageBuilder.append(part)
+        if (level.ordinal >= level.ordinal) {
+            messageBuilder.append(part)
+        }
+        return ln()
+    }
+
+    fun writeLn(part: Any?): LogStreamBuilder {
+        if (level.ordinal >= level.ordinal) {
+            messageBuilder.append(part)
+        }
         return ln()
     }
 
@@ -48,12 +66,16 @@ class LogStreamBuilder(private val level: Logger.Level, private val logger: Logg
     }
 
     fun tab(): LogStreamBuilder {
-        messageBuilder.append('\t')
+        if (level.ordinal >= level.ordinal) {
+            messageBuilder.append('\t')
+        }
         return this
     }
 
     fun ln(): LogStreamBuilder {
-        messageBuilder.append('\n')
+        if (level.ordinal >= level.ordinal) {
+            messageBuilder.append('\n')
+        }
         return this
     }
 

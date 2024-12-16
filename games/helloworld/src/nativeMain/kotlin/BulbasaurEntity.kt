@@ -49,10 +49,10 @@ class BulbasaurEntity : SpriteEntity(
                 v.y = speed * clock.deltaTimeSec
             }
             if (keyboard.isRPressed()) {
-                rotation += 1.0
+                angle += 1.0
             }
             if (keyboard.isFPressed()) {
-                rotation -= 1.0
+                angle -= 1.0
             }
             if (keyboard.isSpacePressed()) {
                 logger.info { "Bulbasaur ROARED!" }
@@ -75,7 +75,7 @@ class BulbasaurEntity : SpriteEntity(
         p.x += v.x
         p.y += v.y
 
-        sprite.rotation += 1.0
+        angle += 1.0
     }
 
     private fun init() {

@@ -1,14 +1,15 @@
 package com.kengine.map.tiled
 
+import com.kengine.log.Logging
 import com.kengine.test.expectThat
 import kotlin.test.Test
 
-class TiledMapLoaderTest {
-    enum class Tiles(val id: Int) {
-        EMPTY(0),
-        BRICK(1),
-        BOX(2),
-        BOX_SET(3),
+class TiledMapLoaderTest : Logging {
+    enum class Tiles(val id: UInt) {
+        EMPTY(0u),
+        BRICK(1u),
+        BOX(2u),
+        BOX_SET(3u),
     }
 
     @Test
@@ -47,6 +48,49 @@ class TiledMapLoaderTest {
     }
 
     @Test
+    fun `load ninja turdle all-tiles map`() {
+        val tiledMap = TiledMapLoader()
+            .loadMap("src/nativeTest/resources/ninja_turdle_all_tiles.tmj")
+
+        // validate map properties
+        expectThat(tiledMap) {
+            property(TiledMap::tileWidth).isEqualTo(16)
+            property(TiledMap::tileHeight).isEqualTo(16)
+            property(TiledMap::width).isEqualTo(20)
+            property(TiledMap::height).isEqualTo(47)
+        }
+
+        // validate layers exist
+        val mainLayer = tiledMap.layers.first()
+        expectThat(mainLayer.name).isEqualTo("main")
+
+        // validate main layer properties
+        expectThat(mainLayer) {
+            property(TiledMapLayer::width).isEqualTo(100)
+            property(TiledMapLayer::height).isEqualTo(17)
+            satisfiesAll({ it.getTileAt(0, 0) == 1u }) // Check the first tile ID
+        }
+
+        // log ahead of asserts for easy visualization in case of failure
+        logger.infoStream {
+            (0 until tiledMap.height).forEach { row ->
+                (0 until tiledMap.width).forEach { column ->
+                    val tileId = (row * tiledMap.width) + column + 1
+                    write(tileId).write(",")
+                }
+                ln()
+            }
+        }
+
+        (0 until tiledMap.height).forEach { row ->
+            (0 until tiledMap.width).forEach { column ->
+                val tileId = ((row * tiledMap.width) + column + 1).toUInt()
+                expectThat(mainLayer.getTileAt(column, row)).isEqualTo(tileId)
+            }
+        }
+    }
+
+    @Test
     fun `load ninja turdle map`() {
         val tiledMap = TiledMapLoader()
             .loadMap("src/nativeTest/resources/ninja_turdle_stomach_0.tmj")
@@ -68,7 +112,11 @@ class TiledMapLoaderTest {
         expectThat(mainLayer) {
             property(TiledMapLayer::width).isEqualTo(100)
             property(TiledMapLayer::height).isEqualTo(17)
-            satisfiesAll({ it.getTileAt(0, 0) == 1 }) // Check the first tile ID
+            satisfiesAll({ it.getTileAt(0, 0) == 1u }) // Check the first tile ID
+
+            expectThat(mainLayer.getTileAt(6, 8)).isEqualTo(203u)
+            expectThat(mainLayer.getTileAt(6, 9)).isEqualTo(224u)
+            expectThat(mainLayer.getTileAt(14, 0)).isEqualTo(203u)
         }
 
         // Validate object layer

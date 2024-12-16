@@ -25,8 +25,6 @@ class Logger {
         DEBUG, INFO, WARN, ERROR
     }
 
-    private var logLevel: Level = INFO
-
     fun debug(message: () -> String?) = log(DEBUG, message())
     fun info(message: () -> String?) = log(INFO, message())
     fun warn(message: () -> String?) = log(WARN, message())
@@ -92,10 +90,21 @@ class Logger {
     }
 
     companion object {
+        private var logLevel: Level = INFO
+
+        /**
+         * Sets the global log level.
+         * Messages below this level will not be logged.
+         */
+        fun setLevel(level: Level) {
+            logLevel = level
+        }
+
         /**
          * helper for creating loggers for static classes
          */
         fun get(klass: KClass<*>) = cachedLoggerOf(klass)
+
     }
 
 }

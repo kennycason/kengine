@@ -13,11 +13,10 @@ class SpriteSheet private constructor(
     val spacingX: Int = 0, // Spacing between tiles (horizontal)
     val spacingY: Int = 0  // Spacing between tiles (vertical)
 ) : Logging {
-    val columns = (texture.width - marginX + spacingX) / (tileWidth + spacingX)
-    val rows = (texture.height - marginY + spacingY) / (tileHeight + spacingY)
-
-    val width: Int = columns * tileWidth + (columns - 1) * spacingX + marginX * 2
-    val height: Int = rows * tileHeight + (rows - 1) * spacingY + marginY * 2
+    val width = texture.width - (2 * marginX)
+    val height = texture.height - (2 * marginY)
+    val columns = (width + spacingX) / (tileWidth + spacingX)
+    val rows = (height + spacingY) / (tileHeight + spacingY)
 
     init {
         logger.infoStream {
@@ -32,14 +31,19 @@ class SpriteSheet private constructor(
      * Get a specific tile as a ClippedSprite based on its grid position (x, y).
      */
     fun getTile(x: Int, y: Int): Sprite {
-        val clip = IntRect(
-            x = marginX + x * (tileWidth + spacingX),
-            y = marginY + y * (tileHeight + spacingY),
-            w = tileWidth,
-            h = tileHeight
+        val pixelX = marginX + x * (tileWidth + spacingX)
+        val pixelY = marginY + y * (tileHeight + spacingY)
+
+        logger.debug {
+            "getTile($x,$y) -> pixel($pixelX,$pixelY), tileSize=${tileWidth}x${tileHeight}, " +
+                    "textureSize=${texture.width}x${texture.height}, margin=($marginX,$marginY), spacing=($spacingX,$spacingY)"
+        }
+
+        // TODO cache these as Array<Array<Sprite>> on init.
+        return Sprite.fromTexture(
+            texture,
+            IntRect(x = pixelX, y = pixelY, w = tileWidth, h = tileHeight)
         )
-        logger.debug { "Loading tile from ($x,$y) -> [(${clip.x},${clip.y}) ${clip.w}${clip.h}" }
-        return Sprite.fromTexture(texture, clip)
     }
 
     fun cleanup() {

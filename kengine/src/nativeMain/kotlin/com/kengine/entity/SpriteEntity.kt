@@ -7,7 +7,7 @@ import com.kengine.math.Vec2
 open class SpriteEntity(
     protected val sprite: Sprite,
     var flipMode: FlipMode = FlipMode.NONE,
-    var rotation: Double = 0.0,
+    var angle: Double = 0.0,
     p: Vec2 = Vec2(),
     v: Vec2 = Vec2(),
     a: Vec2 = Vec2()
@@ -20,8 +20,7 @@ open class SpriteEntity(
 ) {
     override fun update() {}
     override fun draw() {
-        sprite.rotation = rotation
-        sprite.draw(p.x, p.y, flipMode)
+        sprite.draw(p.x, p.y, flipMode, angle)
     }
     override fun cleanup() {
         sprite.cleanup()

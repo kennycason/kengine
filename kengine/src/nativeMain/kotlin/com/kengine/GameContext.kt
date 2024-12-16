@@ -1,19 +1,21 @@
 package com.kengine
 
 import com.kengine.action.ActionContext
-import com.kengine.hooks.context.Context
-import com.kengine.hooks.context.ContextRegistry
 import com.kengine.event.EventContext
 import com.kengine.font.FontContext
 import com.kengine.geometry.GeometryContext
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.TextureContext
+import com.kengine.hooks.context.Context
+import com.kengine.hooks.context.ContextRegistry
 import com.kengine.input.controller.ControllerContext
 import com.kengine.input.controller.getControllerContext
 import com.kengine.input.keyboard.KeyboardContext
 import com.kengine.input.keyboard.getKeyboardContext
 import com.kengine.input.mouse.MouseContext
 import com.kengine.input.mouse.getMouseContext
+import com.kengine.log.Logger
+import com.kengine.log.LoggerContext
 import com.kengine.log.Logging
 import com.kengine.network.NetworkContext
 import com.kengine.physics.PhysicsContext
@@ -24,6 +26,7 @@ import com.kengine.sound.SoundContext
 import com.kengine.time.ClockContext
 
 class GameContext private constructor(
+    val log: LoggerContext,
     val sdl: SDLContext,
     val sdlEvent: SDLEventContext,
     val events: EventContext,
@@ -43,6 +46,7 @@ class GameContext private constructor(
     var isRunning = true
 
     init {
+        ContextRegistry.register(log)
         ContextRegistry.register(sdl)
         ContextRegistry.register(sdlEvent)
         ContextRegistry.register(events)
@@ -74,13 +78,15 @@ class GameContext private constructor(
         fun create(
             title: String,
             width: Int,
-            height: Int
+            height: Int,
+            logLevel: Logger.Level = Logger.Level.INFO
         ): GameContext {
             if (currentContext != null) {
                 throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
             }
             // TODO order matters, i.e. there are dependencies
             currentContext = GameContext(
+                log = LoggerContext.create(logLevel),
                 sdl = SDLContext.create(title, width, height),
                 events = EventContext.get(),
                 sdlEvent = SDLEventContext.get(),
@@ -107,6 +113,7 @@ class GameContext private constructor(
 
     override fun cleanup() {
         logger.info { "Cleaning up game resources" }
+        log.cleanup()
         action.cleanup()
         sdlEvent.cleanup()
         events.cleanup()
