@@ -77,8 +77,8 @@ class AnimatedSprite private constructor(
             loopMode: LoopMode = LoopMode.WRAP_AROUND
         ): AnimatedSprite {
             val sprites = mutableListOf<Sprite>()
-            for (y in 0 until spriteSheet.height) {
-                for (x in 0 until spriteSheet.width) {
+            for (y in 0 until spriteSheet.rows) {
+                for (x in 0 until spriteSheet.columns) {
                     sprites.add(spriteSheet.getTile(x, y))
                 }
             }

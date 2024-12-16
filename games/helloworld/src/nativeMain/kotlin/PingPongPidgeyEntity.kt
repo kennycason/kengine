@@ -1,9 +1,9 @@
 
-import com.kengine.hooks.context.getContext
 import com.kengine.entity.SpriteEntity
 import com.kengine.event.useEventContext
 import com.kengine.graphics.FlipMode
 import com.kengine.graphics.Sprite
+import com.kengine.hooks.context.getContext
 import com.kengine.log.Logging
 import com.kengine.sdl.useSDLContext
 import com.kengine.time.ClockContext
@@ -38,8 +38,8 @@ class PingPongPidgeyEntity : SpriteEntity(
             }
         }
         useSDLContext {
-            p.x = Random.nextInt(0, screenWidth - width).toDouble()
-            p.y = Random.nextInt(0, screenHeight - height).toDouble()
+            p.x = Random.nextInt(10, screenWidth - width - 10).toDouble()
+            p.y = Random.nextInt(10, screenHeight - height - 10).toDouble()
             v.x = Random.nextInt(10, 60).toDouble() * if (Random.nextBoolean()) 1 else -1
             v.y = Random.nextInt(10, 60).toDouble() * if (Random.nextBoolean()) 1 else -1
         }
@@ -49,10 +49,10 @@ class PingPongPidgeyEntity : SpriteEntity(
     private fun bounce() {
         useSDLContext {
             p += v * getContext<ClockContext>().deltaTimeSec
-            if (p.x < 0 || p.x > screenWidth - width) {
+            if (p.x <= 0 || p.x + width >= screenWidth) {
                 v.x *= -1
             }
-            if (p.y < 0 || p.y > screenHeight - height) {
+            if (p.y <= 0 || p.y + height >= screenHeight) {
                 v.y *= -1
             }
         }

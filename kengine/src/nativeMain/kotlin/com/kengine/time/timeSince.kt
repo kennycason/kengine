@@ -1,14 +1,12 @@
 package com.kengine.time
 
-import com.kengine.hooks.context.useContext
-
 /**
  * A convenience function for entities to track time since some timestamp.
  * e.g. if (keyboard.isSpacePressed() && timeSince(spaceLastPressedMs) > 200) { }
  */
 fun timeSinceMs(timeMs: Long): Long {
     useClockContext {
-        return totalTimeMs - timeMs
+        return getCurrentMilliseconds() - timeMs
     }
 }
 
@@ -18,6 +16,6 @@ fun timeSinceMs(timeMs: Long): Long {
  */
 fun timeSinceSec(timeSec: Double): Double {
     useClockContext {
-        return totalTimeSec - timeSec
+        return (getCurrentMilliseconds() / 1000.0) - timeSec
     }
 }

@@ -40,7 +40,7 @@
         {
          "columns":4,
          "firstgid":1,
-         "image":"..\/sprites\/boxxle.bmp",
+         "image":"assets/sprites/boxxle.bmp",
          "imageheight":128,
          "imagewidth":128,
          "margin":0,
