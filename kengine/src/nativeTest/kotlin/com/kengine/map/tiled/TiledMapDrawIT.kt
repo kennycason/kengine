@@ -7,7 +7,7 @@ import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.log.Logger
 import com.kengine.sdl.useSDLContext
 import com.kengine.time.getClockContext
-import com.kengine.time.timeSinceMs
+import com.kengine.time.getCurrentMilliseconds
 import com.kengine.time.useTimer
 import kotlin.test.Test
 
@@ -30,7 +30,6 @@ class TiledMapDrawIT {
             GameRunner(frameRate = 60) {
                 object : Game {
                     private val scrollSpeed = 100.0
-                    private var lastMapRenderTimeMs = 0L
                     override fun update() {
                         useTimer(60000L) { // end after 60 seconds
                             isRunning = false
@@ -55,9 +54,9 @@ class TiledMapDrawIT {
                         }
                         useSDLContext {
                             fillScreen(0u, 0u, 0u)
-                            lastMapRenderTimeMs = getClockContext().totalTimeMs
+                            val lastMapRenderTimeMs = getCurrentMilliseconds()
                             tiledMap.draw()
-                            logger.info { "Map rendered in ${timeSinceMs(lastMapRenderTimeMs)}ms" }
+                            logger.info { "Map rendered in ${getCurrentMilliseconds() - lastMapRenderTimeMs}ms" }
                             flipScreen()
                         }
                     }

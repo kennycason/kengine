@@ -5,6 +5,7 @@ import com.kengine.graphics.Sprite
 import com.kengine.graphics.SpriteSheet
 import com.kengine.log.Logging
 import com.kengine.math.Vec2
+import com.kengine.sdl.getSDLContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -86,10 +87,22 @@ class TiledMap(
             logger.debug { "Skipping layer ${layer.name}: visible=${layer.visible}, type=${layer.type}" }
             return
         }
-
         logger.debug { "Drawing tilelayer: ${layer.name}" }
-        for (y in 0 until layer.height!!) {
-            for (x in 0 until layer.width!!) {
+
+        // calculate visible area based on screen dimensions and position
+        val screenLeft = -p.x
+        val screenRight = screenLeft + getSDLContext().screenWidth
+        val screenTop = -p.y
+        val screenBottom = screenTop + getSDLContext().screenHeight
+
+        // convert to tile coordinates
+        val startX = (screenLeft / tileWidth).toInt().coerceAtLeast(0)
+        val endX = (screenRight / tileWidth).toInt().coerceAtMost(layer.width!! - 1)
+        val startY = (screenTop / tileHeight).toInt().coerceAtLeast(0)
+        val endY = (screenBottom / tileHeight).toInt().coerceAtMost(layer.height!! - 1)
+
+        for (y in startY..endY) {
+            for (x in startX..endX) {
                 val rawGid = layer.getTileAt(x, y)
                 if (rawGid == 0u) continue  // compare with 0u for UInt
 
