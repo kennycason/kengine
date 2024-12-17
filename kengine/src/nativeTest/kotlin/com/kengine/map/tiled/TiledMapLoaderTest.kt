@@ -50,7 +50,7 @@ class TiledMapLoaderTest : Logging {
     @Test
     fun `load ninja turdle all-tiles map`() {
         val tiledMap = TiledMapLoader()
-            .loadMap("src/nativeTest/resources/ninja_turdle_all_tiles.tmj")
+            .loadMap("src/nativeTest/resources/ninjaturdle/all_tiles.tmj")
 
         // validate map properties
         expectThat(tiledMap) {
@@ -93,7 +93,7 @@ class TiledMapLoaderTest : Logging {
     @Test
     fun `load ninja turdle map`() {
         val tiledMap = TiledMapLoader()
-            .loadMap("src/nativeTest/resources/ninja_turdle_stomach_0.tmj")
+            .loadMap("src/nativeTest/resources/ninjaturdle/stomach_0.tmj")
 
         // Validate map properties
         expectThat(tiledMap) {

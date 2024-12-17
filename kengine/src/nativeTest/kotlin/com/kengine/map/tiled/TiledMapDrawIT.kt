@@ -31,7 +31,7 @@ class TiledMapDrawIT {
                 object : Game {
                     private val scrollSpeed = 100.0
                     override fun update() {
-                        useTimer(60000L) { // end after 60 seconds
+                        useTimer(5000L) {
                             isRunning = false
                         }
                     }
