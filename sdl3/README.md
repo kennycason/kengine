@@ -29,3 +29,7 @@ cmake .. \
 make -j$(sysctl -n hw.ncpu)
 sudo make install
 ```
+
+```shell
+sudo install_name_tool -id @rpath/libSDL3_image.dylib /usr/local/lib/libSDL3_image.dylib
+```

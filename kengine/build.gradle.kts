@@ -39,7 +39,9 @@ kotlin {
                     "-lSDL2_ttf",
                     "-L/usr/local/lib",
                     "-lSDL3",
-                    "-Wl,-rpath,/usr/local/lib" // Correct rpath syntax for macOS
+                    "-lSDL3_image",
+//                    "-Wl,-rpath,@executable_path/Frameworks",
+//                    "-Wl,-rpath,/usr/local/lib"
                 )
             }
         }
@@ -120,9 +122,33 @@ kotlin {
 tasks.register<Copy>("copySDL3Dylib") {
     description = "Copy libSDL3.0.dylib to the Frameworks directory"
     from("/usr/local/lib/libSDL3.0.dylib")
+    into("${buildDir}/bin/macosArm64/Frameworks")
+}
+
+tasks.register<Copy>("copySDL3DylibDebugTest") {
+    description = "Copy libSDL3.0.dylib to the Frameworks directory"
+    from("/usr/local/lib/libSDL3.0.dylib")
+    into("${buildDir}/bin/macosArm64/debugTest/Frameworks")
+}
+
+
+tasks.named("macosArm64Test") {
+    dependsOn("copySDL3Dylib", "copySDL3DylibDebugTest")
+}
+
+
+tasks.register<Copy>("copySDL3ImageDylib") {
+    description = "Copy libSDL3_image.dylib to the Frameworks directory"
+    from("/usr/local/lib/libSDL3_image.dylib")
+    into("${buildDir}/bin/macosArm64/Frameworks")
+}
+
+tasks.register<Copy>("copySDL3ImageDylibDebugTest") {
+    description = "Copy libSDL3_image.dylib to the Frameworks directory"
+    from("/usr/local/lib/libSDL3_image.dylib")
     into("${buildDir}/bin/macosArm64/debugTest/Frameworks")
 }
 
 tasks.named("macosArm64Test") {
-    dependsOn("copySDL3Dylib")
+    dependsOn("copySDL3ImageDylib", "copySDL3ImageDylibDebugTest")
 }
