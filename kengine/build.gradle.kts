@@ -114,16 +114,12 @@ kotlin {
     }
 }
 
-tasks.register<Exec>("fixRpath") {
-    description = "Fix rpath for test.kexe to locate libSDL3.0.dylib"
-    commandLine(
-        "install_name_tool",
-        "-add_rpath",
-        "/usr/local/lib",
-        "${buildDir}/bin/macosArm64/debugTest/test.kexe"
-    )
+tasks.register<Copy>("copySDL3Dylib") {
+    description = "Copy libSDL3.0.dylib to the Frameworks directory"
+    from("/usr/local/lib/libSDL3.0.dylib")
+    into("${buildDir}/bin/macosArm64/debugTest/Frameworks")
 }
 
 tasks.named("macosArm64Test") {
-    finalizedBy("fixRpath")
+    dependsOn("copySDL3Dylib")
 }
