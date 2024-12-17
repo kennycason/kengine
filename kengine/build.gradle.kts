@@ -31,10 +31,22 @@ kotlin {
         binaries {
             sharedLib {
                 baseName = "kengine" // generates libkengine.dylib, .so, .dll
-                linkerOpts("-L/opt/homebrew/lib", "-lSDL2", "-lSDL2_mixer", "-lSDL2_net", "-lSDL2_ttf")
+                linkerOpts(
+                    "-L/opt/homebrew/lib",
+                    "-lSDL2",
+                    "-lSDL2_mixer",
+                    "-lSDL2_net",
+                    "-lSDL2_ttf",
+                    "-L/usr/local/lib",
+                    "-lSDL3",
+                    "-Wl,-rpath,/usr/local/lib" // Correct rpath syntax for macOS
+                )
             }
         }
         compilations["main"].cinterops {
+            val sdl3 by creating {
+                defFile = file("src/nativeInterop/cinterop/sdl3.def")
+            }
             val sdl2 by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl2.def")
             }
@@ -100,4 +112,18 @@ kotlin {
             }
         }
     }
+}
+
+tasks.register<Exec>("fixRpath") {
+    description = "Fix rpath for test.kexe to locate libSDL3.0.dylib"
+    commandLine(
+        "install_name_tool",
+        "-add_rpath",
+        "/usr/local/lib",
+        "${buildDir}/bin/macosArm64/debugTest/test.kexe"
+    )
+}
+
+tasks.named("macosArm64Test") {
+    finalizedBy("fixRpath")
 }

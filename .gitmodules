@@ -1,0 +1,3 @@
+[submodule "sdl3/SDL"]
+	path = sdl3/SDL
+	url = https://github.com/libsdl-org/SDL
