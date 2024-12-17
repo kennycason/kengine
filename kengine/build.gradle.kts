@@ -47,6 +47,9 @@ kotlin {
             val sdl3 by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3.def")
             }
+            val sdl3image by creating {
+                defFile = file("src/nativeInterop/cinterop/sdl3_image.def")
+            }
             val sdl2 by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl2.def")
             }
