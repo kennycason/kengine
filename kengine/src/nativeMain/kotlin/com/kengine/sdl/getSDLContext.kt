@@ -2,6 +2,6 @@ package com.kengine.sdl
 
 import com.kengine.hooks.context.ContextRegistry
 
-fun getSDLContext(): SDL3Context {
-    return ContextRegistry.get<SDL3Context>()
+fun getSDLContext(): SDLContext {
+    return ContextRegistry.get<SDLContext>()
 }

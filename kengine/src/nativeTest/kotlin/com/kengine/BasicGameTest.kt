@@ -1,8 +1,5 @@
-package com.kengine.map.tiled
+package com.kengine
 
-import com.kengine.Game
-import com.kengine.GameRunner
-import com.kengine.createGameContext
 import com.kengine.log.Logger
 import com.kengine.sdl.useSDLContext
 import com.kengine.time.getCurrentMilliseconds
@@ -21,10 +18,9 @@ class TiledMapDrawIT {
         ) {
             GameRunner(frameRate = 60) {
                 object : Game {
-                    private val scrollSpeed = 100.0
                     override fun update() {
                         useTimer(5000L) {
-                            isRunning = false
+                          //  isRunning = false
                         }
                     }
 

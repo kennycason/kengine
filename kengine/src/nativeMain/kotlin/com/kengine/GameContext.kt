@@ -5,6 +5,7 @@ package com.kengine
 //import com.kengine.graphics.SpriteContext
 //import com.kengine.graphics.TextureContext
 //import com.kengine.sound.SoundContext
+//import com.kengine.network.NetworkContext
 import com.kengine.action.ActionContext
 import com.kengine.event.EventContext
 import com.kengine.hooks.context.Context
@@ -18,18 +19,16 @@ import com.kengine.input.mouse.getMouseContext
 import com.kengine.log.Logger
 import com.kengine.log.LoggerContext
 import com.kengine.log.Logging
-//import com.kengine.network.NetworkContext
 import com.kengine.physics.PhysicsContext
-import com.kengine.sdl.SDL3Context
-//import com.kengine.sdl.SDLEventContext
-//import com.kengine.sdl.registerSDLQuitHandler
+import com.kengine.sdl.SDLContext
+import com.kengine.sdl.SDLEventContext
+import com.kengine.sdl.registerSDLQuitHandler
 import com.kengine.time.ClockContext
 
 class GameContext private constructor(
     val log: LoggerContext,
-//    val sdl: SDLContext,
-    val sdl: SDL3Context,
-//    val sdlEvent: SDLEventContext,
+    val sdl: SDLContext,
+    val sdlEvent: SDLEventContext,
     val events: EventContext,
     val keyboard: KeyboardContext,
     val mouse: MouseContext,
@@ -49,7 +48,7 @@ class GameContext private constructor(
     init {
         ContextRegistry.register(log)
         ContextRegistry.register(sdl)
-//        ContextRegistry.register(sdlEvent)
+        ContextRegistry.register(sdlEvent)
         ContextRegistry.register(events)
         ContextRegistry.register(keyboard)
         ContextRegistry.register(mouse)
@@ -66,7 +65,7 @@ class GameContext private constructor(
         getKeyboardContext().init()
         getMouseContext().init()
         getControllerContext().init()
-//        registerSDLQuitHandler()
+        registerSDLQuitHandler()
     }
 
     fun registerContext(context: Context) {
@@ -88,9 +87,9 @@ class GameContext private constructor(
             // TODO order matters, i.e. there are dependencies
             currentContext = GameContext(
                 log = LoggerContext.create(logLevel),
-                sdl = SDL3Context.create(title, width, height),
+                sdl = SDLContext.create(title, width, height),
                 events = EventContext.get(),
-//                sdlEvent = SDLEventContext.get(),
+                sdlEvent = SDLEventContext.get(),
                 keyboard = KeyboardContext.get(),
                 mouse = MouseContext.get(),
                 controller = ControllerContext.get(),
@@ -116,7 +115,7 @@ class GameContext private constructor(
         logger.info { "Cleaning up game resources" }
         log.cleanup()
         action.cleanup()
-//        sdlEvent.cleanup()
+        sdlEvent.cleanup()
         events.cleanup()
         keyboard.cleanup()
         mouse.cleanup()
