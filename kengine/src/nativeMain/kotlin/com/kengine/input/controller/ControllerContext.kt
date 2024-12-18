@@ -3,10 +3,10 @@ package com.kengine.input.controller
 import com.kengine.hooks.context.Context
 import com.kengine.log.getLogger
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.toKString
-import sdl2.SDL_GetError
-import sdl2.SDL_INIT_JOYSTICK
-import sdl2.SDL_Init
+
+//import sdl2.SDL_GetError
+//import sdl2.SDL_INIT_JOYSTICK
+//import sdl2.SDL_Init
 
 class ControllerContext private constructor(
     val controller: ControllerInputEventSubscriber
@@ -23,9 +23,9 @@ class ControllerContext private constructor(
                     controller = ControllerInputEventSubscriber()
                 )
 
-                if (SDL_Init(SDL_INIT_JOYSTICK) != 0) {
-                    logger.error { "SDL_Init Error: ${SDL_GetError()!!.toKString()}" }
-                }
+//                if (SDL_Init(SDL_INIT_JOYSTICK) != 0) {
+//                    logger.error { "SDL_Init Error: ${SDL_GetError()!!.toKString()}" }
+//                }
             }
             return currentContext ?: throw IllegalStateException("Failed to create controller context")
         }
@@ -35,6 +35,6 @@ class ControllerContext private constructor(
     }
 
     fun init() {
-        controller.init()
+//        controller.init()
     }
 }

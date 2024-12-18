@@ -1,18 +1,18 @@
 package com.kengine.input.mouse
 
-import com.kengine.hooks.context.useContext
+//import com.kengine.sdl.SDLContext
+//import com.kengine.sdl.SDLEventContext
 import com.kengine.math.Vec2
-import com.kengine.sdl.SDLContext
-import com.kengine.sdl.SDLEventContext
 import com.kengine.time.getCurrentMilliseconds
 import kotlinx.cinterop.ExperimentalForeignApi
-import sdl2.SDL_BUTTON_LEFT
-import sdl2.SDL_BUTTON_MIDDLE
-import sdl2.SDL_BUTTON_RIGHT
-import sdl2.SDL_Event
-import sdl2.SDL_MOUSEBUTTONDOWN
-import sdl2.SDL_MOUSEBUTTONUP
-import sdl2.SDL_MOUSEMOTION
+
+//import sdl2.SDL_BUTTON_LEFT
+//import sdl2.SDL_BUTTON_MIDDLE
+//import sdl2.SDL_BUTTON_RIGHT
+//import sdl2.SDL_Event
+//import sdl2.SDL_MOUSEBUTTONDOWN
+//import sdl2.SDL_MOUSEBUTTONUP
+//import sdl2.SDL_MOUSEMOTION
 
 @OptIn(ExperimentalForeignApi::class)
 class MouseInputEventSubscriber {
@@ -26,33 +26,33 @@ class MouseInputEventSubscriber {
 
     // must be called
     fun init() {
-        useContext <SDLContext> {
-            sdlEvents.subscribe(SDLEventContext.EventType.MOUSE, ::handleMouseEvent)
-        }
+//        useContext <SDLContext> {
+//            sdlEvents.subscribe(SDLEventContext.EventType.MOUSE, ::handleMouseEvent)
+//        }
     }
 
-    fun handleMouseEvent(event: SDL_Event) {
-        when (event.type) {
-            SDL_MOUSEBUTTONDOWN -> {
-                val button = event.button.button.toInt()
-                if (!buttonStates.containsKey(button)) {
-                    buttonStates[button] = ButtonState()
-                }
-                buttonStates[button]?.apply {
-                    isPressed = true
-                    lastPressedTime = getCurrentMilliseconds()
-                }
-            }
-            SDL_MOUSEBUTTONUP -> {
-                val button = event.button.button.toInt()
-                buttonStates[button]?.isPressed = false
-            }
-            SDL_MOUSEMOTION -> {
-                mouseCursor.x = event.motion.x.toDouble()
-                mouseCursor.y = event.motion.y.toDouble()
-            }
-        }
-    }
+//    fun handleMouseEvent(event: SDL_Event) {
+//        when (event.type) {
+//            SDL_MOUSEBUTTONDOWN -> {
+//                val button = event.button.button.toInt()
+//                if (!buttonStates.containsKey(button)) {
+//                    buttonStates[button] = ButtonState()
+//                }
+//                buttonStates[button]?.apply {
+//                    isPressed = true
+//                    lastPressedTime = getCurrentMilliseconds()
+//                }
+//            }
+//            SDL_MOUSEBUTTONUP -> {
+//                val button = event.button.button.toInt()
+//                buttonStates[button]?.isPressed = false
+//            }
+//            SDL_MOUSEMOTION -> {
+//                mouseCursor.x = event.motion.x.toDouble()
+//                mouseCursor.y = event.motion.y.toDouble()
+//            }
+//        }
+//    }
 
     /**
      * Get mouse cursor (x,y) position
@@ -75,12 +75,12 @@ class MouseInputEventSubscriber {
             if (it.isPressed) 0L else currentTime - it.lastPressedTime
         } ?: Long.MAX_VALUE
     }
-
-    fun isLeftPressed() = isButtonPressed(SDL_BUTTON_LEFT)
-    fun isRightPressed() = isButtonPressed(SDL_BUTTON_RIGHT)
-    fun isMiddlePressed() = isButtonPressed(SDL_BUTTON_MIDDLE)
-
-    fun timeSinceLeftPressed() = timeSinceButtonPressed(SDL_BUTTON_LEFT)
-    fun timeSinceRightPressed() = timeSinceButtonPressed(SDL_BUTTON_RIGHT)
-    fun timeSinceMiddlePressed() = timeSinceButtonPressed(SDL_BUTTON_MIDDLE)
+//
+//    fun isLeftPressed() = isButtonPressed(SDL_BUTTON_LEFT)
+//    fun isRightPressed() = isButtonPressed(SDL_BUTTON_RIGHT)
+//    fun isMiddlePressed() = isButtonPressed(SDL_BUTTON_MIDDLE)
+//
+//    fun timeSinceLeftPressed() = timeSinceButtonPressed(SDL_BUTTON_LEFT)
+//    fun timeSinceRightPressed() = timeSinceButtonPressed(SDL_BUTTON_RIGHT)
+//    fun timeSinceMiddlePressed() = timeSinceButtonPressed(SDL_BUTTON_MIDDLE)
 }

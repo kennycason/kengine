@@ -1,5 +1,10 @@
 package com.kengine.sdl
 
+//import sdl3.SDL_CreateRenderer
+//import sdl3.SDL_CreateWindow
+//import sdl3.SDL_DestroyRenderer
+//import sdl3.SDL_DestroyWindow
+//import sdl3.SDL_GetError
 import com.kengine.graphics.alphaFromRGBA
 import com.kengine.graphics.blueFromRGBA
 import com.kengine.graphics.greenFromRGBA
@@ -11,19 +16,28 @@ import kotlinx.cinterop.CValuesRef
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
 import platform.posix.exit
-import sdl3.image.SDL_CreateWindow
-import sdl3.image.SDL_DestroyRenderer
-import sdl3.image.SDL_DestroyWindow
-import sdl3.image.SDL_GetError
-import sdl3.image.SDL_INIT_VIDEO
-import sdl3.image.SDL_Init
-import sdl3.image.SDL_Quit
-import sdl3.image.SDL_RenderClear
-import sdl3.image.SDL_RenderPresent
-import sdl3.image.SDL_SetRenderDrawColor
-import sdl3.image.SDL_WINDOWPOS_CENTERED
-import sdl3.image.SDL_WINDOW_FULLSCREEN
-import sdl3.image.SDL_WINDOW_RESIZABLE
+import sdl3.SDL_CreateRenderer
+import sdl3.SDL_CreateWindow
+import sdl3.SDL_GetError
+import sdl3.SDL_INIT_VIDEO
+import sdl3.SDL_Init
+import sdl3.SDL_RenderClear
+import sdl3.SDL_RenderPresent
+import sdl3.SDL_SetRenderDrawColor
+import sdl3.SDL_WINDOW_FULLSCREEN
+import sdl3.SDL_WINDOW_RESIZABLE
+
+//import sdl3.SDL_Quit
+//import sdl3.SDL_RenderClear
+//import sdl3.SDL_RenderPresent
+//import sdl3.SDL_SetRenderDrawColor
+//import sdl3.SDL_WINDOWPOS_CENTERED
+//import sdl3.SDL_RENDERER_ACCELERATED
+//
+//import sdl3.image.IMG_INIT_JPG
+//import sdl3.image.IMG_INIT_PNG
+//import sdl3.image.IMG_Init
+//import sdl3.image.IMG_Quit
 
 @OptIn(ExperimentalForeignApi::class)
 class SDL3Context private constructor(
@@ -31,7 +45,6 @@ class SDL3Context private constructor(
     val screenHeight: Int,
     private val window: CValuesRef<cnames.structs.SDL_Window>,
     val renderer: CValuesRef<cnames.structs.SDL_Renderer>?,
-    val sdlEvents: SDLEventContext
 ) : Context(), Logging {
 
     fun fillScreen(r: UInt, g: UInt, b: UInt, a: UInt = 0xFFu) {
@@ -63,14 +76,14 @@ class SDL3Context private constructor(
     }
 
     override fun cleanup() {
-        SDL_DestroyRenderer(renderer)
-        SDL_DestroyWindow(window)
-//        IMG_Quit() can't find in sdl3
-        SDL_Quit()
+//        SDL_DestroyRenderer(renderer)
+//        SDL_DestroyWindow(window)
+//        IMG_Quit()
+//        SDL_Quit()
     }
 
     companion object {
-        private val logger = Logger.get(SDLContext::class)
+        private val logger = Logger.get(SDL3Context::class)
         private var currentContext: SDL3Context? = null
 
         fun create(
@@ -83,29 +96,25 @@ class SDL3Context private constructor(
                 throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
             }
 
-            // Initialize SDL
             if (!SDL_Init(SDL_INIT_VIDEO)) {
                 logger.error("Error initializing SDL Video: ${SDL_GetError()?.toKString()}")
                 exit(1)
             }
-//            if (IMG_Init((IMG_INIT_PNG or IMG_INIT_JPG).toInt()) == 0) { // can't find sdl3
+//            if (IMG_Init((IMG_INIT_PNG or IMG_INIT_JPG).toInt()) == 0) {
 //                throw IllegalStateException("Failed to initialize SDL_image: ${SDL_GetError()?.toKString()}")
 //            }
 
-            // Create window + renderer without SDL_WINDOW_SHOWN
             val window = SDL_CreateWindow(
                 title,
-                SDL_WINDOWPOS_CENTERED.toInt(),
-                SDL_WINDOWPOS_CENTERED.toInt(),
                 width,
                 height,
-                flags // No SDL_WINDOW_SHOWN
+                flags
             ) ?: throw IllegalStateException("Error creating window: ${SDL_GetError()?.toKString()}")
 
-//            val renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED.toUInt())
-//                ?: throw IllegalStateException("Error creating renderer: ${SDL_GetError()?.toKString()}")
+            val renderer = SDL_CreateRenderer(window, null)
+                ?: throw IllegalStateException("Error creating renderer: ${SDL_GetError()?.toKString()}")
 
-            currentContext = SDL3Context(width, height, window, null, SDLEventContext.get())
+            currentContext = SDL3Context(width, height, window, renderer)
             return currentContext!!
         }
 

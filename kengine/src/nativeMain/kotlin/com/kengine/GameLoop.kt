@@ -4,7 +4,7 @@ import com.kengine.log.Logging
 import com.kengine.time.getClockContext
 import com.kengine.time.getCurrentMilliseconds
 import kotlinx.cinterop.ExperimentalForeignApi
-import sdl2.SDL_Delay
+//import sdl2.SDL_Delay
 
 @OptIn(ExperimentalForeignApi::class)
 class GameLoop(
@@ -25,7 +25,7 @@ class GameLoop(
             while (isRunning) {
                 getClockContext().update()
 
-                sdlEvent.pollEvents()
+//                sdlEvent.pollEvents()
                 action.update()
 
                 update()
@@ -33,7 +33,7 @@ class GameLoop(
                 if (frameRate > 0) { // set frameRate = -1 to avoid sleep run as fast as possible
                     val frameTimeMs = getCurrentMilliseconds() - clock.totalTimeMs
                     if (frameTimeMs < targetFrameTime) {
-                        SDL_Delay((targetFrameTime - frameTimeMs).toUInt())
+//                        SDL_Delay((targetFrameTime - frameTimeMs).toUInt())
                     }
                 }
             }

@@ -1,11 +1,12 @@
 package com.kengine
 
+//import com.kengine.font.FontContext
+//import com.kengine.geometry.GeometryContext
+//import com.kengine.graphics.SpriteContext
+//import com.kengine.graphics.TextureContext
+//import com.kengine.sound.SoundContext
 import com.kengine.action.ActionContext
 import com.kengine.event.EventContext
-import com.kengine.font.FontContext
-import com.kengine.geometry.GeometryContext
-import com.kengine.graphics.SpriteContext
-import com.kengine.graphics.TextureContext
 import com.kengine.hooks.context.Context
 import com.kengine.hooks.context.ContextRegistry
 import com.kengine.input.controller.ControllerContext
@@ -17,28 +18,28 @@ import com.kengine.input.mouse.getMouseContext
 import com.kengine.log.Logger
 import com.kengine.log.LoggerContext
 import com.kengine.log.Logging
-import com.kengine.network.NetworkContext
+//import com.kengine.network.NetworkContext
 import com.kengine.physics.PhysicsContext
-import com.kengine.sdl.SDLContext
-import com.kengine.sdl.SDLEventContext
-import com.kengine.sdl.registerSDLQuitHandler
-import com.kengine.sound.SoundContext
+import com.kengine.sdl.SDL3Context
+//import com.kengine.sdl.SDLEventContext
+//import com.kengine.sdl.registerSDLQuitHandler
 import com.kengine.time.ClockContext
 
 class GameContext private constructor(
     val log: LoggerContext,
-    val sdl: SDLContext,
-    val sdlEvent: SDLEventContext,
+//    val sdl: SDLContext,
+    val sdl: SDL3Context,
+//    val sdlEvent: SDLEventContext,
     val events: EventContext,
     val keyboard: KeyboardContext,
     val mouse: MouseContext,
     val controller: ControllerContext,
-    val texture: TextureContext,
-    val sprite: SpriteContext,
-    val geometry: GeometryContext,
-    val font: FontContext,
-    val sound: SoundContext,
-    val network: NetworkContext,
+//    val texture: TextureContext,
+//    val sprite: SpriteContext,
+//    val geometry: GeometryContext,
+//    val font: FontContext,
+//    val sound: SoundContext,
+//    val network: NetworkContext,
     val action: ActionContext,
     val physics: PhysicsContext,
     val clock: ClockContext,
@@ -48,24 +49,24 @@ class GameContext private constructor(
     init {
         ContextRegistry.register(log)
         ContextRegistry.register(sdl)
-        ContextRegistry.register(sdlEvent)
+//        ContextRegistry.register(sdlEvent)
         ContextRegistry.register(events)
         ContextRegistry.register(keyboard)
         ContextRegistry.register(mouse)
         ContextRegistry.register(controller)
-        ContextRegistry.register(texture)
-        ContextRegistry.register(sprite)
-        ContextRegistry.register(geometry)
-        ContextRegistry.register(font)
-        ContextRegistry.register(sound)
-        ContextRegistry.register(network)
+//        ContextRegistry.register(texture)
+//        ContextRegistry.register(sprite)
+//        ContextRegistry.register(geometry)
+//        ContextRegistry.register(font)
+//        ContextRegistry.register(sound)
+//        ContextRegistry.register(network)
         ContextRegistry.register(action)
         ContextRegistry.register(physics)
         ContextRegistry.register(clock)
         getKeyboardContext().init()
         getMouseContext().init()
         getControllerContext().init()
-        registerSDLQuitHandler()
+//        registerSDLQuitHandler()
     }
 
     fun registerContext(context: Context) {
@@ -87,18 +88,18 @@ class GameContext private constructor(
             // TODO order matters, i.e. there are dependencies
             currentContext = GameContext(
                 log = LoggerContext.create(logLevel),
-                sdl = SDLContext.create(title, width, height),
+                sdl = SDL3Context.create(title, width, height),
                 events = EventContext.get(),
-                sdlEvent = SDLEventContext.get(),
+//                sdlEvent = SDLEventContext.get(),
                 keyboard = KeyboardContext.get(),
                 mouse = MouseContext.get(),
                 controller = ControllerContext.get(),
-                texture = TextureContext.get(),
-                sprite = SpriteContext.get(),
-                font = FontContext.get(),
-                sound = SoundContext.get(),
-                network = NetworkContext.get(),
-                geometry = GeometryContext.get(),
+//                texture = TextureContext.get(),
+//                sprite = SpriteContext.get(),
+//                font = FontContext.get(),
+//                sound = SoundContext.get(),
+//                network = NetworkContext.get(),
+//                geometry = GeometryContext.get(),
                 action = ActionContext.get(),
                 physics = PhysicsContext.get(),
                 clock = ClockContext.get()
@@ -115,22 +116,20 @@ class GameContext private constructor(
         logger.info { "Cleaning up game resources" }
         log.cleanup()
         action.cleanup()
-        sdlEvent.cleanup()
+//        sdlEvent.cleanup()
         events.cleanup()
         keyboard.cleanup()
         mouse.cleanup()
         controller.cleanup()
-        texture.cleanup()
-        sprite.cleanup()
-        geometry.cleanup()
-        font.cleanup()
-        sound.cleanup()
-        network.cleanup()
+//        texture.cleanup()
+//        sprite.cleanup()
+//        geometry.cleanup()
+//        font.cleanup()
+//        sound.cleanup()
+//        network.cleanup()
         sdl.cleanup()
         clock.cleanup()
         ContextRegistry.clearAll()
     }
 
 }
-
-
