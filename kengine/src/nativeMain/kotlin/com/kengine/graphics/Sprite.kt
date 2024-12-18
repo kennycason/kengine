@@ -3,24 +3,38 @@ package com.kengine.graphics
 import com.kengine.log.Logging
 import com.kengine.math.IntRect
 import com.kengine.math.Vec2
+import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.ExperimentalForeignApi
+//import kotlinx.cinterop.convert
+//import kotlinx.cinterop.memScoped
+//import kotlinx.cinterop.toKString
+//import sdl3.SDL_GetError
+//import sdl3.SDL_GetNumberProperty
+//import sdl3.image.IMG_Load
+//import sdl3.image.SDL_CreateTexture
+//import sdl3.image.SDL_CreateTextureFromSurface
+//import sdl3.image.SDL_DestroySurface
+//import sdl3.image.SDL_DestroyTexture
+//import sdl3.image.SDL_GetTextureProperties
+//import sdl3.image.SDL_RenderTexture
+//import sdl3.image.SDL_SetRenderTarget
+//import sdl3.image.SDL_Surface
+//import sdl3.image.SDL_Texture
+//import sdl3.image.SDL_TextureAccess
 
-// TODO object pools or locally storing SDL_Rects so I don't have to keep allocating them
 @OptIn(ExperimentalForeignApi::class)
 class Sprite private constructor(
-//    val texture: Texture,
+    val texture: Texture,
     val clip: IntRect? = null,
     val scale: Vec2 = Vec2(1.0, 1.0),
 ) : Logging {
-    val width = 0
-    val height = 0
-//    val width: Int = clip?.w ?: texture.width
-//    val height: Int = clip?.h ?: texture.height
+    val width: Int = clip?.w ?: texture.width
+    val height: Int = clip?.h ?: texture.height
 
     fun draw(p: Vec2, flip: FlipMode = FlipMode.NONE) = draw(p.x, p.y, flip)
 
     fun draw(x: Double, y: Double, flip: FlipMode = FlipMode.NONE, angle: Double = 0.0) {
-//        useSDLContext {
+        useSDLContext {
 //            memScoped {
 //                val clipRect = if (clip == null) null
 //                else alloc<SDL_Rect>().apply {
@@ -59,22 +73,22 @@ class Sprite private constructor(
 //                    return
 //                }
 //            }
-//        }
+        }
     }
 
     fun cleanup() {
-        // TextureManager handles texture cleanup
+         // TextureManager handles texture cleanup
     }
 
-//    companion object {
-//        fun fromFilePath(filePath: String, clip: IntRect? = null): Sprite {
-//            val texture = getContext<TextureContext>().getTexture(filePath)
-//            return Sprite(texture, clip)
-//        }
-//
-//        fun fromTexture(texture: Texture, clip: IntRect? = null): Sprite {
-//            return Sprite(texture, clip)
-//        }
-//    }
+    companion object {
+        fun fromFilePath(filePath: String, clip: IntRect? = null): Sprite {
+            val texture = getTextureContext().getTexture(filePath)
+            return Sprite(texture, clip)
+        }
+
+        fun fromTexture(texture: Texture, clip: IntRect? = null): Sprite {
+            return Sprite(texture, clip)
+        }
+    }
 
 }

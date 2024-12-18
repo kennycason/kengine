@@ -103,8 +103,8 @@ kotlin {
 val copyDylibs = listOf(
     "/usr/local/lib/libSDL3.0.dylib" to "${buildDir}/bin/native/Frameworks",
     "/usr/local/lib/libSDL3.0.dylib" to "${buildDir}/bin/native/debugTest/Frameworks",
-    "/usr/local/lib/libSDL3_image.dylib" to "${buildDir}/bin/native/Frameworks",
-    "/usr/local/lib/libSDL3_image.dylib" to "${buildDir}/bin/native/debugTest/Frameworks"
+    "/usr/local/lib/libSDL3_image.0.dylib" to "${buildDir}/bin/native/Frameworks",  // Changed to .0.dylib
+    "/usr/local/lib/libSDL3_image.0.dylib" to "${buildDir}/bin/native/debugTest/Frameworks"  // Changed to .0.dylib
 )
 
 copyDylibs.forEach { (fromPath, toPath) ->
@@ -121,6 +121,9 @@ copyDylibs.forEach { (fromPath, toPath) ->
         description = "Copy $dylibName to ${targetDir}"
         from(fromPath)
         into(toPath)
+        doFirst {
+            println("Copying $fromPath to $toPath")
+        }
     }
 }
 

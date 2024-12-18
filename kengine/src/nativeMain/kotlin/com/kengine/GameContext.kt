@@ -2,12 +2,12 @@ package com.kengine
 
 //import com.kengine.font.FontContext
 //import com.kengine.geometry.GeometryContext
-//import com.kengine.graphics.SpriteContext
-//import com.kengine.graphics.TextureContext
 //import com.kengine.sound.SoundContext
 //import com.kengine.network.NetworkContext
 import com.kengine.action.ActionContext
 import com.kengine.event.EventContext
+import com.kengine.graphics.SpriteContext
+import com.kengine.graphics.TextureContext
 import com.kengine.hooks.context.Context
 import com.kengine.hooks.context.ContextRegistry
 import com.kengine.input.controller.ControllerContext
@@ -33,8 +33,8 @@ class GameContext private constructor(
     val keyboard: KeyboardContext,
     val mouse: MouseContext,
     val controller: ControllerContext,
-//    val texture: TextureContext,
-//    val sprite: SpriteContext,
+    val texture: TextureContext,
+    val sprite: SpriteContext,
 //    val geometry: GeometryContext,
 //    val font: FontContext,
 //    val sound: SoundContext,
@@ -53,8 +53,8 @@ class GameContext private constructor(
         ContextRegistry.register(keyboard)
         ContextRegistry.register(mouse)
         ContextRegistry.register(controller)
-//        ContextRegistry.register(texture)
-//        ContextRegistry.register(sprite)
+        ContextRegistry.register(texture)
+        ContextRegistry.register(sprite)
 //        ContextRegistry.register(geometry)
 //        ContextRegistry.register(font)
 //        ContextRegistry.register(sound)
@@ -93,8 +93,8 @@ class GameContext private constructor(
                 keyboard = KeyboardContext.get(),
                 mouse = MouseContext.get(),
                 controller = ControllerContext.get(),
-//                texture = TextureContext.get(),
-//                sprite = SpriteContext.get(),
+                texture = TextureContext.get(),
+                sprite = SpriteContext.get(),
 //                font = FontContext.get(),
 //                sound = SoundContext.get(),
 //                network = NetworkContext.get(),
@@ -120,8 +120,8 @@ class GameContext private constructor(
         keyboard.cleanup()
         mouse.cleanup()
         controller.cleanup()
-//        texture.cleanup()
-//        sprite.cleanup()
+        texture.cleanup()
+        sprite.cleanup()
 //        geometry.cleanup()
 //        font.cleanup()
 //        sound.cleanup()
