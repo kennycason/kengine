@@ -18,25 +18,16 @@ import kotlinx.cinterop.toKString
 import platform.posix.exit
 import sdl3.SDL_CreateRenderer
 import sdl3.SDL_CreateWindow
+import sdl3.SDL_DestroyRenderer
+import sdl3.SDL_DestroyWindow
 import sdl3.SDL_GetError
 import sdl3.SDL_INIT_VIDEO
 import sdl3.SDL_Init
+import sdl3.SDL_Quit
 import sdl3.SDL_RenderClear
 import sdl3.SDL_RenderPresent
 import sdl3.SDL_SetRenderDrawColor
 import sdl3.SDL_WINDOW_RESIZABLE
-
-//import sdl3.SDL_Quit
-//import sdl3.SDL_RenderClear
-//import sdl3.SDL_RenderPresent
-//import sdl3.SDL_SetRenderDrawColor
-//import sdl3.SDL_WINDOWPOS_CENTERED
-//import sdl3.SDL_RENDERER_ACCELERATED
-//
-//import sdl3.image.IMG_INIT_JPG
-//import sdl3.image.IMG_INIT_PNG
-//import sdl3.image.IMG_Init
-//import sdl3.image.IMG_Quit
 
 @OptIn(ExperimentalForeignApi::class)
 class SDLContext private constructor(
@@ -75,10 +66,9 @@ class SDLContext private constructor(
     }
 
     override fun cleanup() {
-//        SDL_DestroyRenderer(renderer)
-//        SDL_DestroyWindow(window)
-//        IMG_Quit()
-//        SDL_Quit()
+        SDL_DestroyRenderer(renderer)
+        SDL_DestroyWindow(window)
+        SDL_Quit()
     }
 
     companion object {
@@ -99,9 +89,6 @@ class SDLContext private constructor(
                 logger.error("Error initializing SDL Video: ${SDL_GetError()?.toKString()}")
                 exit(1)
             }
-//            if (IMG_Init((IMG_INIT_PNG or IMG_INIT_JPG).toInt()) == 0) {
-//                throw IllegalStateException("Failed to initialize SDL_image: ${SDL_GetError()?.toKString()}")
-//            }
 
             val window = SDL_CreateWindow(
                 title,

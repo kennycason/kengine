@@ -20,7 +20,7 @@ class TiledMapDrawIT {
                 object : Game {
                     override fun update() {
                         useTimer(5000L) {
-                          //  isRunning = false
+                            isRunning = false
                         }
                     }
 

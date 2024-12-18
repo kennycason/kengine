@@ -25,11 +25,15 @@ cmake .. \
   -DCMAKE_INSTALL_PREFIX=/usr/local \
   -DSDL3_IMAGE=ON \
   -DSDL3_INCLUDE_DIR=/usr/local/include/SDL3 \
-  -DSDL3_LIBRARY=/usr/local/lib/libSDL3.dylib
+  -DSDL3_LIBRARY=/usr/local/lib/libSDL3.dylib \
+  -DINSTALL_PKGCONFIG=ON
 make -j$(sysctl -n hw.ncpu)
 sudo make install
+pkg-config --libs sdl3-image
 ```
 
+Other commands: (dev notes)
 ```shell
+export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"
 sudo install_name_tool -id @rpath/libSDL3_image.dylib /usr/local/lib/libSDL3_image.dylib
 ```
