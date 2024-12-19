@@ -1,6 +1,7 @@
 package com.kengine
 
 import com.kengine.entity.SpriteEntity
+import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Sprite
 import com.kengine.log.Logger
 import com.kengine.sdl.useSDLContext
@@ -24,7 +25,7 @@ class TiledMapDrawIT {
 
                 object : Game {
                     override fun update() {
-                        useTimer(5000L) {
+                        useTimer(20000L) {
                             isRunning = false
                         }
                     }
@@ -34,6 +35,10 @@ class TiledMapDrawIT {
                         useSDLContext {
                             fillScreen(0u, 0u, 0u)
                             pokeball.draw()
+
+                            useGeometryContext {
+                                fillRectangle(10, 10, 100, 100, 0x88u, 0x33u, 0xFFu)
+                            }
                             flipScreen()
                         }
                         logger.info { "Game loop in ${getCurrentMilliseconds() - lastMapRenderTimeMs}ms" }
