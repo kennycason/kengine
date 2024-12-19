@@ -80,7 +80,7 @@ class SDLContext private constructor(
                 throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
             }
 
-            if (!SDL_Init(SDL_INIT_VIDEO)) {
+            require(SDL_Init(SDL_INIT_VIDEO)) {
                 logger.error("Error initializing SDL Video: ${SDL_GetError()?.toKString()}")
                 exit(1)
             }

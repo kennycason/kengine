@@ -18,7 +18,7 @@ kotlin {
     }
     val hostOs = System.getProperty("os.name")
     val isArm64 = System.getProperty("os.arch") == "aarch64"
-    val nativeTarget = when {
+    val nativeTarget = when { // NOTE: linkerOpts require compiling platform to be Mac OS
         hostOs == "Mac OS X" && isArm64 -> macosArm64("native")
         hostOs == "Mac OS X" && !isArm64 -> macosX64("native")
         hostOs == "Linux" && isArm64 -> linuxArm64("native")
@@ -39,7 +39,9 @@ kotlin {
                     "-framework", "Cocoa",
                     "-framework", "IOKit",
                     "-framework", "CoreVideo",
-                    // Set runtime library paths
+                    "-framework", "CoreAudio",
+                    "-framework", "AudioToolbox",
+                    // set runtime library paths
                     "-Wl,-rpath,@executable_path/Frameworks",
                     "-Wl,-rpath,/usr/local/lib",
                     "-Wl,-rpath,/opt/homebrew/lib"
@@ -57,9 +59,13 @@ kotlin {
                 defFile = file("src/nativeInterop/cinterop/sdl3_image.def")
                 compilerOpts("-I/usr/local/include")
             }
+            val sdl3mixer by creating {
+                defFile = file("src/nativeInterop/cinterop/sdl3_mixer.def")
+                compilerOpts("-I/usr/local/include")
+            }
             val chipmunk by creating {
                 defFile = file("src/nativeInterop/cinterop/chipmunk.def")
-                compilerOpts("-I/usr/local/include") // Adjust if Chipmunk headers are elsewhere
+                compilerOpts("-I/usr/local/include")
             }
         }
 
@@ -68,8 +74,8 @@ kotlin {
                 freeCompilerArgs += listOf(
                     "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
                     "-opt-in=kotlin.ExperimentalStdlibApi",
-                    "-g",  // Enable debug symbols
-                    "-ea"  // Enable assertions
+                    "-g",  // enable debug symbols
+                    "-ea"  // enable assertions
                 )
             }
         }
@@ -103,8 +109,10 @@ kotlin {
 val copyDylibs = listOf(
     "/usr/local/lib/libSDL3.0.dylib" to "${buildDir}/bin/native/Frameworks",
     "/usr/local/lib/libSDL3.0.dylib" to "${buildDir}/bin/native/debugTest/Frameworks",
-    "/usr/local/lib/libSDL3_image.0.dylib" to "${buildDir}/bin/native/Frameworks",  // Changed to .0.dylib
-    "/usr/local/lib/libSDL3_image.0.dylib" to "${buildDir}/bin/native/debugTest/Frameworks"  // Changed to .0.dylib
+    "/usr/local/lib/libSDL3_image.0.dylib" to "${buildDir}/bin/native/Frameworks",
+    "/usr/local/lib/libSDL3_image.0.dylib" to "${buildDir}/bin/native/debugTest/Frameworks",
+    "/usr/local/lib/libSDL3_mixer.0.dylib" to "${buildDir}/bin/native/Frameworks",
+    "/usr/local/lib/libSDL3_mixer.0.dylib" to "${buildDir}/bin/native/debugTest/Frameworks"
 )
 
 copyDylibs.forEach { (fromPath, toPath) ->

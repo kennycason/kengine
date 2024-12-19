@@ -4,3 +4,6 @@
 [submodule "sdl3/SDL_image"]
 	path = sdl3/SDL_image
 	url = https://github.com/libsdl-org/SDL_image.git
+[submodule "sdl3/sdl3/SDL_mixer"]
+	path = sdl3/sdl3/SDL_mixer
+	url = https://github.com/libsdl-org/SDL_mixer
