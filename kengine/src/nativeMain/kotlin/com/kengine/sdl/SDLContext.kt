@@ -1,10 +1,5 @@
 package com.kengine.sdl
 
-//import sdl3.SDL_CreateRenderer
-//import sdl3.SDL_CreateWindow
-//import sdl3.SDL_DestroyRenderer
-//import sdl3.SDL_DestroyWindow
-//import sdl3.SDL_GetError
 import com.kengine.graphics.alphaFromRGBA
 import com.kengine.graphics.blueFromRGBA
 import com.kengine.graphics.greenFromRGBA

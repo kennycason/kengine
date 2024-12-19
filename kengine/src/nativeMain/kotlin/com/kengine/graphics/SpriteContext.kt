@@ -4,7 +4,7 @@ import com.kengine.hooks.context.Context
 
 class SpriteContext private constructor(
     private val manager: SpriteManager,
-//    val spriteBatch: SpriteBatch,
+    val spriteBatch: SpriteBatch,
 ) : Context() {
 
     fun getSprite(name: String): Sprite {
@@ -73,7 +73,7 @@ class SpriteContext private constructor(
             if (currentContext == null) {
                 currentContext = SpriteContext(
                     manager = SpriteManager(),
-                 //   spriteBatch = SpriteBatch()
+                    spriteBatch = SpriteBatch()
                 )
             }
             return currentContext ?: throw IllegalStateException("Failed to create SpriteManagerContext")
@@ -82,6 +82,6 @@ class SpriteContext private constructor(
 
     override fun cleanup() {
         manager.cleanup()
-     //   spriteBatch.cleanup()
+        spriteBatch.cleanup()
     }
 }

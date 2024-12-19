@@ -22,4 +22,10 @@ object Math {
     const val SILVER_RATIO: Double = 2.414213562373095      // 1 + √2
     const val APERY: Double = 1.2020569031595943            // Apéry's constant ζ(3)
     const val CATALAN: Double = 0.915965594177219           // Catalan's constant
+
+    private const val DEG_TO_RAD = PI / 180.0
+    private const val RAD_TO_DEG = 180.0 / PI
+
+    fun toRadians(degrees: Double): Double = degrees * DEG_TO_RAD
+    fun toDegrees(radians: Double): Double = radians * RAD_TO_DEG
 }

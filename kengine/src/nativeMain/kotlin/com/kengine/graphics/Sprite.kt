@@ -2,26 +2,23 @@ package com.kengine.graphics
 
 import com.kengine.log.Logging
 import com.kengine.math.IntRect
+import com.kengine.math.Math
 import com.kengine.math.Vec2
 import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.ExperimentalForeignApi
-//import kotlinx.cinterop.convert
-//import kotlinx.cinterop.memScoped
-//import kotlinx.cinterop.toKString
-//import sdl3.SDL_GetError
-//import sdl3.SDL_GetNumberProperty
-//import sdl3.image.IMG_Load
-//import sdl3.image.SDL_CreateTexture
-//import sdl3.image.SDL_CreateTextureFromSurface
-//import sdl3.image.SDL_DestroySurface
-//import sdl3.image.SDL_DestroyTexture
-//import sdl3.image.SDL_GetTextureProperties
-//import sdl3.image.SDL_RenderTexture
-//import sdl3.image.SDL_SetRenderTarget
-//import sdl3.image.SDL_Surface
-//import sdl3.image.SDL_Texture
-//import sdl3.image.SDL_TextureAccess
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.toKString
+import sdl3.image.SDL_FPoint
+import sdl3.image.SDL_FRect
+import sdl3.image.SDL_GetError
+import sdl3.image.SDL_RenderTexture
+import sdl3.image.SDL_RenderTextureAffine
 
+/**
+ * TODO cache rects/points
+ */
 @OptIn(ExperimentalForeignApi::class)
 class Sprite private constructor(
     val texture: Texture,
@@ -35,49 +32,68 @@ class Sprite private constructor(
 
     fun draw(x: Double, y: Double, flip: FlipMode = FlipMode.NONE, angle: Double = 0.0) {
         useSDLContext {
-//            memScoped {
-//                val clipRect = if (clip == null) null
-//                else alloc<SDL_Rect>().apply {
-//                    this.x = clip.x
-//                    this.y = clip.y
-//                    this.w = clip.w
-//                    this.h = clip.h
-//                }
-//
-//                val destRect = alloc<SDL_Rect>().apply {
-//                    this.x = (x * scale.x).toInt()
-//                    this.y = (y * scale.y).toInt()
-//                    this.w = ((clipRect?.w ?: texture.width) * scale.x).toInt()
-//                    this.h = ((clipRect?.h ?: texture.height) * scale.y).toInt()
-//                }
-//
-//                if (angle == 0.0 && flip == FlipMode.NONE) {
-//                    SDL_RenderCopy(renderer, texture.texture, clipRect?.ptr, destRect.ptr)
-//                } else {
-//                    val center = alloc<SDL_Point>().apply {
-//                        this.x = destRect.w / 2
-//                        this.y = destRect.h / 2
-//                    }
-//                    val result = SDL_RenderCopyEx(
-//                        renderer = renderer,
-//                        texture = texture.texture,
-//                        srcrect = clipRect?.ptr,
-//                        dstrect = destRect.ptr,
-//                        angle = angle,
-//                        center = center.ptr,
-//                        flip = flip.flag
-//                    )
-//                    if (result != 0) {
-//                        logger.error("Error drawing sprite: ${SDL_GetError()?.toKString()}")
-//                    }
-//                    return
-//                }
-//            }
+            memScoped {
+                val clipRect = if (clip == null) null
+                else alloc<SDL_FRect>().apply {
+                    this.x = clip.x.toFloat()
+                    this.y = clip.y.toFloat()
+                    this.w = clip.w.toFloat()
+                    this.h = clip.h.toFloat()
+                }
+
+                if (angle == 0.0 && flip == FlipMode.NONE) {
+                    val destRect = alloc<SDL_FRect>().apply {
+                        this.x = (x * scale.x).toFloat()
+                        this.y = (y * scale.y).toFloat()
+                        this.w = ((clipRect?.w ?: texture.width.toFloat()) * scale.x).toFloat()
+                        this.h = ((clipRect?.h ?: texture.height.toFloat()) * scale.y).toFloat()
+                    }
+
+                    if (!SDL_RenderTexture(renderer, texture.texture, clipRect?.ptr, destRect.ptr)) {
+                        logger.error("Error drawing sprite: ${SDL_GetError()?.toKString()}")
+                    }
+                } else {
+                    val width = (clipRect?.w ?: texture.width.toFloat()) * scale.x.toFloat()
+                    val height = (clipRect?.h ?: texture.height.toFloat()) * scale.y.toFloat()
+
+                    val rad = Math.toRadians(angle)
+                    val cos = kotlin.math.cos(rad).toFloat()
+                    val sin = kotlin.math.sin(rad).toFloat()
+
+                    val flipX = if (flip == FlipMode.HORIZONTAL || flip == FlipMode.BOTH) -1f else 1f
+                    val flipY = if (flip == FlipMode.VERTICAL || flip == FlipMode.BOTH) -1f else 1f
+
+                    // calculate destination points
+                    val origin = alloc<SDL_FPoint>().apply {
+                        this.x = x.toFloat()
+                        this.y = y.toFloat()
+                    }
+                    val right = alloc<SDL_FPoint>().apply {
+                        this.x = origin.x + width * cos * flipX
+                        this.y = origin.y + width * sin * flipX
+                    }
+                    val down = alloc<SDL_FPoint>().apply {
+                        this.x = origin.x - height * sin * flipY
+                        this.y = origin.y + height * cos * flipY
+                    }
+
+                    val result = SDL_RenderTextureAffine(
+                        renderer,
+                        texture.texture,
+                        clipRect?.ptr,
+                        origin.ptr,
+                        right.ptr,
+                        down.ptr
+                    )
+                    if (!result) {
+                        logger.error("Error drawing sprite: ${SDL_GetError()?.toKString()}")
+                    }
+                }
+            }
         }
     }
 
     fun cleanup() {
-         // TextureManager handles texture cleanup
     }
 
     companion object {
@@ -90,5 +106,4 @@ class Sprite private constructor(
             return Sprite(texture, clip)
         }
     }
-
 }
