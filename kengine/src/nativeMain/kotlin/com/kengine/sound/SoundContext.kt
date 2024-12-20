@@ -50,10 +50,12 @@ class SoundContext private constructor(
 
                 memScoped {
                     val audioSpec = alloc<SDL_AudioSpec>().apply {
-                        freq = 44100
+                        freq = 44100     // Sample rate
                         format = 0x8010u // 16-bit signed little-endian
-                        channels = 2     // stereo
+                        channels = 2     // Stereo
                     }
+
+                    logger.info { "freq=${audioSpec.freq}, format=${audioSpec.format}, channels=${audioSpec.channels}" }
 
                     val result = Mix_OpenAudio(0u, audioSpec.ptr)
                     require(result) {
@@ -64,5 +66,4 @@ class SoundContext private constructor(
             return currentContext ?: throw IllegalStateException("Failed to create SoundContext")
         }
     }
-
 }

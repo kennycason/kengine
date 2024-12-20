@@ -14,18 +14,18 @@ class TiledMapDrawIT {
     @Test
     fun `basic game test`() {
         createGameContext(
-            title = "Basic Game Test",
+            title = "Render Sprite Test",
             width = 800,
             height = 600,
             logLevel = Logger.Level.INFO
         ) {
             GameRunner(frameRate = 60) {
-                val pokeball = SpriteEntity(Sprite.fromFilePath("src/nativeTest/assets/pokeball.bmp"))
+                val pokeball = SpriteEntity(Sprite.fromFilePath("src/nativeTest/resources/assets/sprites/pokeball.bmp"))
                 pokeball.p.set(100.0, 100.0)
 
                 object : Game {
                     override fun update() {
-                        useTimer(20000L) {
+                        useTimer(5000L) {
                             isRunning = false
                         }
                     }
