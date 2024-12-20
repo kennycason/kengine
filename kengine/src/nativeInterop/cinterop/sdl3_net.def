@@ -1,0 +1,4 @@
+headers = SDL3_net/SDL_net.h
+package = sdl3.net
+compilerOpts = -I/usr/local/include
+linkerOpts = -L/usr/local/lib -lSDL3_net -framework Cocoa -framework IOKit
