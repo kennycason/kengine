@@ -1,5 +1,6 @@
 package com.kengine.map.tiled
 
+import com.kengine.file.File
 import com.kengine.log.Logging
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.refTo
@@ -16,12 +17,13 @@ class TiledMapLoader : Logging {
     }
 
     fun loadMap(filePath: String): TiledMap {
-        logger.info { "Loading map from: $filePath" }
-        val jsonContent = readFile(filePath)
+        val fullFilePath = "${File.pwd()}/$filePath"
+        logger.info { "Loading map from: $fullFilePath" }
+        val jsonContent = readFile(fullFilePath)
         val map = json.decodeFromString<TiledMap>(jsonContent)
 
         // determine the base directory of the map file
-        val baseDirectory = filePath.substringBeforeLast("/")
+        val baseDirectory = fullFilePath.substringBeforeLast("/")
 
         // process external tilesets
         map.tilesets.forEach { tileset ->

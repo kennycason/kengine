@@ -30,6 +30,7 @@ cmake .. \
 make -j$(sysctl -n hw.ncpu)
 sudo make install
 pkg-config --libs sdl3-image
+otool -D /usr/local/lib/libSDL3_image.dylib
 ```
 
 ```shell
@@ -46,6 +47,7 @@ cmake .. \
 make -j$(sysctl -n hw.ncpu)
 sudo make install
 pkg-config --libs sdl3-mixer
+otool -D /usr/local/lib/libSDL3_mixer.dylib
 ```
 
 ```shell
@@ -60,6 +62,7 @@ cmake .. \
 make -j$(sysctl -n hw.ncpu)
 sudo make install
 pkg-config --libs sdl3-ttf
+otool -D /usr/local/lib/libSDL3_ttf.dylib
 ```
 
 ```shell
@@ -74,10 +77,11 @@ cmake .. \
 make -j$(sysctl -n hw.ncpu)
 sudo make install
 pkg-config --libs sdl3-net
+otool -D /usr/local/lib/libSDL3_net.dylib
 ```
 
 
-Misc notes/commands
+Misc unused notes/commands
 
 ```shell
 export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"

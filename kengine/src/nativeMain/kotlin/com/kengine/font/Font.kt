@@ -17,17 +17,17 @@
 //import kotlinx.cinterop.ptr
 //import kotlinx.cinterop.readValue
 //import kotlinx.cinterop.toKString
-//import sdl2.ttf.SDL_Color
-//import sdl2.ttf.SDL_CreateTextureFromSurface
-//import sdl2.ttf.SDL_DestroyTexture
-//import sdl2.ttf.SDL_FreeSurface
-//import sdl2.ttf.SDL_GetError
-//import sdl2.ttf.SDL_Rect
-//import sdl2.ttf.SDL_RenderCopy
-//import sdl2.ttf.SDL_Surface
-//import sdl2.ttf.TTF_CloseFont
-//import sdl2.ttf.TTF_Font
-//import sdl2.ttf.TTF_RenderText_Solid
+//import sdl3.ttf.SDL_Color
+//import sdl3.ttf.SDL_CreateTextureFromSurface
+//import sdl3.ttf.SDL_DestroyTexture
+//import sdl3.ttf.SDL_FreeSurface
+//import sdl3.ttf.SDL_GetError
+//import sdl3.ttf.SDL_Rect
+//import sdl3.ttf.SDL_RenderCopy
+//import sdl3.ttf.SDL_Surface
+//import sdl3.ttf.TTF_CloseFont
+//import sdl3.ttf.TTF_Font
+//import sdl3.ttf.TTF_RenderText_Solid
 //
 //@OptIn(ExperimentalForeignApi::class)
 //// look at: colorToRGBA

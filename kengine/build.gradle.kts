@@ -63,6 +63,14 @@ kotlin {
                 defFile = file("src/nativeInterop/cinterop/sdl3_mixer.def")
                 compilerOpts("-I/usr/local/include")
             }
+            val sdl3net by creating {
+                defFile = file("src/nativeInterop/cinterop/sdl3_net.def")
+                compilerOpts("-I/usr/local/include")
+            }
+            val sdl3ttf by creating {
+                defFile = file("src/nativeInterop/cinterop/sdl3_ttf.def")
+                compilerOpts("-I/usr/local/include")
+            }
             val chipmunk by creating {
                 defFile = file("src/nativeInterop/cinterop/chipmunk.def")
                 compilerOpts("-I/usr/local/include")
@@ -106,43 +114,48 @@ kotlin {
     }
 }
 
-val copyDylibs = listOf(
-    "/usr/local/lib/libSDL3.0.dylib" to "${buildDir}/bin/native/Frameworks",
-    "/usr/local/lib/libSDL3.0.dylib" to "${buildDir}/bin/native/debugTest/Frameworks",
-    "/usr/local/lib/libSDL3_image.0.dylib" to "${buildDir}/bin/native/Frameworks",
-    "/usr/local/lib/libSDL3_image.0.dylib" to "${buildDir}/bin/native/debugTest/Frameworks",
-    "/usr/local/lib/libSDL3_mixer.0.dylib" to "${buildDir}/bin/native/Frameworks",
-    "/usr/local/lib/libSDL3_mixer.0.dylib" to "${buildDir}/bin/native/debugTest/Frameworks"
+val dylibsToCopy = listOf(
+    "/usr/local/lib/libSDL3.0.dylib",
+    "/usr/local/lib/libSDL3_image.0.dylib",
+    "/usr/local/lib/libSDL3_mixer.0.dylib",
+    "/usr/local/lib/libSDL3_net.0.dylib",
+    "/usr/local/lib/libSDL3_ttf.0.dylib"
+)
+val dylibTargetDirs = listOf(
+    "${buildDir}/bin/native/Frameworks",
+    "${buildDir}/bin/native/debugTest/Frameworks"
 )
 
-copyDylibs.forEach { (fromPath, toPath) ->
-    val dylibName = fromPath.substringAfterLast("/")
-    val targetDir = toPath.substringAfter("${buildDir}/bin/native/")
+dylibsToCopy.forEach { dylibPath ->
+    val dylibName = dylibPath.substringAfterLast("/")
+    dylibTargetDirs.forEach { toDir ->
+        val targetDir = toDir.substringAfter("${buildDir}/bin/native/")
 
-    // generate a descriptive task name
-    val taskName = when {
-        targetDir.contains("debugTest") -> "copy${dylibName.removePrefix("lib").removeSuffix(".dylib").capitalize()}ToDebugTestFrameworks"
-        else -> "copy${dylibName.removePrefix("lib").removeSuffix(".dylib").capitalize()}ToFrameworks"
-    }
-
-    tasks.register<Copy>(taskName) {
-        description = "Copy $dylibName to ${targetDir}"
-        from(fromPath)
-        into(toPath)
-        doFirst {
-            println("Copying $fromPath to $toPath")
+        // generate a descriptive task name
+        val taskName = if (targetDir.contains("debugTest"))
+            "copy${dylibName.removePrefix("lib").removeSuffix(".dylib").capitalize()}ToDebugTestFrameworks"
+        else "copy${dylibName.removePrefix("lib").removeSuffix(".dylib").capitalize()}ToFrameworks"
+        tasks.register<Copy>(taskName) {
+            description = "Copy $dylibName to $targetDir"
+            from(dylibPath)
+            into(toDir)
+            doFirst {
+                println("Copying $dylibPath to $toDir")
+            }
         }
     }
 }
 
 tasks.named("nativeTest") {
     dependsOn(
-        copyDylibs.map { (from, to) ->
-            val dylibName = from.substringAfterLast("/")
-            val targetDir = to.substringAfter("${buildDir}/bin/native/")
-            when {
-                targetDir.contains("debugTest") -> "copy${dylibName.removePrefix("lib").removeSuffix(".dylib").capitalize()}ToDebugTestFrameworks"
-                else -> "copy${dylibName.removePrefix("lib").removeSuffix(".dylib").capitalize()}ToFrameworks"
+        dylibsToCopy.flatMap { dylibPath ->
+            val dylibName = dylibPath.substringAfterLast("/")
+            dylibTargetDirs.map { toDir ->
+                val targetDir = toDir.substringAfter("${buildDir}/bin/native/")
+                if (targetDir.contains("debugTest"))
+                    "copy${dylibName.removePrefix("lib").removeSuffix(".dylib").capitalize()}ToDebugTestFrameworks"
+                else
+                    "copy${dylibName.removePrefix("lib").removeSuffix(".dylib").capitalize()}ToFrameworks"
             }
         }
     )

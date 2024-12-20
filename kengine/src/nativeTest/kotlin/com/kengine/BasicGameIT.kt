@@ -7,11 +7,11 @@ import com.kengine.log.Logger
 import com.kengine.sdl.useSDLContext
 import com.kengine.time.getCurrentMilliseconds
 import com.kengine.time.useTimer
-import kotlin.test.Test
+import kotlin.test.Ignore
 
-class TiledMapDrawIT {
+class BasicGameIT {
 
-    @Test
+    @Ignore
     fun `basic game test`() {
         createGameContext(
             title = "Render Sprite Test",

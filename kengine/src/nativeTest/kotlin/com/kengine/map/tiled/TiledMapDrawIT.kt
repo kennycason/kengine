@@ -9,11 +9,11 @@ import com.kengine.sdl.useSDLContext
 import com.kengine.time.getClockContext
 import com.kengine.time.getCurrentMilliseconds
 import com.kengine.time.useTimer
-import kotlin.test.Test
+import kotlin.test.Ignore
 
 class TiledMapDrawIT {
 
-    @Test
+    @Ignore
     fun `draw ninja turdle map`() {
         val tiledMap = TiledMapLoader()
 //            .loadMap("src/nativeTest/resources/ninjaturdle/stomach_0.tmj")

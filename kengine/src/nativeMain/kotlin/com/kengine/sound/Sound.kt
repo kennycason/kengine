@@ -1,5 +1,6 @@
 package com.kengine.sound
 
+import com.kengine.file.File
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.mixer.MIX_MAX_VOLUME
@@ -15,16 +16,17 @@ import kotlin.math.max
 import kotlin.math.min
 
 @OptIn(ExperimentalForeignApi::class)
-class Sound(private val filePath: String) {
+class Sound(filePath: String) {
     private var sound: CPointer<Mix_Chunk>? = null
     private var channel: Int = -1
 
     // 0 (silent) to 100 (maximum)
     private var volume: Int = 100
+    private val fullFilePath = "${File.pwd()}/$filePath"
 
     init {
-        sound = Mix_LoadWAV(filePath)
-        requireNotNull(sound) { "Failed to load sound: $filePath" }
+        sound = Mix_LoadWAV(fullFilePath)
+        requireNotNull(sound) { "Failed to load sound: $fullFilePath" }
     }
 
     /**
@@ -47,7 +49,7 @@ class Sound(private val filePath: String) {
      */
     fun play() {
         channel = Mix_PlayChannel(-1, sound, 0)
-        require(channel != -1) { "Failed to play sound: $filePath" }
+        require(channel != -1) { "Failed to play sound: $fullFilePath" }
         Mix_Volume(channel, scaleVolume(volume))
     }
 
@@ -56,7 +58,7 @@ class Sound(private val filePath: String) {
      */
     fun loop() {
         channel = Mix_PlayChannel(-1, sound, -1)
-        require(channel != -1) { "Failed to loop sound: $filePath" }
+        require(channel != -1) { "Failed to loop sound: $fullFilePath" }
         Mix_Volume(channel, scaleVolume(volume))
     }
 

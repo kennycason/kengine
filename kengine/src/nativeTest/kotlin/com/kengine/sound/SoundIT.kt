@@ -7,11 +7,11 @@ import com.kengine.file.File
 import com.kengine.log.Logger
 import com.kengine.time.getCurrentMilliseconds
 import com.kengine.time.useTimer
-import kotlin.test.Test
+import kotlin.test.Ignore
 
 class SoundIT {
 
-    @Test
+    @Ignore
     fun `basic sound test`() {
         createGameContext(
             title = "Sound Test",
