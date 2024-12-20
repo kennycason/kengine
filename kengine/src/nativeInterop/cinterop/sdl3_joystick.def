@@ -1,4 +1,0 @@
-headers = SDL3/SDL_joystick.h
-package = sdl3.joystick
-compilerOpts = -I/usr/local/include
-linkerOpts = -L/usr/local/lib -lSDL3 -framework Cocoa -framework IOKit
