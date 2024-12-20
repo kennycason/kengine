@@ -14,6 +14,7 @@ cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 cmake --build . --config Release --parallel
 sudo cmake --install . --config Release
+otool -D /usr/local/lib/libSDL3.dylib
 ```
 
 ```shell

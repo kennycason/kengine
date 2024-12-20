@@ -7,11 +7,11 @@ import com.kengine.log.Logger
 import com.kengine.sdl.useSDLContext
 import com.kengine.time.getCurrentMilliseconds
 import com.kengine.time.useTimer
-import kotlin.test.Ignore
+import kotlin.test.Test
 
 class BasicGameIT {
 
-    @Ignore
+    @Test
     fun `basic game test`() {
         createGameContext(
             title = "Render Sprite Test",

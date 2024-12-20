@@ -1,9 +1,9 @@
 package com.kengine
 
-//import com.kengine.font.FontContext
 //import com.kengine.network.NetworkContext
 import com.kengine.action.ActionContext
 import com.kengine.event.EventContext
+import com.kengine.font.FontContext
 import com.kengine.geometry.GeometryContext
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.TextureContext
@@ -36,7 +36,7 @@ class GameContext private constructor(
     val texture: TextureContext,
     val sprite: SpriteContext,
     val geometry: GeometryContext,
-//    val font: FontContext,
+    val font: FontContext,
     val sound: SoundContext,
 //    val network: NetworkContext,
     val action: ActionContext,
@@ -56,7 +56,7 @@ class GameContext private constructor(
         ContextRegistry.register(texture)
         ContextRegistry.register(sprite)
         ContextRegistry.register(geometry)
-//        ContextRegistry.register(font)
+        ContextRegistry.register(font)
         ContextRegistry.register(sound)
 //        ContextRegistry.register(network)
         ContextRegistry.register(action)
@@ -95,7 +95,7 @@ class GameContext private constructor(
                 controller = ControllerContext.get(),
                 texture = TextureContext.get(),
                 sprite = SpriteContext.get(),
-//                font = FontContext.get(),
+                font = FontContext.get(),
                 sound = SoundContext.get(),
 //                network = NetworkContext.get(),
                 geometry = GeometryContext.get(),
@@ -123,7 +123,7 @@ class GameContext private constructor(
         texture.cleanup()
         sprite.cleanup()
         geometry.cleanup()
-//        font.cleanup()
+        font.cleanup()
         sound.cleanup()
 //        network.cleanup()
         sdl.cleanup()
