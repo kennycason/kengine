@@ -1,6 +1,5 @@
 package com.kengine
 
-//import com.kengine.network.NetworkContext
 import com.kengine.action.ActionContext
 import com.kengine.event.EventContext
 import com.kengine.font.FontContext
@@ -18,6 +17,7 @@ import com.kengine.input.mouse.getMouseContext
 import com.kengine.log.Logger
 import com.kengine.log.LoggerContext
 import com.kengine.log.Logging
+import com.kengine.network.NetworkContext
 import com.kengine.physics.PhysicsContext
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
@@ -38,7 +38,7 @@ class GameContext private constructor(
     val geometry: GeometryContext,
     val font: FontContext,
     val sound: SoundContext,
-//    val network: NetworkContext,
+    val network: NetworkContext,
     val action: ActionContext,
     val physics: PhysicsContext,
     val clock: ClockContext,
@@ -58,7 +58,7 @@ class GameContext private constructor(
         ContextRegistry.register(geometry)
         ContextRegistry.register(font)
         ContextRegistry.register(sound)
-//        ContextRegistry.register(network)
+        ContextRegistry.register(network)
         ContextRegistry.register(action)
         ContextRegistry.register(physics)
         ContextRegistry.register(clock)
@@ -97,7 +97,7 @@ class GameContext private constructor(
                 sprite = SpriteContext.get(),
                 font = FontContext.get(),
                 sound = SoundContext.get(),
-//                network = NetworkContext.get(),
+                network = NetworkContext.get(),
                 geometry = GeometryContext.get(),
                 action = ActionContext.get(),
                 physics = PhysicsContext.get(),
@@ -125,7 +125,7 @@ class GameContext private constructor(
         geometry.cleanup()
         font.cleanup()
         sound.cleanup()
-//        network.cleanup()
+        network.cleanup()
         sdl.cleanup()
         clock.cleanup()
         ContextRegistry.clearAll()
