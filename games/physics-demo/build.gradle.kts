@@ -70,3 +70,5 @@ fun KotlinNativeTarget.configureTarget() {
         }
     }
 }
+
+//SdlDylibCopier.registerCopyTasks(project, dylibsToCopy, dylibTargetDirs)

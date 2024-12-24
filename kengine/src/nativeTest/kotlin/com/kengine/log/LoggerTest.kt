@@ -19,6 +19,27 @@ class LoggerTest : Logging {
     )
 
     @Test
+    fun `log example`() {
+        logger.trace("Trace message")
+        logger.debug("Debug message")
+        logger.info("Info message")
+        logger.warn("Warn message.")
+        logger.error("Error message.")
+
+        logger.trace { "Trace lambda message" }
+        logger.debug { "Debug lambda message" }
+        logger.info { "Info lambda message" }
+        logger.warn { "Warn lambda message." }
+        logger.error { "Error lambda message." }
+
+        try {
+            throw Exception("Uh, Oh")
+        } catch (e: Exception) {
+            logger.error(e)
+        }
+    }
+
+    @Test
     fun `log stream`() {
         logger
             .infoStream()

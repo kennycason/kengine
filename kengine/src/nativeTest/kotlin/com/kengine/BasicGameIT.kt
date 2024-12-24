@@ -1,6 +1,7 @@
 package com.kengine
 
 import com.kengine.entity.SpriteEntity
+import com.kengine.file.File
 import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Sprite
 import com.kengine.log.Logger
@@ -20,7 +21,9 @@ class BasicGameIT {
             logLevel = Logger.Level.INFO
         ) {
             GameRunner(frameRate = 60) {
-                val pokeball = SpriteEntity(Sprite.fromFilePath("src/nativeTest/resources/assets/sprites/pokeball.bmp"))
+                val pokeballSpritePath = File.pwd() + "/src/nativeTest/resources/assets/sprites/pokeball.bmp"
+                logger.info(pokeballSpritePath)
+                val pokeball = SpriteEntity(Sprite.fromFilePath(pokeballSpritePath))
                 pokeball.p.set(100.0, 100.0)
 
                 object : Game {
@@ -34,11 +37,12 @@ class BasicGameIT {
                         val lastMapRenderTimeMs = getCurrentMilliseconds()
                         useSDLContext {
                             fillScreen(0u, 0u, 0u)
-                            pokeball.draw()
 
                             useGeometryContext {
                                 fillRectangle(10, 10, 100, 100, 0x88u, 0x33u, 0xFFu)
                             }
+                            pokeball.draw()
+
                             flipScreen()
                         }
                         logger.info { "Game loop in ${getCurrentMilliseconds() - lastMapRenderTimeMs}ms" }

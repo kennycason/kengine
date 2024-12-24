@@ -5,11 +5,11 @@ import boxxle.context.getBoxxleContext
 import boxxle.context.useBoxxleContext
 import com.kengine.Game
 import com.kengine.action.getActionContext
-import com.kengine.hooks.context.getContext
 import com.kengine.font.Font
 import com.kengine.font.getFontContext
 import com.kengine.font.useFontContext
 import com.kengine.getGameContext
+import com.kengine.hooks.context.getContext
 import com.kengine.input.controller.useControllerContext
 import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.log.Logging
@@ -44,7 +44,7 @@ class BoxxleGame : Game, Logging {
                 .also { it.setVolume(20) }
         }
         useFontContext {
-            addFont(Fonts.ARCADE_CLASSIC, Fonts.ARCADE_CLASSIC_TTF, fontSize = 32)
+            addFont(Fonts.ARCADE_CLASSIC, Fonts.ARCADE_CLASSIC_TTF, fontSize = 32f)
         }
     }
 

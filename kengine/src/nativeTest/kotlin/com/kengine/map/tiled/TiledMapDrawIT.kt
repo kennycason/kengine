@@ -31,7 +31,7 @@ class TiledMapDrawIT {
                 object : Game {
                     private val scrollSpeed = 100.0
                     override fun update() {
-                        useTimer(5000L) {
+                        useTimer(50000L) {
                             isRunning = false
                         }
                     }
@@ -39,18 +39,18 @@ class TiledMapDrawIT {
                     override fun draw() {
                         val deltaTime = getClockContext().deltaTimeSec
                         useKeyboardContext {
-//                            if (keyboard.isUpPressed()) {
-//                                tiledMap.p.y -= scrollSpeed * deltaTime
-//                            }
-//                            if (keyboard.isDownPressed()) {
-//                                tiledMap.p.y += scrollSpeed * deltaTime
-//                            }
-//                            if (keyboard.isLeftPressed()) {
-//                                tiledMap.p.x -= scrollSpeed * deltaTime
-//                            }
-//                            if (keyboard.isRightPressed()) {
-//                                tiledMap.p.x += scrollSpeed * deltaTime
-//                            }
+                            if (keyboard.isUpPressed()) {
+                                tiledMap.p.y -= scrollSpeed * deltaTime
+                            }
+                            if (keyboard.isDownPressed()) {
+                                tiledMap.p.y += scrollSpeed * deltaTime
+                            }
+                            if (keyboard.isLeftPressed()) {
+                                tiledMap.p.x -= scrollSpeed * deltaTime
+                            }
+                            if (keyboard.isRightPressed()) {
+                                tiledMap.p.x += scrollSpeed * deltaTime
+                            }
                         }
                         useSDLContext {
                             fillScreen(0u, 0u, 0u)

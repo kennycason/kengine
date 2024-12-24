@@ -19,13 +19,13 @@ if (isPlaydateEnabled) {
     modules.add("kengine-playdate")
 }
 
-//modules.addAll(
-//    listOf(
-//        "games:boxxle",
-//        "games:helloworld",
+modules.addAll(
+    listOf(
+        "games:boxxle",
+        "games:helloworld",
 //        "games:image-shuffle",
-//        "games:physics-demo"
-//    )
-//)
+        "games:physics-demo"
+    )
+)
 
 include(modules)

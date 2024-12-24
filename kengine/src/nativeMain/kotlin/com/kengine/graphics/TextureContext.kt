@@ -1,7 +1,7 @@
 package com.kengine.graphics
 
 import com.kengine.hooks.context.Context
-import kotlinx.cinterop.CValuesRef
+import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.image.SDL_Texture
 
@@ -22,7 +22,7 @@ class TextureContext private constructor(
     }
 
     @OptIn(ExperimentalForeignApi::class)
-    fun copyTexture(texture: CValuesRef<SDL_Texture>): CValuesRef<SDL_Texture> {
+    fun copyTexture(texture: CPointer<SDL_Texture>): CPointer<SDL_Texture> {
         return manager.copyTexture(texture)
     }
 

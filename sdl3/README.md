@@ -3,6 +3,9 @@
 Sub-Modules
 - SDL
 - SDL_image
+- SDL_mixer
+- SDL_net
+- SDL_ttf
 
 [Installation](https://wiki.libsdl.org/SDL3/Installation)
 
@@ -14,6 +17,7 @@ cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 cmake --build . --config Release --parallel
 sudo cmake --install . --config Release
+pkg-config --libs sdl3
 otool -D /usr/local/lib/libSDL3.dylib
 ```
 

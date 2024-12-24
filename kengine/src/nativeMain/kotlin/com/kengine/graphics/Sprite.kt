@@ -1,6 +1,7 @@
 package com.kengine.graphics
 
 import com.kengine.log.Logging
+import com.kengine.log.getLogger
 import com.kengine.math.IntRect
 import com.kengine.math.Math
 import com.kengine.math.Vec2
@@ -97,8 +98,10 @@ class Sprite private constructor(
     }
 
     companion object {
+        private val logger = getLogger(Sprite::class)
         fun fromFilePath(filePath: String, clip: IntRect? = null): Sprite {
             val texture = getTextureContext().getTexture(filePath)
+            logger.info { "Loaded texture: ${texture.width}x${texture.height}" }
             return Sprite(texture, clip)
         }
 
