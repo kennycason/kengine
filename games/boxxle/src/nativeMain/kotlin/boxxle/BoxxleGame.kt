@@ -66,7 +66,7 @@ class BoxxleGame : Game, Logging {
             }
 
             val level = getBoxxleContext().level
-            menuFont.drawText("LVL ${level.levelNumber}", 690, 560, r = 0x33u, g = 0x33u, b = 0x33u, a = 0xFFu)
+           // menuFont.drawText("LVL ${level.levelNumber}", 690, 560, r = 0x33u, g = 0x33u, b = 0x33u, a = 0xFFu)
 
             flipScreen()
         }

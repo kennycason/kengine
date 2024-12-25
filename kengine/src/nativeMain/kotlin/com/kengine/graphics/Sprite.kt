@@ -32,7 +32,7 @@ class Sprite private constructor(
     fun draw(x: Double, y: Double, flip: FlipMode = FlipMode.NONE, angle: Double = 0.0) {
         useSDLContext {
             memScoped {
-                // define clipping rectangle if needed
+                // Define clipping rectangle if needed
                 val clipRect = clip?.let {
                     alloc<SDL_FRect>().apply {
                         this.x = it.x.toFloat()
@@ -42,15 +42,21 @@ class Sprite private constructor(
                     }
                 }
 
-                // calculate the scaled size
+                // Calculate scaled size
                 val scaledWidth = (clipRect?.w ?: texture.width.toFloat()) * scale.x.toFloat()
                 val scaledHeight = (clipRect?.h ?: texture.height.toFloat()) * scale.y.toFloat()
 
-                // optimized rendering and early exit for fast path (no rotation, no flipping)
+                // Snap to grid: Calculate tile-aligned position
+                val tileSize = 32.0 // Example fixed tile size, replace with actual size
+                val alignedX = x.toFloat()
+                val alignedY = y.toFloat()
+
+                // Early exit for no rotation or flipping
                 if (angle == 0.0 && flip == FlipMode.NONE) {
                     val destRect = alloc<SDL_FRect>().apply {
-                        this.x = x.toFloat()
-                        this.y = y.toFloat()
+                        // Use exact x, y positions without over-adjusting
+                        this.x = alignedX
+                        this.y = alignedY
                         this.w = scaledWidth
                         this.h = scaledHeight
                     }
@@ -61,44 +67,33 @@ class Sprite private constructor(
                     return
                 }
 
-                // calculate flipping factors
-                val flipX = if (flip == FlipMode.HORIZONTAL || flip == FlipMode.BOTH) -1f else 1f
-                // val flipY = if (flip == FlipMode.VERTICAL || flip == FlipMode.BOTH) -1f else 1f
-
-                // convert angle to radians
+                // Handle rotation and flipping
                 val rad = Math.toRadians(angle)
                 val cos = kotlin.math.cos(rad).toFloat()
                 val sin = kotlin.math.sin(rad).toFloat()
 
-                // calculate half dimensions for center-point rotation
-                val halfWidth = scaledWidth / 2.0f
-                val halfHeight = scaledHeight / 2.0f
+                val flipX = if (flip == FlipMode.HORIZONTAL || flip == FlipMode.BOTH) -1f else 1f
+                val flipY = if (flip == FlipMode.VERTICAL || flip == FlipMode.BOTH) -1f else 1f
 
-                // Calculate the center position
-                val centerX = x.toFloat() + halfWidth
-                val centerY = y.toFloat() + halfHeight
+                // Calculate pivot (center) for rotation
+                val pivotX = alignedX + (tileSize / 2.0f)
+                val pivotY = alignedY + (tileSize / 2.0f)
 
-                // Calculate the three points needed for SDL_RenderTextureAffine
-
-                // origin point (top-left)
+                // Define affine points
                 val origin = alloc<SDL_FPoint>().apply {
-                    this.x = centerX - halfWidth * cos * flipX + halfHeight * sin
-                    this.y = centerY - halfWidth * sin * flipX - halfHeight * cos
+                    this.x = (pivotX - (scaledWidth / 2.0f) * cos + (scaledHeight / 2.0f) * sin).toFloat()
+                    this.y = (pivotY - (scaledWidth / 2.0f) * sin - (scaledHeight / 2.0f) * cos).toFloat()
                 }
-
-                // right point (top-right, moving along the width)
                 val right = alloc<SDL_FPoint>().apply {
-                    this.x = centerX + halfWidth * cos * flipX + halfHeight * sin
-                    this.y = centerY + halfWidth * sin * flipX - halfHeight * cos
+                    this.x = (pivotX + (scaledWidth / 2.0f) * cos + (scaledHeight / 2.0f) * sin).toFloat()
+                    this.y = (pivotY + (scaledWidth / 2.0f) * sin - (scaledHeight / 2.0f) * cos).toFloat()
                 }
-
-                // down point (bottom-left, moving along the height)
                 val down = alloc<SDL_FPoint>().apply {
-                    this.x = centerX - halfWidth * cos * flipX - halfHeight * sin
-                    this.y = centerY - halfWidth * sin * flipX + halfHeight * cos
+                    this.x = (pivotX - (scaledWidth / 2.0f) * cos - (scaledHeight / 2.0f) * sin).toFloat()
+                    this.y = (pivotY - (scaledWidth / 2.0f) * sin + (scaledHeight / 2.0f) * cos).toFloat()
                 }
 
-                // render using affine transform
+                // Render using affine transform
                 val result = SDL_RenderTextureAffine(
                     renderer,
                     texture.texture,
@@ -114,9 +109,8 @@ class Sprite private constructor(
             }
         }
     }
-
     fun cleanup() {
-        // texture manager handles cleanup of Texture/Surfaces
+        // Add cleanup logic if needed
     }
 
     companion object {

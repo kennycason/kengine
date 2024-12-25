@@ -72,17 +72,26 @@ class SpriteBatch : Logging {
         val flipY = if (flip == FlipMode.VERTICAL || flip == FlipMode.BOTH) -1f else 1f
 
         memScoped {
+            // Calculate half dimensions
+            val halfWidth = (dstW / 2).toFloat()
+            val halfHeight = (dstH / 2).toFloat()
+
+            // Origin is at the center of the destination rectangle
             val origin = alloc<SDL_FPoint>().apply {
-                x = dstX.toFloat()
-                y = dstY.toFloat()
+                x = (dstX + halfWidth).toFloat()
+                y = (dstY + halfHeight).toFloat()
             }
+
+            // Right vector from center to right edge (half width)
             val right = alloc<SDL_FPoint>().apply {
-                x = origin.x + (dstW * cos * flipX).toFloat()
-                y = origin.y + (dstW * sin * flipX).toFloat()
+                x = halfWidth * cos * flipX
+                y = halfWidth * sin * flipX
             }
+
+            // Down vector from center to bottom edge (half height)
             val down = alloc<SDL_FPoint>().apply {
-                x = origin.x - (dstH * sin * flipY).toFloat()
-                y = origin.y + (dstH * cos * flipY).toFloat()
+                x = -halfHeight * sin * flipY
+                y = halfHeight * cos * flipY
             }
 
             batch.add(
@@ -108,13 +117,14 @@ class SpriteBatch : Logging {
         useSDLContext {
             memScoped {
                 for (item in batch) {
-                    val clipRect = if (item.srcX != null && item.srcY != null && item.srcW != null && item.srcH != null) {
+                    val srcRect = if (item.srcX != null && item.srcY != null &&
+                        item.srcW != null && item.srcH != null) {
                         alloc<SDL_FRect>().apply {
                             x = item.srcX.toFloat()
                             y = item.srcY.toFloat()
                             w = item.srcW.toFloat()
                             h = item.srcH.toFloat()
-                        }.ptr
+                        }
                     } else {
                         null
                     }
@@ -122,12 +132,11 @@ class SpriteBatch : Logging {
                     if (!SDL_RenderTextureAffine(
                             renderer,
                             item.texture,
-                            clipRect,
+                            srcRect?.ptr,
                             item.origin.ptr,
                             item.right.ptr,
                             item.down.ptr
-                        )
-                    ) {
+                        )) {
                         logger.error("Error rendering sprite batch: ${SDL_GetError()?.toKString()}")
                     }
                 }
