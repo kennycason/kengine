@@ -24,7 +24,7 @@ class SpriteManager {
     }
 
     fun cleanup() {
-        sprites.values.forEach { it.cleanup() }
+        // sprites.values.forEach { it.cleanup() }
         spriteSheets.values.forEach { it.cleanup() }
     }
 }

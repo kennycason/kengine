@@ -2,6 +2,7 @@
 import com.kengine.Game
 import com.kengine.geometry.useGeometryContext
 import com.kengine.map.tiled.TiledMapLoader
+import com.kengine.sdl.getSDLContext
 import com.kengine.sdl.useSDLContext
 
 class HelloWorldGame : Game {
@@ -10,6 +11,10 @@ class HelloWorldGame : Game {
     private val scytherEntity = ScytherEntity()
     private val tiledMap = TiledMapLoader().loadMap("assets/maps/simple_map.tmj")
         .also { it.p.set(480.0, 0.0) }
+
+    init {
+        getSDLContext().enableBlendedMode()
+    }
 
     override fun update() {
         pidgies.forEach {

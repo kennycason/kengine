@@ -88,7 +88,7 @@ class SpriteSheet private constructor(
     fun cleanup() {
         tileSprites.forEach { row ->
             row.forEach { sprite ->
-                sprite.cleanup()
+            //    sprite.cleanup()
             }
         }
     }

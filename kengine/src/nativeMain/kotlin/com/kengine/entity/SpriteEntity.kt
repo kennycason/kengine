@@ -25,7 +25,7 @@ open class SpriteEntity(
     }
 
     override fun cleanup() {
-        sprite.cleanup()
+       // sprite.cleanup()
     }
 
     companion object {

@@ -11,6 +11,8 @@ import kotlinx.cinterop.CValuesRef
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
 import platform.posix.exit
+import sdl3.SDL_BLENDMODE_BLEND
+import sdl3.SDL_BLENDMODE_NONE
 import sdl3.SDL_CreateRenderer
 import sdl3.SDL_CreateWindow
 import sdl3.SDL_DestroyRenderer
@@ -21,6 +23,7 @@ import sdl3.SDL_Init
 import sdl3.SDL_Quit
 import sdl3.SDL_RenderClear
 import sdl3.SDL_RenderPresent
+import sdl3.SDL_SetRenderDrawBlendMode
 import sdl3.SDL_SetRenderDrawColor
 import sdl3.SDL_WINDOW_RESIZABLE
 
@@ -31,6 +34,23 @@ class SDLContext private constructor(
     private val window: CValuesRef<cnames.structs.SDL_Window>,
     val renderer: CValuesRef<cnames.structs.SDL_Renderer>?,
 ) : Context(), Logging {
+
+    private var currentBlendMode = SDL_BLENDMODE_NONE
+
+    fun enableBlendedMode() {
+        setBlendMode(SDL_BLENDMODE_BLEND)
+    }
+
+    fun disableBlendedMode() {
+        setBlendMode(SDL_BLENDMODE_NONE)
+    }
+
+    private fun setBlendMode(mode: UInt) {
+        if (currentBlendMode != mode) {
+            SDL_SetRenderDrawBlendMode(renderer, mode)
+            currentBlendMode = mode
+        }
+    }
 
     fun fillScreen(r: UInt, g: UInt, b: UInt, a: UInt = 0xFFu) {
         SDL_SetRenderDrawColor(renderer, r.toUByte(), g.toUByte(), b.toUByte(), a.toUByte())
