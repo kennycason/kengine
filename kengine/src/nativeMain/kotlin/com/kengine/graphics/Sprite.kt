@@ -51,10 +51,10 @@ class Sprite private constructor(
                 // Prepare the clipping rectangle
                 val clipRect = clip?.let {
                     alloc<SDL_FRect>().apply {
-                        this.x = it.x.toFloat()
-                        this.y = it.y.toFloat()
-                        this.w = it.w.toFloat()
-                        this.h = it.h.toFloat()
+                        this.x = it.x.toFloat() + 0.5f
+                        this.y = it.y.toFloat() + 0.5f
+                        this.w = it.w.toFloat() - 1f
+                        this.h = it.h.toFloat() - 1f
                     }
                 }
 

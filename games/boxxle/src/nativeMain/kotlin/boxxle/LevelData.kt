@@ -5,7 +5,7 @@ data class LevelData(
     val boxes: List<List<Int>>,
     val goals: List<List<Int>>,
     val start: List<Int>,
-    val scale: Double = 1.0
+    val scale: Double = 1.5
 )
 
 val LEVEL_DATA: List<LevelData> = listOf(
@@ -97,8 +97,7 @@ val LEVEL_DATA: List<LevelData> = listOf(
         goals = listOf(listOf(2, 4), listOf(3, 4), listOf(2, 5), listOf(3, 5)),
         start = listOf(4, 1)
     ),
-    LevelData(
-        // 6
+    LevelData( // 6
         tiles = listOf(
             listOf(0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0),
             listOf(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0),
@@ -117,6 +116,7 @@ val LEVEL_DATA: List<LevelData> = listOf(
         boxes = listOf(listOf(4, 6), listOf(6, 6), listOf(4, 8), listOf(6, 8)),
         goals = listOf(listOf(4, 4), listOf(8, 6), listOf(2, 8), listOf(6, 10)),
         start = listOf(6, 3),
+        scale = 1.1
     ),
     LevelData( // 7
         tiles = listOf(
@@ -206,8 +206,7 @@ val LEVEL_DATA: List<LevelData> = listOf(
         ),
         start = listOf(1, 3)
     ),
-    LevelData(
-        // 12
+    LevelData( // 12
         tiles = listOf(
             listOf(0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             listOf(0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -230,6 +229,7 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(15, 7), listOf(14, 8), listOf(15, 8)
         ),
         start = listOf(7, 2),
+        scale = 1.1
     ),
     LevelData( // 13
         tiles = listOf(
@@ -249,8 +249,7 @@ val LEVEL_DATA: List<LevelData> = listOf(
         ),
         start = listOf(4, 4)
     ),
-    LevelData(
-        // 14
+    LevelData( // 14
         tiles = listOf(
             listOf(1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             listOf(1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0),
@@ -273,6 +272,7 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(17, 5), listOf(16, 6), listOf(17, 6)
         ),
         start = listOf(6, 4),
+        scale = 1.0
     ),
     LevelData( // 15
         tiles = listOf(
@@ -293,8 +293,7 @@ val LEVEL_DATA: List<LevelData> = listOf(
         ),
         start = listOf(1, 6)
     ),
-    LevelData(
-        // 16
+    LevelData( // 16
         tiles = listOf(
             listOf(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0),
             listOf(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0),
@@ -323,6 +322,7 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(17, 7), listOf(18, 7)
         ),
         start = listOf(7, 10),
+        scale = 1.0
     ),
     LevelData( // 17
         tiles = listOf(
@@ -402,8 +402,7 @@ val LEVEL_DATA: List<LevelData> = listOf(
         start = listOf(1, 3)
     ),
 
-    LevelData(
-        // 21
+    LevelData( // 21
         tiles = listOf(
             listOf(0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0),
             listOf(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0),
@@ -421,9 +420,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(2, 1), listOf(3, 1), listOf(4, 1), listOf(5, 1), listOf(3, 2), listOf(4, 2), listOf(5, 2)
         ),
         start = listOf(7, 5),
+        scale = 1.5
     ),
-    LevelData(
-        // 22
+    LevelData( // 22
         tiles = listOf(
             listOf(0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0),
             listOf(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0),
@@ -450,9 +449,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(2, 11)
         ),
         start = listOf(11, 9),
+        scale = 1.0
     ),
-    LevelData(
-        // 23
+    LevelData( // 23
         tiles = listOf(
             listOf(1, 1, 1, 1, 1, 1, 1, 0),
             listOf(1, 0, 0, 0, 0, 0, 1, 0),
@@ -472,9 +471,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(1, 2), listOf(2, 2), listOf(4, 2), listOf(5, 2)
         ),
         start = listOf(5, 5),
+        scale = 1.8
     ),
-    LevelData(
-        // 24
+    LevelData( // 24
         tiles = listOf(
             listOf(0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0),
             listOf(1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0),
@@ -498,9 +497,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(13, 3), listOf(14, 3), listOf(13, 4), listOf(14, 4)
         ),
         start = listOf(2, 2),
+        scale = 1.0
     ),
-    LevelData(
-        // 25
+    LevelData( // 25
         tiles = listOf(
             listOf(0, 0, 0, 1, 1, 1, 1, 1, 0),
             listOf(0, 0, 0, 1, 0, 0, 0, 1, 0),
@@ -523,9 +522,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(1, 5), listOf(2, 5), listOf(2, 6)
         ),
         start = listOf(6, 1),
+        scale = 1.2
     ),
-    LevelData(
-        // 26
+    LevelData( // 26
         tiles = listOf(
             listOf(0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0),
             listOf(0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0),
@@ -552,9 +551,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(3, 6), listOf(4, 6)
         ),
         start = listOf(8, 5),
+        scale = 1.0
     ),
-    LevelData(
-        // 27
+    LevelData( // 27
         tiles = listOf(
             listOf(1, 1, 1, 1, 1, 1, 1, 1, 0, 0),
             listOf(1, 0, 0, 0, 0, 0, 0, 1, 0, 0),
@@ -575,9 +574,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(2, 4), listOf(3, 4), listOf(4, 4)
         ),
         start = listOf(6, 1),
+        scale = 1.5
     ),
-    LevelData(
-        // 28
+    LevelData( // 28
         tiles = listOf(
             listOf(0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0),
             listOf(1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0),
@@ -597,9 +596,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(4, 6), listOf(5, 6), listOf(6, 6)
         ),
         start = listOf(8, 3),
+        scale = 1.5
     ),
-    LevelData(
-        // 29
+    LevelData( // 29
         tiles = listOf(
             listOf(0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0),
             listOf(0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0),
@@ -623,9 +622,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(4, 5), listOf(3, 6), listOf(4, 6), listOf(3, 7)
         ),
         start = listOf(7, 8),
+        scale = 1.0
     ),
-    LevelData(
-        // 30
+    LevelData( // 30
         tiles = listOf(
             listOf(0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             listOf(1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -656,9 +655,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(14, 6), listOf(15, 6), listOf(16, 6), listOf(17, 6)
         ),
         start = listOf(2, 2),
+        scale = 1.0
     ),
-    LevelData(
-        // 31
+    LevelData( // 31
         tiles = listOf(
             listOf(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0),
             listOf(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0),
@@ -682,9 +681,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(1, 5), listOf(2, 5)
         ),
         start = listOf(6, 4),
+        scale = 1.4
     ),
-    LevelData(
-        // 32
+    LevelData( // 32
         tiles = listOf(
             listOf(0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0),
             listOf(1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0),
@@ -709,9 +708,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(10, 2), listOf(8, 3), listOf(9, 3), listOf(10, 3)
         ),
         start = listOf(1, 2),
+        scale = 1.0
     ),
-    LevelData(
-        // 33
+    LevelData( // 33
         tiles = listOf(
             listOf(0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0),
             listOf(0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0),
@@ -735,9 +734,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(2, 8), listOf(3, 8), listOf(4, 8)
         ),
         start = listOf(11, 1),
+        scale = 1.0
     ),
-    LevelData(
-        // 34
+    LevelData( // 34
         tiles = listOf(
             listOf(0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             listOf(0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0),
@@ -758,9 +757,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(3, 6), listOf(1, 7), listOf(2, 7), listOf(3, 7)
         ),
         start = listOf(10, 2),
+        scale = 1.2
     ),
-    LevelData(
-        // 35
+    LevelData( // 35
         tiles = listOf(
             listOf(1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0),
             listOf(1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 1, 0),
@@ -785,6 +784,7 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(1, 5), listOf(2, 5)
         ),
         start = listOf(10, 9),
+        scale = 1.2
     ),
     LevelData( // 36
         tiles = listOf(
@@ -808,7 +808,8 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(1, 6), listOf(2, 6), listOf(3, 6), listOf(1, 7), listOf(2, 7),
             listOf(3, 7), listOf(1, 8), listOf(2, 8), listOf(3, 8)
         ),
-        start = listOf(16, 6)
+        start = listOf(16, 6),
+        scale = 1.0
     ),
     LevelData( // 37
         tiles = listOf(
@@ -839,7 +840,8 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(12, 9), listOf(13, 9), listOf(14, 9), listOf(12, 10), listOf(13, 10),
             listOf(14, 10), listOf(12, 11), listOf(13, 11), listOf(14, 11)
         ),
-        start = listOf(3, 1)
+        start = listOf(3, 1),
+        scale = 1.0
     ),
     LevelData( // 38
         tiles = listOf(
@@ -869,7 +871,8 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(2, 11), listOf(3, 11), listOf(4, 11), listOf(5, 11), listOf(2, 12),
             listOf(3, 12), listOf(4, 12), listOf(5, 12), listOf(3, 13), listOf(4, 13)
         ),
-        start = listOf(3, 1)
+        start = listOf(3, 1),
+        scale = 1.0
     ),
     LevelData( // 39
         tiles = listOf(
@@ -932,6 +935,7 @@ val LEVEL_DATA: List<LevelData> = listOf(
             listOf(7, 7), listOf(8, 7), listOf(9, 7), listOf(11, 7),
             listOf(1, 8), listOf(2, 8), listOf(11, 8), listOf(12, 8)
         ),
-        start = listOf(6, 4)
+        start = listOf(6, 4),
+        scale = 1.4
     )
 )
