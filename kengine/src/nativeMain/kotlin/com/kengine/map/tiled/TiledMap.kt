@@ -11,7 +11,6 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-
 @Serializable
 class TiledMap(
     val width: Int,
@@ -114,9 +113,6 @@ class TiledMap(
                 val tilesetWithSprite = findTilesetForGid(decoded.tileId)
                 val (tilePx, tilePy) = getTilePosition(decoded.tileId, tilesetWithSprite.tileset)
 
-                // get a tile view directly (no full Sprite object)
-                val tileView = tilesetWithSprite.spriteSheet.getTileView(tilePx.toInt(), tilePy.toInt())
-
                 // compute flipping/rotation if needed
 //                val flipMode = when {
 //                    decoded.flipH && decoded.flipV -> FlipMode.BOTH
@@ -177,15 +173,19 @@ class TiledMap(
                     }
                 }
 
+                val dstX = x * tileWidth + p.x
+                val dstY = y * tileHeight + p.y
+                val tile: Sprite = tilesetWithSprite.spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
+                tile.draw(dstX, dstY, flipMode, angle)
+
+                /*
                 // tileView.clip holds the sub-rect of the texture
                 // tileView.texture is the shared texture
+                val tileView = tilesetWithSprite.spriteSheet.getTileView(tilePx.toInt(), tilePy.toInt())
                 val srcX = tileView.clip!!.x
                 val srcY = tileView.clip.y
                 val srcW = tileView.clip.w
                 val srcH = tileView.clip.h
-                val dstX = x * tileWidth + p.x
-                val dstY = y * tileHeight + p.y
-
                 batch.draw(
                     texture = tileView.texture.texture,
                     srcX = srcX,
@@ -199,7 +199,7 @@ class TiledMap(
                     angle = angle,
                     flip = flipMode
                 )
-
+                 */
             }
         }
 
@@ -216,7 +216,7 @@ class TiledMap(
         if (gid > lastGidInTileset) {
             logger.warn {
                 "GID $gid is outside of tileset '${tileset.tileset.name}' range [${tileset.tileset.firstgid}, $lastGidInTileset]. " +
-                        "This may cause rendering issues."
+                    "This may cause rendering issues."
             }
         }
         return tileset
@@ -265,13 +265,13 @@ class TiledMap(
 
     override fun toString(): String {
         return "TiledMap(\n" +
-                "width=$width, height=$height,\n\t" +
-                "tileWidth=$tileWidth, tileHeight=$tileHeight,\n\t" +
-                "layers=\n\t\t${layers.joinToString("\n\t\t")},\n\t" +
-                "tilesets=\n\t\t${tilesets.joinToString("\n\t\t")},\n\t" +
-                "orientation='$orientation',\n\t" +
-                "renderOrder='$renderOrder',\n\t" +
-                "infinite=$infinite\n" +
-                ")"
+            "width=$width, height=$height,\n\t" +
+            "tileWidth=$tileWidth, tileHeight=$tileHeight,\n\t" +
+            "layers=\n\t\t${layers.joinToString("\n\t\t")},\n\t" +
+            "tilesets=\n\t\t${tilesets.joinToString("\n\t\t")},\n\t" +
+            "orientation='$orientation',\n\t" +
+            "renderOrder='$renderOrder',\n\t" +
+            "infinite=$infinite\n" +
+            ")"
     }
 }

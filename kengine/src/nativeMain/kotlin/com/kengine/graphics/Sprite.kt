@@ -51,6 +51,7 @@ class Sprite private constructor(
                 // Prepare the clipping rectangle
                 val clipRect = clip?.let {
                     alloc<SDL_FRect>().apply {
+                        // add boundary to prevent texture bleed when scaled
                         this.x = it.x.toFloat() + 0.5f
                         this.y = it.y.toFloat() + 0.5f
                         this.w = it.w.toFloat() - 1f
