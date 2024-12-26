@@ -33,6 +33,7 @@ class ControllerContext private constructor(
 
     override fun cleanup() {
         logger.info { "Cleaning up ControllerContext"}
+        controller.cleanup()
         currentContext = null
     }
 

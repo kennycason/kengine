@@ -106,6 +106,11 @@ class BoxxleGame : Game, Logging {
 
             useControllerContext {
                 if (controller.isButtonPressed(Playstation4.TRIANGLE) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                    logger.info { "pressed triangle" }
+                    timeSinceOptionChangeMs = getCurrentMilliseconds()
+                    reloadLevel()
+                }
+                if (controller.isButtonPressed(Playstation4.TRIANGLE) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
                     timeSinceOptionChangeMs = getCurrentMilliseconds()
                     reloadLevel()
                 }

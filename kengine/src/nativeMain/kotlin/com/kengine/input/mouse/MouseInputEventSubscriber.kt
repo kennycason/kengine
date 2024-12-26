@@ -27,6 +27,7 @@ class MouseInputEventSubscriber {
     // must be called
     fun init() {
         useSDLEventContext {
+            logger.info { "Subscribed to mouse events" }
             subscribe(SDLEventContext.EventType.MOUSE, ::handleMouseEvent)
         }
     }

@@ -20,6 +20,7 @@ class KeyboardInputEventSubscriber {
     // must be called
     fun init() {
         useSDLEventContext {
+            logger.info { "Subscribed to keyboard events" }
             subscribe(SDLEventContext.EventType.KEYBOARD, ::handleKeyboardEvent)
         }
     }
