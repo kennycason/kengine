@@ -129,14 +129,6 @@ class Sprite private constructor(
         throw RuntimeException("Failed to render sprite: $error")
     }
 
-    // Handles SDL errors with optional exception throwing
-    private fun handleRenderResult(result: Boolean, throwOnError: Boolean) {
-        val error = SDL_GetError()?.toKString()
-        logger.error("Error rendering sprite: $error")
-
-        throw RuntimeException("Failed to render sprite: $error")
-    }
-
     companion object {
         private val logger = getLogger(Sprite::class)
 

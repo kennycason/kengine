@@ -5,6 +5,7 @@ import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
+import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -64,9 +65,13 @@ open class TcpConnection private constructor(
         streamSocket = SDLNet_CreateClient(sdlAddress, address.port)
             ?: throw Exception("Failed to create TCP client: ${SDL_GetError()}")
 
-        // Wait for connection (new in SDL3)
-        if (SDLNet_WaitUntilConnected(streamSocket, 5000) != 0) {
-            throw Exception("Failed to connect: ${SDL_GetError()}")
+        // Wait for connection (SDL3 returns 1 for success)
+        val connectionStatus = SDLNet_WaitUntilConnected(streamSocket, 5000)
+        if (connectionStatus != 1) {
+            throw Exception("Failed to connect: ${
+                if (connectionStatus == 0) "Connection timed out"
+                else SDL_GetError()?.toKString() ?: "Unknown error"
+            }")
         }
 
         isRunning = true

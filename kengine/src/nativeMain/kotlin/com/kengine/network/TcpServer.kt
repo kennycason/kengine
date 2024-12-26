@@ -48,14 +48,27 @@ class TcpServer(
             server?.let { srv ->
                 memScoped {
                     val clientStream = alloc<CPointerVar<cnames.structs.SDLNet_StreamSocket>>()
-                    if (SDLNet_AcceptClient(srv, clientStream.ptr)) {
-                        logger.info { "Accepted new TCP connection" }
-                        val connection = TcpServerConnection(clientStream.value!!)
-                        onAccept(connection)
+                    val acceptResult = SDLNet_AcceptClient(srv, clientStream.ptr)
+
+                    if (acceptResult) {
+                        clientStream.value?.let { socket ->
+                            logger.debug { "Accepted new TCP connection" }
+                            val connection = TcpServerConnection(socket)
+                            try {
+                                onAccept(connection)
+                            } catch (e: Exception) {
+                                logger.error(e) { "Error handling accepted connection" }
+                                connection.close()
+                            }
+                        } ?: {
+                            if (logger.isTraceEnabled()) {
+                                logger.trace { "Accepted null client stream" }
+                            }
+                        }
                     }
                 }
             }
-            delay(100) // Prevent busy waiting
+            delay(10)  // low delay to be more responsive
         }
     }
 
@@ -64,6 +77,7 @@ class TcpServer(
     ) : TcpConnection(socket) {
         init {
             isRunning = true
+            logger.info { "Created server-side connection" }
         }
     }
 }

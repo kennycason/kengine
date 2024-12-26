@@ -99,8 +99,7 @@ class SDLContext private constructor(
             flags: ULong = SDL_WINDOW_RESIZABLE
         ): SDLContext {
             if (currentContext != null) {
-                return currentContext!!
-               // throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
+               throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
             }
 
             require(SDL_Init(SDL_INIT_VIDEO)) {
