@@ -6,12 +6,11 @@ import com.kengine.createGameContext
 fun main() {
     createGameContext(
         title = "Boxxle",
-        width = 800,
-        height = 600
+        width = 640,
+        height = 480
     ) {
         GameRunner(frameRate = 60) {
             BoxxleGame()
         }
     }
 }
-

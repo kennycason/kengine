@@ -4,6 +4,7 @@ import kotlin.reflect.KClass
 
 
 interface Logging {
+
     @Suppress("unused")
     val logger: Logger
         get() = cachedLoggerOf(this::class)

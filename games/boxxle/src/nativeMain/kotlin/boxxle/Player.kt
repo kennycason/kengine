@@ -1,10 +1,9 @@
 package boxxle
 
+import boxxle.context.getBoxxleContext
 import boxxle.context.useBoxxleContext
-import com.kengine.GameContext
 import com.kengine.action.getActionContext
 import com.kengine.action.useActionContext
-import com.kengine.hooks.context.useContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.useSpriteContext
@@ -146,12 +145,13 @@ class Player(
     }
 
     override fun draw() {
+        val scaledDim = 32 * getBoxxleContext().level.data.scale
         useSpriteContext {
             when (face) {
-                Direction.UP -> playerSpriteUp.draw(p.x * 32, p.y * 32)
-                Direction.DOWN -> playerSpriteDown.draw(p.x * 32, p.y * 32)
-                Direction.LEFT -> playerSpriteLeft.draw(p.x * 32, p.y * 32)
-                Direction.RIGHT -> playerSpriteRight.draw(p.x * 32, p.y * 32)
+                Direction.UP -> playerSpriteUp.draw(p.x * scaledDim, p.y * scaledDim)
+                Direction.DOWN -> playerSpriteDown.draw(p.x * scaledDim, p.y * scaledDim)
+                Direction.LEFT -> playerSpriteLeft.draw(p.x * scaledDim, p.y * scaledDim)
+                Direction.RIGHT -> playerSpriteRight.draw(p.x * scaledDim, p.y * scaledDim)
             }
 
         }

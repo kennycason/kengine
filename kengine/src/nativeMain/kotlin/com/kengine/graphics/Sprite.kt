@@ -27,19 +27,24 @@ class Sprite private constructor(
     val width: Int = clip?.w ?: texture.width
     val height: Int = clip?.h ?: texture.height
 
+    // computed scaled width and height
+    val scaledWidth: Float
+        get() = (width * scale.x).toFloat()
+
+    val scaledHeight: Float
+        get() = (height * scale.y).toFloat()
+
     fun draw(
         position: Vec2,
         flip: FlipMode = FlipMode.NONE,
-        angle: Double = 0.0,
-        throwOnError: Boolean = false // Added error handling flag
-    ) = draw(position.x, position.y, flip, angle, throwOnError)
+        angle: Double = 0.0
+    ) = draw(position.x, position.y, flip, angle)
 
     fun draw(
         x: Double,
         y: Double,
         flip: FlipMode = FlipMode.NONE,
-        angle: Double = 0.0,
-        throwOnError: Boolean = false
+        angle: Double = 0.0
     ) {
         useSDLContext {
             memScoped {
@@ -52,10 +57,6 @@ class Sprite private constructor(
                         this.h = it.h.toFloat()
                     }
                 }
-
-                // Calculate scaled size
-                val scaledWidth = (clipRect?.w ?: texture.width.toFloat()) * scale.x.toFloat()
-                val scaledHeight = (clipRect?.h ?: texture.height.toFloat()) * scale.y.toFloat()
 
                 // Apply flipping
                 val flipX = if (flip == FlipMode.HORIZONTAL || flip == FlipMode.BOTH) -1f else 1f
@@ -74,8 +75,9 @@ class Sprite private constructor(
                         this.h = scaledHeight
                     }
 
-                    val result = SDL_RenderTexture(renderer, texture.texture, clipRect?.ptr, destRect.ptr)
-                    handleRenderResult(result, throwOnError)
+                    if (!SDL_RenderTexture(renderer, texture.texture, clipRect?.ptr, destRect.ptr)) {
+                        handleError()
+                    }
                     return
                 }
 
@@ -102,32 +104,36 @@ class Sprite private constructor(
                 }
 
                 // Render with affine transform
-                val result = SDL_RenderTextureAffine(
+                if (!SDL_RenderTextureAffine(
                     renderer,
                     texture.texture,
                     clipRect?.ptr,
                     origin.ptr,
                     right.ptr,
                     down.ptr
-                )
-                handleRenderResult(result, throwOnError)
+                )) {
+                    handleError()
+                }
             }
         }
     }
 
     fun cleanup() {
-    //    texture.cleanup()
+        //    texture.cleanup()
+    }
+
+    private fun handleError() {
+        val error = SDL_GetError()?.toKString()
+        logger.error("Error rendering sprite: $error")
+        throw RuntimeException("Failed to render sprite: $error")
     }
 
     // Handles SDL errors with optional exception throwing
     private fun handleRenderResult(result: Boolean, throwOnError: Boolean) {
-        if (!result) {
-            val error = SDL_GetError()?.toKString()
-            logger.error("Error rendering sprite: $error")
-            if (throwOnError) {
-                throw RuntimeException("Failed to render sprite: $error")
-            }
-        }
+        val error = SDL_GetError()?.toKString()
+        logger.error("Error rendering sprite: $error")
+
+        throw RuntimeException("Failed to render sprite: $error")
     }
 
     companion object {

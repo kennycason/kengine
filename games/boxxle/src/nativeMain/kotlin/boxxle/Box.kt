@@ -1,10 +1,11 @@
 package boxxle
 
+import boxxle.context.getBoxxleContext
 import boxxle.context.useBoxxleContext
-import com.kengine.hooks.context.getContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.useTextureContext
+import com.kengine.hooks.context.getContext
 import com.kengine.math.Vec2
 
 class Box(
@@ -27,9 +28,10 @@ class Box(
     }
 
     override fun draw() {
+        val scaledDim = 32 * getBoxxleContext().level.data.scale
         useTextureContext {
-            if (isPlaced) boxPlaced.draw(p.x * 32, p.y * 32)
-            else box.draw(p.x * 32, p.y * 32)
+            if (isPlaced) boxPlaced.draw(p.x * scaledDim, p.y * scaledDim)
+            else box.draw(p.x * scaledDim, p.y * scaledDim)
         }
     }
 
