@@ -35,7 +35,7 @@ class SDLContext private constructor(
     val renderer: CValuesRef<cnames.structs.SDL_Renderer>?,
 ) : Context(), Logging {
 
-    private var currentBlendMode = SDL_BLENDMODE_NONE
+    private var currentBlendMode = SDL_BLENDMODE_NONE // SDL3 defaults to NONE
 
     fun enableBlendedMode() {
         setBlendMode(SDL_BLENDMODE_BLEND)

@@ -29,7 +29,7 @@ class BoxxleGame : Game, Logging {
     private lateinit var mainSound: Sound
     private lateinit var finishSound: Sound
     private val menuFont: Font by lazy {
-        getFontContext().getFont(Fonts.ARCADE_CLASSIC, 32)
+        getFontContext().getFont(Fonts.ARCADE_CLASSIC, 32f)
     }
 
     init {
@@ -66,7 +66,7 @@ class BoxxleGame : Game, Logging {
             }
 
             val level = getBoxxleContext().level
-           // menuFont.drawText("LVL ${level.levelNumber}", 690, 560, r = 0x33u, g = 0x33u, b = 0x33u, a = 0xFFu)
+            menuFont.drawText("LVL ${level.levelNumber}", 690, 560, r = 0x33u, g = 0x33u, b = 0x33u, a = 0xFFu)
 
             flipScreen()
         }

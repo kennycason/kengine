@@ -1,5 +1,6 @@
 package com.kengine.font
 
+import com.kengine.file.File
 import com.kengine.hooks.context.Context
 import com.kengine.log.Logging
 import kotlinx.cinterop.CPointer
@@ -24,19 +25,30 @@ class FontContext : Context(), Logging {
     }
 
     fun addFont(fontName: String, fontFilePath: String, fontSize: Float): Font {
+        val fullFontFilePath = File.pwd() + "/" + fontFilePath
+        if (!File.isExist(fullFontFilePath)) {
+            throw IllegalStateException("Font file does not exist at $fullFontFilePath")
+        }
+
         val key = "$fontName:$fontSize"
-        logger.info { "adding font $key" }
-        return fontCache.getOrPut(key) {
-            Font(
+        logger.info { "adding font $key@$fullFontFilePath" }
+        try {
+            if (fontCache.containsKey(key)) {
+                throw IllegalStateException("Font $key already registered.")
+            }
+            fontCache[key] = Font(
                 name = fontName,
-                font = TTF_OpenFont(fontFilePath, fontSize)
-                    ?: throw IllegalStateException("Failed to load font at $fontFilePath: ${SDL_GetError()?.toKString()}"),
+                font = TTF_OpenFont(fullFontFilePath, fontSize)
+                    ?: throw IllegalStateException("Failed to load font at $fullFontFilePath: ${SDL_GetError()?.toKString()}"),
                 fontSize = fontSize
             )
+            return fontCache.getValue(key)
+        } catch (e: Exception) {
+            throw IllegalStateException("Failed to load font at $fullFontFilePath: ${SDL_GetError()?.toKString()}")
         }
     }
 
-    fun getFont(fontName: String, fontSize: Int): Font {
+    fun getFont(fontName: String, fontSize: Float): Font {
         val key = "$fontName:$fontSize"
         return fontCache.getOrElse(key) {
             throw IllegalStateException("Failed to get font $fontName:$fontSize")
