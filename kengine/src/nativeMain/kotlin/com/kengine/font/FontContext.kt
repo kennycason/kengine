@@ -83,10 +83,9 @@ class FontContext : Context(), Logging {
         private var currentContext: FontContext? = null
 
         fun get(): FontContext {
-            if (currentContext == null) {
-                currentContext = FontContext()
+            return currentContext ?: FontContext().also {
+                currentContext = it
             }
-            return currentContext!!
         }
     }
 }

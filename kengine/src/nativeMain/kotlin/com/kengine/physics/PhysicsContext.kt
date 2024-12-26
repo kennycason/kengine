@@ -100,10 +100,9 @@ class PhysicsContext private constructor() : Context(), Logging {
         private var currentContext: PhysicsContext? = null
 
         fun get(): PhysicsContext {
-            if (currentContext == null) {
-                currentContext = PhysicsContext()
+            return currentContext ?: PhysicsContext().also {
+                currentContext = it
             }
-            return currentContext ?: throw IllegalStateException("Failed to create PhysicsContext")
         }
     }
 }

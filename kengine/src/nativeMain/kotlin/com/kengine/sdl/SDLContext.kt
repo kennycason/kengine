@@ -29,13 +29,30 @@ import sdl3.SDL_WINDOW_RESIZABLE
 
 @OptIn(ExperimentalForeignApi::class)
 class SDLContext private constructor(
+    val title: String,
     val screenWidth: Int,
     val screenHeight: Int,
-    private val window: CValuesRef<cnames.structs.SDL_Window>,
-    val renderer: CValuesRef<cnames.structs.SDL_Renderer>?,
+    flags: ULong = SDL_WINDOW_RESIZABLE
 ) : Context(), Logging {
 
+    private val window: CValuesRef<cnames.structs.SDL_Window> by lazy {
+        SDL_CreateWindow(title, screenWidth, screenHeight, flags)
+            ?: throw IllegalStateException("Error creating window: ${SDL_GetError()?.toKString()}")
+    }
+
+    val renderer: CValuesRef<cnames.structs.SDL_Renderer>? by lazy {
+        SDL_CreateRenderer(window, null)
+            ?: throw IllegalStateException("Error creating renderer: ${SDL_GetError()?.toKString()}")
+    }
+
     private var currentBlendMode = SDL_BLENDMODE_NONE // SDL3 defaults to NONE
+
+    init {
+        require(SDL_Init(SDL_INIT_VIDEO)) {
+            Companion.logger.error("Error initializing SDL Video: ${SDL_GetError()?.toKString()}")
+            exit(1)
+        }
+    }
 
     fun enableBlendedMode() {
         setBlendMode(SDL_BLENDMODE_BLEND)
@@ -102,18 +119,7 @@ class SDLContext private constructor(
                throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
             }
 
-            require(SDL_Init(SDL_INIT_VIDEO)) {
-                logger.error("Error initializing SDL Video: ${SDL_GetError()?.toKString()}")
-                exit(1)
-            }
-
-            val window = SDL_CreateWindow(title, width, height, flags)
-                ?: throw IllegalStateException("Error creating window: ${SDL_GetError()?.toKString()}")
-
-            val renderer = SDL_CreateRenderer(window, null)
-                ?: throw IllegalStateException("Error creating renderer: ${SDL_GetError()?.toKString()}")
-
-            currentContext = SDLContext(width, height, window, renderer)
+            currentContext = SDLContext(title, width, height, flags)
             return currentContext!!
         }
 

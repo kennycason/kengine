@@ -192,10 +192,9 @@ class GeometryContext private constructor() : Context(), Logging {
         private var currentContext: GeometryContext? = null
 
         fun get(): GeometryContext {
-            if (currentContext == null) {
-                currentContext = GeometryContext()
+            return currentContext ?: GeometryContext().also {
+                currentContext = it
             }
-            return currentContext ?: throw IllegalStateException("Failed to create GeometryContext")
         }
     }
 

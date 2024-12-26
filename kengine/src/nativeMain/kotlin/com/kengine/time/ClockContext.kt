@@ -50,10 +50,9 @@ data class ClockContext private constructor(
         private var currentContext: ClockContext? = null
 
         fun get(): ClockContext {
-            if (currentContext == null) {
-                currentContext = ClockContext()
+            return currentContext ?: ClockContext().also {
+                currentContext = it
             }
-            return currentContext ?: throw IllegalStateException("Failed to create ClockContext")
         }
     }
 }

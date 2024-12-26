@@ -33,10 +33,9 @@ class SDLEventContext private constructor() : Context(), Logging {
         private var currentContext: SDLEventContext? = null
 
         fun get(): SDLEventContext {
-            if (currentContext == null) {
-                currentContext = SDLEventContext()
+            return currentContext ?: SDLEventContext().also {
+                currentContext = it
             }
-            return currentContext ?: throw IllegalStateException("Failed to create event context")
         }
     }
 

@@ -11,17 +11,16 @@ class KeyboardContext private constructor(
         private var currentContext: KeyboardContext? = null
 
         fun get(): KeyboardContext {
-            if (currentContext == null) {
-                currentContext = KeyboardContext(
-                    keyboard = KeyboardInputEventSubscriber()
-                )
+            return currentContext ?: KeyboardContext(
+                keyboard = KeyboardInputEventSubscriber()
+            ).also {
+                currentContext = it
             }
-            return currentContext ?: throw IllegalStateException("Failed to create keyboard context")
         }
     }
 
     override fun cleanup() {
-        logger.info { "Cleaning up KeyboardContext"}
+        logger.info { "Cleaning up KeyboardContext" }
         currentContext = null
     }
 

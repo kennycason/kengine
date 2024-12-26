@@ -19,21 +19,19 @@ class LoggerContext private constructor(
             if (currentContext != null) {
                 throw IllegalStateException("LoggerContext has already been created. Call cleanup() before creating a new context.")
             }
-            currentContext = LoggerContext(
+            return LoggerContext(
                 logLevel = logLevel
             )
-            return currentContext!!
+                .also { currentContext = it }
         }
 
         fun get(): LoggerContext {
             return currentContext ?: throw IllegalStateException("LoggerContext has not been created. Call create() first.")
         }
-
     }
 
     override fun cleanup() {
-        logger.info { "Cleaning up LoggerContext"}
+        logger.info { "Cleaning up LoggerContext" }
         currentContext = null
     }
-
 }

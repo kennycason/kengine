@@ -31,17 +31,16 @@ class TextureContext private constructor(
         private var currentContext: TextureContext? = null
 
         fun get(): TextureContext {
-            if (currentContext == null) {
-                currentContext = TextureContext(
-                    manager = TextureManager()
-                )
+            return currentContext ?: TextureContext(
+                manager = TextureManager()
+            ).also {
+                currentContext = it
             }
-            return currentContext ?: throw IllegalStateException("Failed to create TextureManagerContext")
         }
     }
 
     override fun cleanup() {
-        logger.info { "Cleaning up TextureContext"}
+        logger.info { "Cleaning up TextureContext" }
         manager.cleanup()
         currentContext = null
     }

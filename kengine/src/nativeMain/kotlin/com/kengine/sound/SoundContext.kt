@@ -21,6 +21,28 @@ class SoundContext private constructor(
     private val manager: SoundManager
 ) : Context(), Logging {
 
+    init {
+        require(SDL_Init(SDL_INIT_AUDIO)) {
+            Companion.logger.error("Error initializing SDL Audio: ${SDL_GetError()?.toKString()}")
+            exit(1)
+        }
+
+        memScoped {
+            val audioSpec = alloc<SDL_AudioSpec>().apply {
+                freq = 44100     // Sample rate
+                format = 0x8010u // 16-bit signed little-endian
+                channels = 2     // Stereo
+            }
+
+            Companion.logger.info { "freq=${audioSpec.freq}, format=${audioSpec.format}, channels=${audioSpec.channels}" }
+
+            val result = Mix_OpenAudio(0u, audioSpec.ptr)
+            require(result) {
+                "Failed to initialize SDL_mixer: ${SDL_GetError()?.toKString()}"
+            }
+        }
+    }
+
     fun addSound(name: String, sound: Sound) {
         manager.addSound(name, sound)
     }
@@ -41,32 +63,11 @@ class SoundContext private constructor(
         private var currentContext: SoundContext? = null
 
         fun get(): SoundContext {
-            if (currentContext == null) {
-                currentContext = SoundContext(
-                    manager = SoundManager()
-                )
-
-                require(SDL_Init(SDL_INIT_AUDIO)) {
-                    logger.error("Error initializing SDL Audio: ${SDL_GetError()?.toKString()}")
-                    exit(1)
-                }
-
-                memScoped {
-                    val audioSpec = alloc<SDL_AudioSpec>().apply {
-                        freq = 44100     // Sample rate
-                        format = 0x8010u // 16-bit signed little-endian
-                        channels = 2     // Stereo
-                    }
-
-                    logger.info { "freq=${audioSpec.freq}, format=${audioSpec.format}, channels=${audioSpec.channels}" }
-
-                    val result = Mix_OpenAudio(0u, audioSpec.ptr)
-                    require(result) {
-                        "Failed to initialize SDL_mixer: ${SDL_GetError()?.toKString()}"
-                    }
-                }
+            return currentContext ?: SoundContext(
+                manager = SoundManager()
+            ).also {
+                currentContext = it
             }
-            return currentContext ?: throw IllegalStateException("Failed to create SoundContext")
         }
     }
 }
