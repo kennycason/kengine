@@ -31,7 +31,7 @@ class TiledMapDrawIT {
                 object : Game {
                     private val scrollSpeed = 100.0
                     override fun update() {
-                        useTimer(50000L) {
+                        useTimer(5000L) {
                             isRunning = false
                         }
                     }
@@ -64,6 +64,7 @@ class TiledMapDrawIT {
                     override fun cleanup() {}
                 }
             }
+                .also { cleanup() }
         }
     }
 }

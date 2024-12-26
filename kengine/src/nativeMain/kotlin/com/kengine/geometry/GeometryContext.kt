@@ -200,6 +200,7 @@ class GeometryContext private constructor() : Context(), Logging {
     }
 
     override fun cleanup() {
-        // no-op cleanup
+        logger.info { "Cleaning up GeometryContext"}
+        currentContext = null
     }
 }

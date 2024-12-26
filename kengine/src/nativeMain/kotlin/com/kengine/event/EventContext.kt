@@ -35,7 +35,9 @@ class EventContext : Context(), Logging {
     }
 
     override fun cleanup() {
+        logger.info { "Cleaning up EventContext"}
         clearAll()
+        currentContext = null
     }
 
     companion object {

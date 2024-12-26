@@ -51,6 +51,7 @@ class BasicGameIT {
                     override fun cleanup() {}
                 }
             }
+                .also { cleanup() }
         }
     }
 }

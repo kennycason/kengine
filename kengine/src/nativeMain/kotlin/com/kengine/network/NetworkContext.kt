@@ -49,7 +49,9 @@ class NetworkContext : Context(), Logging {
     }
 
     override fun cleanup() {
+        logger.info { "Cleaning up NetworkContext"}
         closeAllConnections()
+        currentContext = null
     }
 
     companion object {

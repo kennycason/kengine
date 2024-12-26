@@ -4,7 +4,7 @@ import com.kengine.hooks.context.Context
 
 class LoggerContext private constructor(
     var logLevel: Logger.Level = Logger.Level.INFO
-) : Context() {
+) : Context(), Logging {
 
     init {
         Logger.setLevel(logLevel)
@@ -17,7 +17,7 @@ class LoggerContext private constructor(
             logLevel: Logger.Level = Logger.Level.INFO
         ): LoggerContext {
             if (currentContext != null) {
-                throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
+                throw IllegalStateException("LoggerContext has already been created. Call cleanup() before creating a new context.")
             }
             currentContext = LoggerContext(
                 logLevel = logLevel
@@ -32,7 +32,8 @@ class LoggerContext private constructor(
     }
 
     override fun cleanup() {
+        logger.info { "Cleaning up LoggerContext"}
+        currentContext = null
     }
 
 }
-

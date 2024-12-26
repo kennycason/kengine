@@ -41,8 +41,10 @@ class SDLEventContext private constructor() : Context(), Logging {
     }
 
     override fun cleanup() {
+        logger.info { "Cleaning up SDLEventContext"}
         events.clear()
         subscribers.clear()
+        currentContext = null
     }
 
     /**

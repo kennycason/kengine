@@ -81,9 +81,11 @@ class SDLContext private constructor(
     }
 
     override fun cleanup() {
+        logger.info { "Cleaning up SDLContext"}
         SDL_DestroyRenderer(renderer)
         SDL_DestroyWindow(window)
         SDL_Quit()
+        currentContext = null
     }
 
     companion object {
@@ -97,7 +99,8 @@ class SDLContext private constructor(
             flags: ULong = SDL_WINDOW_RESIZABLE
         ): SDLContext {
             if (currentContext != null) {
-                throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
+                return currentContext!!
+               // throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
             }
 
             require(SDL_Init(SDL_INIT_VIDEO)) {
@@ -105,12 +108,8 @@ class SDLContext private constructor(
                 exit(1)
             }
 
-            val window = SDL_CreateWindow(
-                title,
-                width,
-                height,
-                flags
-            ) ?: throw IllegalStateException("Error creating window: ${SDL_GetError()?.toKString()}")
+            val window = SDL_CreateWindow(title, width, height, flags)
+                ?: throw IllegalStateException("Error creating window: ${SDL_GetError()?.toKString()}")
 
             val renderer = SDL_CreateRenderer(window, null)
                 ?: throw IllegalStateException("Error creating renderer: ${SDL_GetError()?.toKString()}")

@@ -71,20 +71,22 @@ class FontContext : Context(), Logging {
     }
 
     override fun cleanup() {
+        logger.info { "Cleaning up FontContext" }
         clearCache()
         fontCache.values.forEach { it.cleanup() }
         fontCache.clear()
         TTF_Quit()
+        currentContext = null
     }
 
     companion object {
-        private var instance: FontContext? = null
+        private var currentContext: FontContext? = null
 
         fun get(): FontContext {
-            if (instance == null) {
-                instance = FontContext()
+            if (currentContext == null) {
+                currentContext = FontContext()
             }
-            return instance!!
+            return currentContext!!
         }
     }
 }

@@ -1,11 +1,12 @@
 package com.kengine.graphics
 
 import com.kengine.hooks.context.Context
+import com.kengine.log.Logging
 
 class SpriteContext private constructor(
     private val manager: SpriteManager,
     val spriteBatch: SpriteBatch,
-) : Context() {
+) : Context(), Logging{
 
     fun getSprite(name: String): Sprite {
         return manager.getSprite(name)
@@ -81,7 +82,9 @@ class SpriteContext private constructor(
     }
 
     override fun cleanup() {
+        logger.info { "Cleaning up SpriteContext"}
         manager.cleanup()
         spriteBatch.cleanup()
+        currentContext = null
     }
 }

@@ -2,6 +2,7 @@ package com.kengine.sound
 
 import com.kengine.hooks.context.Context
 import com.kengine.log.Logger
+import com.kengine.log.Logging
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -18,7 +19,7 @@ import sdl3.mixer.SDL_AudioSpec
 @OptIn(ExperimentalForeignApi::class)
 class SoundContext private constructor(
     private val manager: SoundManager
-) : Context() {
+) : Context(), Logging {
 
     fun addSound(name: String, sound: Sound) {
         manager.addSound(name, sound)
@@ -29,8 +30,10 @@ class SoundContext private constructor(
     }
 
     override fun cleanup() {
+        logger.info { "Cleaning up SoundContext" }
         manager.cleanup()
         Mix_CloseAudio()
+        currentContext = null
     }
 
     companion object {

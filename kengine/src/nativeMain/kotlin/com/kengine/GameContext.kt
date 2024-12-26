@@ -46,6 +46,77 @@ class GameContext private constructor(
     var isRunning = true
 
     init {
+        initContexts()
+    }
+
+    fun registerContext(context: Context) {
+        ContextRegistry.register(context)
+    }
+
+    companion object {
+        private var currentContext: GameContext? = null
+
+        fun create(
+            title: String,
+            width: Int,
+            height: Int,
+            logLevel: Logger.Level = Logger.Level.INFO
+        ): GameContext {
+            if (currentContext != null) {
+                throw IllegalStateException("GameContext has already been created. Call cleanup() before creating a new context.")
+            }
+
+            // TODO order matters, i.e. there are dependencies
+            return GameContext(
+                log = LoggerContext.create(logLevel),
+                sdl = SDLContext.create(title, width, height),
+                events = EventContext.get(),
+                sdlEvent = SDLEventContext.get(),
+                keyboard = KeyboardContext.get(),
+                mouse = MouseContext.get(),
+                controller = ControllerContext.get(),
+                texture = TextureContext.get(),
+                sprite = SpriteContext.get(),
+                font = FontContext.get(),
+                sound = SoundContext.get(),
+                network = NetworkContext.get(),
+                geometry = GeometryContext.get(),
+                action = ActionContext.get(),
+                physics = PhysicsContext.get(),
+                clock = ClockContext.get()
+            )
+                .also { it.initContexts() }
+                .also { currentContext = it }
+        }
+
+        fun get(): GameContext {
+            return currentContext ?: throw IllegalStateException("AppContext has not been created. Call create() first.")
+        }
+    }
+
+    override fun cleanup() {
+        logger.info { "Cleaning up GameContext"}
+        log.cleanup()
+        action.cleanup()
+        sdlEvent.cleanup()
+        events.cleanup()
+        keyboard.cleanup()
+        mouse.cleanup()
+        controller.cleanup()
+        texture.cleanup()
+        sprite.cleanup()
+        geometry.cleanup()
+        font.cleanup()
+        sound.cleanup()
+        network.cleanup()
+        sdl.cleanup()
+        clock.cleanup()
+        ContextRegistry.clearAll()
+        currentContext = null
+    }
+
+    internal fun initContexts() {
+        ContextRegistry.register(this)
         ContextRegistry.register(log)
         ContextRegistry.register(sdl)
         ContextRegistry.register(sdlEvent)
@@ -67,68 +138,4 @@ class GameContext private constructor(
         getControllerContext().init()
         registerSDLQuitHandler()
     }
-
-    fun registerContext(context: Context) {
-        ContextRegistry.register(context)
-    }
-
-    companion object {
-        private var currentContext: GameContext? = null
-
-        fun create(
-            title: String,
-            width: Int,
-            height: Int,
-            logLevel: Logger.Level = Logger.Level.INFO
-        ): GameContext {
-            if (currentContext != null) {
-                throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
-            }
-            // TODO order matters, i.e. there are dependencies
-            currentContext = GameContext(
-                log = LoggerContext.create(logLevel),
-                sdl = SDLContext.create(title, width, height),
-                events = EventContext.get(),
-                sdlEvent = SDLEventContext.get(),
-                keyboard = KeyboardContext.get(),
-                mouse = MouseContext.get(),
-                controller = ControllerContext.get(),
-                texture = TextureContext.get(),
-                sprite = SpriteContext.get(),
-                font = FontContext.get(),
-                sound = SoundContext.get(),
-                network = NetworkContext.get(),
-                geometry = GeometryContext.get(),
-                action = ActionContext.get(),
-                physics = PhysicsContext.get(),
-                clock = ClockContext.get()
-            )
-            return currentContext!!
-        }
-
-        fun get(): GameContext {
-            return currentContext ?: throw IllegalStateException("AppContext has not been created. Call create() first.")
-        }
-    }
-
-    override fun cleanup() {
-        logger.info { "Cleaning up game resources" }
-        log.cleanup()
-        action.cleanup()
-        sdlEvent.cleanup()
-        events.cleanup()
-        keyboard.cleanup()
-        mouse.cleanup()
-        controller.cleanup()
-        texture.cleanup()
-        sprite.cleanup()
-        geometry.cleanup()
-        font.cleanup()
-        sound.cleanup()
-        network.cleanup()
-        sdl.cleanup()
-        clock.cleanup()
-        ContextRegistry.clearAll()
-    }
-
 }
