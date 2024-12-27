@@ -23,7 +23,7 @@ modules.addAll(
     listOf(
         "games:boxxle",
         "games:helloworld",
-//        "games:image-shuffle",
+        "games:image-shuffle",
         "games:physics-demo"
     )
 )
