@@ -7,7 +7,7 @@ import com.kengine.action.useActionContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.useSpriteContext
-import com.kengine.input.controller.controls.Playstation4
+import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.useControllerContext
 import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.math.Vec2
@@ -68,24 +68,24 @@ class Player(
         }
         useControllerContext {
             if (!isMoving && timeSinceMs(lastMovedMs) > 300) {
-                if (controller.isButtonPressed(Playstation4.DPAD_LEFT)) {
+                if (controller.isButtonPressed(Buttons.DPAD_LEFT)) {
                     face = Direction.LEFT
                     tryMove(Vec2(-1.0, 0.0))
                 }
-                if (controller.isButtonPressed(Playstation4.DPAD_RIGHT)) {
+                if (controller.isButtonPressed(Buttons.DPAD_RIGHT)) {
                     face = Direction.RIGHT
                     tryMove(Vec2(1.0, 0.0))
                 }
-                if (controller.isButtonPressed(Playstation4.DPAD_UP)) {
+                if (controller.isButtonPressed(Buttons.DPAD_UP)) {
                     face = Direction.UP
                     tryMove(Vec2(0.0, -1.0))
                 }
-                else if (controller.isButtonPressed(Playstation4.DPAD_DOWN)) {
+                else if (controller.isButtonPressed(Buttons.DPAD_DOWN)) {
                     face = Direction.DOWN
                     tryMove(Vec2(0.0, 1.0))
                 }
 
-                if (controller.isButtonPressed(Playstation4.SHARE)) {
+                if (controller.isButtonPressed(Buttons.SELECT)) {
                     useGameContext {
                         isRunning = false
                     }

@@ -1,7 +1,18 @@
-package com.kengine.input.controller.controls
+package com.kengine.input.controller.controls.mappings
+
+import com.kengine.input.controller.controls.AxisType
+import com.kengine.input.controller.controls.ButtonType
+import com.kengine.input.controller.controls.Buttons
+import com.kengine.input.controller.controls.ControllerMapping
 
 object Playstation4 : ControllerMapping {
     override val name = "PS4 Controller"
+
+    override fun isMatches(controllerName: String): Boolean {
+        return controllerName.contains("PS4", ignoreCase = true) ||
+            controllerName.contains("DualShock", ignoreCase = true) ||
+            controllerName.contains("PlayStation 4", ignoreCase = true)
+    }
 
     // Face buttons
     const val X = 0
@@ -20,6 +31,8 @@ object Playstation4 : ControllerMapping {
     // Shoulder buttons
     const val L1 = 9
     const val R1 = 10
+    const val L2 = 11
+    const val R2 = 12
 
     // D-Pad (using same logical IDs as before)
     const val DPAD_UP = 100
@@ -60,6 +73,35 @@ object Playstation4 : ControllerMapping {
         DPAD_LEFT to ButtonType.HAT_LEFT,
         DPAD_RIGHT to ButtonType.HAT_RIGHT
     )
+
+    override val gamepadMappings = mapOf(
+        // Map both generic and PS-specific buttons
+        Buttons.B to X,             // X button
+        Buttons.A to O,             // O button
+        Buttons.Y to SQUARE,        // Square button
+        Buttons.X to TRIANGLE,      // Triangle button
+
+        // PS-specific mappings
+        Buttons.SQUARE to SQUARE,
+        Buttons.TRIANGLE to TRIANGLE,
+        Buttons.CIRCLE to O,
+
+        Buttons.SELECT to SHARE,
+        Buttons.START to OPTIONS,
+
+        Buttons.L1 to L1,
+        Buttons.R1 to R1,
+        Buttons.L2 to L2,
+        Buttons.R2 to R2,
+        Buttons.L3 to L3,
+        Buttons.R3 to R3,
+
+        Buttons.DPAD_UP to DPAD_UP,
+        Buttons.DPAD_DOWN to DPAD_DOWN,
+        Buttons.DPAD_LEFT to DPAD_LEFT,
+        Buttons.DPAD_RIGHT to DPAD_RIGHT
+    )
+
 
     // Optional: Add axis mappings if you want to normalize/configure axis handling
     val axisMappings = mapOf(

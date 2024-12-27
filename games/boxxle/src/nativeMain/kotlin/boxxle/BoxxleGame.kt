@@ -10,7 +10,7 @@ import com.kengine.font.getFontContext
 import com.kengine.font.useFontContext
 import com.kengine.getGameContext
 import com.kengine.hooks.context.getContext
-import com.kengine.input.controller.controls.Playstation4
+import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.useControllerContext
 import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.log.Logging
@@ -106,28 +106,23 @@ class BoxxleGame : Game, Logging {
             }
 
             useControllerContext {
-                if (controller.isButtonPressed(Playstation4.TRIANGLE) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
-                    logger.info { "pressed triangle" }
+                if (controller.isButtonPressed(Buttons.X) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
                     timeSinceOptionChangeMs = getCurrentMilliseconds()
                     reloadLevel()
                 }
-                if (controller.isButtonPressed(Playstation4.TRIANGLE) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
-                    timeSinceOptionChangeMs = getCurrentMilliseconds()
-                    reloadLevel()
-                }
-                if (controller.isButtonPressed(Playstation4.R1) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                if (controller.isButtonPressed(Buttons.R1) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
                     timeSinceOptionChangeMs = getCurrentMilliseconds()
                     loadLevel((level.levelNumber + 1) % LEVEL_DATA.size)
                 }
-                if (controller.isButtonPressed(Playstation4.L1) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                if (controller.isButtonPressed(Buttons.L1) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
                     timeSinceOptionChangeMs = getCurrentMilliseconds()
                     loadLevel((level.levelNumber - 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
                 }
-                if (controller.isButtonPressed(Playstation4.R3)) {
+                if (controller.isButtonPressed(Buttons.R3)) {
                     mainSound.setVolume(mainSound.getVolume() + 1)
                     finishSound.setVolume(finishSound.getVolume() + 1)
                 }
-                if (controller.isButtonPressed(Playstation4.L3)) {
+                if (controller.isButtonPressed(Buttons.L3)) {
                     mainSound.setVolume(mainSound.getVolume() - 1)
                     finishSound.setVolume(finishSound.getVolume() - 1)
                 }

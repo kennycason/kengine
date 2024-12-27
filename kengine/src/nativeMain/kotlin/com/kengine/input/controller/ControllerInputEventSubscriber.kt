@@ -1,9 +1,10 @@
 package com.kengine.input.controller
 
 import com.kengine.input.controller.controls.ButtonType
+import com.kengine.input.controller.controls.Buttons
+import com.kengine.input.controller.controls.ControllerMapper
 import com.kengine.input.controller.controls.ControllerMapping
 import com.kengine.input.controller.controls.HatDirection
-import com.kengine.input.controller.controls.Playstation4
 import com.kengine.log.Logging
 import com.kengine.sdl.SDLEventContext
 import com.kengine.sdl.useSDLEventContext
@@ -93,6 +94,7 @@ class ControllerInputEventSubscriber : Logging {
         val joystickID = event.jaxis.which
         val axis = event.jaxis.axis.toInt()
         val value = event.jaxis.value.toFloat() / 32767.0f
+
         if (logger.isDebugEnabled()) {
             logger.debug { "Axis Motion - JoystickID: $joystickID, Axis: $axis, Value: $value" }
         }
@@ -148,7 +150,6 @@ class ControllerInputEventSubscriber : Logging {
     /**
      * Checks if a button is pressed on any connected controller
      */
-
     fun isButtonPressed(buttonIndex: Int): Boolean {
         for ((id, state) in controllerStates) {
             val mapping = controllerMappings[id]?.buttonMappings?.get(buttonIndex)
@@ -167,6 +168,15 @@ class ControllerInputEventSubscriber : Logging {
 
     fun isButtonPressed(controllerId: UInt, buttonIndex: Int): Boolean {
         return controllerStates[controllerId]?.buttons?.getOrNull(buttonIndex) ?: false
+    }
+
+    fun isButtonPressed(button: Buttons): Boolean {
+        for ((id, state) in controllerStates) {
+            val mapping = controllerMappings[id] ?: continue
+            val buttonIndex = mapping.gamepadMappings[button] ?: continue
+            if (isButtonPressed(buttonIndex)) return true
+        }
+        return false
     }
 
     /**
@@ -207,13 +217,7 @@ class ControllerInputEventSubscriber : Logging {
                     val instanceId = joyArray[i]
                     SDL_OpenJoystick(instanceId)?.let { joystick ->
                         val name = SDL_GetJoystickName(joystick)?.toKString() ?: "Unknown Controller"
-
-                        // Auto-detect controller type
-                        val mapping = when {
-                            name.contains(Playstation4.name, ignoreCase = true) -> Playstation4
-                            // Add more controller types here
-                            else -> null
-                        }
+                        val mapping = ControllerMapper.getMapping(name)
 
                         logger.info { "Controller '$name' connected with mapping: ${mapping?.name ?: "None"}" }
 
