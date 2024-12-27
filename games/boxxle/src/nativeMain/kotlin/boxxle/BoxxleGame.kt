@@ -10,6 +10,7 @@ import com.kengine.font.getFontContext
 import com.kengine.font.useFontContext
 import com.kengine.getGameContext
 import com.kengine.hooks.context.getContext
+import com.kengine.input.controller.controls.Playstation4
 import com.kengine.input.controller.useControllerContext
 import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.log.Logging

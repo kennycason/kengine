@@ -7,6 +7,7 @@ import com.kengine.action.useActionContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.useSpriteContext
+import com.kengine.input.controller.controls.Playstation4
 import com.kengine.input.controller.useControllerContext
 import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.math.Vec2
