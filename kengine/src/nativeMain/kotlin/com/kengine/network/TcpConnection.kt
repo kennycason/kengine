@@ -1,15 +1,11 @@
 package com.kengine.network
 
 import com.kengine.log.Logging
-import com.kengine.sdl.cinterop.SDLNet_TCPsocket
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.alloc
 import kotlinx.cinterop.convert
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,25 +18,37 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
-import sdl2.net.IPaddress
-import sdl2.net.SDLNet_GetError
-import sdl2.net.SDLNet_ResolveHost
-import sdl2.net.SDLNet_TCP_Close
-import sdl2.net.SDLNet_TCP_Open
-import sdl2.net.SDLNet_TCP_Recv
-import sdl2.net.SDLNet_TCP_Send
+import sdl3.net.SDLNet_CreateClient
+import sdl3.net.SDLNet_DestroyStreamSocket
+import sdl3.net.SDLNet_ReadFromStreamSocket
+import sdl3.net.SDLNet_WaitUntilConnected
+import sdl3.net.SDLNet_WriteToStreamSocket
+import sdl3.net.SDL_GetError
 
 @OptIn(ExperimentalForeignApi::class)
-open class TcpConnection(
+open class TcpConnection private constructor(
     private val address: IPAddress,
+    initialSocket: CPointer<cnames.structs.SDLNet_StreamSocket>?,
     private val bufferSize: Int = DEFAULT_BUFFER_SIZE
 ) : NetworkConnection, Logging, AutoCloseable {
+
+    // Primary constructor for normal connections
+    constructor(
+        address: IPAddress,
+        bufferSize: Int = DEFAULT_BUFFER_SIZE
+    ) : this(address, null, bufferSize)
+
+    // Protected constructor for server connections
+    protected constructor(
+        socket: CPointer<cnames.structs.SDLNet_StreamSocket>
+    ) : this(IPAddress("0.0.0.0", 0u), socket)
+
 
     companion object {
         const val DEFAULT_BUFFER_SIZE = 1024
     }
 
-    var tcpSocket: CPointer<SDLNet_TCPsocket>? = null
+    private var streamSocket: CPointer<cnames.structs.SDLNet_StreamSocket>? = initialSocket
     private var receiveJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     var isRunning = false
@@ -51,14 +59,19 @@ open class TcpConnection(
     override fun connect() {
         logger.info { "Starting TCP connection on ${address.host}:${address.port}" }
 
-        memScoped {
-            val resolvedIp = alloc<IPaddress>()
-            if (SDLNet_ResolveHost(resolvedIp.ptr, address.host, address.port) < 0) {
-                throw Exception("Failed to resolve host ${address.host}: ${SDLNet_GetError()}")
-            }
+        val sdlAddress = address.toSDL()
+            ?: throw Exception("Failed to resolve host ${address.host}")
 
-            tcpSocket = SDLNet_TCP_Open(resolvedIp.ptr)?.reinterpret()
-                ?: throw Exception("Failed to open TCP connection: ${SDLNet_GetError()}")
+        streamSocket = SDLNet_CreateClient(sdlAddress, address.port)
+            ?: throw Exception("Failed to create TCP client: ${SDL_GetError()}")
+
+        // Wait for connection (SDL3 returns 1 for success)
+        val connectionStatus = SDLNet_WaitUntilConnected(streamSocket, 5000)
+        if (connectionStatus != 1) {
+            throw Exception("Failed to connect: ${
+                if (connectionStatus == 0) "Connection timed out"
+                else SDL_GetError()?.toKString() ?: "Unknown error"
+            }")
         }
 
         isRunning = true
@@ -71,20 +84,20 @@ open class TcpConnection(
         runBlocking {
             receiveJob?.cancelAndJoin()
         }
-        tcpSocket?.reinterpret<cnames.structs._TCPsocket>()?.let { socket ->
-            SDLNet_TCP_Close(socket)
-            tcpSocket = null
+        streamSocket?.let { socket ->
+            SDLNet_DestroyStreamSocket(socket)
+            streamSocket = null
         }
     }
 
     fun send(data: ByteArray) {
         if (!isRunning) throw IllegalStateException("Connection is not open")
 
-        tcpSocket?.reinterpret<cnames.structs._TCPsocket>()?.let { socket ->
+        streamSocket?.let { socket ->
             data.usePinned { pinned ->
-                val sent = SDLNet_TCP_Send(socket, pinned.addressOf(0), data.size.convert())
-                if (sent < data.size) {
-                    throw Exception("Failed to send TCP data: ${SDLNet_GetError()}")
+                val success = SDLNet_WriteToStreamSocket(socket, pinned.addressOf(0), data.size.convert())
+                if (!success) {
+                    throw Exception("Failed to send TCP data: ${SDL_GetError()}")
                 }
                 if (logger.isDebugEnabled()) {
                     logger.debug { "Sent ${data.size} bytes" }
@@ -111,55 +124,58 @@ open class TcpConnection(
         if (receiveJob != null) throw IllegalStateException("Already subscribed")
 
         receiveJob = scope.launch {
-            memScoped {
-                val buffer = ByteArray(bufferSize)
+            val buffer = ByteArray(bufferSize)
 
-                try {
-                    while (isRunning && isActive) {
-                        val shouldContinue = tcpSocket?.reinterpret<cnames.structs._TCPsocket>()?.let { socket ->
-                            buffer.usePinned { pinned ->
-                                val received = SDLNet_TCP_Recv(socket, pinned.addressOf(0), bufferSize.convert())
-                                when {
-                                    received > 0 -> {
-                                        val data = buffer.copyOf(received)
-                                        if (logger.isDebugEnabled()) {
-                                            logger.debug { "Received $received bytes" }
-                                        }
+            try {
+                while (isRunning && isActive) {
+                    val shouldContinue = streamSocket?.let { socket ->
+                        buffer.usePinned { pinned ->
+                            val received = SDLNet_ReadFromStreamSocket(
+                                socket,
+                                pinned.addressOf(0),
+                                bufferSize.convert()
+                            )
 
-                                        launch(Dispatchers.Default) {
-                                            try {
-                                                onReceive(data)
-                                            } catch (e: Exception) {
-                                                logger.error(e) { "Error in receive callback" }
-                                            }
+                            when {
+                                received > 0 -> {
+                                    val data = buffer.copyOf(received)
+                                    if (logger.isDebugEnabled()) {
+                                        logger.debug { "Received $received bytes" }
+                                    }
+
+                                    launch(Dispatchers.Default) {
+                                        try {
+                                            onReceive(data)
+                                        } catch (e: Exception) {
+                                            logger.error(e) { "Error in receive callback" }
                                         }
-                                        true // continue receiving
                                     }
-                                    received == 0 -> {
-                                        logger.info { "Connection closed normally by peer" }
-                                        isRunning = false
-                                        false // stop receiving
-                                    }
-                                    else -> {
-                                        logger.info { "Connection error or closed abruptly" }
-                                        isRunning = false
-                                        false // stop receiving
-                                    }
+                                    true // continue receiving
+                                }
+                                received == 0 -> {
+                                    logger.info { "Connection closed normally" }
+                                    isRunning = false
+                                    false
+                                }
+                                else -> {
+                                    logger.info { "Connection error: ${SDL_GetError()}" }
+                                    isRunning = false
+                                    false
                                 }
                             }
-                        } ?: false
-
-                        if (!shouldContinue) {
-                            break
                         }
+                    } ?: false
 
-                        delay(1) // prevent busy waiting
+                    if (!shouldContinue) {
+                        break
                     }
-                } catch (e: Exception) {
-                    logger.error(e) { "Error in receive loop" }
-                    isRunning = false
-                    throw e
+
+                    delay(1) // prevent busy waiting
                 }
+            } catch (e: Exception) {
+                logger.error(e) { "Error in receive loop" }
+                isRunning = false
+                throw e
             }
         }
     }

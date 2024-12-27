@@ -2,9 +2,10 @@ package com.kengine.action
 
 import com.kengine.entity.Entity
 import com.kengine.hooks.context.Context
+import com.kengine.log.Logging
 import com.kengine.math.Vec2
 
-class ActionContext private constructor() : Context() {
+class ActionContext private constructor() : Context(), Logging {
     private val actions = ArrayDeque<Action>()
 
     fun moveTo(entity: Entity, destination: Vec2, speed: Double, onComplete: (() -> Unit)) {
@@ -30,6 +31,7 @@ class ActionContext private constructor() : Context() {
     }
 
     override fun cleanup() {
+        logger.info { "Cleaning up ActionContext"}
         actions.clear()
     }
 

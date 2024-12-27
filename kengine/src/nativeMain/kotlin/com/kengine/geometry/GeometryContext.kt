@@ -1,10 +1,10 @@
 package com.kengine.geometry
 
-import com.kengine.hooks.context.Context
 import com.kengine.graphics.alphaFromRGBA
 import com.kengine.graphics.blueFromRGBA
 import com.kengine.graphics.greenFromRGBA
 import com.kengine.graphics.redFromRGBA
+import com.kengine.hooks.context.Context
 import com.kengine.log.Logging
 import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -12,20 +12,14 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.toKString
-import sdl2.SDL_GetError
-import sdl2.SDL_Rect
-import sdl2.SDL_RenderDrawLine
-import sdl2.SDL_RenderDrawPoint
-import sdl2.SDL_RenderDrawRect
-import sdl2.SDL_RenderFillRect
-import sdl2.SDL_SetRenderDrawColor
-import sdl2gfx.circleRGBA
-import sdl2gfx.filledCircleRGBA
+import sdl3.SDL_FRect
+import sdl3.SDL_GetError
+import sdl3.SDL_RenderFillRect
+import sdl3.SDL_RenderRect
+import sdl3.SDL_SetRenderDrawColor
+import sdl3.image.SDL_RenderLine
+import sdl3.image.SDL_RenderPoint
 
-/**
- *
- * TODO better handle Int to Short cast
- */
 @OptIn(ExperimentalForeignApi::class)
 class GeometryContext private constructor() : Context(), Logging {
 
@@ -44,14 +38,48 @@ class GeometryContext private constructor() : Context(), Logging {
     fun drawCircle(
         centerX: Int, centerY: Int,
         radius: Int,
-        r: UByte, g: UByte, b: UByte, a: UByte
+        r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
         useSDLContext {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
-            val result = circleRGBA(renderer, centerX.toShort(), centerY.toShort(), radius.toShort(), r, g, b, a)
-            if (result != 0) {
-                logger.error("Error drawing circle: ${SDL_GetError()?.toKString()}")
+            // SDL3 doesn't have a built-in circle-drawing function. Use a custom implementation.
+            drawCirclePoints(centerX, centerY, radius, r, g, b, a)
+        }
+    }
+
+    private fun drawCirclePoints(
+        centerX: Int, centerY: Int, radius: Int,
+        r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
+    ) {
+        // mid-point circle algorithm
+        var x = radius
+        var y = 0
+        var p = 1 - radius
+
+        while (x >= y) {
+            drawSymmetricCirclePoints(centerX, centerY, x, y, r, g, b, a)
+            y++
+            if (p <= 0) {
+                p += 2 * y + 1
+            } else {
+                x--
+                p += 2 * y - 2 * x + 1
             }
+        }
+    }
+
+    private fun drawSymmetricCirclePoints(
+        centerX: Int, centerY: Int, x: Int, y: Int,
+        r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
+    ) {
+        val points = listOf(
+            centerX + x to centerY + y, centerX - x to centerY + y,
+            centerX + x to centerY - y, centerX - x to centerY - y,
+            centerX + y to centerY + x, centerX - y to centerY + x,
+            centerX + y to centerY - x, centerX - y to centerY - x
+        )
+        for ((px, py) in points) {
+            drawPixel(px, py, r, g, b, a)
         }
     }
 
@@ -70,55 +98,15 @@ class GeometryContext private constructor() : Context(), Logging {
     fun fillCircle(
         centerX: Int, centerY: Int,
         radius: Int,
-        r: UByte, g: UByte, b: UByte, a: UByte
+        r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
         useSDLContext {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
-            val result = filledCircleRGBA(renderer, centerX.toShort(), centerY.toShort(), radius.toShort(), r, g, b, a)
-            if (result != 0) {
-                logger.error("Error filling circle: ${SDL_GetError()?.toKString()}")
+            for (y in -radius..radius) {
+                val width = kotlin.math.sqrt((radius * radius - y * y).toDouble()).toInt()
+                drawLine(centerX - width, centerY + y, centerX + width, centerY + y, r, g, b, a)
             }
         }
-    }
-
-    fun drawSquare(
-        x: Int, y: Int,
-        size: Int,
-        rgba: UInt
-    ) = drawSquare(
-        x, y, size,
-        r = redFromRGBA(rgba),
-        g = greenFromRGBA(rgba),
-        b = blueFromRGBA(rgba),
-        a = alphaFromRGBA(rgba)
-    )
-
-    fun drawSquare(
-        x: Int, y: Int,
-        size: Int,
-        r: UByte, g: UByte, b: UByte, a: UByte
-    ) {
-        drawRectangle(x, y, size, size, r, g, b, a)
-    }
-
-    fun fillSquare(
-        x: Int, y: Int,
-        size: Int,
-        rgba: UInt
-    ) = fillSquare(
-        x, y, size,
-        r = redFromRGBA(rgba),
-        g = greenFromRGBA(rgba),
-        b = blueFromRGBA(rgba),
-        a = alphaFromRGBA(rgba)
-    )
-
-    fun fillSquare(
-        x: Int, y: Int,
-        size: Int,
-        r: UByte, g: UByte, b: UByte, a: UByte
-    ) {
-        fillRectangle(x, y, size, size, r, g, b, a)
     }
 
     fun drawRectangle(
@@ -136,19 +124,18 @@ class GeometryContext private constructor() : Context(), Logging {
     fun drawRectangle(
         x: Int, y: Int,
         width: Int, height: Int,
-        r: UByte, g: UByte, b: UByte, a: UByte
+        r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
         useSDLContext {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
             memScoped {
-                val rect = alloc<SDL_Rect>().apply {
-                    this.x = x
-                    this.y = y
-                    this.w = width
-                    this.h = height
+                val rect = alloc<SDL_FRect>().apply {
+                    this.x = x.toFloat()
+                    this.y = y.toFloat()
+                    this.w = width.toFloat()
+                    this.h = height.toFloat()
                 }
-                val result = SDL_RenderDrawRect(renderer, rect.ptr)
-                if (result != 0) {
+                if (!SDL_RenderRect(renderer, rect.ptr)) {
                     logger.error("Error drawing rectangle: ${SDL_GetError()?.toKString()}")
                 }
             }
@@ -158,30 +145,18 @@ class GeometryContext private constructor() : Context(), Logging {
     fun fillRectangle(
         x: Int, y: Int,
         width: Int, height: Int,
-        rgba: UInt
-    ) = fillRectangle(
-        x, y, width, height,
-        r = redFromRGBA(rgba),
-        g = greenFromRGBA(rgba),
-        b = blueFromRGBA(rgba),
-        a = alphaFromRGBA(rgba)
-    )
-
-    fun fillRectangle(
-        x: Int, y: Int,
-        width: Int, height: Int,
-        r: UByte, g: UByte, b: UByte, a: UByte
+        r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
         useSDLContext {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
             memScoped {
-                val rect = alloc<SDL_Rect>()
-                rect.x = x
-                rect.y = y
-                rect.w = width
-                rect.h = height
-                val result = SDL_RenderFillRect(renderer, rect.ptr)
-                if (result != 0) {
+                val rect = alloc<SDL_FRect>().apply {
+                    this.x = x.toFloat()
+                    this.y = y.toFloat()
+                    this.w = width.toFloat()
+                    this.h = height.toFloat()
+                }
+                if (!SDL_RenderFillRect(renderer, rect.ptr)) {
                     logger.error("Error filling rectangle: ${SDL_GetError()?.toKString()}")
                 }
             }
@@ -191,43 +166,23 @@ class GeometryContext private constructor() : Context(), Logging {
     fun drawLine(
         startX: Int, startY: Int,
         endX: Int, endY: Int,
-        rgba: UInt
-    ) = drawLine(
-        startX, startY, endX, endY,
-        r = redFromRGBA(rgba),
-        g = greenFromRGBA(rgba),
-        b = blueFromRGBA(rgba),
-        a = alphaFromRGBA(rgba)
-    )
-
-    fun drawLine(
-        startX: Int, startY: Int,
-        endX: Int, endY: Int,
-        r: UByte, g: UByte, b: UByte, a: UByte
+        r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
         useSDLContext {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
-            val result = SDL_RenderDrawLine(renderer, startX, startY, endX, endY)
-            if (result != 0) {
+            if (!SDL_RenderLine(renderer, startX.toFloat(), startY.toFloat(), endX.toFloat(), endY.toFloat())) {
                 logger.error("Error drawing line: ${SDL_GetError()?.toKString()}")
             }
         }
     }
 
-    fun drawPixel(x: Int, y: Int, rgba: UInt) =
-        drawPixel(
-            x, y,
-            r = redFromRGBA(rgba),
-            g = greenFromRGBA(rgba),
-            b = blueFromRGBA(rgba),
-            a = alphaFromRGBA(rgba)
-        )
-
-    fun drawPixel(x: Int, y: Int, r: UByte, g: UByte, b: UByte, a: UByte) {
+    fun drawPixel(
+        x: Int, y: Int,
+        r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
+    ) {
         useSDLContext {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
-            val result = SDL_RenderDrawPoint(renderer, x, y)
-            if (result != 0) {
+            if (!SDL_RenderPoint(renderer, x.toFloat(), y.toFloat())) {
                 logger.error("Error drawing pixel: ${SDL_GetError()?.toKString()}")
             }
         }
@@ -237,14 +192,14 @@ class GeometryContext private constructor() : Context(), Logging {
         private var currentContext: GeometryContext? = null
 
         fun get(): GeometryContext {
-            if (currentContext == null) {
-                currentContext = GeometryContext()
+            return currentContext ?: GeometryContext().also {
+                currentContext = it
             }
-            return currentContext ?: throw IllegalStateException("Failed to create GeometryContext")
         }
     }
 
     override fun cleanup() {
+        logger.info { "Cleaning up GeometryContext"}
+        currentContext = null
     }
-
 }

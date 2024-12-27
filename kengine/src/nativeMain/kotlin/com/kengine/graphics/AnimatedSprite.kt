@@ -59,7 +59,7 @@ class AnimatedSprite private constructor(
     }
 
     fun cleanup() {
-        sprites.forEach { it.cleanup() }
+        //sprites.forEach { it.cleanup() }
     }
 
     companion object {

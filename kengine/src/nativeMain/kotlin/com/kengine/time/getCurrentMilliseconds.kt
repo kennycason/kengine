@@ -1,7 +1,7 @@
 package com.kengine.time
 
 import kotlinx.cinterop.ExperimentalForeignApi
-import sdl2.SDL_GetTicks
+import sdl3.SDL_GetTicks
 
 /**
  * While this is safe to use, default to use ClockContext
@@ -14,4 +14,3 @@ import sdl2.SDL_GetTicks
 fun getCurrentMilliseconds(): Long {
     return SDL_GetTicks().toLong()
 }
-

@@ -64,6 +64,7 @@ class TiledMapDrawIT {
                     override fun cleanup() {}
                 }
             }
+                .also { cleanup() }
         }
     }
 }

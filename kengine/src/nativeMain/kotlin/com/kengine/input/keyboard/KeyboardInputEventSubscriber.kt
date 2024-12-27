@@ -1,16 +1,16 @@
 package com.kengine.input.keyboard
 
 import com.kengine.sdl.SDLEventContext
-import com.kengine.sdl.useSDLContext
+import com.kengine.sdl.useSDLEventContext
 import com.kengine.time.getCurrentMilliseconds
 import kotlinx.cinterop.ExperimentalForeignApi
-import sdl2.SDL_Event
-import sdl2.SDL_KEYDOWN
-import sdl2.SDL_KEYUP
+import sdl3.SDL_EVENT_KEY_DOWN
+import sdl3.SDL_EVENT_KEY_UP
+import sdl3.SDL_Event
 
 @OptIn(ExperimentalForeignApi::class)
 class KeyboardInputEventSubscriber {
-    private val keyStates = mutableMapOf<Int, KeyState>()
+    private val keyStates = mutableMapOf<UInt, KeyState>()
 
     data class KeyState(
         var isPressed: Boolean = false,
@@ -19,27 +19,28 @@ class KeyboardInputEventSubscriber {
 
     // must be called
     fun init() {
-        useSDLContext {
-            sdlEvents.subscribe(SDLEventContext.EventType.KEYBOARD, ::handleKeyboardEvent)
+        useSDLEventContext {
+            logger.info { "Subscribed to keyboard events" }
+            subscribe(SDLEventContext.EventType.KEYBOARD, ::handleKeyboardEvent)
         }
     }
 
     fun handleKeyboardEvent(event: SDL_Event) {
         when (event.type) {
-            SDL_KEYDOWN -> {
-                val key = event.key.keysym.sym
-                if (!keyStates.containsKey(key)) {
-                    keyStates[key] = KeyState()
+            SDL_EVENT_KEY_DOWN -> {
+                val keyCode = event.key.key
+                if (!keyStates.containsKey(keyCode)) {
+                    keyStates[keyCode] = KeyState()
                 }
-                keyStates[key]?.apply {
+                keyStates[keyCode]?.apply {
                     isPressed = true
                     lastPressed = getCurrentMilliseconds()
                 }
             }
 
-            SDL_KEYUP -> {
-                val key = event.key.keysym.sym
-                keyStates[key]?.isPressed = false
+            SDL_EVENT_KEY_UP -> {
+                val keyCode = event.key.key
+                keyStates[keyCode]?.isPressed = false
             }
         }
     }
@@ -48,7 +49,7 @@ class KeyboardInputEventSubscriber {
      * check if a specific key is currently pressed
      */
     fun isPressed(keyCode: UInt): Boolean {
-        return keyStates[keyCode.toInt()]?.isPressed ?: false
+        return keyStates[keyCode]?.isPressed ?: false
     }
 
     /**
@@ -57,7 +58,7 @@ class KeyboardInputEventSubscriber {
      */
     fun timeSincePressed(keyCode: UInt): Long {
         val currentTime = getCurrentMilliseconds()
-        return keyStates[keyCode.toInt()]?.let {
+        return keyStates[keyCode]?.let {
             if (it.isPressed) 0L else currentTime - it.lastPressed
         } ?: Long.MAX_VALUE
     }

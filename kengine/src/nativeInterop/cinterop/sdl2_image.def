@@ -1,4 +1,0 @@
-headers = SDL_image.h
-package = sdl2.image
-compilerOpts = -I/opt/homebrew/include/SDL2
-linkerOpts = -L/opt/homebrew/lib -lSDL2_image

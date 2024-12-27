@@ -3,7 +3,6 @@ package com.kengine.event
 import com.kengine.hooks.context.Context
 import com.kengine.log.Logging
 
-
 class EventContext : Context(), Logging {
     private val subscribers = mutableMapOf<String, MutableList<(Any) -> Unit>>()
 
@@ -35,18 +34,18 @@ class EventContext : Context(), Logging {
     }
 
     override fun cleanup() {
+        logger.info { "Cleaning up EventContext"}
         clearAll()
+        currentContext = null
     }
 
     companion object {
         private var currentContext: EventContext? = null
 
         fun get(): EventContext {
-            if (currentContext == null) {
-                currentContext = EventContext()
-
+            return currentContext ?: EventContext().also {
+                currentContext = it
             }
-            return currentContext ?: throw IllegalStateException("Failed to create EventContext")
         }
     }
 

@@ -2,25 +2,25 @@ package com.kengine.graphics
 
 import com.kengine.log.Logging
 import com.kengine.sdl.useSDLContext
-import kotlinx.cinterop.CValuesRef
+import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.IntVar
-import kotlinx.cinterop.UIntVar
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
+import kotlinx.cinterop.pointed
 import kotlinx.cinterop.toKString
-import kotlinx.cinterop.value
-import sdl2.SDL_CreateTexture
-import sdl2.SDL_DestroyTexture
-import sdl2.SDL_GetError
-import sdl2.SDL_QueryTexture
-import sdl2.SDL_RenderCopy
-import sdl2.SDL_SetRenderTarget
-import sdl2.image.IMG_Load
-import sdl2.image.SDL_CreateTextureFromSurface
-import sdl2.image.SDL_FreeSurface
+import sdl3.SDL_GetError
+import sdl3.image.IMG_Load
+import sdl3.image.SDL_CreateTexture
+import sdl3.image.SDL_CreateTextureFromSurface
+import sdl3.image.SDL_DestroySurface
+import sdl3.image.SDL_DestroyTexture
+import sdl3.image.SDL_RenderTexture
+import sdl3.image.SDL_SetRenderTarget
+import sdl3.image.SDL_Surface
+import sdl3.image.SDL_Texture
+import sdl3.image.SDL_TextureAccess
 
+/**
+ * A centralized texture manager to help with caching for faster, more efficient texture loading.
+ */
 /**
  * A centralized texture manager to help with caching for faster, more efficient texture loading.
  */
@@ -42,31 +42,37 @@ class TextureManager : Logging {
         useSDLContext {
             logger.debug { "Loading texture $texturePath to cache" }
 
-            val surface = IMG_Load(texturePath)
+            // load the surface first
+            val surface: CPointer<SDL_Surface> = IMG_Load(texturePath)
                 ?: throw IllegalStateException("Error loading image: ${SDL_GetError()?.toKString()}")
+
+            // extract width and height from the surface BEFORE destroying it
+            val w = surface.pointed.w
+            val h = surface.pointed.h
+            val format = surface.pointed.format
+
+            logger.info { "Loaded surface: width=$w, height=$h, format=$format" }
+
+            // Cceate a texture from the surface
             val texture = SDL_CreateTextureFromSurface(renderer, surface)
                 ?: throw IllegalStateException("Error creating texture from surface: ${SDL_GetError()?.toKString()}")
-            SDL_FreeSurface(surface)
 
-            memScoped {
-                val w = alloc<IntVar>()
-                val h = alloc<IntVar>()
-                val format = alloc<UIntVar>()
-                val access = alloc<IntVar>()
+            // destroy the surface now that it's no longer needed
+            SDL_DestroySurface(surface)
 
-                if (SDL_QueryTexture(texture, format.ptr, access.ptr, w.ptr, h.ptr) != 0) {
-                    throw IllegalStateException("Error querying texture: ${SDL_GetError()?.toKString()}")
-                }
+            // add to cache with extracted dimensions
+            textureCache[texturePath] = Texture(
+                texture = texture,
+                width = w,
+                height = h,
+                format = format,
+                access = SDL_TextureAccess.SDL_TEXTUREACCESS_STATIC.ordinal
+            )
 
-                textureCache[texturePath] = Texture(
-                    texture = texture,
-                    width = w.value,
-                    height = h.value,
-                    format = format.value,
-                    access = access.value
-                )
-            }
+            logger.info { "Added texture to cache: path=$texturePath, width=$w, height=$h" }
         }
+
+        // return the cached texture
         return textureCache[texturePath]!!
     }
 
@@ -75,34 +81,33 @@ class TextureManager : Logging {
         return texture.copy(texture = copyTexture(texture.texture))
     }
 
-    fun copyTexture(source: CValuesRef<cnames.structs.SDL_Texture>): CValuesRef<cnames.structs.SDL_Texture> {
+    fun copyTexture(source: CPointer<SDL_Texture>): CPointer<SDL_Texture> {
         useSDLContext {
-            memScoped {
-                val w = alloc<IntVar>()
-                val h = alloc<IntVar>()
-                val format = alloc<UIntVar>()
-                val access = alloc<IntVar>()
+            // lookup dimensions from the cached texture, not source itself
+            val cachedTexture = textureCache.values.find { it.texture == source }
+                ?: throw IllegalStateException("Source texture not found in cache!")
 
-                if (SDL_QueryTexture(source, format.ptr, access.ptr, w.ptr, h.ptr) != 0) {
-                    throw IllegalStateException("Error querying texture: ${SDL_GetError()?.toKString()}")
-                }
+            val targetTexture = SDL_CreateTexture(
+                renderer,
+                cachedTexture.format, // use cached format
+                SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET,
+                cachedTexture.width,
+                cachedTexture.height
+            ) ?: throw IllegalStateException("Error creating new texture: ${SDL_GetError()?.toKString()}")
 
-                // create a new texture with the same dimensions and format
-                val targetTexture = SDL_CreateTexture(renderer, format.value.toUInt(), access.value, w.value, h.value)
-                    ?: throw IllegalStateException("Error creating new texture: ${SDL_GetError()?.toKString()}")
+            // copy the source texture onto the new texture
+            SDL_SetRenderTarget(renderer, targetTexture)
+            SDL_RenderTexture(renderer, source, null, null)
+            SDL_SetRenderTarget(renderer, null) // reset the render target back to default
 
-                // copy source texture to the new texture
-                SDL_SetRenderTarget(renderer, targetTexture)
-                SDL_RenderCopy(renderer, source, null, null)
-                SDL_SetRenderTarget(renderer, null) // Reset the render target back to default
-
-                return targetTexture
-            }
+            return targetTexture
         }
     }
 
     fun cleanup() {
-        textureCache.forEach { (_, texture) -> SDL_DestroyTexture(texture.texture) }
+        textureCache.forEach { (_, texture) ->
+            SDL_DestroyTexture(texture.texture)
+        }
         textureCache.clear()
     }
 }

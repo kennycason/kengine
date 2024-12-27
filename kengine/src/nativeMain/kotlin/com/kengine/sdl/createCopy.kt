@@ -3,7 +3,7 @@ package com.kengine.sdl
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
-import sdl2.SDL_Rect
+import sdl3.image.SDL_Rect
 
 @OptIn(ExperimentalForeignApi::class)
 fun createCopy(rect: SDL_Rect): SDL_Rect {

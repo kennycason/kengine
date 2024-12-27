@@ -55,7 +55,7 @@ class SpriteSheet private constructor(
 //        require(x in 0 until columns && y in 0 until rows) {
 //            "Tile coordinates ($x,$y) out of bounds. Sheet size: ${columns}x$rows"
 //        }
-
+//
 //        if (logger.isTraceEnabled()) {
 //            logger.trace {
 //                val pixelX = marginX + x * (tileWidth + spacingX)
@@ -88,7 +88,7 @@ class SpriteSheet private constructor(
     fun cleanup() {
         tileSprites.forEach { row ->
             row.forEach { sprite ->
-                sprite.cleanup()
+            //    sprite.cleanup()
             }
         }
     }

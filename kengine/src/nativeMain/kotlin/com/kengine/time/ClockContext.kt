@@ -1,6 +1,7 @@
 package com.kengine.time
 
 import com.kengine.hooks.context.Context
+import com.kengine.log.Logging
 
 /**
  * These values are updated each update within GameLoop.
@@ -26,7 +27,7 @@ data class ClockContext private constructor(
     var deltaTimeSec: Double = 0.0,
 
     var lastFrameTimeMs: Long = getCurrentMilliseconds() // TODO, should this be zero'd?
-) : Context() {
+) : Context(), Logging {
 
     fun update() {
         totalTimeMs = getCurrentMilliseconds()
@@ -37,20 +38,21 @@ data class ClockContext private constructor(
     }
 
     override fun cleanup() {
+        logger.info { "Cleaning up ControllerContext"}
         totalTimeMs = 0L
         deltaTimeMs = 0L
         totalTimeSec = 0.0
         deltaTimeSec = 0.0
+        currentContext = null
     }
 
     companion object {
         private var currentContext: ClockContext? = null
 
         fun get(): ClockContext {
-            if (currentContext == null) {
-                currentContext = ClockContext()
+            return currentContext ?: ClockContext().also {
+                currentContext = it
             }
-            return currentContext ?: throw IllegalStateException("Failed to create ClockContext")
         }
     }
 }

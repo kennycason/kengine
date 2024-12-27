@@ -1,25 +1,30 @@
 package com.kengine.sdl
+
 import com.kengine.hooks.context.Context
 import com.kengine.log.Logging
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
-import sdl2.SDL_Event
-import sdl2.SDL_JOYAXISMOTION
-import sdl2.SDL_JOYBALLMOTION
-import sdl2.SDL_JOYBUTTONDOWN
-import sdl2.SDL_JOYBUTTONUP
-import sdl2.SDL_JOYDEVICEADDED
-import sdl2.SDL_JOYDEVICEREMOVED
-import sdl2.SDL_JOYHATMOTION
-import sdl2.SDL_KEYDOWN
-import sdl2.SDL_KEYUP
-import sdl2.SDL_MOUSEBUTTONDOWN
-import sdl2.SDL_MOUSEBUTTONUP
-import sdl2.SDL_MOUSEMOTION
-import sdl2.SDL_PollEvent
-import sdl2.SDL_QUIT
+import sdl3.SDL_EVENT_GAMEPAD_ADDED
+import sdl3.SDL_EVENT_GAMEPAD_AXIS_MOTION
+import sdl3.SDL_EVENT_GAMEPAD_BUTTON_DOWN
+import sdl3.SDL_EVENT_GAMEPAD_BUTTON_UP
+import sdl3.SDL_EVENT_GAMEPAD_REMOVED
+import sdl3.SDL_EVENT_JOYSTICK_ADDED
+import sdl3.SDL_EVENT_JOYSTICK_AXIS_MOTION
+import sdl3.SDL_EVENT_JOYSTICK_BUTTON_DOWN
+import sdl3.SDL_EVENT_JOYSTICK_BUTTON_UP
+import sdl3.SDL_EVENT_JOYSTICK_HAT_MOTION
+import sdl3.SDL_EVENT_JOYSTICK_REMOVED
+import sdl3.SDL_EVENT_KEY_DOWN
+import sdl3.SDL_EVENT_KEY_UP
+import sdl3.SDL_EVENT_MOUSE_BUTTON_DOWN
+import sdl3.SDL_EVENT_MOUSE_BUTTON_UP
+import sdl3.SDL_EVENT_MOUSE_MOTION
+import sdl3.SDL_EVENT_QUIT
+import sdl3.SDL_Event
+import sdl3.SDL_PollEvent
 
 @OptIn(ExperimentalForeignApi::class)
 class SDLEventContext private constructor() : Context(), Logging {
@@ -34,16 +39,17 @@ class SDLEventContext private constructor() : Context(), Logging {
         private var currentContext: SDLEventContext? = null
 
         fun get(): SDLEventContext {
-            if (currentContext == null) {
-                currentContext = SDLEventContext()
+            return currentContext ?: SDLEventContext().also {
+                currentContext = it
             }
-            return currentContext ?: throw IllegalStateException("Failed to create event context")
         }
     }
 
     override fun cleanup() {
+        logger.info { "Cleaning up SDLEventContext" }
         events.clear()
         subscribers.clear()
+        currentContext = null
     }
 
     /**
@@ -52,7 +58,10 @@ class SDLEventContext private constructor() : Context(), Logging {
     fun pollEvents() {
         memScoped {
             val event = alloc<SDL_Event>()
-            while (SDL_PollEvent(event.ptr) != 0) {
+            while (SDL_PollEvent(event.ptr)) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug { "Event polled: ${event.type}" }
+                }
                 events.add(event)
                 notifySubscribers(event)
             }
@@ -72,19 +81,28 @@ class SDLEventContext private constructor() : Context(), Logging {
      */
     private fun notifySubscribers(event: SDL_Event) {
         val eventType = when (event.type) {
-            SDL_KEYDOWN,
-            SDL_KEYUP -> EventType.KEYBOARD
-            SDL_MOUSEBUTTONDOWN,
-            SDL_MOUSEBUTTONUP,
-            SDL_MOUSEMOTION -> EventType.MOUSE
-            SDL_JOYBUTTONDOWN,
-            SDL_JOYBUTTONUP,
-            SDL_JOYAXISMOTION,
-            SDL_JOYBALLMOTION,
-            SDL_JOYHATMOTION,
-            SDL_JOYDEVICEADDED,
-            SDL_JOYDEVICEREMOVED -> EventType.CONTROLLER
-            SDL_QUIT -> EventType.QUIT
+            SDL_EVENT_KEY_DOWN,
+            SDL_EVENT_KEY_UP -> EventType.KEYBOARD
+
+            SDL_EVENT_MOUSE_BUTTON_DOWN,
+            SDL_EVENT_MOUSE_BUTTON_UP,
+            SDL_EVENT_MOUSE_MOTION -> EventType.MOUSE
+
+            SDL_EVENT_GAMEPAD_BUTTON_DOWN,
+            SDL_EVENT_GAMEPAD_BUTTON_UP,
+            SDL_EVENT_GAMEPAD_AXIS_MOTION,
+            SDL_EVENT_GAMEPAD_ADDED,
+            SDL_EVENT_GAMEPAD_REMOVED,
+
+            SDL_EVENT_JOYSTICK_BUTTON_DOWN,
+            SDL_EVENT_JOYSTICK_BUTTON_UP,
+            SDL_EVENT_JOYSTICK_AXIS_MOTION,
+            SDL_EVENT_JOYSTICK_ADDED,
+            SDL_EVENT_JOYSTICK_REMOVED,
+
+            SDL_EVENT_JOYSTICK_HAT_MOTION -> EventType.CONTROLLER
+
+            SDL_EVENT_QUIT -> EventType.QUIT
             else -> null
         }
 
@@ -95,7 +113,7 @@ class SDLEventContext private constructor() : Context(), Logging {
                     try {
                         handler(event)
                     } catch (e: Exception) {
-                        logger.error { "Error handling event: ${e.message}" }
+                        logger.error { "Error handling event: ${e::class}${e.message}" }
                     }
                 }
             } else {
@@ -112,5 +130,4 @@ class SDLEventContext private constructor() : Context(), Logging {
     fun clearEvents() {
         events.clear()
     }
-
 }

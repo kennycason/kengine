@@ -70,3 +70,7 @@ fun KotlinNativeTarget.configureTarget() {
         }
     }
 }
+
+
+
+// SdlDylibCopier(project).registerSDLDylibs()

@@ -4,7 +4,7 @@ import com.kengine.log.Logging
 import com.kengine.time.getClockContext
 import com.kengine.time.getCurrentMilliseconds
 import kotlinx.cinterop.ExperimentalForeignApi
-import sdl2.SDL_Delay
+import sdl3.SDL_Delay
 
 @OptIn(ExperimentalForeignApi::class)
 class GameLoop(

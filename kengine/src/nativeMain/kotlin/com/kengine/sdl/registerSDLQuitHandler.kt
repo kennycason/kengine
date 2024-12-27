@@ -3,7 +3,7 @@ package com.kengine.sdl
 import com.kengine.getGameContext
 import com.kengine.log.getLogger
 import kotlinx.cinterop.ExperimentalForeignApi
-import sdl2.SDL_Event
+import sdl3.SDL_Event
 
 private val logger = getLogger("main")
 

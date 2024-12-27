@@ -5,11 +5,12 @@ import boxxle.context.getBoxxleContext
 import boxxle.context.useBoxxleContext
 import com.kengine.Game
 import com.kengine.action.getActionContext
-import com.kengine.hooks.context.getContext
 import com.kengine.font.Font
 import com.kengine.font.getFontContext
 import com.kengine.font.useFontContext
 import com.kengine.getGameContext
+import com.kengine.hooks.context.getContext
+import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.useControllerContext
 import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.log.Logging
@@ -29,7 +30,7 @@ class BoxxleGame : Game, Logging {
     private lateinit var mainSound: Sound
     private lateinit var finishSound: Sound
     private val menuFont: Font by lazy {
-        getFontContext().getFont(Fonts.ARCADE_CLASSIC, 32)
+        getFontContext().getFont(Fonts.ARCADE_CLASSIC, 32f)
     }
 
     init {
@@ -44,7 +45,7 @@ class BoxxleGame : Game, Logging {
                 .also { it.setVolume(20) }
         }
         useFontContext {
-            addFont(Fonts.ARCADE_CLASSIC, Fonts.ARCADE_CLASSIC_TTF, fontSize = 32)
+            addFont(Fonts.ARCADE_CLASSIC, Fonts.ARCADE_CLASSIC_TTF, fontSize = 32f)
         }
     }
 
@@ -66,7 +67,7 @@ class BoxxleGame : Game, Logging {
             }
 
             val level = getBoxxleContext().level
-            menuFont.drawText("LVL ${level.levelNumber}", 690, 560, r = 0x33u, g = 0x33u, b = 0x33u, a = 0xFFu)
+            menuFont.drawText("LVL ${level.levelNumber}", 530, 440, r = 0x33u, g = 0x33u, b = 0x33u, a = 0xFFu)
 
             flipScreen()
         }
@@ -105,23 +106,23 @@ class BoxxleGame : Game, Logging {
             }
 
             useControllerContext {
-                if (controller.isButtonPressed(Playstation4.TRIANGLE) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                if (controller.isButtonPressed(Buttons.X) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
                     timeSinceOptionChangeMs = getCurrentMilliseconds()
                     reloadLevel()
                 }
-                if (controller.isButtonPressed(Playstation4.R1) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                if (controller.isButtonPressed(Buttons.R1) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
                     timeSinceOptionChangeMs = getCurrentMilliseconds()
                     loadLevel((level.levelNumber + 1) % LEVEL_DATA.size)
                 }
-                if (controller.isButtonPressed(Playstation4.L1) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                if (controller.isButtonPressed(Buttons.L1) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
                     timeSinceOptionChangeMs = getCurrentMilliseconds()
                     loadLevel((level.levelNumber - 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
                 }
-                if (controller.isButtonPressed(Playstation4.R3)) {
+                if (controller.isButtonPressed(Buttons.R3)) {
                     mainSound.setVolume(mainSound.getVolume() + 1)
                     finishSound.setVolume(finishSound.getVolume() + 1)
                 }
-                if (controller.isButtonPressed(Playstation4.L3)) {
+                if (controller.isButtonPressed(Buttons.L3)) {
                     mainSound.setVolume(mainSound.getVolume() - 1)
                     finishSound.setVolume(finishSound.getVolume() - 1)
                 }

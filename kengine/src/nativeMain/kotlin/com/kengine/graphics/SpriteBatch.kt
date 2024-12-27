@@ -1,28 +1,24 @@
 package com.kengine.graphics
 
-import cnames.structs.SDL_Texture
 import com.kengine.log.Logging
+import com.kengine.math.Math
 import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.CValuesRef
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.allocArray
-import kotlinx.cinterop.get
-import kotlinx.cinterop.nativeHeap
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.reinterpret
-import sdl2.SDL_Point
-import sdl2.SDL_Rect
-import sdl2.SDL_RenderCopy
-import sdl2.SDL_RenderCopyEx
+import kotlinx.cinterop.toKString
+import sdl3.SDL_GetError
+import sdl3.image.SDL_FPoint
+import sdl3.image.SDL_FRect
+import sdl3.image.SDL_RenderTextureAffine
+import sdl3.image.SDL_Texture
 
-/**
- * NOTE SDL2 does not support batch.
- */
 @OptIn(ExperimentalForeignApi::class)
 class SpriteBatch : Logging {
     private val maxSprites = 1000
 
-    // batch state
     private var drawing = false
     private var currentTexture: CValuesRef<SDL_Texture>? = null
     private var spriteCount = 0
@@ -33,21 +29,12 @@ class SpriteBatch : Logging {
         val srcY: Int?,
         val srcW: Int?,
         val srcH: Int?,
-        val dstX: Int,
-        val dstY: Int,
-        val dstW: Int,
-        val dstH: Int,
-        val angle: Double = 0.0,
-        val flip: FlipMode = FlipMode.NONE
+        val origin: SDL_FPoint,
+        val right: SDL_FPoint,
+        val down: SDL_FPoint
     )
 
     private val batch = ArrayList<BatchItem>(maxSprites)
-
-    // pre-allocated native arrays to avoid per-sprite allocations
-    private val srects = nativeHeap.allocArray<SDL_Rect>(maxSprites)
-    private val drects = nativeHeap.allocArray<SDL_Rect>(maxSprites)
-    private val centers = nativeHeap.allocArray<SDL_Point>(maxSprites)
-    private val useSrc = BooleanArray(maxSprites)
 
     fun begin() {
         if (drawing) throw IllegalStateException("SpriteBatch.end() must be called before begin()")
@@ -57,43 +44,70 @@ class SpriteBatch : Logging {
         batch.clear()
     }
 
-    /**
-     * draw a portion of a texture (or entire if src parameters are null) to the screen.
-     * if the current batch texture differs from the given texture, or we reached maxSprites,
-     * we flush before adding the new item.
-     */
     fun draw(
         texture: CValuesRef<SDL_Texture>,
         srcX: Int? = null,
         srcY: Int? = null,
         srcW: Int? = null,
         srcH: Int? = null,
-        dstX: Int,
-        dstY: Int,
-        dstW: Int,
-        dstH: Int,
+        dstX: Double,
+        dstY: Double,
+        dstW: Double,
+        dstH: Double,
         angle: Double = 0.0,
         flip: FlipMode = FlipMode.NONE
     ) {
         if (!drawing) throw IllegalStateException("SpriteBatch.begin() must be called before draw()")
 
-        // if texture changes or we reached capacity, flush
         if (currentTexture != texture || spriteCount >= maxSprites) {
             flush()
             currentTexture = texture
         }
 
-        batch.add(
-            BatchItem(
-                texture = texture,
-                srcX = srcX, srcY = srcY,
-                srcW = srcW, srcH = srcH,
-                dstX = dstX, dstY = dstY,
-                dstW = dstW, dstH = dstH,
-                angle = angle,
-                flip = flip
+        val rad = Math.toRadians(angle)
+        val cos = kotlin.math.cos(rad).toFloat()
+        val sin = kotlin.math.sin(rad).toFloat()
+
+        val flipX = if (flip == FlipMode.HORIZONTAL || flip == FlipMode.BOTH) -1f else 1f
+        val flipY = if (flip == FlipMode.VERTICAL || flip == FlipMode.BOTH) -1f else 1f
+
+        memScoped {
+            // Calculate half dimensions
+            val halfWidth = (dstW / 2).toFloat()
+            val halfHeight = (dstH / 2).toFloat()
+
+            // Origin is at the center of the destination rectangle
+            val origin = alloc<SDL_FPoint>().apply {
+                x = (dstX + halfWidth).toFloat()
+                y = (dstY + halfHeight).toFloat()
+            }
+
+            // Right vector from center to right edge (half width)
+            val right = alloc<SDL_FPoint>().apply {
+                x = halfWidth * cos * flipX
+                y = halfWidth * sin * flipX
+            }
+
+            // Down vector from center to bottom edge (half height)
+            val down = alloc<SDL_FPoint>().apply {
+                x = -halfHeight * sin * flipY
+                y = halfHeight * cos * flipY
+            }
+
+            batch.add(
+                BatchItem(
+                    texture,
+                    srcX,
+                    srcY,
+                    srcW,
+                    srcH,
+                    origin,
+                    right,
+                    down
+                )
             )
-        )
+        }
+
         spriteCount++
     }
 
@@ -101,64 +115,30 @@ class SpriteBatch : Logging {
         if (spriteCount == 0) return
 
         useSDLContext {
-            // fill pre-allocated arrays with sprite data
-            for (i in 0 until spriteCount) {
-                val item = batch[i]
-
-                // destination rect always exists
-                drects[i].reinterpret<SDL_Rect>().apply {
-                    x = item.dstX
-                    y = item.dstY
-                    w = item.dstW
-                    h = item.dstH
-                }
-
-                // source rect is optional
-                if (item.srcX != null && item.srcY != null && item.srcW != null && item.srcH != null) {
-                    srects[i].reinterpret<SDL_Rect>().apply {
-                        x = item.srcX
-                        y = item.srcY
-                        w = item.srcW
-                        h = item.srcH
+            memScoped {
+                for (item in batch) {
+                    val srcRect = if (item.srcX != null && item.srcY != null &&
+                        item.srcW != null && item.srcH != null) {
+                        alloc<SDL_FRect>().apply {
+                            x = item.srcX.toFloat()
+                            y = item.srcY.toFloat()
+                            w = item.srcW.toFloat()
+                            h = item.srcH.toFloat()
+                        }
+                    } else {
+                        null
                     }
 
-                    useSrc[i] = true
-                } else {
-                    useSrc[i] = false
-                }
-
-                // center for rotation if needed
-                if (item.angle != 0.0 || item.flip != FlipMode.NONE) {
-                    centers[i].reinterpret<SDL_Rect>().apply {
-                        x = drects[i].w / 2
-                        y = drects[i].h / 2
+                    if (!SDL_RenderTextureAffine(
+                            renderer,
+                            item.texture,
+                            srcRect?.ptr,
+                            item.origin.ptr,
+                            item.right.ptr,
+                            item.down.ptr
+                        )) {
+                        logger.error("Error rendering sprite batch: ${SDL_GetError()?.toKString()}")
                     }
-                }
-            }
-
-            // now render all
-            for (i in 0 until spriteCount) {
-                val item = batch[i]
-
-                if (item.angle == 0.0 && item.flip == FlipMode.NONE) {
-                    // Nn rotation/flipping
-                    SDL_RenderCopy(
-                        renderer,
-                        item.texture,
-                        if (useSrc[i]) srects[i].ptr else null,
-                        drects[i].ptr
-                    )
-                } else {
-                    // rotation/flip
-                    SDL_RenderCopyEx(
-                        renderer = renderer,
-                        texture = item.texture,
-                        srcrect = if (useSrc[i]) srects[i].ptr else null,
-                        dstrect = drects[i].ptr,
-                        angle = item.angle,
-                        center = centers[i].ptr,
-                        flip = item.flip.flag
-                    )
                 }
             }
         }
@@ -166,7 +146,6 @@ class SpriteBatch : Logging {
         batch.clear()
         spriteCount = 0
     }
-
 
     fun end() {
         if (!drawing) throw IllegalStateException("SpriteBatch.begin() must be called before end()")
@@ -178,6 +157,6 @@ class SpriteBatch : Logging {
     }
 
     fun cleanup() {
-
+        batch.clear()
     }
 }

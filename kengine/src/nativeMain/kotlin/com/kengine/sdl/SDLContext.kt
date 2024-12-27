@@ -11,33 +11,63 @@ import kotlinx.cinterop.CValuesRef
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
 import platform.posix.exit
-import sdl2.SDL_CreateRenderer
-import sdl2.SDL_CreateWindow
-import sdl2.SDL_DestroyRenderer
-import sdl2.SDL_DestroyWindow
-import sdl2.SDL_GetError
-import sdl2.SDL_INIT_VIDEO
-import sdl2.SDL_Init
-import sdl2.SDL_Quit
-import sdl2.SDL_RENDERER_ACCELERATED
-import sdl2.SDL_RenderClear
-import sdl2.SDL_RenderPresent
-import sdl2.SDL_SetRenderDrawColor
-import sdl2.SDL_WINDOWPOS_CENTERED
-import sdl2.SDL_WINDOW_SHOWN
-import sdl2.image.IMG_INIT_JPG
-import sdl2.image.IMG_INIT_PNG
-import sdl2.image.IMG_Init
-import sdl2.image.IMG_Quit
+import sdl3.SDL_BLENDMODE_BLEND
+import sdl3.SDL_BLENDMODE_NONE
+import sdl3.SDL_CreateRenderer
+import sdl3.SDL_CreateWindow
+import sdl3.SDL_DestroyRenderer
+import sdl3.SDL_DestroyWindow
+import sdl3.SDL_GetError
+import sdl3.SDL_INIT_VIDEO
+import sdl3.SDL_Init
+import sdl3.SDL_Quit
+import sdl3.SDL_RenderClear
+import sdl3.SDL_RenderPresent
+import sdl3.SDL_SetRenderDrawBlendMode
+import sdl3.SDL_SetRenderDrawColor
+import sdl3.SDL_WINDOW_RESIZABLE
 
 @OptIn(ExperimentalForeignApi::class)
 class SDLContext private constructor(
+    val title: String,
     val screenWidth: Int,
     val screenHeight: Int,
-    private val window: CValuesRef<cnames.structs.SDL_Window>,
-    val renderer: CValuesRef<cnames.structs.SDL_Renderer>,
-    val sdlEvents: SDLEventContext
+    flags: ULong = SDL_WINDOW_RESIZABLE
 ) : Context(), Logging {
+
+    private val window: CValuesRef<cnames.structs.SDL_Window> by lazy {
+        SDL_CreateWindow(title, screenWidth, screenHeight, flags)
+            ?: throw IllegalStateException("Error creating window: ${SDL_GetError()?.toKString()}")
+    }
+
+    val renderer: CValuesRef<cnames.structs.SDL_Renderer>? by lazy {
+        SDL_CreateRenderer(window, null)
+            ?: throw IllegalStateException("Error creating renderer: ${SDL_GetError()?.toKString()}")
+    }
+
+    private var currentBlendMode = SDL_BLENDMODE_NONE // SDL3 defaults to NONE
+
+    init {
+        require(SDL_Init(SDL_INIT_VIDEO)) {
+            Companion.logger.error("Error initializing SDL Video: ${SDL_GetError()?.toKString()}")
+            exit(1)
+        }
+    }
+
+    fun enableBlendedMode() {
+        setBlendMode(SDL_BLENDMODE_BLEND)
+    }
+
+    fun disableBlendedMode() {
+        setBlendMode(SDL_BLENDMODE_NONE)
+    }
+
+    private fun setBlendMode(mode: UInt) {
+        if (currentBlendMode != mode) {
+            SDL_SetRenderDrawBlendMode(renderer, mode)
+            currentBlendMode = mode
+        }
+    }
 
     fun fillScreen(r: UInt, g: UInt, b: UInt, a: UInt = 0xFFu) {
         SDL_SetRenderDrawColor(renderer, r.toUByte(), g.toUByte(), b.toUByte(), a.toUByte())
@@ -68,10 +98,11 @@ class SDLContext private constructor(
     }
 
     override fun cleanup() {
+        logger.info { "Cleaning up SDLContext"}
         SDL_DestroyRenderer(renderer)
         SDL_DestroyWindow(window)
-        IMG_Quit()
         SDL_Quit()
+        currentContext = null
     }
 
     companion object {
@@ -82,41 +113,18 @@ class SDLContext private constructor(
             title: String,
             width: Int,
             height: Int,
-            flags: UInt = SDL_WINDOW_SHOWN
+            flags: ULong = SDL_WINDOW_RESIZABLE
         ): SDLContext {
             if (currentContext != null) {
-                throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
+               throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
             }
 
-            // init SDL
-            if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-                logger.error("Error initializing SDL Video: ${SDL_GetError()?.toKString()}")
-                exit(1)
-            }
-            if (IMG_Init((IMG_INIT_PNG or IMG_INIT_JPG).toInt()) == 0) {
-                throw IllegalStateException("Failed to initialize SDL_image: ${SDL_GetError()?.toKString()}")
-            }
-
-            // create window + renderer
-            val window = SDL_CreateWindow(
-                title,
-                SDL_WINDOWPOS_CENTERED.toInt(),
-                SDL_WINDOWPOS_CENTERED.toInt(),
-                width,
-                height,
-                flags
-            ) ?: throw IllegalStateException("Error creating window: ${SDL_GetError()?.toKString()}")
-
-            val renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED)
-                ?: throw IllegalStateException("Error creating renderer: ${SDL_GetError()?.toKString()}")
-
-
-            currentContext = SDLContext(width, height, window, renderer, SDLEventContext.get())
+            currentContext = SDLContext(title, width, height, flags)
             return currentContext!!
         }
 
         fun get(): SDLContext {
-            return currentContext ?: throw IllegalStateException("SDLContext has not been created. Call create() first.")
+            return currentContext ?: throw IllegalStateException("SDL3Context has not been created. Call create() first.")
         }
     }
 }

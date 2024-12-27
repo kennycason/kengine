@@ -1,8 +1,8 @@
 package com.kengine.network
 
 import com.kengine.log.Logging
-import com.kengine.sdl.cinterop.SDLNet_UDPsocket
 import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.CPointerVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
@@ -10,30 +10,31 @@ import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
+import kotlinx.cinterop.value
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import platform.posix.memcpy
-import sdl2.net.IPaddress
-import sdl2.net.SDLNet_AllocPacket
-import sdl2.net.SDLNet_FreePacket
-import sdl2.net.SDLNet_GetError
-import sdl2.net.SDLNet_ResolveHost
-import sdl2.net.SDLNet_UDP_Close
-import sdl2.net.SDLNet_UDP_Open
-import sdl2.net.SDLNet_UDP_Recv
-import sdl2.net.SDLNet_UDP_Send
+import sdl3.net.SDLNet_CreateDatagramSocket
+import sdl3.net.SDLNet_Datagram
+import sdl3.net.SDLNet_DestroyDatagram
+import sdl3.net.SDLNet_DestroyDatagramSocket
+import sdl3.net.SDLNet_GetAddressString
+import sdl3.net.SDLNet_ReceiveDatagram
+import sdl3.net.SDLNet_SendDatagram
+import sdl3.net.SDLNet_WaitUntilInputAvailable
+import sdl3.net.SDLNet_WaitUntilResolved
+import sdl3.net.SDL_GetError
 
 /**
  * Connectionless protocol
@@ -47,10 +48,10 @@ class UdpConnection(
 ) : NetworkConnection, Logging, AutoCloseable {
 
     companion object {
-        const val DEFAULT_BUFFER_SIZE = 1024 // TODO make configurable
+        const val DEFAULT_BUFFER_SIZE = 1024
     }
 
-    private var udpSocket: CPointer<SDLNet_UDPsocket>? = null
+    private var datagramSocket: CPointer<cnames.structs.SDLNet_DatagramSocket>? = null
     private var receiveJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var isRunning = false
@@ -60,8 +61,23 @@ class UdpConnection(
 
     override fun connect() {
         logger.info { "Starting UDP connection on ${address.host}:${address.port}" }
-        udpSocket = SDLNet_UDP_Open(address.port.convert())?.reinterpret()
-            ?: throw Exception("Failed to open UDP socket: ${SDLNet_GetError()}")
+
+        val sdlAddress = address.toSDL()
+            ?: throw Exception("Failed to resolve host ${address.host}")
+
+        // wait for address resolution to complete
+        // SDL3: returns 1 for success, -1 for failure, 0 for still resolving
+        val resolutionStatus = SDLNet_WaitUntilResolved(sdlAddress, 5000)
+        if (resolutionStatus != 1) {
+            throw Exception("Failed to resolve address: ${
+                if (resolutionStatus == 0) "Timed out"
+                else SDL_GetError()?.toKString() ?: "Unknown error"
+            }")
+        }
+
+        datagramSocket = SDLNet_CreateDatagramSocket(sdlAddress, address.port)
+            ?: throw Exception("Failed to create UDP socket: ${SDL_GetError()?.toKString()}")
+
         isRunning = true
         logger.info { "UDP connection established: $id" }
     }
@@ -72,47 +88,36 @@ class UdpConnection(
         runBlocking {
             receiveJob?.cancelAndJoin()
         }
-        udpSocket?.reinterpret<cnames.structs._UDPsocket>()?.let { socket ->
-            SDLNet_UDP_Close(socket)
-            udpSocket = null
+        datagramSocket?.let { socket ->
+            SDLNet_DestroyDatagramSocket(socket)
+            datagramSocket = null
         }
     }
 
     fun send(data: ByteArray, remoteAddress: IPAddress) {
         if (!isRunning) throw IllegalStateException("Connection is not open")
 
-        memScoped {
-            val packet = SDLNet_AllocPacket(data.size.convert())
-                ?: throw Exception("Failed to allocate packet")
+        datagramSocket?.let { socket ->
+            val sdlRemoteAddr = remoteAddress.toSDL()
+                ?: throw Exception("Failed to resolve remote host ${remoteAddress.host}")
 
-            try {
-                val sdlRemoteAddr = alloc<IPaddress>()
-                if (SDLNet_ResolveHost(sdlRemoteAddr.ptr, remoteAddress.host, remoteAddress.port) < 0) {
-                    throw Exception("Failed to resolve remote host: ${SDLNet_GetError()}")
+            data.usePinned { pinned ->
+                logger.debug { "Attempting to send ${data.size} bytes" }
+                val success = SDLNet_SendDatagram(
+                    socket,
+                    sdlRemoteAddr,
+                    remoteAddress.port,
+                    pinned.addressOf(0),
+                    data.size.convert()
+                )
+
+                if (!success) {
+                    throw Exception("Failed to send UDP datagram: ${SDL_GetError()?.toKString()}")
                 }
 
-                packet.pointed.address.host = sdlRemoteAddr.host
-                packet.pointed.address.port = sdlRemoteAddr.port
-
-                // copy data into packet
-                data.usePinned { pinned ->
-                    memcpy(packet.pointed.data, pinned.addressOf(0), data.size.convert())
-                }
-                packet.pointed.len = data.size.convert()
-                packet.pointed.maxlen = data.size.convert()
-
-                udpSocket?.reinterpret<cnames.structs._UDPsocket>()?.let { socket ->
-                    // send without specifying a channel (-1), TOOD confirm how best to handle this
-                    val sent = SDLNet_UDP_Send(socket, -1, packet)
-                    if (sent == 0) {
-                        throw Exception("Failed to send UDP packet: ${SDLNet_GetError()}")
-                    }
-                    logger.info { "Sent ${data.size} bytes to ${remoteAddress.host}:${remoteAddress.port}" }
-                } ?: throw IllegalStateException("UDP socket is not open")
-            } finally {
-                SDLNet_FreePacket(packet)
+                logger.info { "Successfully sent ${data.size} bytes to ${remoteAddress.host}:${remoteAddress.port}" }
             }
-        }
+        } ?: throw IllegalStateException("UDP socket is not open")
     }
 
     fun send(data: UByteArray, remoteAddress: IPAddress) {
@@ -128,40 +133,62 @@ class UdpConnection(
         send(json.encodeToByteArray(), remoteAddress)
     }
 
-
     override fun subscribe(onReceive: (ByteArray) -> Unit) {
         if (!isRunning) throw IllegalStateException("Connection is not open")
         if (receiveJob != null) throw IllegalStateException("Already subscribed")
 
         receiveJob = scope.launch {
-            memScoped {
-                val packet = SDLNet_AllocPacket(bufferSize.convert())
-                    ?: throw Exception("Failed to allocate receive packet")
+            try {
+                logger.info { "Starting receive loop on ${address.host}:${address.port}" }
+                while (isRunning && isActive) {
+                    datagramSocket?.let { socket ->
+                        memScoped {
+                            // wait for incoming data
+                            val socketPtr = alloc<CPointerVar<cnames.structs.SDLNet_DatagramSocket>>()
+                            socketPtr.value = socket
 
-                try {
-                    while (isRunning && isActive) {
-                        udpSocket?.reinterpret<cnames.structs._UDPsocket>()?.let { socket ->
-                            if (SDLNet_UDP_Recv(socket, packet) > 0) {
-                                val data = packet.pointed.data!!.readBytes(packet.pointed.len.convert())
-                                if (logger.isDebugEnabled()) {
-                                    logger.debug { "Received ${data.size} bytes from ${packet.pointed.address.host}:${packet.pointed.address.port}" }
-                                }
+                            val waitResult = SDLNet_WaitUntilInputAvailable(
+                                socketPtr.ptr.reinterpret(),
+                                1,
+                                100
+                            )
+                            logger.debug { "Wait result: $waitResult" }
 
-                                launch(Dispatchers.Default) {
-                                    try {
+                            if (waitResult > 0) {
+                                val dgramPtr = alloc<CPointerVar<SDLNet_Datagram>>()
+                                val receiveResult = SDLNet_ReceiveDatagram(socket, dgramPtr.ptr)
+                                logger.debug { "Receive attempt result: $receiveResult" }
+
+                                if (receiveResult) {
+                                    val dgram = dgramPtr.value
+                                    dgram?.let { datagram ->
+                                        logger.info {
+                                            "Received datagram - Size: ${datagram.pointed.buflen}, " +
+                                                "From: ${SDLNet_GetAddressString(datagram.pointed.addr)}:${datagram.pointed.port}"
+                                        }
+
+                                        val data = ByteArray(datagram.pointed.buflen)
+                                        data.usePinned { pinnedData ->
+                                            memcpy(
+                                                pinnedData.addressOf(0),
+                                                datagram.pointed.buf,
+                                                datagram.pointed.buflen.convert()
+                                            )
+                                        }
+
                                         onReceive(data)
-                                    } catch (e: Exception) {
-                                        logger.error(e) { "Error in receive callback" }
+                                        SDLNet_DestroyDatagram(datagram)
                                     }
                                 }
-                            } else {
-                                delay(1)
                             }
-                        } ?: break
-                    }
-                } finally {
-                    SDLNet_FreePacket(packet)
+                        }
+                    } ?: break
                 }
+                logger.info { "Receive loop ending on ${address.host}:${address.port}" }
+            } catch (e: Exception) {
+                logger.error(e) { "Error in receive loop" }
+                isRunning = false
+                throw e
             }
         }
     }
@@ -193,4 +220,11 @@ class UdpConnection(
         }
     }
 
+    fun resolveAddressOrThrow(host: String): IPAddress {
+        val address = IPAddress(host, 0u) // port is irrelevant for resolution.
+        if (SDLNet_WaitUntilResolved(address.toSDL(), 5000) != 1) {
+            throw Exception("Failed to resolve address: $host -> ${SDL_GetError()}")
+        }
+        return address
+    }
 }

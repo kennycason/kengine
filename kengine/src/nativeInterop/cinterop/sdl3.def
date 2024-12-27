@@ -1,0 +1,4 @@
+headers = SDL3/SDL.h
+package = sdl3
+compilerOpts = -I/usr/local/include
+linkerOpts = -L/usr/local/lib -lSDL3 -framework Cocoa -framework IOKit -framework CoreVideo

@@ -1,13 +1,13 @@
 package boxxle
 
+import boxxle.context.getBoxxleContext
 import boxxle.context.useBoxxleContext
-import com.kengine.GameContext
 import com.kengine.action.getActionContext
 import com.kengine.action.useActionContext
-import com.kengine.hooks.context.useContext
 import com.kengine.entity.Entity
 import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.useSpriteContext
+import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.useControllerContext
 import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.math.Vec2
@@ -68,24 +68,24 @@ class Player(
         }
         useControllerContext {
             if (!isMoving && timeSinceMs(lastMovedMs) > 300) {
-                if (controller.isButtonPressed(Playstation4.DPAD_LEFT)) {
+                if (controller.isButtonPressed(Buttons.DPAD_LEFT)) {
                     face = Direction.LEFT
                     tryMove(Vec2(-1.0, 0.0))
                 }
-                if (controller.isButtonPressed(Playstation4.DPAD_RIGHT)) {
+                if (controller.isButtonPressed(Buttons.DPAD_RIGHT)) {
                     face = Direction.RIGHT
                     tryMove(Vec2(1.0, 0.0))
                 }
-                if (controller.isButtonPressed(Playstation4.DPAD_UP)) {
+                if (controller.isButtonPressed(Buttons.DPAD_UP)) {
                     face = Direction.UP
                     tryMove(Vec2(0.0, -1.0))
                 }
-                else if (controller.isButtonPressed(Playstation4.DPAD_DOWN)) {
+                else if (controller.isButtonPressed(Buttons.DPAD_DOWN)) {
                     face = Direction.DOWN
                     tryMove(Vec2(0.0, 1.0))
                 }
 
-                if (controller.isButtonPressed(Playstation4.SHARE)) {
+                if (controller.isButtonPressed(Buttons.SELECT)) {
                     useGameContext {
                         isRunning = false
                     }
@@ -146,12 +146,13 @@ class Player(
     }
 
     override fun draw() {
+        val scaledDim = 32 * getBoxxleContext().level.data.scale
         useSpriteContext {
             when (face) {
-                Direction.UP -> playerSpriteUp.draw(p.x * 32, p.y * 32)
-                Direction.DOWN -> playerSpriteDown.draw(p.x * 32, p.y * 32)
-                Direction.LEFT -> playerSpriteLeft.draw(p.x * 32, p.y * 32)
-                Direction.RIGHT -> playerSpriteRight.draw(p.x * 32, p.y * 32)
+                Direction.UP -> playerSpriteUp.draw(p.x * scaledDim, p.y * scaledDim)
+                Direction.DOWN -> playerSpriteDown.draw(p.x * scaledDim, p.y * scaledDim)
+                Direction.LEFT -> playerSpriteLeft.draw(p.x * scaledDim, p.y * scaledDim)
+                Direction.RIGHT -> playerSpriteRight.draw(p.x * scaledDim, p.y * scaledDim)
             }
 
         }
