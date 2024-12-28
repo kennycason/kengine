@@ -21,9 +21,6 @@ import sdl3.image.SDL_TextureAccess
 /**
  * A centralized texture manager to help with caching for faster, more efficient texture loading.
  */
-/**
- * A centralized texture manager to help with caching for faster, more efficient texture loading.
- */
 @OptIn(ExperimentalForeignApi::class)
 class TextureManager : Logging {
     private val textureCache = mutableMapOf<String, Texture>()

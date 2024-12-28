@@ -53,7 +53,25 @@ fun KotlinNativeTarget.configureTarget() {
     binaries {
         executable {
             entryPoint = "main"
-            linkerOpts("-L/opt/homebrew/lib", "-lSDL2", "-lSDL2_mixer")
+            linkerOpts(
+                "-L/usr/local/lib",
+                "-L/opt/homebrew/lib",
+                "-lSDL3",  // Note: you had SDL2 here, need SDL3
+                "-lSDL3_image",
+                "-lSDL3_mixer",
+                "-lSDL3_net",
+                "-lSDL3_ttf",
+                "-lchipmunk",
+                "-framework", "Cocoa",
+                "-framework", "IOKit",
+                "-framework", "CoreVideo",
+                "-framework", "CoreAudio",
+                "-framework", "AudioToolbox",
+                // set runtime library paths
+                "-Wl,-rpath,@executable_path/Frameworks",
+                "-Wl,-rpath,/usr/local/lib",
+                "-Wl,-rpath,/opt/homebrew/lib"
+            )
         }
     }
     compilations.all {
@@ -70,4 +88,17 @@ fun KotlinNativeTarget.configureTarget() {
             }
         }
     }
+}
+
+tasks.register<Copy>("copyReleaseAssets") {
+    from("assets")
+    into("$buildDir/bin/native/releaseExecutable/assets")
+}
+tasks.register<Copy>("copyDebugAssets") {
+    from("assets")
+    into("$buildDir/bin/native/debugExecutable/assets")
+}
+tasks.named("build") {
+    dependsOn("copyReleaseAssets")
+    dependsOn("copyDebugAssets")
 }

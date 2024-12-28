@@ -10,7 +10,7 @@ class HelloWorldGame : Game {
     private val pidgies = List(size = 25) { PingPongPidgeyEntity() }
     private val scytherEntity = ScytherEntity()
     private val tiledMap = TiledMapLoader().loadMap("assets/maps/simple_map.tmj")
-        .also { it.p.set(480.0, 100.0) }
+        .also { it.p.set(480.0, 0.0) }
 
     init {
         getSDLContext().enableBlendedMode()

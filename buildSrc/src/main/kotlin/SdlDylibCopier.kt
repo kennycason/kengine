@@ -1,4 +1,3 @@
-package com.kengine.lib
 
 import org.gradle.api.Project
 import org.gradle.api.tasks.Copy
@@ -15,9 +14,9 @@ class SdlDylibCopier(private val project: Project) {
             "/usr/local/lib/libSDL3_ttf.0.dylib"
         )
         val dylibTargetDirs = listOf(
-            "${buildDir}/bin/native/Frameworks",
-            "${buildDir}/bin/native/debugExecutable/Frameworks",
-            "${buildDir}/bin/native/debugTest/Frameworks"
+            "${project.buildDir}/bin/native/Frameworks",
+            "${project.buildDir}/bin/native/debugExecutable/Frameworks",
+            "${project.buildDir}/bin/native/debugTest/Frameworks"
         )
         registerCopyTasks(project, dylibsToCopy, dylibTargetDirs)
     }

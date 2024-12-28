@@ -1,0 +1,21 @@
+# Gradle build directory
+build/
+
+# Gradle cache
+.gradle/
+
+# IDE files (IntelliJ)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# IDE files (VS Code)
+.vscode/
+.settings/
+
+# Compiled class files
+*.class
+
+# Kotlin compiler output
+out/
