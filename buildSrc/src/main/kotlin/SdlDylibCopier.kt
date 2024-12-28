@@ -10,7 +10,7 @@ class SdlDylibCopier(private val project: Project) {
             "/usr/local/lib/libSDL3.0.dylib",
             "/usr/local/lib/libSDL3_image.0.dylib",
             "/usr/local/lib/libSDL3_mixer.0.dylib",
-            "/usr/local/lib/libSDL3_net.dylib",
+            "/usr/local/lib/libSDL3_net.dylib",  // fails if versioned lib included, symlink exits, not sure error
             "/usr/local/lib/libSDL3_ttf.0.dylib"
         )
         val dylibTargetDirs = listOf(

@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
+    id("kengine.assets")
 }
 
 group = "kengine.boxxle"
@@ -69,42 +70,15 @@ fun KotlinNativeTarget.configureTarget() {
     compilations.all {
         compileTaskProvider.configure {
             compilerOptions {
-                val includeBinariesArgs = buildIncludeBinaryArgsForAssets()
+              //  val includeBinariesArgs = buildIncludeBinaryArgsForAssets()
                 val compilerArgs = listOf(
                     "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
                     "-opt-in=kotlin.ExperimentalStdlibApi",
                     "-g", // enable debug symbols
                     "-ea" // enable assertions
-                ) + includeBinariesArgs
+                )// + includeBinariesArgs
                 freeCompilerArgs.addAll(compilerArgs)
             }
         }
     }
-}
-
-// NOTE copy assets alongside executable. This is a workaround until I figure out how to embed data files into the exe file.
-tasks.register<Copy>("copyReleaseAssets") {
-    from("assets")
-    into("$buildDir/bin/native/releaseExecutable/assets")
-}
-tasks.register<Copy>("copyDebugAssets") {
-    from("assets")
-    into("$buildDir/bin/native/debugExecutable/assets")
-}
-tasks.named("build") {
-    dependsOn("copyReleaseAssets")
-    dependsOn("copyDebugAssets")
-}
-
-private fun buildIncludeBinaryArgsForAssets(): List<String> {
-    val assetsDir = File(project.projectDir, "assets")
-    if (!(assetsDir.exists() && assetsDir.isDirectory)) {
-        println("Warning: 'assets' directory not found or is not a directory.")
-        return listOf()
-    }
-    return assetsDir
-        .walkTopDown()
-        .filter { it.isFile }
-        .map { "-include-binary=${it.absolutePath}" }
-        .toList()
 }

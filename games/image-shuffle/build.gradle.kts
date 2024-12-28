@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
+    id("kengine.assets")
 }
 
 group = "kengine.image-shuffle"
@@ -88,17 +89,4 @@ fun KotlinNativeTarget.configureTarget() {
             }
         }
     }
-}
-
-tasks.register<Copy>("copyReleaseAssets") {
-    from("assets")
-    into("$buildDir/bin/native/releaseExecutable/assets")
-}
-tasks.register<Copy>("copyDebugAssets") {
-    from("assets")
-    into("$buildDir/bin/native/debugExecutable/assets")
-}
-tasks.named("build") {
-    dependsOn("copyReleaseAssets")
-    dependsOn("copyDebugAssets")
 }

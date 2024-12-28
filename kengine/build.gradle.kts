@@ -1,10 +1,9 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.kotlinxSerialization)
+    id("kengine.sdl-dylib")
 }
 
-// copies SDL3 libs
-apply<SdlDylibPlugin>()
 
 group = "kengine"
 version = "1.0.0"
