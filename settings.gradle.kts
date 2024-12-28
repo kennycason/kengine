@@ -1,7 +1,7 @@
 pluginManagement {
     repositories {
-        mavenCentral()
         gradlePluginPortal()
+        mavenCentral()
     }
 }
 
@@ -28,4 +28,4 @@ modules.addAll(
     )
 )
 
-include(modules)
+include(*modules.toTypedArray())

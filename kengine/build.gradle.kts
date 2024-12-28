@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.kotlinxSerialization)
+//    id("kengine.native")
+    id("kengine.assets")
     id("kengine.sdl-dylib")
 }
 
