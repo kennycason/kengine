@@ -51,10 +51,13 @@ class TiledMap(
         val tileset: Tileset,
         val spriteSheet: SpriteSheet
     )
+
     @Transient
     private lateinit var tilesetsWithSprites: List<TilesetAndSpriteSheet>
     @Transient
     private lateinit var gidToTilesetArray: Array<TilesetAndSpriteSheet?>
+
+    private var isCacheBuilt = false
 
     init {
         tilesets.sortedBy { it.firstgid }
@@ -71,9 +74,10 @@ class TiledMap(
     }
 
     /**
-     * rebuilds transient fields after deserialization or when tilesets change.
+     * build transient fields after deserialization or when tilesets change.
      */
-    fun rebuild() {
+    private fun buildResourceCaches() {
+        isCacheBuilt = true
         // initialize tilesets with spritesheets
         tilesetsWithSprites = tilesets.map { tileset ->
             TilesetAndSpriteSheet(
@@ -111,11 +115,6 @@ class TiledMap(
         }
     }
 
-    fun postDeserialize() {
-        logger.info { "Post deserialization of Tiledmap" }
-        rebuild()
-    }
-
     fun draw() {
        // batches.values.forEach { it.begin() }
         layers.forEach { draw(it) }
@@ -130,6 +129,9 @@ class TiledMap(
 
     private fun draw(layer: TiledMapLayer) {
         if (!layer.visible || layer.type != "tilelayer") return
+        if (!isCacheBuilt) {
+            buildResourceCaches()
+        }
 
         // calculate the screen and tile coordinates to draw
         val screenLeft = -p.x

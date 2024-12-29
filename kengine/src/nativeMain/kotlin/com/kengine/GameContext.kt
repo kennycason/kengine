@@ -111,6 +111,7 @@ class GameContext private constructor(
         network.cleanup()
         sdl.cleanup()
         clock.cleanup()
+//         physics.cleanup()
         ContextRegistry.clearAll()
         currentContext = null
     }

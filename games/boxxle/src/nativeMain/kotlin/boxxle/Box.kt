@@ -28,10 +28,10 @@ class Box(
     }
 
     override fun draw() {
-        val scaledDim = 32 * getBoxxleContext().level.data.scale
+        val dim = getBoxxleContext().tileDim
         useTextureContext {
-            if (isPlaced) boxPlaced.draw(p.x * scaledDim, p.y * scaledDim)
-            else box.draw(p.x * scaledDim, p.y * scaledDim)
+            if (isPlaced) boxPlaced.draw(p.x * dim, p.y * dim)
+            else box.draw(p.x * dim, p.y * dim)
         }
     }
 

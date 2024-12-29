@@ -1,5 +1,6 @@
 package boxxle
 
+import boxxle.context.getBoxxleContext
 import com.kengine.graphics.SpriteContext
 import com.kengine.hooks.context.getContext
 import com.kengine.math.Vec2
@@ -33,19 +34,19 @@ class Level(val levelNumber: Int) {
     }
 
     fun draw() {
-        val scaledDim = 32 * data.scale
+       val dim = getBoxxleContext().tileDim
         tiles.forEachIndexed { y, row ->
             row.forEachIndexed { x, tileType ->
                 when (tileType) {
                     Tiles.BRICK -> {
-                        brickSprite.draw(x * scaledDim, y * scaledDim)
+                        brickSprite.draw(x.toDouble() * dim, y.toDouble() * dim)
                     }
                 }
             }
         }
 
         for (goal in goals) {
-            goalSprite.draw(goal.x * scaledDim, goal.y * scaledDim)
+            goalSprite.draw(goal.x * dim, goal.y * dim)
         }
 
         for (box in boxes) {

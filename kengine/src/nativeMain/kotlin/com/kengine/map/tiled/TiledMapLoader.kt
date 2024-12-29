@@ -63,10 +63,7 @@ class TiledMapLoader : Logging {
                 logger.error { "Failed to load external tileset at $tilesetPath: ${e.message}" }
                 throw IllegalStateException("Cannot load external tileset: $tilesetPath", e)
             }
-
         }
-
-        map.postDeserialize()
 
         logger.info { "Map successfully loaded: ${map.width}x${map.height}, ${map.layers.size} layers, ${map.tilesets.size} tilesets." }
         return map

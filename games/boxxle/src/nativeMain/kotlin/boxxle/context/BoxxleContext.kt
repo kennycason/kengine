@@ -3,14 +3,16 @@ package boxxle.context
 import boxxle.Level
 import boxxle.Player
 import boxxle.Sprites
-import com.kengine.hooks.context.Context
 import com.kengine.graphics.SpriteSheet
 import com.kengine.graphics.useSpriteContext
+import com.kengine.hooks.context.Context
 
 class BoxxleContext private constructor(
     var level: Level,
     val player: Player
 ) : Context() {
+
+    val tileDim = 32
 
     companion object {
         private var currentContext: BoxxleContext? = null
@@ -43,4 +45,3 @@ class BoxxleContext private constructor(
     }
 
 }
-

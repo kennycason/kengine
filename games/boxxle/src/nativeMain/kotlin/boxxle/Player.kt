@@ -146,13 +146,13 @@ class Player(
     }
 
     override fun draw() {
-        val scaledDim = 32 * getBoxxleContext().level.data.scale
+        val dim = getBoxxleContext().tileDim
         useSpriteContext {
             when (face) {
-                Direction.UP -> playerSpriteUp.draw(p.x * scaledDim, p.y * scaledDim)
-                Direction.DOWN -> playerSpriteDown.draw(p.x * scaledDim, p.y * scaledDim)
-                Direction.LEFT -> playerSpriteLeft.draw(p.x * scaledDim, p.y * scaledDim)
-                Direction.RIGHT -> playerSpriteRight.draw(p.x * scaledDim, p.y * scaledDim)
+                Direction.UP -> playerSpriteUp.draw(p.x * dim, p.y * dim)
+                Direction.DOWN -> playerSpriteDown.draw(p.x * dim, p.y * dim)
+                Direction.LEFT -> playerSpriteLeft.draw(p.x * dim, p.y * dim)
+                Direction.RIGHT -> playerSpriteRight.draw(p.x * dim, p.y * dim)
             }
 
         }
