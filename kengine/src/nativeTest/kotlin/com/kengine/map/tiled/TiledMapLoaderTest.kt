@@ -1,5 +1,6 @@
 package com.kengine.map.tiled
 
+import com.kengine.graphics.TextureContext
 import com.kengine.log.Logging
 import com.kengine.test.expectThat
 import kotlin.test.Test
@@ -10,6 +11,10 @@ class TiledMapLoaderTest : Logging {
         BRICK(1u),
         BOX(2u),
         BOX_SET(3u),
+    }
+
+    init {
+        TextureContext.get()
     }
 
     @Test

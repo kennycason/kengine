@@ -33,6 +33,10 @@ kotlin {
         else -> throw GradleException("Host OS [$hostOs] is not supported in Kotlin/Native.")
     }
 
+    val vulkanSdkPath = System.getenv("VULKAN_SDK")
+        ?: project.findProperty("vulkanSdkPath")
+        ?: error("VULKAN_SDK env var AND gradle.properties vulkanSdkPath not set")
+
     nativeTarget.apply {
         binaries {
             staticLib()
@@ -47,6 +51,9 @@ kotlin {
                     "-lSDL3_net",
                     "-lSDL3_ttf",
                     "-lchipmunk",
+                    "-L$vulkanSdkPath/lib",
+                    "-lvulkan",
+                    "-framework", "QuartzCore", // Required for MoltenVK (Metal support)
                     "-framework", "Cocoa",
                     "-framework", "IOKit",
                     "-framework", "CoreVideo",
@@ -86,6 +93,15 @@ kotlin {
                 defFile = file("src/nativeInterop/cinterop/chipmunk.def")
                 compilerOpts("-I/usr/local/include")
             }
+            val vulkan by creating {
+                defFile = file("src/nativeInterop/cinterop/vulkan.def")
+                compilerOpts("-I$vulkanSdkPath/include")
+                linkerOpts(
+                    "-L${vulkanSdkPath}/lib",   // library path
+                    "-lvulkan",                 // vulkan loader (only if explicitly required)
+                    "-framework", "QuartzCore"  // metal backend dependency
+                )
+            }
         }
 
         compilations["main"].compileTaskProvider.configure {
@@ -93,8 +109,8 @@ kotlin {
                 freeCompilerArgs += listOf(
                     "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
                     "-opt-in=kotlin.ExperimentalStdlibApi",
-                    "-g",  // Enable debug symbols
-                    "-ea"  // Enable assertions
+                    "-g",  // enable debug symbols
+                    "-ea"  // enable assertions
                 )
             }
         }
@@ -106,7 +122,7 @@ kotlin {
                 implementation(libs.kotlinxSerializationJson)
                 implementation(libs.kotlinxCoroutinesCore)
 
-                api(libs.kotlinxSerializationJson) // Expose API dependencies for reuse
+                api(libs.kotlinxSerializationJson) // expose API dependencies for reuse
                 api(libs.kotlinxCoroutinesCore)
                 implementation(project(":kengine-test"))
             }

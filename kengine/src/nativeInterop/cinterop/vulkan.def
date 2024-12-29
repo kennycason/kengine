@@ -1,0 +1,4 @@
+headers = vulkan/vulkan.h
+package = vulkan
+compilerOpts = -I${vulkanSdkPath}/include
+linkerOpts = -framework QuartzCore

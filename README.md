@@ -141,6 +141,25 @@ Install 3DL3. SDL3 is not yet released on brew and must be manually installed.
 
 [SDL3 Installation Guide](/sdl3/README.md)
 
+
+Install Vulkan 3D
+
+Download from: https://vulkan.lunarg.com/sdk/home
+
+(add to `~/.zshrc`)
+
+```shell
+export VULKAN_SDK=/Users/kennycason/VulkanSDK/1.3.296.0/macOS
+export PATH=$VULKAN_SDK/bin:$PATH
+export DYLD_LIBRARY_PATH=$VULKAN_SDK/lib:$DYLD_LIBRARY_PATH
+export VK_ICD_FILENAMES=$VULKAN_SDK/etc/vulkan/icd.d/MoltenVK_icd.json
+export VK_LAYER_PATH=$VULKAN_SDK/etc/vulkan/explicit_layer.d
+```
+
+```shell
+ln -s $VULKAN_SDK/lib/libvulkan.dylib /usr/local/lib/libvulkan.dylib
+```
+
 Build the project
 ```shell
 ./gradlew clean build

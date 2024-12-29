@@ -63,7 +63,6 @@ class TiledMapDrawIT {
                         useSDLContext {
                             fillScreen(0u, 0u, 0u)
                             val startTimeNs = getCurrentNanoseconds()
-//                            tiledMap.p.set(100.0, 100.0)
                             tiledMap.draw()
                             val deltaTimeNs = getCurrentNanoseconds() - startTimeNs  // This now measures actual draw time
                             totalRenderTimesNs += deltaTimeNs
