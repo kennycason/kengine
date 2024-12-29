@@ -8,7 +8,8 @@ import com.kengine.math.Vec2
 import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.free
+import kotlinx.cinterop.nativeHeap
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.toKString
 import sdl3.image.SDL_FPoint
@@ -34,11 +35,30 @@ class Sprite private constructor(
     val scaledHeight: Float
         get() = (height * scale.y).toFloat()
 
+    // pre-allocated SDL objects
+    private val clipRect: SDL_FRect? = clip?.let {
+        nativeHeap.alloc<SDL_FRect>().apply {
+            this.x = it.x.toFloat() + 0.5f
+            this.y = it.y.toFloat() + 0.5f
+            this.w = it.w.toFloat() - 1f
+            this.h = it.h.toFloat() - 1f
+        }
+    }
+    private val destRect = nativeHeap.alloc<SDL_FRect>().apply {
+        this.x = 0f
+        this.y = 0f
+        this.w = scaledWidth
+        this.h = scaledHeight
+    }
+    private val origin = nativeHeap.alloc<SDL_FPoint>()
+    private val right = nativeHeap.alloc<SDL_FPoint>()
+    private val down = nativeHeap.alloc<SDL_FPoint>()
+
     fun draw(
-        position: Vec2,
+        p: Vec2,
         flip: FlipMode = FlipMode.NONE,
         angle: Double = 0.0
-    ) = draw(position.x, position.y, flip, angle)
+    ) = draw(p.x, p.y, flip, angle)
 
     fun draw(
         x: Double,
@@ -47,65 +67,51 @@ class Sprite private constructor(
         angle: Double = 0.0
     ) {
         useSDLContext {
-            memScoped {
-                // Prepare the clipping rectangle
-                val clipRect = clip?.let {
-                    alloc<SDL_FRect>().apply {
-                        // add boundary to prevent texture bleed when scaled
-                        this.x = it.x.toFloat() + 0.5f
-                        this.y = it.y.toFloat() + 0.5f
-                        this.w = it.w.toFloat() - 1f
-                        this.h = it.h.toFloat() - 1f
-                    }
+            // handle no rotation or flipping early
+            if (angle == 0.0 && flip == FlipMode.NONE) {
+                destRect.apply {
+                    this.x = x.toFloat()
+                    this.y = y.toFloat()
                 }
 
-                // Apply flipping
-                val flipX = if (flip == FlipMode.HORIZONTAL || flip == FlipMode.BOTH) -1f else 1f
-                val flipY = if (flip == FlipMode.VERTICAL || flip == FlipMode.BOTH) -1f else 1f
-
-                // Compute pivot point
-                val pivotX = x + (scaledWidth / 2.0f)
-                val pivotY = y + (scaledHeight / 2.0f)
-
-                // Handle no rotation or flipping early
-                if (angle == 0.0 && flip == FlipMode.NONE) {
-                    val destRect = alloc<SDL_FRect>().apply {
-                        this.x = x.toFloat()
-                        this.y = y.toFloat()
-                        this.w = scaledWidth
-                        this.h = scaledHeight
-                    }
-
-                    if (!SDL_RenderTexture(renderer, texture.texture, clipRect?.ptr, destRect.ptr)) {
-                        handleError()
-                    }
-                    return
+                if (!SDL_RenderTexture(renderer, texture.texture, clipRect?.ptr, destRect.ptr)) {
+                    handleError()
                 }
+                return
+            }
 
-                // Calculate rotation with affine transform
-                val rad = Math.toRadians(angle)
-                val cos = kotlin.math.cos(rad).toFloat()
-                val sin = kotlin.math.sin(rad).toFloat()
+            // aply flipping
+            val flipX = if (flip == FlipMode.HORIZONTAL || flip == FlipMode.BOTH) -1f else 1f
+            val flipY = if (flip == FlipMode.VERTICAL || flip == FlipMode.BOTH) -1f else 1f
 
-                val offsetX = (scaledWidth / 2.0f) * flipX
-                val offsetY = (scaledHeight / 2.0f) * flipY
+            // compute pivot point
+            val pivotX = x + (scaledWidth / 2.0f)
+            val pivotY = y + (scaledHeight / 2.0f)
 
-                // Affine points
-                val origin = alloc<SDL_FPoint>().apply {
-                    this.x = ((pivotX - offsetX * cos + offsetY * sin).toFloat())
-                    this.y = ((pivotY - offsetX * sin - offsetY * cos).toFloat())
-                }
-                val right = alloc<SDL_FPoint>().apply {
-                    this.x = ((pivotX + offsetX * cos + offsetY * sin).toFloat())
-                    this.y = ((pivotY + offsetX * sin - offsetY * cos).toFloat())
-                }
-                val down = alloc<SDL_FPoint>().apply {
-                    this.x = ((pivotX - offsetX * cos - offsetY * sin).toFloat())
-                    this.y = ((pivotY - offsetX * sin + offsetY * cos).toFloat())
-                }
+            // calculate rotation with affine transform
+            val rad = Math.toRadians(angle)
+            val cos = kotlin.math.cos(rad).toFloat()
+            val sin = kotlin.math.sin(rad).toFloat()
 
-                // Render with affine transform
-                if (!SDL_RenderTextureAffine(
+            val offsetX = (scaledWidth / 2.0f) * flipX
+            val offsetY = (scaledHeight / 2.0f) * flipY
+
+            // update affine points
+            origin.apply {
+                this.x = ((pivotX - offsetX * cos + offsetY * sin).toFloat())
+                this.y = ((pivotY - offsetX * sin - offsetY * cos).toFloat())
+            }
+            right.apply {
+                this.x = ((pivotX + offsetX * cos + offsetY * sin).toFloat())
+                this.y = ((pivotY + offsetX * sin - offsetY * cos).toFloat())
+            }
+            down.apply {
+                this.x = ((pivotX - offsetX * cos - offsetY * sin).toFloat())
+                this.y = ((pivotY - offsetX * sin + offsetY * cos).toFloat())
+            }
+
+            // render with affine transform
+            if (!SDL_RenderTextureAffine(
                     renderer,
                     texture.texture,
                     clipRect?.ptr,
@@ -113,14 +119,18 @@ class Sprite private constructor(
                     right.ptr,
                     down.ptr
                 )) {
-                    handleError()
-                }
+                handleError()
             }
         }
     }
 
     fun cleanup() {
-        //    texture.cleanup()
+        logger.info { "Cleaning up Sprite $this" }
+        clipRect?.let { nativeHeap.free(it) }
+        nativeHeap.free(destRect)
+        nativeHeap.free(origin)
+        nativeHeap.free(right)
+        nativeHeap.free(down)
     }
 
     private fun handleError() {
@@ -132,16 +142,17 @@ class Sprite private constructor(
     companion object {
         private val logger = getLogger(Sprite::class)
 
-        // Load sprite from file
+        // load sprite from file
         fun fromFilePath(filePath: String, clip: IntRect? = null): Sprite {
             val texture = getTextureContext().getTexture(filePath)
             logger.info { "Loaded texture: ${texture.width}x${texture.height}" }
             return Sprite(texture, clip)
         }
 
-        // Load sprite from existing texture
+        // load sprite from existing texture
         fun fromTexture(texture: Texture, clip: IntRect? = null): Sprite {
             return Sprite(texture, clip)
         }
+
     }
 }

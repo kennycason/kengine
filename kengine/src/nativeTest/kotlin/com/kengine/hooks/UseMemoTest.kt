@@ -2,7 +2,7 @@ package com.kengine.hooks
 
 import com.kengine.hooks.state.State
 import com.kengine.hooks.state.useState
-import com.kengine.memo.useMemo
+import com.kengine.hooks.memo.useMemo
 import com.kengine.test.expectThat
 import kotlin.test.Test
 

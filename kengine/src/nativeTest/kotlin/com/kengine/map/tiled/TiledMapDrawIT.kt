@@ -7,7 +7,7 @@ import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.log.Logger
 import com.kengine.sdl.useSDLContext
 import com.kengine.time.getClockContext
-import com.kengine.time.getCurrentMilliseconds
+import com.kengine.time.getCurrentNanoseconds
 import com.kengine.time.useTimer
 import kotlin.test.Test
 
@@ -15,12 +15,6 @@ class TiledMapDrawIT {
 
     @Test
     fun `draw ninja turdle map`() {
-        val tiledMap = TiledMapLoader()
-//            .loadMap("src/nativeTest/resources/ninjaturdle/stomach_0.tmj")
-            .loadMap("src/nativeTest/resources/ninjaturdle/lungs_25.tmj")
-//            .loadMap("src/nativeTest/resources/ninjaturdle/all_tiles.tmj")
-//            .loadMap("src/nativeTest/resources/ninjaturdle/single_layer.tmj")
-//            .loadMap("src/nativeTest/resources/rotations.tmj")
         createGameContext(
             title = "Tile Map Test",
             width = 800,
@@ -28,10 +22,24 @@ class TiledMapDrawIT {
             logLevel = Logger.Level.INFO
         ) {
             GameRunner(frameRate = 60) {
+                val tiledMap = TiledMapLoader()
+//            .loadMap("src/nativeTest/resources/ninjaturdle/stomach_0.tmj")
+                    .loadMap("src/nativeTest/resources/ninjaturdle/lungs_25.tmj")
+//            .loadMap("src/nativeTest/resources/ninjaturdle/all_tiles.tmj")
+//            .loadMap("src/nativeTest/resources/ninjaturdle/single_layer.tmj")
+//            .loadMap("src/nativeTest/resources/rotations.tmj")
+
                 object : Game {
                     private val scrollSpeed = 100.0
+                    private var totalRenderTimesNs = 0L
+                    private var iterations = 0
+
+                    private var minRenderTimeNs = Long.MAX_VALUE
+                    private var maxRenderTimeNs = Long.MIN_VALUE
+                    private var avgRenderTimeNs = 0L
+
                     override fun update() {
-                        useTimer(5000L) {
+                        useTimer(10000L) {
                             isRunning = false
                         }
                     }
@@ -54,9 +62,21 @@ class TiledMapDrawIT {
                         }
                         useSDLContext {
                             fillScreen(0u, 0u, 0u)
-                            val lastMapRenderTimeMs = getCurrentMilliseconds()
+                            val startTimeNs = getCurrentNanoseconds()
+//                            tiledMap.p.set(100.0, 100.0)
                             tiledMap.draw()
-                            logger.info { "Map rendered in ${getCurrentMilliseconds() - lastMapRenderTimeMs}ms" }
+                            val deltaTimeNs = getCurrentNanoseconds() - startTimeNs  // This now measures actual draw time
+                            totalRenderTimesNs += deltaTimeNs
+                            iterations++
+                            minRenderTimeNs = minOf(minRenderTimeNs, deltaTimeNs)
+                            maxRenderTimeNs = maxOf(maxRenderTimeNs, deltaTimeNs)
+                            avgRenderTimeNs = (totalRenderTimesNs / iterations.toFloat()).toLong()
+                            logger.info {
+                                "Map rendered in ${deltaTimeNs}ns, " +
+                                    "avg: ${avgRenderTimeNs}ns " +
+                                    "min: ${minRenderTimeNs}ns " +
+                                    "max: ${maxRenderTimeNs}ns"
+                            }
                             flipScreen()
                         }
                     }

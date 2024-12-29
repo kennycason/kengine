@@ -8,7 +8,11 @@ import com.kengine.math.Vec2
 import com.kengine.sdl.getSDLContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
+/**
+ * Batching disabled while in DEV
+ */
 @Serializable
 class TiledMap(
     val width: Int,
@@ -33,50 +37,24 @@ class TiledMap(
     }
 
     // position offset for rendering
-    val p by lazy { Vec2() }
+    @Transient
+    val p = Vec2()
 
+    // Layer lookup
     private val layersByName = layers.associateBy(TiledMapLayer::name)
 
+//    @Transient
+//    private val batches: MutableMap<Texture, SpriteBatch> = mutableMapOf()
+
+    // Tileset and spritesheet storage
     private data class TilesetAndSpriteSheet(
         val tileset: Tileset,
         val spriteSheet: SpriteSheet
     )
-
-    private val tilesetsWithSprites: List<TilesetAndSpriteSheet> by lazy {
-        tilesets.map { tileset ->
-            TilesetAndSpriteSheet(
-                tileset = tileset,
-                spriteSheet = SpriteSheet.fromSprite(
-                    sprite = Sprite.fromFilePath(tileset.image!!),
-                    tileWidth = tileset.tileWidth!!,
-                    tileHeight = tileset.tileHeight!!,
-                    offsetX = tileset.margin,
-                    offsetY = tileset.margin,
-                    paddingX = tileset.spacing,
-                    paddingY = tileset.spacing
-                )
-            )
-        }
-    }
-
-    private val gidToTilesetArray: Array<TilesetAndSpriteSheet?> by lazy {
-        // Find max GID across all tilesets
-        val maxGid = tilesetsWithSprites.maxOf {
-            it.tileset.firstgid + it.tileset.tileCount!!.toUInt() - 1u
-        }
-
-        // Create lookup array
-        Array<TilesetAndSpriteSheet?>(maxGid.toInt() + 1) { null }.also { array ->
-            // Fill array with tileset references
-            tilesetsWithSprites.forEach { tilesetAndSheet ->
-                val start = tilesetAndSheet.tileset.firstgid.toInt()
-                val end = (start + tilesetAndSheet.tileset.tileCount!!.toInt() - 1)
-                for (i in start..end) {
-                    array[i] = tilesetAndSheet
-                }
-            }
-        }
-    }
+    @Transient
+    private lateinit var tilesetsWithSprites: List<TilesetAndSpriteSheet>
+    @Transient
+    private lateinit var gidToTilesetArray: Array<TilesetAndSpriteSheet?>
 
     init {
         tilesets.sortedBy { it.firstgid }
@@ -92,12 +70,62 @@ class TiledMap(
             .flush()
     }
 
+    /**
+     * rebuilds transient fields after deserialization or when tilesets change.
+     */
+    fun rebuild() {
+        // initialize tilesets with spritesheets
+        tilesetsWithSprites = tilesets.map { tileset ->
+            TilesetAndSpriteSheet(
+                tileset = tileset,
+                spriteSheet = SpriteSheet.fromSprite(
+                    sprite = Sprite.fromFilePath(tileset.image!!),
+                    tileWidth = tileset.tileWidth!!,
+                    tileHeight = tileset.tileHeight!!,
+                    offsetX = tileset.margin,
+                    offsetY = tileset.margin,
+                    paddingX = tileset.spacing,
+                    paddingY = tileset.spacing
+                )
+            )
+        }
+
+        // initialize batches for each texture
+//        batches.clear()
+//        tilesetsWithSprites.forEach {
+//            batches[it.spriteSheet.texture] = SpriteBatch(it.spriteSheet.texture)
+//        }
+
+        // precompute GID lookup
+        val maxGid = tilesetsWithSprites.maxOf {
+            it.tileset.firstgid + it.tileset.tileCount!!.toUInt() - 1u
+        }
+        gidToTilesetArray = arrayOfNulls<TilesetAndSpriteSheet>(maxGid.toInt() + 1).also { array ->
+            tilesetsWithSprites.forEach { tileset ->
+                val start = tileset.tileset.firstgid.toInt()
+                val end = (start + tileset.tileset.tileCount!!.toInt() - 1)
+                for (i in start..end) {
+                    array[i] = tileset
+                }
+            }
+        }
+    }
+
+    fun postDeserialize() {
+        logger.info { "Post deserialization of Tiledmap" }
+        rebuild()
+    }
+
     fun draw() {
+       // batches.values.forEach { it.begin() }
         layers.forEach { draw(it) }
+       // batches.values.forEach { it.end() }
     }
 
     fun draw(layerName: String) {
+      //  batches.values.forEach { it.begin() }
         draw(layersByName.getValue(layerName))
+      //  batches.values.forEach { it.end() }
     }
 
     private fun draw(layer: TiledMapLayer) {
@@ -114,7 +142,6 @@ class TiledMap(
         val startY = (screenTop / tileHeight).toInt().coerceAtLeast(0)
         val endY = (screenBottom / tileHeight).toInt().coerceAtMost(layer.height!! - 1)
 
-
         for (y in startY..endY) {
             for (x in startX..endX) {
                 val rawGid = layer.getTileAt(x, y)
@@ -123,7 +150,6 @@ class TiledMap(
                 val decoded = decodeTileGid(rawGid)
                 if (decoded.tileId <= 0u) continue
 
-                // find the tileset and tile position in the sheet
                 val tilesetWithSprite = findTilesetForGid(decoded.tileId)
                 val (tilePx, tilePy) = getTilePosition(decoded.tileId, tilesetWithSprite.tileset)
 
@@ -133,7 +159,8 @@ class TiledMap(
                 val dstY = y * tileHeight + p.y
                 val tile: Sprite = tilesetWithSprite.spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
                 tile.draw(dstX, dstY, flipMode, angle)
-
+           //     val batch = batches[tile.texture]!!
+         //       batch.draw(tile, dstX.toFloat(), dstY.toFloat(), flipMode, angle)
             }
         }
     }
