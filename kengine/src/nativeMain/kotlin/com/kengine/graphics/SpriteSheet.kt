@@ -6,7 +6,7 @@ import com.kengine.math.IntRect
 import com.kengine.math.Vec2
 
 class SpriteSheet private constructor(
-    private val texture: Texture,
+    val texture: Texture,
     val tileWidth: Int,
     val tileHeight: Int,
     val marginX: Int = 0,

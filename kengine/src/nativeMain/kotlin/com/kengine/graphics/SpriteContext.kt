@@ -4,8 +4,7 @@ import com.kengine.hooks.context.Context
 import com.kengine.log.Logging
 
 class SpriteContext private constructor(
-    private val manager: SpriteManager,
-    val spriteBatch: SpriteBatch,
+    private val manager: SpriteManager
 ) : Context(), Logging {
 
     fun getSprite(name: String): Sprite {
@@ -72,8 +71,7 @@ class SpriteContext private constructor(
 
         fun get(): SpriteContext {
             return currentContext ?: SpriteContext(
-                manager = SpriteManager(),
-                spriteBatch = SpriteBatch()
+                manager = SpriteManager()
             ).also {
                 currentContext = it
             }
@@ -83,7 +81,6 @@ class SpriteContext private constructor(
     override fun cleanup() {
         logger.info { "Cleaning up SpriteContext" }
         manager.cleanup()
-        spriteBatch.cleanup()
         currentContext = null
     }
 }
