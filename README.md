@@ -20,7 +20,7 @@ Controls:
 
 There are 41 levels total. 
 
-<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/boxxle/screenshot.png" />
+<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/games/boxxle/screenshot.png" />
 
 ```kotlin
 fun main() {
@@ -131,15 +131,15 @@ kengine/
 
 Install OpenJDK 17.0+
 
-Install SDL via Brew (on Mac)
-```shell
-brew install sdl2 sdl2_gfx sdl2_image sdl2_mixer sdl2_net sdl2_ttf
-```
-
 Install Chipmunk2D via Brew (on Mac)
 ```shell
 brew install chipmunk
 ```
+
+
+Install 3DL3. SDL3 is not yet released on brew and must be manually installed.
+
+[SDL3 Installation Guide](/sdl3/README.md)
 
 Build the project
 ```shell
@@ -155,16 +155,17 @@ rm -rf ~/.gradle/wrapper
 ```
 
 ## Roadmap
-- Embed data files in executable binary
-- GameLoop updates (improve handling of delta timestamps, decouple update/draw calls)
-- TiledMapLoader (WIP)
-- Logger -> File
+- Binary
+  - Embed data files in executable
+- GameLoop
+  - Decouple update/draw calls
+- TiledMapLoader 
+  - Performance enhancements
+  - Support TMX (XML format)
+- Logger file support
 - Menu system
 - GUI
 - fix @OptIn(ExperimentalForeignApi::class) (-opt-in being ignored by compiler in multi-module project in IJ)
 - Add Vec2 versions of functions that take (x,y) parameters, ditto for Rect2 and (x,y,w,h)
 - Redesign font handling + caching/config
 - Playdate integration (WIP struggling to target cortex-m7 arch)
-
-
-
