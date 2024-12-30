@@ -1,8 +1,8 @@
 package com.kengine.graphics
 
-import com.kengine.hooks.context.getContext
+import com.kengine.log.Logging
 import com.kengine.math.Vec2
-import com.kengine.time.ClockContext
+import com.kengine.time.getClockContext
 
 enum class LoopMode {
     /**
@@ -18,12 +18,16 @@ enum class LoopMode {
 
 class AnimatedSprite private constructor(
     private val sprites: List<Sprite>,
-    private val frameDurationMs: Long,
+    private val frameDurations: List<Long>, // Duration for each frame
     private val loopMode: LoopMode = LoopMode.WRAP_AROUND
-) {
+) : Logging {
+
     private var currentFrameIndex = 0
     private var elapsedTime = 0.0
-    private var pingPongDirection = 1 // 1 for forward, -1 for reverse
+    private var pingPongDirection = 1 // 1 = forward, -1 = reverse
+
+    private val totalDurationMs = frameDurations.sum() // total cycle duration
+//    private val frameLookup: List<Double> = frameDurations.runningFold(0.0) { acc, duration -> acc + duration }
 
     fun draw(p: Vec2, flip: FlipMode = FlipMode.NONE) {
         updateFrame()
@@ -36,39 +40,76 @@ class AnimatedSprite private constructor(
     }
 
     private fun updateFrame() {
-        elapsedTime += getContext<ClockContext>().deltaTimeMs
-        if (elapsedTime >= frameDurationMs) {
-            elapsedTime -= frameDurationMs
-            when (loopMode) {
-                LoopMode.WRAP_AROUND -> updateWrapAround()
-                LoopMode.PING_PONG -> updatePingPong()
-            }
+        // Update elapsed time
+        val deltaTime = getClockContext().deltaTimeMs
+        elapsedTime += deltaTime
+
+//        logger.info {
+//            "DeltaTime=$deltaTime, ElapsedTime=$elapsedTime, CurrentFrame=$currentFrameIndex"
+//        }
+
+        when (loopMode) {
+            LoopMode.WRAP_AROUND -> updateWrapAround()
+            LoopMode.PING_PONG -> updatePingPong()
         }
     }
 
+    // about 1ms slower.
+//    private fun updateWrapAround() {
+//        elapsedTime %= totalDurationMs // wrap time into range [0, totalDurationMs]
+//
+//        // Binary search to find the current frame
+//        val frameIndex = frameLookup.binarySearch { time -> time.compareTo(elapsedTime) }
+//        currentFrameIndex = if (frameIndex >= 0) frameIndex else -(frameIndex + 2)
+//    }
+
     private fun updateWrapAround() {
-        currentFrameIndex = (currentFrameIndex + 1) % sprites.size
+        elapsedTime %= totalDurationMs // keep within total duration
+
+        var frameElapsed = 0.0
+        for (i in sprites.indices) {
+            frameElapsed += frameDurations[i]
+            if (elapsedTime < frameElapsed) {
+                currentFrameIndex = i
+                break
+            }
+        }
+
+//        logger.info {
+//            "WrapAround: FrameIndex=$currentFrameIndex, Elapsed=$elapsedTime, FrameDuration=${frameDurations[currentFrameIndex]}"
+//        }
     }
 
     private fun updatePingPong() {
-        currentFrameIndex += pingPongDirection
-        if (currentFrameIndex == sprites.size || currentFrameIndex < 0) {
-            pingPongDirection *= -1
-            currentFrameIndex = (currentFrameIndex + pingPongDirection).coerceIn(0, sprites.size - 1)
+        while (elapsedTime >= frameDurations[currentFrameIndex]) {
+            elapsedTime -= frameDurations[currentFrameIndex]
+
+            currentFrameIndex += pingPongDirection
+            if (currentFrameIndex >= sprites.size || currentFrameIndex < 0) {
+                pingPongDirection *= -1
+                currentFrameIndex = (currentFrameIndex + pingPongDirection).coerceIn(0, sprites.size - 1)
+            }
+
+//            logger.info {
+//                "PingPong: FrameIndex=$currentFrameIndex, Elapsed=$elapsedTime, Direction=$pingPongDirection"
+//            }
         }
     }
 
     fun cleanup() {
-        //sprites.forEach { it.cleanup() }
+        sprites.forEach { it.cleanup() }
     }
 
     companion object {
         fun fromSprites(
             sprites: List<Sprite>,
-            frameDurationMs: Long,
+            frameDurations: List<Long>,
             loopMode: LoopMode = LoopMode.WRAP_AROUND
         ): AnimatedSprite {
-            return AnimatedSprite(sprites, frameDurationMs, loopMode)
+            require(sprites.size == frameDurations.size) {
+                "Sprite count and frame duration count must match!"
+            }
+            return AnimatedSprite(sprites, frameDurations, loopMode)
         }
 
         fun fromSpriteSheet(
@@ -82,8 +123,8 @@ class AnimatedSprite private constructor(
                     sprites.add(spriteSheet.getTile(x, y))
                 }
             }
-            return AnimatedSprite(sprites, frameDurationMs, loopMode)
+            val durations = List(sprites.size) { frameDurationMs }
+            return AnimatedSprite(sprites, durations, loopMode)
         }
     }
-
 }

@@ -54,10 +54,12 @@ data class TileData(
     val id: Int,
     val animation: List<Frame>? = null,
     val properties: List<TiledObject.Property>? = null
-)
+) {
+    fun isAnimated(): Boolean = animation != null && animation.isNotEmpty()
+}
 
 @Serializable
 data class Frame(
-    val duration: Int,
+    val duration: Int, // milliseconds
     val tileid: Int
 )

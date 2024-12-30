@@ -12,7 +12,7 @@ class ScytherEntity : Entity(width = 56, height = 56) {
     }
 
     override fun draw() {
-        animatedScyther.draw(p)
+        animatedScyther.draw(p.x, p.y)
     }
 
     override fun cleanup() {

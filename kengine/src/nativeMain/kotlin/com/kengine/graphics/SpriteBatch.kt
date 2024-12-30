@@ -187,8 +187,8 @@ class SpriteBatch(
         vertex.tex_coord.y = v
     }
 
-    private fun grow() {
-        val newCapacity = capacity * 2
+    private fun grow(minCapacity: Int = 0) {
+        val newCapacity = maxOf(capacity * 2, minCapacity)
 
         // allocate new buffers
         val newVertexBuffer = nativeHeap.allocArray<SDL_Vertex>(newCapacity * 4) // 4 vertices per sprite
