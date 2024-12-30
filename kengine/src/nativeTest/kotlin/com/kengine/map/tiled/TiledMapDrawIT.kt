@@ -39,7 +39,7 @@ class TiledMapDrawIT {
                     private var avgRenderTimeNs = 0L
 
                     override fun update() {
-                        useTimer(30000L) {
+                        useTimer(5000L) {
                             isRunning = false
                         }
                     }

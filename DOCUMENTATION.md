@@ -47,7 +47,7 @@ class BallSpriteEntity : SpriteEntity(
     v = Vec2(30.0, 30.0) // initial velocity (pixels/sec)
 ), Logging {
     private var bounceCounter = 0
-    
+
     override fun update() {
         val clock = getContext<ClockContext>()
 
@@ -65,7 +65,7 @@ class BallSpriteEntity : SpriteEntity(
                 bounceCounter++
             }
         }
-        
+
         useKeyboardContext {
             if (keyboard.isRPressed()) {
                 logger.info { "Reset ball" }
@@ -78,7 +78,6 @@ class BallSpriteEntity : SpriteEntity(
     }
 }
 ```
-
 
 ## Overview by Section
 
@@ -99,7 +98,8 @@ useTextureContext {
 
 #### Sprites
 
-Sprites represent drawable objects on the screen. They can be created from textures or sprite sheets and drawn with transformations like scaling and rotation.
+Sprites represent drawable objects on the screen. They can be created from textures or sprite sheets and drawn with transformations like scaling and
+rotation.
 
 Example: Drawing a Sprite
 
@@ -131,7 +131,7 @@ Another example loading from a `SpriteSheet`.
 
 ```kotlin
 val spriteSheet = SpriteSheet.fromFilePath("assets/sprites/metroid.bmp", tileWidth = 32, tileHeight = 32)
-    private val animatedMetroid = AnimatedSprite.fromSpriteSheet(spriteSheet, frameDurationMs = 200L)
+private val animatedMetroid = AnimatedSprite.fromSpriteSheet(spriteSheet, frameDurationMs = 200L)
 ```
 
 #### Geometry
@@ -148,7 +148,7 @@ useGeometryContext {
 }
 ```
 
-#### Time
+### Time
 
 The `ClockContext` handles game time, providing delta times for updates and total elapsed time since the game started.
 
@@ -161,15 +161,151 @@ useClockContext {
 }
 ```
 
-#### Entities
+### Input
 
-Entities represent objects in the game world, from players to obstacles. The Entity class provides a base for managing position, velocity, and actions.
+#### Mouse Input
+
+The `MouseContext` provides utilities to handle mouse input events, including button presses, cursor position, and timing.
+
+Example: Handling Mouse Input
+
+```kotlin
+useMouseContext {
+    if (mouse.isLeftPressed() || mouse.isRightPressed()) {
+        p.x = mouse.getCursor().x - width / 2
+        p.y = mouse.getCursor().y - height / 2
+    }
+}
+```
+
+Mouse Functions
+
+| Function                         | Description                                                      |
+|----------------------------------|------------------------------------------------------------------|
+| `mouse.isLeftPressed()`          | Returns `true` if the **left mouse button** is pressed.          |
+| `mouse.isRightPressed()`         | Returns `true` if the **right mouse button** is pressed.         |
+| `mouse.isMiddlePressed()`        | Returns `true` if the **middle mouse button** is pressed.        |
+| `mouse.getCursor()`              | Returns the current cursor position as `Vec2(x, y)`.             |
+| `mouse.timeSinceLeftPressed()`   | Returns time (ms) since the **left mouse button** was pressed.   |
+| `mouse.timeSinceRightPressed()`  | Returns time (ms) since the **right mouse button** was pressed.  |
+| `mouse.timeSinceMiddlePressed()` | Returns time (ms) since the **middle mouse button** was pressed. |
+
+#### Keyboard Input
+
+The KeyboardContext provides utilities for handling keyboard input, including key presses and timings.
+
+Example: Handling Keyboard Input
+
+```kotlin
+useKeyboardContext {
+    if (keyboard.isWPressed()) {
+        logger.info { "Moving up!" }
+    }
+
+    if (keyboard.isReturnPressed()) {
+        logger.info { "Return key pressed!" }
+    }
+}
+```
+
+Keyboard Functions
+
+| Function                            | Description                                                   |
+|-------------------------------------|---------------------------------------------------------------|
+| `keyboard.isAPressed()`             | Returns `true` if the **A key** is pressed.                   |
+| `keyboard.isSpacePressed()`         | Returns `true` if the **Space key** is pressed.               |
+| `keyboard.isReturnPressed()`        | Returns `true` if the **Return/Enter key** is pressed.        |
+| `keyboard.isEscapePressed()`        | Returns `true` if the **Escape key** is pressed.              |
+| `keyboard.isLeftPressed()`          | Returns `true` if the **Left Arrow key** is pressed.          |
+| `keyboard.isRightPressed()`         | Returns `true` if the **Right Arrow key** is pressed.         |
+| `keyboard.timeSinceAPressed()`      | Returns time (ms) since the **A key** was pressed.            |
+| `keyboard.timeSinceSpacePressed()`  | Returns time (ms) since the **Space key** was pressed.        |
+| `keyboard.timeSinceReturnPressed()` | Returns time (ms) since the **Return/Enter key** was pressed. |
+
+#### Controller Input
+
+The ControllerContext handles input from game controllers, supporting PlayStation, Xbox, Nintendo Switch, and generic gamepads.
+
+Example: Handling Controller Input
+
+```kotlin
+useControllerContext {
+    if (controller.isButtonPressed(Buttons.A)) {
+        logger.info { "Jump button pressed!" }
+    }
+
+    val axisValue = controller.getAxisValue(0) // Read the left stick horizontal axis
+    logger.info { "Axis value: $axisValue" }
+}
+```
+
+Supported Controllers
+
+- PlayStation 4 (DualShock 4)
+- PlayStation 5 (DualSense)
+- Xbox One
+- Xbox Series X/S
+- Nintendo Switch Pro Controller
+- Logitech
+- Ouya
+- Steam Controller (needs more testing)
+- Generic Gamepads (fallback mapping)
+
+Controller Functions
+
+| Function                                               | Description                                                |
+|--------------------------------------------------------|------------------------------------------------------------|
+| `controller.isButtonPressed(Buttons.A)`                | Returns `true` if the **A button** is pressed.             |
+| `controller.isButtonPressed(Buttons.B)`                | Returns `true` if the **B button** is pressed.             |
+| `controller.isButtonPressed(Buttons.START)`            | Returns `true` if the **Start/Options button** is pressed. |
+| `controller.isButtonPressed(Buttons.DPAD_UP)`          | Returns `true` if the **D-Pad Up** is pressed.             |
+| `controller.getAxisValue(0)`                           | Gets the value of the **Left Stick X-Axis** (-1.0 to 1.0). |
+| `controller.getAxisValue(1)`                           | Gets the value of the **Left Stick Y-Axis** (-1.0 to 1.0). |
+| `controller.isHatDirectionPressed(0, HatDirection.UP)` | Returns `true` if the **D-Pad Up** direction is pressed.   |
+
+Controller Buttons Overview
+
+Controller Button Mapping Table:
+
+| Button                     | Code Example                                         | PlayStation 5                        | Xbox Series X                      |
+|----------------------------|------------------------------------------------------|--------------------------------------|------------------------------------|
+| **Buttons.A**              | `controller.isButtonPressed(Buttons.A)`              | X                                    | A                                  |
+| **Buttons.B**              | `controller.isButtonPressed(Buttons.B)`              | Circle (O)                           | B                                  |
+| **Buttons.X**              | `controller.isButtonPressed(Buttons.X)`              | Square (□)                           | X                                  |
+| **Buttons.Y**              | `controller.isButtonPressed(Buttons.Y)`              | Triangle (△)                         | Y                                  |
+| **Buttons.L1**             | `controller.isButtonPressed(Buttons.L1)`             | L1                                   | LB (Left Bumper)                   |
+| **Buttons.R1**             | `controller.isButtonPressed(Buttons.R1)`             | R1                                   | RB (Right Bumper)                  |
+| **Buttons.L2**             | `controller.getAxisValue(4)`                         | L2 Trigger Axis                      | LT (Left Trigger)                  |
+| **Buttons.R2**             | `controller.getAxisValue(5)`                         | R2 Trigger Axis                      | RT (Right Trigger)                 |
+| **Buttons.L3**             | `controller.isButtonPressed(Buttons.L3)`             | L3 (Left Stick Button)               | LS (Left Stick Button)             |
+| **Buttons.R3**             | `controller.isButtonPressed(Buttons.R3)`             | R3 (Right Stick Button)              | RS (Right Stick Button)            |
+| **Buttons.START**          | `controller.isButtonPressed(Buttons.START)`          | Options                              | Menu (Start)                       |
+| **Buttons.SELECT**         | `controller.isButtonPressed(Buttons.SELECT)`         | Create (Share)                       | View (Back)                        |
+| **Buttons.DPAD_UP**        | `controller.isButtonPressed(Buttons.DPAD_UP)`        | D-Pad Up                             | D-Pad Up                           |
+| **Buttons.DPAD_DOWN**      | `controller.isButtonPressed(Buttons.DPAD_DOWN)`      | D-Pad Down                           | D-Pad Down                         |
+
+Controller Axes Overview
+
+| Axis Name                 | Code Example                              | PlayStation 5                        | Xbox Series X                      |
+|---------------------------|-------------------------------------------|--------------------------------------|------------------------------------|
+| **Left Stick X**          | `controller.getAxisValue(0)`              | Left Stick Horizontal Axis           | Left Stick Horizontal Axis         |
+| **Left Stick Y**          | `controller.getAxisValue(1)`              | Left Stick Vertical Axis             | Left Stick Vertical Axis           |
+| **Right Stick X**         | `controller.getAxisValue(2)`              | Right Stick Horizontal Axis          | Right Stick Horizontal Axis        |
+| **Right Stick Y**         | `controller.getAxisValue(3)`              | Right Stick Vertical Axis            | Right Stick Vertical Axis          |
+| **Left Trigger Axis**     | `controller.getAxisValue(4)`              | L2 Trigger Axis                      | LT Trigger Axis                    |
+| **Right Trigger Axis**    | `controller.getAxisValue(5)`              | R2 Trigger Axis                      | RT Trigger Axis                    |
+
+
+### Entities
+
+Entities represent objects in the game world, from players to obstacles. The Entity class provides a base for managing position, velocity, and
+actions.
 
 Example: Creating a Custom Entity
 
 ```kotlin
 class MyEntity : Entity(width = 32, height = 32) {
-    
+
     override fun update() {
         p.x += 1.0
     }
@@ -182,10 +318,9 @@ class MyEntity : Entity(width = 32, height = 32) {
         // cleanup resources
     }
 }
-
 ```
 
-#### Event Handling
+### Event Handling
 
 The `EventContext` enables decoupled communication between components using events.
 
@@ -200,12 +335,16 @@ useEventContext {
 }
 ```
 
+### Functional Hooks
+
+Inspired from React Hooks
 
 #### useState
 
-useState is a utility for managing state in your Kengine applications. 
-It allows you to track and update values while notifying any subscribed listeners about changes. 
-This state management mechanism is designed for lightweight use cases and integrates seamlessly with the Context system for broader application state management.
+useState is a utility for managing state in your Kengine applications.
+It allows you to track and update values while notifying any subscribed listeners about changes.
+This state management mechanism is designed for lightweight use cases and integrates seamlessly with the Context system for broader application state
+management.
 
 Creating and Using a State Variable
 
@@ -225,8 +364,9 @@ count.set(2) // No output
 
 #### useContext
 
-The Context class in your framework serves as a foundational building block for managing scoped, singleton-like components in your application. 
-Inspired by React’s Context API, it provides a flexible and extensible way to share functionality or state across different parts of your application without tightly coupling them.
+The Context class in your framework serves as a foundational building block for managing scoped, singleton-like components in your application.
+Inspired by React’s Context API, it provides a flexible and extensible way to share functionality or state across different parts of your application
+without tightly coupling them.
 
 ```kotlin
 class SimpleContext : Context() {
@@ -273,8 +413,8 @@ useContext<StatefulContext> {
 
 #### useEffect
 
-useEffect is a utility that allows you to manage side effects in response to changes in state variables. 
-It subscribes to the provided state dependencies and automatically triggers the effect whenever any of the dependencies change. 
+useEffect is a utility that allows you to manage side effects in response to changes in state variables.
+It subscribes to the provided state dependencies and automatically triggers the effect whenever any of the dependencies change.
 The effect can also include a cleanup mechanism, which is executed when dependencies change or when the effect is removed.
 
 Simple Side Effect
@@ -294,7 +434,7 @@ count.set(2)  // Logs: "The count has changed: 2"
 
 #### useMemo
 
-useMemo is a utility function for caching expensive computations based on dependencies. 
+useMemo is a utility function for caching expensive computations based on dependencies.
 It ensures that a computed value is only recalculated when one of its dependencies changes.
 
 ```kotlin
@@ -311,7 +451,7 @@ expectThat(computedValue.get()).isEqualTo(4)
 
 #### useReducer
 
-The useReducer hook is another great addition to the state management toolbox, especially for handling complex state logic. 
+The useReducer hook is another great addition to the state management toolbox, especially for handling complex state logic.
 It provides a predictable way to update state by defining actions and a reducer function.
 
 This example demonstrates using useReducer with simple String actions:
@@ -335,7 +475,6 @@ expectThat(count.get()).isEqualTo(0)
 ```
 
 Here’s a more robust example, showcasing useReducer with object-based actions:
-
 
 ```kotlin
 data class User(val name: String, val age: Int)
