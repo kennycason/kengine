@@ -22,7 +22,7 @@ class PhysicsDemoGame : Game, Logging {
             // Create boundaries
             createBoundary(0.0, screenHeight - 20.0, screenWidth, 20.0)  // Ground
             createBoundary(-20.0, 0.0, 20.0, screenHeight)               // Left wall
-            createBoundary(screenWidth, 0.0, 20.0, screenHeight)         // Right wall
+            createBoundary(screenWidth, 0.0, 20.0, screenHeight)            // Right wall
 
             // Create initial objects
             repeat(10) {

@@ -62,18 +62,29 @@ class PhysicsContext private constructor() : Context(), Logging {
     }
 
     fun removeObject(obj: PhysicsObject) {
-        val list = if (obj.body.isStatic) staticObjects else dynamicObjects
-        if (list.remove(obj)) {
-            if (!isClearing) {
-                cpSpaceRemoveBody(space, obj.body.handle)
-                cpSpaceRemoveShape(space, obj.shape.handle)
-            }
+        logger.debug { "Remove object begin" }
+        logger.debug { "Removing object: $obj" }
+        logger.debug { "Body destroyed: ${obj.body.isDestroyed}, Shape destroyed: ${obj.shape.isDestroyed}" }
+        cpSpaceRemoveBody(space, obj.body.handle)
+        cpSpaceRemoveShape(space, obj.shape.handle)
+
+        // free memory safely
+        if (!obj.body.isDestroyed) {
             cpBodyFree(obj.body.handle)
             obj.body.isDestroyed = true
+        }
 
+        if (!obj.shape.isDestroyed) {
             cpShapeFree(obj.shape.handle)
             obj.shape.isDestroyed = true
         }
+
+        // finally, remove from lists if still present
+        dynamicObjects.remove(obj)
+        staticObjects.remove(obj)
+
+        logger.debug { "Removing object: $obj" }
+        logger.debug { "Body destroyed: ${obj.body.isDestroyed}, Shape destroyed: ${obj.shape.isDestroyed}" }
     }
 
     fun getDynamicObjects(): List<PhysicsObject> = dynamicObjects
@@ -88,17 +99,22 @@ class PhysicsContext private constructor() : Context(), Logging {
 
     fun clearDynamicObjects() {
         withClearing {
-            dynamicObjects.clear()
-            dynamicObjects.forEach(::removeObject)
+            val objectsToRemove = dynamicObjects.toList()  // take a snapshot
+            objectsToRemove.forEach(::removeObject)        // remove from physics space first
+            dynamicObjects.clear()                         // THEN clear the list references...
         }
     }
 
     fun clearAll() {
         withClearing {
+            val dynamicToRemove = dynamicObjects.toList()
+            val staticToRemove = staticObjects.toList()
+
             dynamicObjects.clear()
             staticObjects.clear()
-            dynamicObjects.forEach(::removeObject)
-            staticObjects.forEach(::removeObject)
+
+            dynamicToRemove.forEach(::removeObject)
+            staticToRemove.forEach(::removeObject)
         }
     }
 
