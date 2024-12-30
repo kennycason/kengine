@@ -21,8 +21,8 @@ import kotlinx.cinterop.ExperimentalForeignApi
 @OptIn(ExperimentalForeignApi::class)
 class PhysicsContext private constructor() : Context(), Logging {
     private val space = cpSpaceNew()
-    private val bodies = mutableListOf<Body>()
-    private val shapes = mutableListOf<Shape>()
+    private val dynamicObjects = mutableListOf<PhysicsObject>()
+    private val staticObjects = mutableListOf<PhysicsObject>()
     private var isClearing = false
 
     var gravity: Vec2 = Vec2(0.0, 500.0)
@@ -49,31 +49,63 @@ class PhysicsContext private constructor() : Context(), Logging {
         iterations = iterations
     }
 
-    fun addObject(body: Body, shape: Shape) {
+    fun addObject(obj: PhysicsObject) {
         if (isClearing) throw IllegalStateException("Can not add objects while clearing.")
-        cpSpaceAddBody(space, body.handle)
-        cpSpaceAddShape(space, shape.handle)
-        bodies.add(body)
-        shapes.add(shape)
-    }
+        if (obj.isDestroyed) throw IllegalStateException("Cannot add destroyed object")
 
-    internal fun removeFromSpace(body: Body) {
-        if (bodies.remove(body)) {
-            cpSpaceRemoveBody(space, body.handle)
-            cpBodyFree(body.handle)
+        val list = if (obj.body.isStatic) staticObjects else dynamicObjects
+        if (!list.contains(obj)) {
+            cpSpaceAddBody(space, obj.body.handle)
+            cpSpaceAddShape(space, obj.shape.handle)
+            list.add(obj)
         }
     }
 
-    internal fun removeFromSpace(shape: Shape) {
-        if (shapes.remove(shape)) {
-            cpSpaceRemoveShape(space, shape.handle)
-            cpShapeFree(shape.handle)
+    fun removeObject(obj: PhysicsObject) {
+        val list = if (obj.body.isStatic) staticObjects else dynamicObjects
+        if (list.remove(obj)) {
+            if (!isClearing) {
+                cpSpaceRemoveBody(space, obj.body.handle)
+                cpSpaceRemoveShape(space, obj.shape.handle)
+            }
+            cpBodyFree(obj.body.handle)
+            obj.body.isDestroyed = true
+
+            cpShapeFree(obj.shape.handle)
+            obj.shape.isDestroyed = true
         }
     }
+
+    fun getDynamicObjects(): List<PhysicsObject> = dynamicObjects
+
+    fun getStaticObjects(): List<PhysicsObject> = staticObjects
 
     fun step(deltaTime: Double) {
         if (!isClearing) {
             cpSpaceStep(space, deltaTime)
+        }
+    }
+
+    fun clearDynamicObjects() {
+        withClearing {
+            dynamicObjects.clear()
+            dynamicObjects.forEach(::removeObject)
+        }
+    }
+
+    fun clearAll() {
+        withClearing {
+            dynamicObjects.clear()
+            staticObjects.clear()
+            dynamicObjects.forEach(::removeObject)
+            staticObjects.forEach(::removeObject)
+        }
+    }
+
+    override fun cleanup() {
+        withClearing {
+            clearAll()
+            cpSpaceFree(space)
         }
     }
 
@@ -83,16 +115,6 @@ class PhysicsContext private constructor() : Context(), Logging {
             block()
         } finally {
             isClearing = false
-        }
-    }
-
-    override fun cleanup() {
-        withClearing {
-            shapes.forEach(Shape::destroy)
-            bodies.forEach(Body::destroy)
-            cpSpaceFree(space)
-            shapes.clear()
-            bodies.clear()
         }
     }
 

@@ -49,9 +49,6 @@ class Body private constructor(
             if (!isDestroyed) cpBodySetAngularVelocity(handle, value)
         }
 
-    var isDestroyed = false
-        private set
-
     fun applyForce(force: Vec2, point: Vec2) {
         if (!isDestroyed) {
             cpBodyApplyForceAtWorldPoint(handle, cpv(force.x, force.y), cpv(point.x, point.y))
@@ -65,21 +62,11 @@ class Body private constructor(
     }
 
     val isStatic: Boolean get() = type == BodyType.STATIC
-
     val isDynamic: Boolean get() = type == BodyType.DYNAMIC
-
     val isKinematic: Boolean get() = type == BodyType.KINEMATIC
 
-    fun destroy() {
-        if (!isDestroyed) {
-            isDestroyed = true
-            usePhysicsContext {
-                withClearing {
-                    removeFromSpace(this@Body)
-                }
-            }
-        }
-    }
+    var isDestroyed = false
+        internal set
 
     companion object {
         fun createDynamic(mass: Double, moment: Double): Body {

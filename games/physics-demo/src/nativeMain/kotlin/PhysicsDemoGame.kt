@@ -14,19 +14,21 @@ import com.kengine.sdl.useSDLContext
 import kotlin.random.Random
 
 class PhysicsDemoGame : Game, Logging {
-    private val objects = mutableListOf<PhysicsObject>()
-    private val boundaries = mutableListOf<PhysicsObject>()
     private val screenWidth = getSDLContext().screenWidth.toDouble()
     private val screenHeight = getSDLContext().screenHeight.toDouble()
 
     init {
-        createBoundary(0.0, screenHeight - 20.0, screenWidth, 20.0)  // Ground
-        createBoundary(-20.0, 0.0, 20.0, screenHeight)                // Left wall
-        createBoundary(screenWidth, 0.0, 20.0, screenHeight)             // Right wall
+        usePhysicsContext {
+            // Create boundaries
+            createBoundary(0.0, screenHeight - 20.0, screenWidth, 20.0)  // Ground
+            createBoundary(-20.0, 0.0, 20.0, screenHeight)               // Left wall
+            createBoundary(screenWidth, 0.0, 20.0, screenHeight)         // Right wall
 
-        repeat(10) {
-            createRandomBall()
-            createRandomBox()
+            // Create initial objects
+            repeat(10) {
+                createRandomBall()
+                createRandomBox()
+            }
         }
     }
 
@@ -39,8 +41,7 @@ class PhysicsDemoGame : Game, Logging {
             shape.friction = 0.8
             shape.elasticity = 0.5
 
-            addObject(body, shape)
-            boundaries.add(PhysicsObject(body, shape))
+            addObject(PhysicsObject(body, shape))
         }
     }
 
@@ -60,8 +61,7 @@ class PhysicsDemoGame : Game, Logging {
             shape.friction = 0.5
             shape.elasticity = 0.8
 
-            addObject(body, shape)
-            objects.add(PhysicsObject(body, shape))
+            addObject(PhysicsObject(body, shape))
         }
     }
 
@@ -69,7 +69,6 @@ class PhysicsDemoGame : Game, Logging {
         usePhysicsContext {
             val size = Random.nextDouble(20.0, 40.0)
             val mass = Random.nextDouble(1.0, 5.0)
-            // for a box, moment = mass * (width² + height²) / 12
             val moment = mass * (size * size + size * size) / 12.0
 
             val body = Body.createDynamic(mass = mass, moment = moment)
@@ -83,8 +82,7 @@ class PhysicsDemoGame : Game, Logging {
             shape.friction = 0.5
             shape.elasticity = 0.6
 
-            addObject(body, shape)
-            objects.add(PhysicsObject(body, shape))
+            addObject(PhysicsObject(body, shape))
         }
     }
 
@@ -103,7 +101,7 @@ class PhysicsDemoGame : Game, Logging {
 
             useKeyboardContext {
                 if (keyboard.isSpacePressed()) {
-                    objects.forEach(PhysicsObject::destroy)
+                    clearDynamicObjects()
                 }
                 if (keyboard.isUpPressed()) {
                     gravity = gravity.copy(y = gravity.y + 5)
@@ -112,8 +110,6 @@ class PhysicsDemoGame : Game, Logging {
                     gravity = gravity.copy(y = gravity.y - 5)
                 }
             }
-
-            objects.removeAll { it.body.isDestroyed || it.shape.isDestroyed }
         }
     }
 
@@ -121,19 +117,20 @@ class PhysicsDemoGame : Game, Logging {
         useSDLContext {
             fillScreen(0x22u, 0x22u, 0x22u)
             useGeometryContext {
-                boundaries.forEach(::drawShape)
-                objects.forEach(::drawShape)
+                usePhysicsContext {
+                    // Draw static objects (boundaries)
+                    getStaticObjects().forEach(::drawShape)
+                    // Draw dynamic objects
+                    getDynamicObjects().forEach(::drawShape)
+                }
             }
             flipScreen()
         }
     }
 
     private fun drawShape(obj: PhysicsObject) {
-        if (obj.body.isDestroyed) return
-
         useGeometryContext {
-            val shape = obj.shape
-            when (shape) {
+            when (val shape = obj.shape) {
                 is Shape.Circle -> {
                     val pos = obj.body.position
                     fillCircle(
@@ -143,7 +140,6 @@ class PhysicsDemoGame : Game, Logging {
                         0xFFu, 0x44u, 0x44u, 0xFFu
                     )
                 }
-
                 is Shape.Box -> {
                     val pos = obj.body.position
                     val rect = shape.rect
@@ -155,16 +151,14 @@ class PhysicsDemoGame : Game, Logging {
                         0x44u, 0x44u, 0xFFu, 0xFFu
                     )
                 }
-
                 is Shape.Segment -> TODO()
             }
         }
     }
 
     override fun cleanup() {
-        objects.forEach(PhysicsObject::destroy)
-        objects.clear()
-        boundaries.forEach(PhysicsObject::destroy)
-        boundaries.clear()
+        usePhysicsContext {
+            clearAll()
+        }
     }
 }

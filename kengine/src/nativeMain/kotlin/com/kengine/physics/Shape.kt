@@ -46,17 +46,9 @@ sealed class Shape(internal val handle: CPointer<cnames.structs.cpShape>) {
             if (!isDestroyed) cpShapeSetSensor(handle, value.toCpBool())
         }
 
-    var isDestroyed = false
-        private set
 
-    fun destroy() {
-        if (!isDestroyed) {
-            isDestroyed = true
-            usePhysicsContext {
-                removeFromSpace(this@Shape)
-            }
-        }
-    }
+    var isDestroyed = false
+        internal set
 
     class Circle(
         body: Body,
