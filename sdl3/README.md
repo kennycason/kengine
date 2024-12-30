@@ -14,7 +14,7 @@ git submodule add https://github.com/libsdl-org/SDL SDL
 cd SDL
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake -DCMAKE_BUILD_TYPE=Release -DSDL_VULKAN=ON -DCMAKE_INSTALL_PREFIX=/usr/local ..
 cmake --build . --config Release --parallel
 sudo cmake --install . --config Release
 pkg-config --libs sdl3

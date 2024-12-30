@@ -54,6 +54,63 @@ class SDLContext private constructor(
         }
     }
 
+
+//    private fun initVulkan() {
+//        // Load Vulkan library through SDL
+//        if (SDL_Vulkan_LoadLibrary(null) != 0) {
+//            throw IllegalStateException("Failed to load Vulkan library: ${SDL_GetError()?.toKString()}")
+//        }
+//
+//        // Get required extensions
+//        val extensions = memScoped {
+//            var count = 0u
+//            if (!SDL_Vulkan_GetInstanceExtensions(window, count.ptr, null)) {
+//                throw IllegalStateException("Failed to get Vulkan extensions count: ${SDL_GetError()?.toKString()}")
+//            }
+//            val extensionArray = allocArray<CPointerVar<ByteVar>>(count.toInt())
+//            if (!SDL_Vulkan_GetInstanceExtensions(window, count.ptr, extensionArray)) {
+//                throw IllegalStateException("Failed to get Vulkan extensions: ${SDL_GetError()?.toKString()}")
+//            }
+//            List(count.toInt()) { extensionArray[it]!!.toKString() }
+//        }
+//
+//        // Create Vulkan Instance
+//        memScoped {
+//            val appInfo = cValue<VkApplicationInfo> {
+//                sType = VK_STRUCTURE_TYPE_APPLICATION_INFO
+//                pApplicationName = "Kengine Vulkan".cstr.ptr
+//                applicationVersion = VK_MAKE_VERSION(1, 0, 0)
+//                pEngineName = "Kengine".cstr.ptr
+//                engineVersion = VK_MAKE_VERSION(1, 0, 0)
+//                apiVersion = VK_API_VERSION_1_0
+//            }
+//
+//            val createInfo = cValue<VkInstanceCreateInfo> {
+//                sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO
+//                pApplicationInfo = appInfo.ptr
+//                enabledExtensionCount = extensions.size.toUInt()
+//                ppEnabledExtensionNames = extensions.toCStringArray(this)
+//            }
+//
+//            val instanceVar = alloc<VkInstanceVar>()
+//            if (vkCreateInstance(createInfo.ptr, null, instanceVar.ptr) != VK_SUCCESS) {
+//                throw IllegalStateException("Failed to create Vulkan instance")
+//            }
+//            vkInstance = instanceVar.value
+//        }
+//
+//        // Create Vulkan Surface
+//        vkSurface = memScoped {
+//            val surface = alloc<VkSurfaceKHRVar>()
+//            if (!SDL_Vulkan_CreateSurface(window, vkInstance!!, surface.ptr)) {
+//                throw IllegalStateException("Failed to create Vulkan surface: ${SDL_GetError()?.toKString()}")
+//            }
+//            surface.value
+//        }
+//
+//        logger.info { "Vulkan initialized successfully." }
+//    }
+
     fun enableBlendedMode() {
         setBlendMode(SDL_BLENDMODE_BLEND)
     }
