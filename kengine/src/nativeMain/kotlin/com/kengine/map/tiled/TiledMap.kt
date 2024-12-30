@@ -57,8 +57,10 @@ class TiledMap(
 
     @Transient
     private lateinit var tilesetsWithSprites: List<TilesetAndSpriteSheet>
+
     @Transient
     private lateinit var gidToTilesetArray: Array<TilesetAndSpriteSheet?>
+
     @Transient
     private val animatedSprites = mutableMapOf<UInt, AnimatedSprite>()
 
@@ -114,7 +116,6 @@ class TiledMap(
             TilesetAndSpriteSheet(tileset, spriteSheet)
         }
 
-
         // initialize batches for each texture
 //        batches.clear()
 //        tilesetsWithSprites.forEach {
@@ -136,16 +137,23 @@ class TiledMap(
         }
     }
 
+    /**
+     * Updates animated tiles once per frame.
+     */
+    fun update() {
+        animatedSprites.values.forEach { it.update() }
+    }
+
     fun draw() {
-       // batches.values.forEach { it.begin() }
+        // batches.values.forEach { it.begin() }
         layers.forEach { draw(it) }
-       // batches.values.forEach { it.end() }
+        // batches.values.forEach { it.end() }
     }
 
     fun draw(layerName: String) {
-      //  batches.values.forEach { it.begin() }
+        //  batches.values.forEach { it.begin() }
         draw(layersByName.getValue(layerName))
-      //  batches.values.forEach { it.end() }
+        //  batches.values.forEach { it.end() }
     }
 
     private fun draw(layer: TiledMapLayer) {
@@ -178,10 +186,10 @@ class TiledMap(
                 val dstY = y * tileHeight + p.y
 
                 // Handle Animated Tiles
-                animatedSprites[decoded.tileId]?.let { animatedSprite ->
-                    animatedSprite.draw(dstX.toDouble(), dstY.toDouble(), flipMode) // Pass Flip
-                } ?: run {
-                    // Handle Static Tiles
+                if (decoded.tileId in animatedSprites) {
+                    animatedSprites[decoded.tileId]!!.draw(dstX, dstY, flipMode)
+                } else {
+                    // handle Static Tiles
                     val tilesetWithSprite = findTilesetForGid(decoded.tileId)
                     val (tilePx, tilePy) = getTilePosition(decoded.tileId, tilesetWithSprite.tileset)
 
@@ -190,12 +198,12 @@ class TiledMap(
                 }
 
                 // standard
-//                val tile: Sprite = tilesetWithSprite.spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
-//                tile.draw(dstX, dstY, flipMode, angle)
+                // val tile: Sprite = tilesetWithSprite.spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
+                // tile.draw(dstX, dstY, flipMode, angle)
 
                 // batch
-           //     val batch = batches[tile.texture]!!
-         //       batch.draw(tile, dstX.toFloat(), dstY.toFloat(), flipMode, angle)
+                // val batch = batches[tile.texture]!!
+                // batch.draw(tile, dstX.toFloat(), dstY.toFloat(), flipMode, angle)
             }
         }
     }
@@ -284,5 +292,4 @@ class TiledMap(
         val flipV: Boolean,
         val flipD: Boolean
     )
-
 }

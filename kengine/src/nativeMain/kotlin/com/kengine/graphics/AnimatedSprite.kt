@@ -29,39 +29,21 @@ class AnimatedSprite private constructor(
     private val totalDurationMs = frameDurations.sum() // total cycle duration
 //    private val frameLookup: List<Double> = frameDurations.runningFold(0.0) { acc, duration -> acc + duration }
 
-    fun draw(p: Vec2, flip: FlipMode = FlipMode.NONE) {
-        updateFrame()
-        sprites[currentFrameIndex].draw(p, flip)
-    }
-
-    fun draw(x: Double, y: Double, flip: FlipMode = FlipMode.NONE) {
-        updateFrame()
-        sprites[currentFrameIndex].draw(x, y, flip)
-    }
-
-    private fun updateFrame() {
-        // Update elapsed time
-        val deltaTime = getClockContext().deltaTimeMs
-        elapsedTime += deltaTime
-
-//        logger.info {
-//            "DeltaTime=$deltaTime, ElapsedTime=$elapsedTime, CurrentFrame=$currentFrameIndex"
-//        }
-
+    fun update() {
+        elapsedTime += getClockContext().deltaTimeMs
         when (loopMode) {
             LoopMode.WRAP_AROUND -> updateWrapAround()
             LoopMode.PING_PONG -> updatePingPong()
         }
     }
 
-    // about 1ms slower.
-//    private fun updateWrapAround() {
-//        elapsedTime %= totalDurationMs // wrap time into range [0, totalDurationMs]
-//
-//        // Binary search to find the current frame
-//        val frameIndex = frameLookup.binarySearch { time -> time.compareTo(elapsedTime) }
-//        currentFrameIndex = if (frameIndex >= 0) frameIndex else -(frameIndex + 2)
-//    }
+    fun draw(p: Vec2, flip: FlipMode = FlipMode.NONE) {
+        sprites[currentFrameIndex].draw(p, flip)
+    }
+
+    fun draw(x: Double, y: Double, flip: FlipMode = FlipMode.NONE) {
+        sprites[currentFrameIndex].draw(x, y, flip)
+    }
 
     private fun updateWrapAround() {
         elapsedTime %= totalDurationMs // keep within total duration
@@ -74,11 +56,16 @@ class AnimatedSprite private constructor(
                 break
             }
         }
-
-//        logger.info {
-//            "WrapAround: FrameIndex=$currentFrameIndex, Elapsed=$elapsedTime, FrameDuration=${frameDurations[currentFrameIndex]}"
-//        }
     }
+
+    // about 1ms slower.
+//    private fun updateWrapAround() {
+//        elapsedTime %= totalDurationMs // wrap time into range [0, totalDurationMs]
+//
+//        // Binary search to find the current frame
+//        val frameIndex = frameLookup.binarySearch { time -> time.compareTo(elapsedTime) }
+//        currentFrameIndex = if (frameIndex >= 0) frameIndex else -(frameIndex + 2)
+//    }
 
     private fun updatePingPong() {
         while (elapsedTime >= frameDurations[currentFrameIndex]) {
@@ -89,10 +76,6 @@ class AnimatedSprite private constructor(
                 pingPongDirection *= -1
                 currentFrameIndex = (currentFrameIndex + pingPongDirection).coerceIn(0, sprites.size - 1)
             }
-
-//            logger.info {
-//                "PingPong: FrameIndex=$currentFrameIndex, Elapsed=$elapsedTime, Direction=$pingPongDirection"
-//            }
         }
     }
 

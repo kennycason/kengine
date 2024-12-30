@@ -64,7 +64,9 @@ class TiledMapDrawIT {
                             fillScreen(0u, 0u, 0u)
                             val startTimeNs = getCurrentNanoseconds()
 //                            tiledMap.p.set(100.0, 100.0)
+                            tiledMap.update()
                             tiledMap.draw()
+
                             val deltaTimeNs = getCurrentNanoseconds() - startTimeNs  // This now measures actual draw time
                             totalRenderTimesNs += deltaTimeNs
                             iterations++
