@@ -4,6 +4,7 @@ import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Color
 import com.kengine.map.tiled.TiledMapLoader
 import com.kengine.math.Vec2
+import com.kengine.particle.Effects
 import com.kengine.particle.Particle
 import com.kengine.sdl.getSDLContext
 import com.kengine.sdl.useSDLContext
@@ -29,7 +30,8 @@ class HelloWorldGame : Game {
                         (Random.nextDouble() - 0.5) * 200
                     ),
                     color = Color(0xFFu, 0x77u, 0x0u, 0xFFu), // Orange burst
-                    lifetime = Random.nextDouble() * 5.0
+                    lifetime = Random.nextDouble() * 4.0,
+                    behaviors = listOf(Effects.smoke, Effects.rainbow)
                 )
             )
         }

@@ -8,21 +8,40 @@ import com.kengine.time.getClockContext
 class Particle(
     var position: Vec2,
     var velocity: Vec2,
-    var color: Color = Color(0xFFu, 0x0u, 0x0u, 0xFFu), // Red by default
-    var lifetime: Double = 1.0
+    var color: Color = Color.red,
+    var lifetime: Double = 1.0,
+    var size: Double = 10.0,
+    var rotation: Double = 0.0,
+    var rotationSpeed: Double = 0.0,
+    var scaleSpeed: Double = 0.0,
+    var gravity: Vec2 = Vec2(0.0, 0.0),
+    var behaviors: List<(Particle) -> Unit> = listOf()
 ) {
     var age = 0.0
 
     fun update() {
         val delta = getClockContext().deltaTimeSec
         age += delta
-        position.set(position + (velocity * delta))
+
+        // apply physics
+        velocity.plusAssign (gravity * delta)
+        position.plusAssign(velocity * delta)
+        rotation += rotationSpeed * delta
+        size += scaleSpeed * delta
+
+        // apply behaviors
+        behaviors.forEach { it(this) }
     }
 
     fun draw() {
         if (age < lifetime) {
             useGeometryContext {
-                drawRectangle(position.x.toInt(), position.y.toInt(), 10, 10, color.toUInt()) // 10x10 particle
+                fillRectangle(
+                    position.x.toInt(), position.y.toInt(),
+                    size.toInt(), size.toInt(),
+                 //   rotation,
+                    color.r, color.g, color.b, color.a
+                )
             }
         }
     }
