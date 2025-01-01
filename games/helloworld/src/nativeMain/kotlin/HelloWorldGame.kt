@@ -1,9 +1,13 @@
 
 import com.kengine.Game
 import com.kengine.geometry.useGeometryContext
+import com.kengine.graphics.Color
 import com.kengine.map.tiled.TiledMapLoader
+import com.kengine.math.Vec2
+import com.kengine.particle.Particle
 import com.kengine.sdl.getSDLContext
 import com.kengine.sdl.useSDLContext
+import kotlin.random.Random
 
 class HelloWorldGame : Game {
     private val bulbasaur = BulbasaurEntity()
@@ -11,9 +15,25 @@ class HelloWorldGame : Game {
     private val scytherEntity = ScytherEntity()
     private val tiledMap = TiledMapLoader().loadMap("assets/maps/simple_map.tmj")
         .also { it.p.set(480.0, 0.0) }
+    val particles = mutableListOf<Particle>()
 
     init {
         getSDLContext().enableBlendedMode()
+
+        repeat(250) {
+            particles.add(
+                Particle(
+                    position = Vec2(250.0, 250.0),
+                    velocity = Vec2(
+                        (Random.nextDouble() - 0.5) * 200,
+                        (Random.nextDouble() - 0.5) * 200
+                    ),
+                    color = Color(0xFFu, 0x77u, 0x0u, 0xFFu), // Orange burst
+                    lifetime = Random.nextDouble() * 5.0
+                )
+            )
+        }
+
     }
 
     override fun update() {
@@ -22,6 +42,9 @@ class HelloWorldGame : Game {
         }
         scytherEntity.update()
         bulbasaur.update()
+
+        particles.forEach { it.update() }
+        particles.removeAll { it.age > it.lifetime }
     }
 
     override fun draw() {
@@ -59,6 +82,8 @@ class HelloWorldGame : Game {
                 drawLine(150, 50, 300, 50, 0xFFu, 0u, 0u, 0xFFu)
                 drawLine(160, 150, 310, 20, 0x57u, 0x23u, 0x5Eu, 0xFFu)
             }
+
+            particles.forEach { it.draw() }
 
             // draw sprite entities
             pidgies.forEach {
