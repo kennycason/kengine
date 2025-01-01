@@ -111,9 +111,16 @@ class KengineTestTest {
         data class User(val name: String, val age: Int)
 
         val user = User("John", 25)
-        expectThat(user)
-            .property(User::name).isEqualTo("John")
-            .property(User::age).satisfies { it > 18 }
+
+        expectObject(user) {
+            property(User::name)
+                .isEqualTo("John")
+
+            property(User::age)
+                .isEqualTo(25)
+                .isGreaterThan(18)
+                .satisfiesAll({ it % 2 != 0 })
+        }
     }
 
     @Test
@@ -123,9 +130,33 @@ class KengineTestTest {
         val user = User("John", 25)
 
         expectObject(user) {
-            property(User::name, { it == "John" }, "Name should be John")
-            property(User::age, { it > 18 }, "User should be an adult")
+            property(User::name).isEqualTo("John") { "Name should be John" }
+            property(User::age).isGreaterThan(18) { "User should be an adult" }
         }
+
+        expectObject(user)
+            .property(User::name).isEqualTo("John")
+    }
+
+    @Test
+    fun `test array of object assertions`() {
+        data class User(val name: String, val age: Int)
+
+        val users = listOf(
+            User("John", 25),
+            User("Bill", 41)
+        )
+
+        expectArray(users) {
+            first().property(User::name).isEqualTo("John") { "Name should be John" }
+            last().property(User::age).isGreaterThan(18) { "User should be an adult" }
+            item(0).property(User::age).isEqualTo(25)
+        }
+
+        expectArray(users).isNotEmpty()
+
+        expectArray(users)
+            .first().property(User::name).isEqualTo("John")
     }
 
     @Test
@@ -154,4 +185,12 @@ class KengineTestTest {
         expectThat(user).hasToString("Hello Kenny")
     }
 
+    @Test
+    fun `test custom exception message`() {
+        expectThrows<AssertionError> {
+            expectThat(false).isTrue {
+                "Custom message"
+            }
+        }.withMessage("Custom message")
+    }
 }

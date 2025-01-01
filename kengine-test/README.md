@@ -77,19 +77,38 @@ expectThat(listOf(1,2,3)).isList()
 ### Property Assertions
 
 ```kotlin
+import java.awt.Color
+
 data class User(val name: String, val age: Int)
 val user = User("John", 25)
 
 // Chained property assertions
 expectThat(user)
-    .property(User::name).isEqualTo("John")
+    .property(User::name).isEqualTo("John") { "Name should be John" }
     .property(User::age).satisfies { it > 18 }
 
 // Object-style property assertions
 expectObject(user) {
-    property(User::name, { it == "John" }, "Name should be John")
-    property(User::age, { it > 18 }, "User should be an adult")
+    property(User::name).isEqualTo("John") { "Name should be John" }
+    property(User::age).isGreaterThan(18) { "User should be an adult" }
 }
+
+// Array of Objects
+val users = listOf(
+    User("John", 25),
+    User("Bill", 41)
+)
+
+expectArray(users) {
+    first().property(User::name).isEqualTo("John") { "Name should be John" }
+    last().property(User::age).isGreaterThan(18) { "User should be an adult" }
+    item(0).property(User::age).isEqualTo(25)
+}
+
+expectArray(users).isNotEmpty()
+
+expectArray(users)
+    .first().property(User::name).isEqualTo("John")
 ```
 
 ### Collection Assertions

@@ -16,47 +16,48 @@ fun <T> expectThat(
     lambda: AssertionBuilder<T>.() -> Unit
 ): AssertionBuilder<T> = AssertionBuilder(actual)
 
-class AssertionBuilder<T>(private val actual: T) {
-    fun isEqualTo(expected: T): AssertionBuilder<T> {
-        assertEquals(expected, actual, "Expected $actual to be equal to $expected")
+open class AssertionBuilder<T>(private val actual: T) {
+
+    fun isEqualTo(expected: T, message: (() -> String)? = null): AssertionBuilder<T> {
+        assertEquals(expected, actual, message?.invoke() ?: "Expected $actual to be equal to $expected")
         return this
     }
 
-    fun isNotEqualTo(expected: T): AssertionBuilder<T> {
-        assertNotEquals(expected, actual, "Expected $actual to not be equal to $expected")
+    fun isNotEqualTo(expected: T, message: (() -> String)? = null): AssertionBuilder<T> {
+        assertNotEquals(expected, actual, message?.invoke() ?: "Expected $actual to not be equal to $expected")
         return this
     }
 
-    fun isNull(): AssertionBuilder<T> {
-        assertNull(actual, "Expected null but was $actual")
+    fun isNull(message: (() -> String)? = null): AssertionBuilder<T> {
+        assertNull(actual, message?.invoke() ?: "Expected null but was $actual")
         return this
     }
 
-    fun isNotNull(): AssertionBuilder<T> {
-        assertNotNull(actual, "Expected non-null value but was null")
+    fun isNotNull(message: (() -> String)? = null): AssertionBuilder<T> {
+        assertNotNull(actual, message?.invoke() ?: "Expected non-null value but was null")
         return this
     }
 
-    fun isTrue(): AssertionBuilder<T> {
-        assertTrue(actual as Boolean, "Expected true but was false")
+    fun isTrue(message: (() -> String)? = null): AssertionBuilder<T> {
+        assertTrue(actual as Boolean, message?.invoke() ?: "Expected true but was false")
         return this
     }
 
-    fun isFalse(): AssertionBuilder<T> {
-        assertFalse(actual as Boolean, "Expected false but was true")
+    fun isFalse(message: (() -> String)? = null): AssertionBuilder<T> {
+        assertFalse(actual as Boolean, message?.invoke() ?: "Expected false but was true")
         return this
     }
 
-    fun contains(element: Any?): AssertionBuilder<T> {
+    fun contains(element: Any?, message: (() -> String)? = null): AssertionBuilder<T> {
         when (actual) {
             is Collection<*> -> assertTrue(
                 actual.contains(element),
-                "Expected collection to contain $element but was $actual"
+                message?.invoke() ?: "Expected collection to contain $element but was $actual"
             )
 
             is String -> assertTrue(
                 actual.contains(element as String),
-                "Expected string to contain $element but was $actual"
+                message?.invoke() ?: "Expected string to contain $element but was $actual"
             )
 
             else -> throw IllegalArgumentException("Contains assertion not supported for type ${actual!!::class}")
@@ -64,11 +65,11 @@ class AssertionBuilder<T>(private val actual: T) {
         return this
     }
 
-    fun containsKey(key: Any?): AssertionBuilder<T> {
+    fun containsKey(key: Any?, message: (() -> String)? = null): AssertionBuilder<T> {
         when (actual) {
             is Map<*, *> -> assertTrue(
                 actual.containsKey(key),
-                "Expected collection to contain key $key but was $actual"
+                message?.invoke() ?: "Expected collection to contain key $key but was $actual"
             )
 
             else -> throw IllegalArgumentException("Contains key assertion not supported for type ${actual!!::class}")
@@ -76,16 +77,16 @@ class AssertionBuilder<T>(private val actual: T) {
         return this
     }
 
-    fun doesNotContain(element: Any?): AssertionBuilder<T> {
+    fun doesNotContain(element: Any?, message: (() -> String)? = null): AssertionBuilder<T> {
         when (actual) {
             is Collection<*> -> assertFalse(
                 actual.contains(element),
-                "Expected collection to not contain $element but was $actual"
+                message?.invoke() ?: "Expected collection to not contain $element but was $actual"
             )
 
             is String -> assertFalse(
                 actual.contains(element as String),
-                "Expected string to not contain $element but was $actual"
+                message?.invoke() ?: "Expected string to not contain $element but was $actual"
             )
 
             else -> throw IllegalArgumentException("Contains assertion not supported for type ${actual!!::class}")
@@ -93,16 +94,16 @@ class AssertionBuilder<T>(private val actual: T) {
         return this
     }
 
-    fun hasSize(expected: Int): AssertionBuilder<T> {
+    fun hasSize(expected: Int, message: (() -> String)? = null): AssertionBuilder<T> {
         when (actual) {
             is Collection<*> -> assertEquals(
                 expected, actual.size,
-                "Expected collection size to be $expected but was ${actual.size}"
+                message?.invoke() ?: "Expected collection size to be $expected but was ${actual.size}"
             )
 
             is String -> assertEquals(
                 expected, actual.length,
-                "Expected string length to be $expected but was ${actual.length}"
+                message?.invoke() ?: "Expected string length to be $expected but was ${actual.length}"
             )
 
             else -> throw IllegalArgumentException("Size assertion not supported for type ${actual!!::class}")
@@ -110,16 +111,16 @@ class AssertionBuilder<T>(private val actual: T) {
         return this
     }
 
-    fun isEmpty(): AssertionBuilder<T> {
+    fun isEmpty(message: (() -> String)? = null): AssertionBuilder<T> {
         when (actual) {
             is Collection<*> -> assertTrue(
                 actual.isEmpty(),
-                "Expected empty collection but was $actual"
+                message?.invoke() ?: "Expected empty collection but was $actual"
             )
 
             is String -> assertTrue(
                 actual.isEmpty(),
-                "Expected empty string but was $actual"
+                message?.invoke() ?: "Expected empty string but was $actual"
             )
 
             else -> throw IllegalArgumentException("Empty assertion not supported for type ${actual!!::class}")
@@ -127,16 +128,16 @@ class AssertionBuilder<T>(private val actual: T) {
         return this
     }
 
-    fun isNotEmpty(): AssertionBuilder<T> {
+    fun isNotEmpty(message: (() -> String)? = null): AssertionBuilder<T> {
         when (actual) {
             is Collection<*> -> assertTrue(
                 actual.isNotEmpty(),
-                "Expected non-empty collection but was empty"
+                message?.invoke() ?: "Expected non-empty collection but was empty"
             )
 
             is String -> assertTrue(
                 actual.isNotEmpty(),
-                "Expected non-empty string but was empty"
+                message?.invoke() ?: "Expected non-empty string but was empty"
             )
 
             else -> throw IllegalArgumentException("Empty assertion not supported for type ${actual!!::class}")
@@ -144,36 +145,36 @@ class AssertionBuilder<T>(private val actual: T) {
         return this
     }
 
-    fun startsWith(prefix: String): AssertionBuilder<T> {
+    fun startsWith(prefix: String, message: (() -> String)? = null): AssertionBuilder<T> {
         assertTrue(
             actual.toString().startsWith(prefix),
-            "Expected $actual to start with $prefix"
+            message?.invoke() ?: "Expected $actual to start with $prefix"
         )
         return this
     }
 
-    fun endsWith(suffix: String): AssertionBuilder<T> {
+    fun endsWith(suffix: String, message: (() -> String)? = null): AssertionBuilder<T> {
         assertTrue(
             actual.toString().endsWith(suffix),
-            "Expected $actual to end with $suffix"
+            message?.invoke() ?: "Expected $actual to end with $suffix"
         )
         return this
     }
 
-    fun matches(regex: Regex): AssertionBuilder<T> {
+    fun matches(regex: Regex, message: (() -> String)? = null): AssertionBuilder<T> {
         assertTrue(
             actual.toString().matches(regex),
-            "Expected $actual to match regex $regex"
+            message?.invoke() ?: "Expected $actual to match regex $regex"
         )
         return this
     }
 
     // Number specific assertions
-    fun isGreaterThan(expected: Number): AssertionBuilder<T> {
+    fun isGreaterThan(expected: Number, message: (() -> String)? = null): AssertionBuilder<T> {
         when (actual) {
             is Number -> assertTrue(
                 actual.toDouble() > expected.toDouble(),
-                "Expected $actual to be greater than $expected"
+                message?.invoke() ?: "Expected $actual to be greater than $expected"
             )
 
             else -> throw IllegalArgumentException("Greater than assertion not supported for type ${actual!!::class}")
@@ -181,11 +182,11 @@ class AssertionBuilder<T>(private val actual: T) {
         return this
     }
 
-    fun isLessThan(expected: Number): AssertionBuilder<T> {
+    fun isLessThan(expected: Number, message: (() -> String)? = null): AssertionBuilder<T> {
         when (actual) {
             is Number -> assertTrue(
                 actual.toDouble() < expected.toDouble(),
-                "Expected $actual to be less than $expected"
+                message?.invoke() ?: "Expected $actual to be less than $expected"
             )
 
             else -> throw IllegalArgumentException("Less than assertion not supported for type ${actual!!::class}")
