@@ -3,7 +3,9 @@ package com.kengine.map.tiled
 import com.kengine.graphics.AnimatedSprite
 import com.kengine.graphics.FlipMode
 import com.kengine.graphics.Sprite
+import com.kengine.graphics.SpriteBatch
 import com.kengine.graphics.SpriteSheet
+import com.kengine.graphics.Texture
 import com.kengine.log.Logging
 import com.kengine.math.Vec2
 import com.kengine.sdl.getSDLContext
@@ -32,6 +34,9 @@ class TiledMap(
     val infinite: Boolean = false,
 ) : Logging {
 
+    // currently non-batch takes 7ms/iter, batch takes 14ms/iter
+    private val enableBatch = false
+
     companion object {
         val GID_HORIZONTAL_FLAG = 0x80000000u  // bit 31 (1000...)
         val GID_VERTICAL_FLAG = 0x40000000u  // bit 30 (0100...)
@@ -46,8 +51,8 @@ class TiledMap(
     // Layer lookup
     private val layersByName = layers.associateBy(TiledMapLayer::name)
 
-//    @Transient
-//    private val batches: MutableMap<Texture, SpriteBatch> = mutableMapOf()
+    @Transient
+    private val batches: MutableMap<Texture, SpriteBatch> = mutableMapOf()
 
     // Tileset and spritesheet storage
     private data class TilesetAndSpriteSheet(
@@ -117,10 +122,12 @@ class TiledMap(
         }
 
         // initialize batches for each texture
-//        batches.clear()
-//        tilesetsWithSprites.forEach {
-//            batches[it.spriteSheet.texture] = SpriteBatch(it.spriteSheet.texture)
-//        }
+        if (enableBatch) {
+            batches.clear()
+            tilesetsWithSprites.forEach {
+                batches[it.spriteSheet.texture] = SpriteBatch(it.spriteSheet.texture)
+            }
+        }
 
         // precompute GID lookup
         val maxGid = tilesetsWithSprites.maxOf {
@@ -145,15 +152,26 @@ class TiledMap(
     }
 
     fun draw() {
-        // batches.values.forEach { it.begin() }
+        if (enableBatch) {
+            batches.values.forEach { it.begin() }
+        }
         layers.forEach { draw(it) }
-        // batches.values.forEach { it.end() }
+
+        if (enableBatch) {
+            batches.values.forEach { it.end() }
+        }
     }
 
     fun draw(layerName: String) {
-        //  batches.values.forEach { it.begin() }
+        if (enableBatch) {
+            batches.values.forEach { it.begin() }
+        }
+
         draw(layersByName.getValue(layerName))
-        //  batches.values.forEach { it.end() }
+
+        if (enableBatch) {
+            batches.values.forEach { it.end() }
+        }
     }
 
     private fun draw(layer: TiledMapLayer) {
@@ -186,24 +204,25 @@ class TiledMap(
                 val dstY = y * tileHeight + p.y
 
                 // Handle Animated Tiles
-                if (decoded.tileId in animatedSprites) {
-                    animatedSprites[decoded.tileId]!!.draw(dstX, dstY, flipMode)
+                if (!enableBatch) {
+                    if (decoded.tileId in animatedSprites) {
+                        animatedSprites[decoded.tileId]!!.draw(dstX, dstY, flipMode)
+                    } else {
+                        // handle Static Tiles
+                        val tilesetWithSprite = findTilesetForGid(decoded.tileId)
+                        val (tilePx, tilePy) = getTilePosition(decoded.tileId, tilesetWithSprite.tileset)
+
+                        val tile: Sprite = tilesetWithSprite.spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
+                        tile.draw(dstX, dstY, flipMode, angle) // Use Flip + Angle for static
+                    }
                 } else {
-                    // handle Static Tiles
+                    // batch
                     val tilesetWithSprite = findTilesetForGid(decoded.tileId)
                     val (tilePx, tilePy) = getTilePosition(decoded.tileId, tilesetWithSprite.tileset)
-
                     val tile: Sprite = tilesetWithSprite.spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
-                    tile.draw(dstX, dstY, flipMode, angle) // Use Flip + Angle for static
+                    val batch = batches[tile.texture]!!
+                    batch.draw(tile, dstX.toFloat(), dstY.toFloat(), flipMode, angle)
                 }
-
-                // standard
-                // val tile: Sprite = tilesetWithSprite.spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
-                // tile.draw(dstX, dstY, flipMode, angle)
-
-                // batch
-                // val batch = batches[tile.texture]!!
-                // batch.draw(tile, dstX.toFloat(), dstY.toFloat(), flipMode, angle)
             }
         }
     }

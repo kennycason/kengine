@@ -39,7 +39,7 @@ class TiledMapDrawIT {
                     private var avgRenderTimeNs = 0L
 
                     override fun update() {
-                        useTimer(5000L) {
+                        useTimer(50000L) {
                             isRunning = false
                         }
                     }
@@ -74,10 +74,10 @@ class TiledMapDrawIT {
                             maxRenderTimeNs = maxOf(maxRenderTimeNs, deltaTimeNs)
                             avgRenderTimeNs = (totalRenderTimesNs / iterations.toFloat()).toLong()
                             logger.info {
-                                "Map rendered in ${deltaTimeNs}ns, " +
-                                    "avg: ${avgRenderTimeNs}ns " +
-                                    "min: ${minRenderTimeNs}ns " +
-                                    "max: ${maxRenderTimeNs}ns"
+                                "Map rendered in ${deltaTimeNs / 1000000.0}ms, " +
+                                    "avg: ${avgRenderTimeNs / 1000000.0}ms " +
+                                    "min: ${minRenderTimeNs / 1000000.0}ms " +
+                                    "max: ${maxRenderTimeNs / 1000000.0}ms"
                             }
                             flipScreen()
                         }
