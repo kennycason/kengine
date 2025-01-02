@@ -8,10 +8,10 @@ data class Color(
     val b: UByte,
     val a: UByte
 ) {
-    inline fun toUInt(): UInt =
+    fun toUInt(): UInt =
         (r.toUInt() shl 24 or (g.toUInt() shl 16) or (b.toUInt() shl 8) or a.toUInt())
 
-    inline fun invert(): Color {
+    fun invert(): Color {
         return Color(
             (255u - r).toUByte(),
             (255u - g).toUByte(),
@@ -40,7 +40,7 @@ data class Color(
         )
     }
 
-    inline fun toGrayscale(): Color {
+    fun toGrayscale(): Color {
         val gray = ((r.toInt() * 0.299) + (g.toInt() * 0.587) + (b.toInt() * 0.114)).toInt().toUByte()
         return Color(gray, gray, gray, a)
     }

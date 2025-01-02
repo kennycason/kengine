@@ -35,7 +35,9 @@ import sdl3.SDL_OpenJoystick
  * Provides both specific controller access and convenience methods for accessing
  * the first active controller.
  */
-class ControllerInputEventSubscriber : Logging {
+class ControllerInputEventSubscriber(
+    val deadzone: Float = 0.05f
+) : Logging {
     private val controllerStates = mutableMapOf<UInt, ControllerState>()
     private val controllerMappings = mutableMapOf<UInt, ControllerMapping>()
 
@@ -95,11 +97,15 @@ class ControllerInputEventSubscriber : Logging {
         val axis = event.jaxis.axis.toInt()
         val value = event.jaxis.value.toFloat() / 32767.0f
 
-        if (logger.isDebugEnabled()) {
-            logger.debug { "Axis Motion - JoystickID: $joystickID, Axis: $axis, Value: $value" }
+        // Apply deadzone threshold
+        val adjustedValue = if (kotlin.math.abs(value) < deadzone) 0f else value
+
+        if (logger.isDebugEnabled() && adjustedValue != 0f) {
+            logger.debug { "Axis Motion - JoystickID: $joystickID, Axis: $axis, Value: $adjustedValue" }
         }
+
         controllerStates[joystickID]?.axes?.getOrNull(axis)?.let {
-            controllerStates[joystickID]?.axes?.set(axis, value)
+            controllerStates[joystickID]?.axes?.set(axis, adjustedValue)
         }
     }
 

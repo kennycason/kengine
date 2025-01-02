@@ -27,38 +27,40 @@ class TiledMap(
     @SerialName("tileheight")
     val tileHeight: Int,
     val layers: List<TiledMapLayer>,
-    val tilesets: List<Tileset>,
+    var tilesets: List<Tileset>,
     val orientation: String,
     @SerialName("renderorder")
     val renderOrder: String,
     val infinite: Boolean = false,
 ) : Logging {
 
-    // currently non-batch takes 7ms/iter, batch takes 14ms/iter
-    private val enableBatch = false
-
     companion object {
-        val GID_HORIZONTAL_FLAG = 0x80000000u  // bit 31 (1000...)
-        val GID_VERTICAL_FLAG = 0x40000000u  // bit 30 (0100...)
-        val GID_DIAGONAL_FLAG = 0x20000000u  // bit 29 (0010...)
-        val TILE_INDEX_MASK = 0x1FFFFFFFu  // bottom 29 bits for tile id
+        val GID_HORIZONTAL_FLAG = 0x80000000u
+        val GID_VERTICAL_FLAG = 0x40000000u
+        val GID_DIAGONAL_FLAG = 0x20000000u
+        val TILE_INDEX_MASK = 0x1FFFFFFFu
     }
 
-    // position offset for rendering
     @Transient
     val p = Vec2()
 
-    // Layer lookup
+    /**
+     * batch mode still WIP
+     * Batch Mode on avg 10.6ms/render
+     * Batch Mode off 7.6ms/render
+     * TiledMapDrawIT
+     */
+    @Transient
+    private val enableBatch = false
+
+    @Transient
+    private var isCacheBuilt = false
+
+    @Transient
     private val layersByName = layers.associateBy(TiledMapLayer::name)
 
     @Transient
-    private val batches: MutableMap<Texture, SpriteBatch> = mutableMapOf()
-
-    // Tileset and spritesheet storage
-    private data class TilesetAndSpriteSheet(
-        val tileset: Tileset,
-        val spriteSheet: SpriteSheet
-    )
+    private val batches = mutableMapOf<Texture, SpriteBatch>()
 
     @Transient
     private lateinit var tilesetsWithSprites: List<TilesetAndSpriteSheet>
@@ -69,10 +71,14 @@ class TiledMap(
     @Transient
     private val animatedSprites = mutableMapOf<UInt, AnimatedSprite>()
 
-    private var isCacheBuilt = false
+    @Transient
+    private val tilesetCache = HashMap<UInt, TilesetAndSpriteSheet>(4)
+
+    @Transient
+    private val spriteCache = HashMap<UInt, Sprite>(64)
 
     init {
-        tilesets.sortedBy { it.firstgid }
+        tilesets = tilesets.sortedBy { it.firstgid }
         logger
             .infoStream()
             .writeLn { "Loading Map." }
@@ -85,13 +91,15 @@ class TiledMap(
             .flush()
     }
 
-    /**
-     * build transient fields after deserialization or when tilesets change.
-     */
     private fun buildResourceCaches() {
-        isCacheBuilt = true
+        if (isCacheBuilt) return
+
+        logger.debug { "Starting resource cache build..." }
+
         // initialize tilesets with spritesheets
         tilesetsWithSprites = tilesets.map { tileset ->
+            logger.debug { "Loading spritesheet for tileset: ${tileset.name} from ${tileset.image}" }
+
             val spriteSheet = SpriteSheet.fromSprite(
                 sprite = Sprite.fromFilePath(tileset.image!!),
                 tileWidth = tileset.tileWidth!!,
@@ -102,7 +110,7 @@ class TiledMap(
                 paddingY = tileset.spacing
             )
 
-            // Process animations
+            // process animations
             tileset.tiles?.forEach { tile ->
                 tile.animation?.let { frames ->
                     val frameSprites = frames.map { frame ->
@@ -110,77 +118,164 @@ class TiledMap(
                         spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
                     }
                     val frameDurations = frames.map { it.duration.toLong() }
-                    val animatedSprite = AnimatedSprite.fromSprites(
+                    animatedSprites[tile.id.toUInt() + tileset.firstgid] = AnimatedSprite.fromSprites(
                         sprites = frameSprites,
                         frameDurations = frameDurations
                     )
-                    animatedSprites[tile.id.toUInt() + tileset.firstgid] = animatedSprite
                 }
             }
 
             TilesetAndSpriteSheet(tileset, spriteSheet)
         }
 
-        // initialize batches for each texture
-        if (enableBatch) {
-            batches.clear()
-            tilesetsWithSprites.forEach {
-                batches[it.spriteSheet.texture] = SpriteBatch(it.spriteSheet.texture)
-            }
-        }
-
-        // precompute GID lookup
+        // Initialize GID lookup array
         val maxGid = tilesetsWithSprites.maxOf {
             it.tileset.firstgid + it.tileset.tileCount!!.toUInt() - 1u
         }
         gidToTilesetArray = arrayOfNulls<TilesetAndSpriteSheet>(maxGid.toInt() + 1).also { array ->
-            tilesetsWithSprites.forEach { tileset ->
-                val start = tileset.tileset.firstgid.toInt()
-                val end = (start + tileset.tileset.tileCount!!.toInt() - 1)
+            tilesetsWithSprites.forEach { tilesetWithSprite ->
+                val tileset = tilesetWithSprite.tileset
+                val start = tileset.firstgid.toInt()
+                val end = (start + tileset.tileCount!!.toInt() - 1)
                 for (i in start..end) {
-                    array[i] = tileset
+                    array[i] = tilesetWithSprite
                 }
             }
         }
+
+        // initialize batches if enabled
+        if (enableBatch) {
+            batches.clear()
+            tilesetsWithSprites.forEach { tilesetAndSheet ->
+                val texture = tilesetAndSheet.spriteSheet.texture
+                if (!batches.containsKey(texture)) {
+                    // calculate maximum possible tiles in view
+                    val maxTilesInView = (getSDLContext().screenWidth / tileWidth + 1) *
+                        (getSDLContext().screenHeight / tileHeight + 1)
+                    batches[texture] = SpriteBatch(texture, maxTilesInView)
+                }
+            }
+        }
+
+        logger.debug { "Resource cache build complete" }
+        isCacheBuilt = true
     }
 
-    /**
-     * Updates animated tiles once per frame.
-     */
     fun update() {
         animatedSprites.values.forEach { it.update() }
     }
 
     fun draw() {
-        if (enableBatch) {
-            batches.values.forEach { it.begin() }
-        }
-        layers.forEach { draw(it) }
+        if (!isCacheBuilt) buildResourceCaches()
 
-        if (enableBatch) {
-            batches.values.forEach { it.end() }
+        layers.forEach { layer ->
+            if (layer.visible && layer.type == "tilelayer") {
+                if (enableBatch) {
+                    draw(layer)
+                } else {
+                    drawNoBatch(layer)
+                }
+            }
         }
     }
 
     fun draw(layerName: String) {
-        if (enableBatch) {
-            batches.values.forEach { it.begin() }
-        }
+        if (!isCacheBuilt) buildResourceCaches()
 
-        draw(layersByName.getValue(layerName))
-
-        if (enableBatch) {
-            batches.values.forEach { it.end() }
+        val layer = layersByName.getValue(layerName)
+        if (layer.visible && layer.type == "tilelayer") {
+            if (enableBatch) {
+                draw(layer)
+            } else {
+                drawNoBatch(layer)
+            }
         }
     }
 
     private fun draw(layer: TiledMapLayer) {
-        if (!layer.visible || layer.type != "tilelayer") return
-        if (!isCacheBuilt) {
-            buildResourceCaches()
+        // Calculate visible region
+        val screenLeft = -p.x
+        val screenRight = screenLeft + getSDLContext().screenWidth
+        val screenTop = -p.y
+        val screenBottom = screenTop + getSDLContext().screenHeight
+
+        val startX = (screenLeft / tileWidth).toInt().coerceAtLeast(0)
+        val endX = (screenRight / tileWidth).toInt().coerceAtMost(layer.width!! - 1)
+        val startY = (screenTop / tileHeight).toInt().coerceAtLeast(0)
+        val endY = (screenBottom / tileHeight).toInt().coerceAtMost(layer.height!! - 1)
+
+        val tileWidthF = tileWidth.toFloat()
+        val tileHeightF = tileHeight.toFloat()
+        val offsetX = p.x.toFloat()
+        val offsetY = p.y.toFloat()
+
+        // Clear caches
+        tilesetCache.clear()
+        spriteCache.clear()
+
+        // Track active batches to minimize state changes
+        var currentBatch: SpriteBatch? = null
+        var lastTexture: Texture? = null
+
+        // Render tiles
+        for (y in startY..endY) {
+            val baseY = y * tileHeightF + offsetY
+
+            for (x in startX..endX) {
+                val rawGid = layer.getTileAt(x, y)
+                if (rawGid == 0u) continue
+
+                val decoded = decodeTileGid(rawGid)
+                if (decoded.tileId <= 0u) continue
+
+                if (decoded.tileId in animatedSprites) {
+                    // handle animated tiles separately (non-batched)
+                    currentBatch?.flush()
+                    animatedSprites[decoded.tileId]!!.draw(
+                        x * tileWidth + p.x,
+                        y * tileHeight + p.y,
+                        if (decoded.flipH) FlipMode.HORIZONTAL else FlipMode.NONE
+                    )
+                    continue
+                }
+
+                val (flip, angle) = decodeFlipAndRotation(decoded)
+
+                // get cached tileset and sprite
+                val tilesetWithSprite = tilesetCache.getOrPut(decoded.tileId) {
+                    findTilesetForGid(decoded.tileId)
+                }
+                val tile = spriteCache.getOrPut(decoded.tileId) {
+                    val (tilePx, tilePy) = getTilePosition(decoded.tileId, tilesetWithSprite.tileset)
+                    tilesetWithSprite.spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
+                }
+
+                // minimize batch switches
+                if (tile.texture != lastTexture) {
+                    currentBatch?.flush()
+                    currentBatch = batches[tile.texture]?.also {
+                        if (!it.isBatching) it.begin()
+                    }
+                    lastTexture = tile.texture
+                }
+
+                // draw tile
+                currentBatch?.draw(
+                    tile,
+                    x * tileWidthF + offsetX,
+                    baseY,
+                    flip = flip,
+                    angle = angle
+                )
+            }
         }
 
-        // calculate the screen and tile coordinates to draw
+        // flush final batch
+        currentBatch?.flush()
+    }
+
+    private fun drawNoBatch(layer: TiledMapLayer) {
+        // calculate visible region
         val screenLeft = -p.x
         val screenRight = screenLeft + getSDLContext().screenWidth
         val screenTop = -p.y
@@ -192,83 +287,49 @@ class TiledMap(
         val endY = (screenBottom / tileHeight).toInt().coerceAtMost(layer.height!! - 1)
 
         for (y in startY..endY) {
+            val baseY = y * tileHeight + p.y
+
             for (x in startX..endX) {
                 val rawGid = layer.getTileAt(x, y)
-                if (rawGid == 0u) continue  // Skip empty tile
+                if (rawGid == 0u) continue
 
                 val decoded = decodeTileGid(rawGid)
-                if (decoded.tileId <= 0u) continue  // Skip invalid GID
+                if (decoded.tileId <= 0u) continue
 
-                val (flipMode, angle) = decodeFlipAndRotation(decoded)
+                val (flip, angle) = decodeFlipAndRotation(decoded)
                 val dstX = x * tileWidth + p.x
-                val dstY = y * tileHeight + p.y
 
-                // Handle Animated Tiles
-                if (!enableBatch) {
-                    if (decoded.tileId in animatedSprites) {
-                        animatedSprites[decoded.tileId]!!.draw(dstX, dstY, flipMode)
-                    } else {
-                        // handle Static Tiles
-                        val tilesetWithSprite = findTilesetForGid(decoded.tileId)
-                        val (tilePx, tilePy) = getTilePosition(decoded.tileId, tilesetWithSprite.tileset)
-
-                        val tile: Sprite = tilesetWithSprite.spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
-                        tile.draw(dstX, dstY, flipMode, angle) // Use Flip + Angle for static
-                    }
+                if (decoded.tileId in animatedSprites) {
+                    animatedSprites[decoded.tileId]!!.draw(dstX, baseY, flip)
                 } else {
-                    // batch
                     val tilesetWithSprite = findTilesetForGid(decoded.tileId)
                     val (tilePx, tilePy) = getTilePosition(decoded.tileId, tilesetWithSprite.tileset)
-                    val tile: Sprite = tilesetWithSprite.spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
-                    val batch = batches[tile.texture]!!
-                    batch.draw(tile, dstX.toFloat(), dstY.toFloat(), flipMode, angle)
+                    val tile = tilesetWithSprite.spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
+                    tile.draw(dstX, baseY, flip, angle)
                 }
             }
         }
     }
 
-    private fun decodeFlipAndRotation(decoded: DecodedTile): Pair<FlipMode, Double> {
-        return when {
-            // No flags set
-            !decoded.flipH && !decoded.flipV && !decoded.flipD -> FlipMode.NONE to 0.0
-
-            // Single flags
-            decoded.flipH && !decoded.flipV && !decoded.flipD -> FlipMode.HORIZONTAL to 0.0
-            !decoded.flipH && decoded.flipV && !decoded.flipD -> FlipMode.VERTICAL to 0.0
-            !decoded.flipH && !decoded.flipV && decoded.flipD -> FlipMode.VERTICAL to 90.0
-
-            // Double flags
-            decoded.flipH && !decoded.flipV && decoded.flipD -> FlipMode.NONE to 90.0
-            decoded.flipH && decoded.flipV && !decoded.flipD -> FlipMode.BOTH to 0.0
-            !decoded.flipH && decoded.flipV && decoded.flipD -> FlipMode.NONE to 270.0
-
-            // Triple flags
-            decoded.flipH && decoded.flipV && decoded.flipD -> FlipMode.HORIZONTAL to 90.0
-
-            // Default fallback (shouldn't be reached)
-            else -> FlipMode.NONE to 0.0
-        }
+    private fun decodeFlipAndRotation(decoded: DecodedTile) = when {
+        !decoded.flipH && !decoded.flipV && !decoded.flipD -> FlipMode.NONE to 0.0
+        decoded.flipH && !decoded.flipV && !decoded.flipD -> FlipMode.HORIZONTAL to 0.0
+        !decoded.flipH && decoded.flipV && !decoded.flipD -> FlipMode.VERTICAL to 0.0
+        !decoded.flipH && !decoded.flipV && decoded.flipD -> FlipMode.VERTICAL to 90.0
+        decoded.flipH && !decoded.flipV && decoded.flipD -> FlipMode.NONE to 90.0
+        decoded.flipH && decoded.flipV && !decoded.flipD -> FlipMode.BOTH to 0.0
+        !decoded.flipH && decoded.flipV && decoded.flipD -> FlipMode.NONE to 270.0
+        decoded.flipH && decoded.flipV && decoded.flipD -> FlipMode.HORIZONTAL to 90.0
+        else -> FlipMode.NONE to 0.0
     }
 
-    private fun findTilesetForGid(gid: UInt): TilesetAndSpriteSheet {
-        return gidToTilesetArray[gid.toInt()]
-            ?: throw IllegalStateException("No tileset found for gid: $gid")
-    }
+    private fun findTilesetForGid(gid: UInt): TilesetAndSpriteSheet =
+        gidToTilesetArray[gid.toInt()] ?: throw IllegalStateException("No tileset found for gid: $gid")
 
     private fun getTilePosition(tileId: UInt, tileset: Tileset): Pair<UInt, UInt> {
         val localId = tileId - tileset.firstgid
         val cols = tileset.columns ?: throw IllegalArgumentException("Tileset '${tileset.name}' must have defined columns.")
-
-        val gridX = localId % cols.toUInt()
-        val gridY = localId / cols.toUInt()
-
-//        if (logger.isTraceEnabled()) {
-//            logger.trace {
-//                "getTilePosition(tileId=$tileId): firstgid=${tileset.firstgid}, localId=$localId, cols=$cols, grid=($gridX,$gridY)"
-//            }
-//        }
-
-        return gridX to gridY
+        return (localId % cols.toUInt()) to (localId / cols.toUInt())
     }
 
     private fun decodeTileGid(gid: UInt): DecodedTile {
@@ -276,33 +337,14 @@ class TiledMap(
         val flipV = (gid and GID_VERTICAL_FLAG) != 0u
         val flipD = (gid and GID_DIAGONAL_FLAG) != 0u
         val tileId = gid and TILE_INDEX_MASK
-
-//        if (logger.isTraceEnabled()) {
-//            logger.traceStream {
-//                writeLn("Decoding GID: ${gid.toString(2).padStart(32, '0')} (${gid})")
-//                writeLn("H FLAG:       ${GID_HORIZONTAL_FLAG.toString(2).padStart(32, '0')}")
-//                writeLn("V FLAG:       ${GID_VERTICAL_FLAG.toString(2).padStart(32, '0')}")
-//                writeLn("D FLAG:       ${GID_DIAGONAL_FLAG.toString(2).padStart(32, '0')}")
-//            }
-//        }
-
         return DecodedTile(tileId, flipH, flipV, flipD)
     }
 
     fun cleanup() {
+        batches.values.forEach { it.cleanup() }
         animatedSprites.values.forEach { it.cleanup() }
-    }
-
-    override fun toString(): String {
-        return "TiledMap(\n" +
-            "width=$width, height=$height,\n\t" +
-            "tileWidth=$tileWidth, tileHeight=$tileHeight,\n\t" +
-            "layers=\n\t\t${layers.joinToString("\n\t\t")},\n\t" +
-            "tilesets=\n\t\t${tilesets.joinToString("\n\t\t")},\n\t" +
-            "orientation='$orientation',\n\t" +
-            "renderOrder='$renderOrder',\n\t" +
-            "infinite=$infinite\n" +
-            ")"
+        tilesetCache.clear()
+        spriteCache.clear()
     }
 
     data class DecodedTile(
@@ -310,5 +352,10 @@ class TiledMap(
         val flipH: Boolean,
         val flipV: Boolean,
         val flipD: Boolean
+    )
+
+    private data class TilesetAndSpriteSheet(
+        val tileset: Tileset,
+        val spriteSheet: SpriteSheet
     )
 }

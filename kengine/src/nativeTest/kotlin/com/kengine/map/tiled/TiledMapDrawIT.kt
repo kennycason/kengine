@@ -25,7 +25,7 @@ class TiledMapDrawIT {
                 val tiledMap = TiledMapLoader()
 //            .loadMap("src/nativeTest/resources/ninjaturdle/stomach_0.tmj")
                     .loadMap("src/nativeTest/resources/ninjaturdle/lungs_25.tmj")
-//            .loadMap("src/nativeTest/resources/ninjaturdle/all_tiles.tmj")
+//            .loadMap("src/nativeTest/resources/ninjatuardle/all_tiles.tmj")
 //            .loadMap("src/nativeTest/resources/ninjaturdle/single_layer.tmj")
 //            .loadMap("src/nativeTest/resources/rotations.tmj")
 
@@ -65,6 +65,7 @@ class TiledMapDrawIT {
                             val startTimeNs = getCurrentNanoseconds()
 //                            tiledMap.p.set(100.0, 100.0)
                             tiledMap.update()
+//                            tiledMap.draw("bg")
                             tiledMap.draw()
 
                             val deltaTimeNs = getCurrentNanoseconds() - startTimeNs  // This now measures actual draw time

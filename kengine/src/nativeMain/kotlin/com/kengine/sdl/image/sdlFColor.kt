@@ -1,7 +1,7 @@
 package com.kengine.sdl.image
 
 import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.nativeHeap
 import sdl3.image.SDL_Color
 import sdl3.image.SDL_FColor
 
@@ -13,13 +13,11 @@ fun sdlFColor(r: UInt, g: UInt, b: UInt, a: UInt): SDL_FColor =
         a.toFloat() / 255f
     )
 
-fun sdlFColor(r: Float, g: Float, b: Float, a: Float): SDL_FColor = memScoped {
-    alloc<SDL_FColor>().apply {
-        this.r = r
-        this.g = g
-        this.b = b
-        this.a = a
-    }
+fun sdlFColor(r: Float, g: Float, b: Float, a: Float): SDL_FColor = nativeHeap.alloc<SDL_FColor>().apply {
+    this.r = r
+    this.g = g
+    this.b = b
+    this.a = a
 }
 
 // Extension: Convert SDL_Color -> SDL_FColor
