@@ -9,6 +9,7 @@ import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.IntVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
@@ -16,6 +17,7 @@ import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.readValue
 import kotlinx.cinterop.toKString
+import kotlinx.cinterop.value
 import platform.posix.size_t
 import sdl3.ttf.SDL_Color
 import sdl3.ttf.SDL_CreateTextureFromSurface
@@ -26,6 +28,7 @@ import sdl3.ttf.SDL_GetError
 import sdl3.ttf.SDL_RenderTexture
 import sdl3.ttf.SDL_Surface
 import sdl3.ttf.TTF_CloseFont
+import sdl3.ttf.TTF_GetStringSize
 import sdl3.ttf.TTF_RenderText_Solid
 
 @OptIn(ExperimentalForeignApi::class)
@@ -35,6 +38,28 @@ class Font(
     val fontSize: Float
 ) : Logging {
     private val surfaceCache = mutableMapOf<String, CPointer<SDL_Surface>>()
+
+    /**
+     * Measures the width of the rendered text in pixels.
+     */
+    fun measureTextWidth(text: String): Int {
+        memScoped {
+            val width = alloc<IntVar>()
+            val height = alloc<IntVar>()
+            val result = TTF_GetStringSize(
+                font = font,
+                text = text,
+                length = text.length.convert<size_t>(),
+                w = width.ptr,
+                h = height.ptr
+            )
+            if (!result) {
+                throw IllegalStateException("Failed to measure text size: ${SDL_GetError()?.toKString()}")
+            }
+            return width.value
+        }
+    }
+
 
     fun drawText(
         text: String,

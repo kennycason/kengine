@@ -1,5 +1,6 @@
 package com.kengine.geometry
 
+import com.kengine.graphics.Color
 import com.kengine.graphics.alphaFromRGBA
 import com.kengine.graphics.blueFromRGBA
 import com.kengine.graphics.greenFromRGBA
@@ -33,6 +34,18 @@ class GeometryContext private constructor() : Context(), Logging {
         g = greenFromRGBA(rgba),
         b = blueFromRGBA(rgba),
         a = alphaFromRGBA(rgba)
+    )
+
+    fun drawCircle(
+        centerX: Int, centerY: Int,
+        radius: Int,
+        color: Color
+    ) = drawCircle(
+        centerX, centerY, radius,
+        r = color.r,
+        g = color.g,
+        b = color.b,
+        a = color.a
     )
 
     fun drawCircle(
@@ -86,6 +99,18 @@ class GeometryContext private constructor() : Context(), Logging {
     fun fillCircle(
         centerX: Int, centerY: Int,
         radius: Int,
+        color: Color
+    ) = fillCircle(
+        centerX, centerY, radius,
+        r = color.r,
+        g = color.g,
+        b = color.b,
+        a = color.a
+    )
+
+    fun fillCircle(
+        centerX: Int, centerY: Int,
+        radius: Int,
         rgba: UInt
     ) = fillCircle(
         centerX, centerY, radius,
@@ -108,6 +133,18 @@ class GeometryContext private constructor() : Context(), Logging {
             }
         }
     }
+
+    fun drawRectangle(
+        x: Int, y: Int,
+        width: Int, height: Int,
+        color: Color
+    ) = drawRectangle(
+        x, y, width, height,
+        r = color.r,
+        g = color.g,
+        b = color.b,
+        a = color.a
+    )
 
     fun drawRectangle(
         x: Int, y: Int,
@@ -145,6 +182,30 @@ class GeometryContext private constructor() : Context(), Logging {
     fun fillRectangle(
         x: Int, y: Int,
         width: Int, height: Int,
+        color: Color
+    ) = fillRectangle(
+        x, y, width, height,
+        r = color.r,
+        g = color.g,
+        b = color.b,
+        a = color.a
+    )
+
+    fun fillRectangle(
+        x: Int, y: Int,
+        width: Int, height: Int,
+        rgba: UInt
+    ) = fillRectangle(
+        x, y, width, height,
+        r = redFromRGBA(rgba),
+        g = greenFromRGBA(rgba),
+        b = blueFromRGBA(rgba),
+        a = alphaFromRGBA(rgba)
+    )
+
+    fun fillRectangle(
+        x: Int, y: Int,
+        width: Int, height: Int,
         r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
         useSDLContext {
@@ -166,12 +227,37 @@ class GeometryContext private constructor() : Context(), Logging {
     fun drawLine(
         startX: Int, startY: Int,
         endX: Int, endY: Int,
+        color: Color
+    ) {
+        useSDLContext {
+            SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a)
+            if (!SDL_RenderLine(renderer, startX.toFloat(), startY.toFloat(), endX.toFloat(), endY.toFloat())) {
+                logger.error("Error drawing line: ${SDL_GetError()?.toKString()}")
+            }
+        }
+    }
+
+    fun drawLine(
+        startX: Int, startY: Int,
+        endX: Int, endY: Int,
         r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
         useSDLContext {
             SDL_SetRenderDrawColor(renderer, r, g, b, a)
             if (!SDL_RenderLine(renderer, startX.toFloat(), startY.toFloat(), endX.toFloat(), endY.toFloat())) {
                 logger.error("Error drawing line: ${SDL_GetError()?.toKString()}")
+            }
+        }
+    }
+
+    fun drawPixel(
+        x: Int, y: Int,
+        color: Color
+    ) {
+        useSDLContext {
+            SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a)
+            if (!SDL_RenderPoint(renderer, x.toFloat(), y.toFloat())) {
+                logger.error("Error drawing pixel: ${SDL_GetError()?.toKString()}")
             }
         }
     }

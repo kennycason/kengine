@@ -2,12 +2,15 @@
 import com.kengine.Game
 import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Color
+import com.kengine.graphics.Sprite
 import com.kengine.map.tiled.TiledMapLoader
 import com.kengine.math.Vec2
 import com.kengine.particle.Effects
 import com.kengine.particle.Particle
 import com.kengine.sdl.getSDLContext
 import com.kengine.sdl.useSDLContext
+import com.kengine.ui.getViewContext
+import com.kengine.ui.useView
 import kotlin.random.Random
 
 class HelloWorldGame : Game {
@@ -17,6 +20,37 @@ class HelloWorldGame : Game {
     private val tiledMap = TiledMapLoader().loadMap("assets/maps/simple_map.tmj")
         .also { it.p.set(480.0, 0.0) }
     val particles = mutableListOf<Particle>()
+
+    val profile = useView(
+        id = "profileBar",
+        x = 0.0,
+        y = getSDLContext().screenHeight - 50.0,
+        w = 300.0,
+        h = 50.0,
+        padding = 5.0,
+        spacing = 5.0,
+        bgColor = Color.red
+    ) {
+        view(
+            id = "leftBox",
+            w = 40.0,
+            h = 40.0,
+            bgColor = Color.orange
+        )
+        view(
+            id = "middleBox",
+            w = 200.0,
+            h = 40.0,
+            bgColor = Color.yellow
+        )
+        view(
+            id = "rightBox",
+            w = 40.0,
+            h = 40.0,
+            bgColor = Color.green,
+            bgImage = Sprite.fromFilePath("assets/sprites/pokeball.bmp")
+        )
+    }
 
     init {
         getSDLContext().enableBlendedMode()
@@ -35,7 +69,6 @@ class HelloWorldGame : Game {
                 )
             )
         }
-
     }
 
     override fun update() {
@@ -47,6 +80,7 @@ class HelloWorldGame : Game {
 
         particles.forEach { it.update() }
         particles.removeAll { it.age > it.lifetime }
+
     }
 
     override fun draw() {
@@ -55,6 +89,8 @@ class HelloWorldGame : Game {
             fillScreen(0xFFu, 0xFFu, 0xFFu)
 
             tiledMap.draw()
+
+            getViewContext().render()
 
             useGeometryContext {
                 // basic shapes
@@ -96,11 +132,17 @@ class HelloWorldGame : Game {
 
             flipScreen()
         }
+
     }
 
     override fun cleanup() {
         bulbasaur.cleanup()
         pidgies.forEach { it.cleanup() }
+        particles.clear()
+        particles.forEach { cleanup() }
+        particles.clear()
+        scytherEntity.cleanup()
+        profile.cleanup()
     }
 
 }

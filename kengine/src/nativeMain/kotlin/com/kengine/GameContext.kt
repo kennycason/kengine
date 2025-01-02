@@ -24,6 +24,7 @@ import com.kengine.sdl.SDLEventContext
 import com.kengine.sdl.registerSDLQuitHandler
 import com.kengine.sound.SoundContext
 import com.kengine.time.ClockContext
+import com.kengine.ui.ViewContext
 
 class GameContext private constructor(
     val log: LoggerContext,
@@ -37,6 +38,7 @@ class GameContext private constructor(
     val sprite: SpriteContext,
     val geometry: GeometryContext,
     val font: FontContext,
+    val view: ViewContext,
     val sound: SoundContext,
     val network: NetworkContext,
     val action: ActionContext,
@@ -78,6 +80,7 @@ class GameContext private constructor(
                 texture = TextureContext.get(),
                 sprite = SpriteContext.get(),
                 font = FontContext.get(),
+                view = ViewContext.get(),
                 sound = SoundContext.get(),
                 network = NetworkContext.get(),
                 geometry = GeometryContext.get(),
@@ -107,6 +110,7 @@ class GameContext private constructor(
         sprite.cleanup()
         geometry.cleanup()
         font.cleanup()
+         view.cleanup()
         sound.cleanup()
         network.cleanup()
         sdl.cleanup()
@@ -129,6 +133,7 @@ class GameContext private constructor(
         ContextRegistry.register(sprite)
         ContextRegistry.register(geometry)
         ContextRegistry.register(font)
+        ContextRegistry.register(view)
         ContextRegistry.register(sound)
         ContextRegistry.register(network)
         ContextRegistry.register(action)

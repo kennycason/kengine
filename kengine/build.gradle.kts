@@ -22,8 +22,8 @@ kotlin {
     }
 
     // native target detection
-    val hostOs = System.getProperty("os.name")
-    val isArm64 = System.getProperty("os.arch") == "aarch64"
+    val hostOs = System.getProperty("os.name").also { println("OS: $it") }
+    val isArm64 = System.getProperty("os.arch").also { println("Arch: $it") } == "aarch64"
     val nativeTarget = when {
         hostOs == "Mac OS X" && isArm64 -> macosArm64("native")
         hostOs == "Mac OS X" && !isArm64 -> macosX64("native")
@@ -101,7 +101,11 @@ kotlin {
     }
 
     sourceSets {
+        val commonMain by getting
+        val commonTest by getting
+
         nativeMain {
+            dependsOn(commonMain)
             dependencies {
                 implementation(libs.kotlinxSerializationJson)
                 implementation(libs.kotlinxCoroutinesCore)
@@ -113,6 +117,7 @@ kotlin {
         }
 
         nativeTest {
+            dependsOn(commonTest)
             dependencies {
                 implementation(kotlin("test"))
             }
