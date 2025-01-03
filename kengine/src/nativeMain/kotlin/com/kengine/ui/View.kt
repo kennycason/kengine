@@ -135,9 +135,11 @@ open class View(
         val absX = parentX + x
         val absY = parentY + y
 
-        logger.debug { "Rendering view $id at ($absX, $absY) size: ${w}x${h}, parent: ${parent?.id}" }
+        if (logger.isTraceEnabled()) {
+            logger.trace { "Rendering view $id at ($absX, $absY) size: ${w}x${h}, parent: ${parent?.id}" }
+        }
 
-        // Draw this view
+        // draw this view
         if (bgColor != null) {
             useGeometryContext {
                 fillRectangle(absX.toInt(), absY.toInt(), w.toInt(), h.toInt(), bgColor)

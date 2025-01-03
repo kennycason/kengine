@@ -7,6 +7,7 @@ import com.kengine.map.tiled.TiledMapLoader
 import com.kengine.math.Vec2
 import com.kengine.particle.Effects
 import com.kengine.particle.Particle
+import com.kengine.particle.RainbowLinesEffect
 import com.kengine.sdl.getSDLContext
 import com.kengine.sdl.useSDLContext
 import com.kengine.ui.FlexDirection
@@ -62,6 +63,14 @@ class HelloWorldGame : Game {
         }
     }
 
+    private val rainbowLinesEffect = RainbowLinesEffect(
+        x = 100,
+        y = 100,
+        width = 256,
+        height = 256,
+        numLines = 256
+    )
+
     init {
         getSDLContext().enableBlendedMode()
 
@@ -97,21 +106,21 @@ class HelloWorldGame : Game {
             }
             getViewContext().hover(mouse.cursor())
         }
+        rainbowLinesEffect.update()
     }
 
     override fun draw() {
         useSDLContext {
             // clear screen
-            fillScreen(0xFFu, 0xFFu, 0xFFu)
+            fillScreen(0x00u, 0x00u, 0x00u)
 
-            tiledMap.draw()
-
-            getViewContext().render()
+           getViewContext().render()
 
             useGeometryContext {
                 // basic shapes
                 drawRectangle(16, 16, 16, 16, 0xFFu, 0xFFu, 0xFFu, 0xFFu)
                 fillRectangle(16 + 32, 16, 16, 16, 0xFFu, 0x00u, 0x00u, 0xFFu)
+                fillRectangle(480, 0, 320, 320, 0xFFu, 0xFFu, 0xFFu)
                 drawCircle(16 + 80, 24, 16, 0x00u, 0xFFu, 0x00u, 0xFFu)
                 fillCircle(16 + 128, 24, 16, 0x00u, 0x00u, 0xFFu, 0xFFu)
 
@@ -136,6 +145,10 @@ class HelloWorldGame : Game {
                 drawLine(150, 50, 300, 50, 0xFFu, 0u, 0u, 0xFFu)
                 drawLine(160, 150, 310, 20, 0x57u, 0x23u, 0x5Eu, 0xFFu)
             }
+
+            tiledMap.draw()
+
+            rainbowLinesEffect.draw()
 
             particles.forEach { it.draw() }
 

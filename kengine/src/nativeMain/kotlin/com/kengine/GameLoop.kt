@@ -2,7 +2,6 @@ package com.kengine
 
 import com.kengine.log.Logging
 import com.kengine.time.getClockContext
-import com.kengine.time.getCurrentMilliseconds
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.SDL_Delay
 
@@ -13,31 +12,36 @@ class GameLoop(
 ) : Logging {
 
     init {
+        val clock = getClockContext()
+        clock.setFrameRate(frameRate) // Let Clock manage FPS logic
+
         if (frameRate < 0) {
-            logger.info { "Looping as fast as possible." }
+            logger.info { "Running as fast as possible." }
         } else {
-            logger.info { "Running with $frameRate FPS." }
+            logger.info { "Running at $frameRate FPS." }
         }
 
-        val targetFrameTime = 1000.0 / frameRate
-
+        // Main game loop
         useGameContext(cleanup = true) {
             while (isRunning) {
-                getClockContext().update()
+                // Update clock (handles FPS tracking & frame drops)
+                clock.update()
 
+                // Process events and actions
                 sdlEvent.pollEvents()
                 action.update()
 
+                // Execute game-specific update logic
                 update()
 
-                if (frameRate > 0) { // set frameRate = -1 to avoid sleep run as fast as possible
-                    val frameTimeMs = getCurrentMilliseconds() - clock.totalTimeMs
-                    if (frameTimeMs < targetFrameTime) {
-                        SDL_Delay((targetFrameTime - frameTimeMs).toUInt())
-                    }
+                // Frame rate limiting handled by Clock
+                val delay = clock.calculateFrameDelay()
+                if (delay > 0) {
+                    SDL_Delay(delay.toUInt())
                 }
             }
         }
+
         logger.info { "Game loop exited cleanly." }
     }
 

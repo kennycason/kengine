@@ -1,10 +1,20 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     id("kengine.assets")
+//    id("kengine.native")
 }
 
 group = "kengine.helloworld"
 version = "1.0.0"
+
+//kengineNative {
+//    entryPoint = "main"
+//    modules = setOf(
+//        KengineModule.GRAPHICS,
+//        KengineModule.SOUND,
+//        KengineModule.PHYSICS
+//    )
+//}
 
 repositories {
     mavenCentral()

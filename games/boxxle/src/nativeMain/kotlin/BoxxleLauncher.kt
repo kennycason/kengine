@@ -8,7 +8,7 @@ fun main() {
         title = "Boxxle",
         width = 640,
         height = 480,
-        logLevel = Logger.Level.DEBUG
+        logLevel = Logger.Level.INFO
     ) {
         GameRunner(frameRate = 60) {
             BoxxleGame()
