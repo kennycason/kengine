@@ -19,9 +19,9 @@ class TiledMapDrawIT {
             title = "Tile Map Test",
             width = 800,
             height = 600,
-            logLevel = Logger.Level.INFO
+            logLevel = Logger.Level.DEBUG
         ) {
-            GameRunner(frameRate = 60) {
+            GameRunner(frameRate = -1) { // unlimited, currently running 130 fps, (map 7ms/render)
                 val tiledMap = TiledMapLoader()
 //            .loadMap("src/nativeTest/resources/ninjaturdle/stomach_0.tmj")
                     .loadMap("src/nativeTest/resources/ninjaturdle/lungs_25.tmj")
@@ -38,10 +38,14 @@ class TiledMapDrawIT {
                     private var maxRenderTimeNs = Long.MIN_VALUE
                     private var avgRenderTimeNs = 0L
 
-                    override fun update() {
-                        useTimer(5000L) {
+                    init {
+                        useTimer(10000L) {
                             isRunning = false
                         }
+                    }
+
+                    override fun update() {
+                        tiledMap.update()
                     }
 
                     override fun draw() {
@@ -63,8 +67,6 @@ class TiledMapDrawIT {
                         useSDLContext {
                             fillScreen(0u, 0u, 0u)
                             val startTimeNs = getCurrentNanoseconds()
-//                            tiledMap.p.set(100.0, 100.0)
-                            tiledMap.update()
 //                            tiledMap.draw("bg")
                             tiledMap.draw()
 

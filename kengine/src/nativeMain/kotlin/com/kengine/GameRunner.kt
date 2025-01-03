@@ -11,10 +11,11 @@ class GameRunner(
         var game: Game? = null
         try {
             game = gameBuilder()
-            GameLoop(frameRate) {
-                game.update()
-                game.draw()
-            }
+            GameLoop(
+                frameRate,
+                update = game::update,
+                draw = game::draw
+            ).start()
         } catch (e: Exception) {
             handleException(e)
         } finally {
@@ -25,5 +26,4 @@ class GameRunner(
     private fun handleException(e: Exception) {
         logger.error(e) { "Unhandled exception in GameLoop" }
     }
-
 }

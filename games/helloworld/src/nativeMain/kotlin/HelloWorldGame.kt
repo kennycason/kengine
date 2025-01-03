@@ -83,7 +83,7 @@ class HelloWorldGame : Game {
                         (Random.nextDouble() - 0.5) * 200
                     ),
                     color = Color(0xFFu, 0x77u, 0x0u, 0xFFu), // Orange burst
-                    lifetime = Random.nextDouble() * 4.0,
+                    lifetime = Random.nextDouble() * 3.0,
                     behaviors = listOf(Effects.smoke, Effects.rainbow)
                 )
             )

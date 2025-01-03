@@ -16,7 +16,7 @@ class ViewContext private constructor(): Context(), Logging {
             if (logger.isTraceEnabled()) {
                 logger.trace { "Rendering root view ${rootView.id} at (${rootView.x}, ${rootView.y}) size: ${rootView.w}x${rootView.h}" }
             }
-            rootView.render()
+            rootView.draw()
         }
     }
 

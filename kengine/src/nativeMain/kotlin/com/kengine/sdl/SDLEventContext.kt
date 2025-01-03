@@ -28,7 +28,6 @@ import sdl3.SDL_PollEvent
 
 @OptIn(ExperimentalForeignApi::class)
 class SDLEventContext private constructor() : Context(), Logging {
-    private val events = mutableListOf<SDL_Event>()
     private val subscribers = mutableMapOf<EventType, MutableList<(SDL_Event) -> Unit>>()
 
     enum class EventType {
@@ -47,7 +46,6 @@ class SDLEventContext private constructor() : Context(), Logging {
 
     override fun cleanup() {
         logger.info { "Cleaning up SDLEventContext" }
-        events.clear()
         subscribers.clear()
         currentContext = null
     }
@@ -59,10 +57,9 @@ class SDLEventContext private constructor() : Context(), Logging {
         memScoped {
             val event = alloc<SDL_Event>()
             while (SDL_PollEvent(event.ptr)) {
-                if (logger.isDebugEnabled()) {
-                    logger.debug { "Event polled: ${event.type}" }
+                if (logger.isTraceEnabled()) {
+                    logger.trace { "Event polled: ${event.type}" }
                 }
-                events.add(event)
                 notifySubscribers(event)
             }
         }
@@ -120,14 +117,10 @@ class SDLEventContext private constructor() : Context(), Logging {
                 logger.warn { "No subscribers for event type: $eventType" }
             }
         } else {
-            logger.debug { "Unsupported event type: ${event.type}" }
+            if (logger.isTraceEnabled()) {
+                logger.trace { "Unsupported event type: ${event.type}" }
+            }
         }
     }
 
-    /**
-     * Clear all stored events
-     */
-    fun clearEvents() {
-        events.clear()
-    }
 }

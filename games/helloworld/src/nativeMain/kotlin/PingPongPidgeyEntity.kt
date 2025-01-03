@@ -38,10 +38,10 @@ class PingPongPidgeyEntity : SpriteEntity(
             }
         }
         useSDLContext {
-            p.x = Random.nextInt(10, screenWidth - width - 10).toDouble()
-            p.y = Random.nextInt(10, screenHeight - height - 10).toDouble()
-            v.x = Random.nextInt(10, 60).toDouble() * if (Random.nextBoolean()) 1 else -1
-            v.y = Random.nextInt(10, 60).toDouble() * if (Random.nextBoolean()) 1 else -1
+            p.x = Random.nextInt(30, screenWidth - width - 30).toDouble()
+            p.y = Random.nextInt(30, screenHeight - height - 30).toDouble()
+            v.x = Random.nextInt(10, 40).toDouble() * if (Random.nextBoolean()) 1 else -1
+            v.y = Random.nextInt(10, 40).toDouble() * if (Random.nextBoolean()) 1 else -1
         }
         state = State.BOUNCE
     }
@@ -49,10 +49,10 @@ class PingPongPidgeyEntity : SpriteEntity(
     private fun bounce() {
         useSDLContext {
             p += v * getContext<ClockContext>().deltaTimeSec
-            if (p.x <= 0 || p.x + width >= screenWidth) {
+            if (p.x < 20 || p.x + width + v.x > screenWidth) {
                 v.x *= -1
             }
-            if (p.y <= 0 || p.y + height >= screenHeight) {
+            if (p.y < 20 || p.y + height + v.y > screenHeight) {
                 v.y *= -1
             }
         }

@@ -1,5 +1,7 @@
+
 import com.kengine.Game
 import com.kengine.geometry.useGeometryContext
+import com.kengine.graphics.Color
 import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.input.mouse.useMouseContext
 import com.kengine.log.Logging
@@ -16,6 +18,13 @@ import kotlin.random.Random
 class PhysicsDemoGame : Game, Logging {
     private val screenWidth = getSDLContext().screenWidth.toDouble()
     private val screenHeight = getSDLContext().screenHeight.toDouble()
+
+    private val colors = listOf(
+        Color.neonBlue, Color.neonBlueGreen, Color.neonGreen, Color.neonPeach, Color.neonOrange, Color.neonCyan,
+        Color.neonLime, Color.neonMagenta, Color.neonPink, Color.neonPurple, Color.neonTurquoise, Color.neonYellow,
+    )
+
+    private val colorMap: MutableMap<PhysicsObject, Color> = mutableMapOf()
 
     init {
         usePhysicsContext {
@@ -102,6 +111,7 @@ class PhysicsDemoGame : Game, Logging {
             useKeyboardContext {
                 if (keyboard.isSpacePressed()) {
                     clearDynamicObjects()
+                    colorMap.clear()
                 }
                 if (keyboard.isUpPressed()) {
                     gravity = gravity.copy(y = gravity.y + 5)
@@ -115,7 +125,7 @@ class PhysicsDemoGame : Game, Logging {
 
     override fun draw() {
         useSDLContext {
-            fillScreen(0x22u, 0x22u, 0x22u)
+            fillScreen(0x11u, 0x11u, 0x11u)
             useGeometryContext {
                 usePhysicsContext {
                     // Draw static objects (boundaries)
@@ -130,6 +140,7 @@ class PhysicsDemoGame : Game, Logging {
 
     private fun drawShape(obj: PhysicsObject) {
         useGeometryContext {
+            val color = colorMap.getOrPut(obj) { colors.random() }
             when (val shape = obj.shape) {
                 is Shape.Circle -> {
                     val pos = obj.body.position
@@ -137,7 +148,7 @@ class PhysicsDemoGame : Game, Logging {
                         pos.x.toInt(),
                         pos.y.toInt(),
                         shape.radius.toInt(),
-                        0xFFu, 0x44u, 0x44u, 0xFFu
+                        color
                     )
                 }
                 is Shape.Box -> {
@@ -148,7 +159,7 @@ class PhysicsDemoGame : Game, Logging {
                         pos.y.toInt() - (rect.h / 2).toInt(),
                         rect.w.toInt(),
                         rect.h.toInt(),
-                        0x44u, 0x44u, 0xFFu, 0xFFu
+                        color
                     )
                 }
                 is Shape.Segment -> TODO()
@@ -157,8 +168,6 @@ class PhysicsDemoGame : Game, Logging {
     }
 
     override fun cleanup() {
-        usePhysicsContext {
-            clearAll()
-        }
+
     }
 }

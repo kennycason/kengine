@@ -95,11 +95,11 @@ open class View(
 
     private val children = mutableListOf<View>()
 
-    // Calculate dimensions based on parent constraints
+    // calculate dimensions based on parent constraints
     private fun calculateDimensions() {
         if (children.isEmpty()) return
 
-        // Width calculation
+        // width calculation
         var fixedWidth = 0.0
         var flexibleWidthChildren = 0
 
@@ -110,7 +110,7 @@ open class View(
         val remainingWidth = w - padding * 2 - spacing * (children.size - 1) - fixedWidth
         val autoWidth = if (flexibleWidthChildren > 0) remainingWidth / flexibleWidthChildren else 0.0
 
-        // Height calculation
+        // height calculation
         val parentHeight = h - padding * 2 // Parent's effective height
         children.forEach { child ->
             if (child.w == 0.0) {
@@ -126,10 +126,10 @@ open class View(
     fun addChild(view: View) {
         logger.debug { "Adding child ${view.id} to parent ${this.id}" }
         children.add(view)
-        calculateDimensions() // Recalculate sizes whenever a child is added
+        calculateDimensions() // recalculate sizes whenever a child is added
     }
 
-    fun render(parentX: Double = 0.0, parentY: Double = 0.0) {
+    fun draw(parentX: Double = 0.0, parentY: Double = 0.0) {
         if (!visible) return
 
         val absX = parentX + x
@@ -151,7 +151,7 @@ open class View(
         var childY = absY + padding
 
         children.forEach { child ->
-            child.render(childX, childY)
+            child.draw(childX, childY)
             if (direction == FlexDirection.ROW) {
                 childX += child.w + spacing
             } else {
@@ -170,12 +170,12 @@ open class View(
         val absX = this.x
         val absY = this.y
 
-        // Check bounds for the current view
+        // check bounds for the current view
         if (x >= absX && x <= absX + w && y >= absY && y <= absY + h) {
             onClick?.invoke()
         }
 
-        // Propagate click to children with relative offsets
+        // propagate click to children with relative offsets
         var childX = absX + padding
         var childY = absY + padding
 
@@ -200,12 +200,12 @@ open class View(
         val absX = this.x
         val absY = this.y
 
-        // Check bounds for the current view
+        // check bounds for the current view
         if (x >= absX && x <= absX + w && y >= absY && y <= absY + h) {
             onHover?.invoke()
         }
 
-        // Propagate hover to children with relative offsets
+        // propagate hover to children with relative offsets
         var childX = absX + padding
         var childY = absY + padding
 

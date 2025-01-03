@@ -22,19 +22,19 @@ class Logger {
     constructor(klass: KClass<*>)
             : this(klass.simpleName ?: "Unknown")
 
-    enum class Level {
-        TRACE, // ideal for expensive debugging that may affect fps, such as per-tile logging in map rendering
-        DEBUG,
-        INFO,
-        WARN,
-        ERROR
+    enum class Level(private val level: Int) {
+        TRACE(5), // ideal for expensive debugging that may affect fps, such as per-tile logging in map rendering
+        DEBUG(4),
+        INFO(3),
+        WARN(2),
+        ERROR(1)
     }
 
-    fun isTraceEnabled() = logLevel == TRACE
-    fun isDebugEnabled() = logLevel == DEBUG
-    fun isInfoEnabled() = logLevel == INFO
-    fun isWarnEnabled() = logLevel == WARN
-    fun isErrorEnabled() = logLevel == ERROR
+    fun isTraceEnabled() = logLevel <= TRACE
+    fun isDebugEnabled() = logLevel <= DEBUG
+    fun isInfoEnabled() = logLevel <= INFO
+    fun isWarnEnabled() = logLevel <= WARN
+    fun isErrorEnabled() = logLevel <= ERROR
 
     fun trace(message: () -> String?) = log(TRACE, message())
     fun debug(message: () -> String?) = log(DEBUG, message())

@@ -29,90 +29,72 @@ data class ClockContext private constructor(
     var lastFrameTimeMs: Long = getCurrentMilliseconds() // TODO, should this be zero'd?
 ) : Context(), Logging {
 
-
     // FPS Tracking
     var fps: Double = 0.0
         private set
 
-    private var frameCount: Int = 0
-    private var elapsedTimeSec: Double = 0.0
+    private var elapsedTimeSec = 0.0
+    private var frameCount = 0
 
-    // Circular buffer for moving average FPS
-    private val fpsBuffer = DoubleArray(60) { 60.0 }
-    private var fpsIndex = 0
-    private var fpsSum = 60.0 * 60
+    // moving average FPS
+    private var avgFps = 60.0 // initial approximation
+    private var frameWeight = 0.1 // weight for current frame in moving average
 
-    // Target frame rate & drift correction
+    // Frame timing
     private var targetFrameTime = 0.0
-    private var frameTimeErrorMs = 0.0 // Error for drift correction
+    private var frameTimeErrorMs = 0.0 // Drift compensation
 
     /**
-     * Sets the target frame rate (FPS) and calculates frame time.
+     * Sets the target FPS and calculates ideal frame time.
      */
     fun setFrameRate(fps: Int) {
         targetFrameTime = if (fps > 0) 1000.0 / fps else 0.0
-        logger.info { "Target frame rate set: $fps FPS (Target Frame Time: ${targetFrameTime.toInt()}ms)." }
+        logger.info { "Target frame rate set: $fps FPS (${targetFrameTime.toInt()}ms)" }
     }
 
     /**
-     * Updates the clock, tracks FPS, and detects frame drops.
+     * Updates time deltas and calculates FPS with a simple moving average.
      */
-    fun update() {
-        val currentTimeMs = getCurrentMilliseconds()
-
-        // Update time deltas
-        deltaTimeMs = currentTimeMs - lastFrameTimeMs
-        deltaTimeSec = deltaTimeMs / 1000.0
+    fun update(deltaTimeMs: Long) {
+        // update deltas
+        this.deltaTimeMs = deltaTimeMs
+        this.deltaTimeSec = deltaTimeMs / 1000.0
         totalTimeMs += deltaTimeMs
         totalTimeSec = totalTimeMs / 1000.0
-        lastFrameTimeMs = currentTimeMs
 
-        // FPS calculation
+        // calculate FPS
         frameCount++
         elapsedTimeSec += deltaTimeSec
 
         if (elapsedTimeSec >= 1.0) {
-            fps = frameCount / elapsedTimeSec
+            val currentFps = frameCount / elapsedTimeSec
 
-            // Update moving average
-            fpsSum -= fpsBuffer[fpsIndex]
-            fpsBuffer[fpsIndex] = fps
-            fpsSum += fps
-            fpsIndex = (fpsIndex + 1) % fpsBuffer.size
-
-            val avgFps = fpsSum / fpsBuffer.size
+            // simple moving average: weight recent frames more
+            avgFps = avgFps * (1.0 - frameWeight) + currentFps * frameWeight
+            fps = avgFps // store smoothed FPS
 
             if (logger.isDebugEnabled()) {
-                logger.debug { "FPS: $fps (Avg: $avgFps)" }
+                logger.debug { "FPS: $currentFps, Avg: $fps" }
             }
 
             frameCount = 0
             elapsedTimeSec = 0.0
         }
-
-        // Frame drop detection (10% tolerance)
-        if (targetFrameTime > 0 && deltaTimeMs > targetFrameTime * 1.1) {
-            if (logger.isTraceEnabled()) {
-                logger.trace { "Frame drop detected: Took ${deltaTimeMs}ms (Target: ${targetFrameTime.toInt()}ms)" }
-            }
-        }
     }
 
-
     /**
-     * Calculates and returns the delay required to match target frame time.
+     * Computes the time to delay for next frame, correcting drift.
      */
     fun calculateFrameDelay(): Double {
-        if (targetFrameTime <= 0) return 0.0 // No frame rate limiting
+        if (targetFrameTime <= 0.0) return 0.0 // Uncapped FPS
 
         val frameTimeMs = getCurrentMilliseconds() - lastFrameTimeMs
         val adjustedDelay = targetFrameTime - frameTimeMs + frameTimeErrorMs
 
-        // Adjust error for sub-millisecond drift correction
+        // sub-millisecond drift correction
         frameTimeErrorMs = adjustedDelay % 1.0
         return adjustedDelay.coerceAtLeast(0.0)
     }
-
 
     override fun cleanup() {
         logger.info { "Cleaning up ClockContext" }
@@ -121,11 +103,9 @@ data class ClockContext private constructor(
         totalTimeSec = 0.0
         deltaTimeSec = 0.0
         fps = 0.0
-        frameCount = 0
         elapsedTimeSec = 0.0
-        fpsSum = 60.0 * 60
-        fpsIndex = 0
-        fpsBuffer.fill(60.0)
+        frameCount = 0
+        avgFps = 60.0
         frameTimeErrorMs = 0.0
         currentContext = null
     }
