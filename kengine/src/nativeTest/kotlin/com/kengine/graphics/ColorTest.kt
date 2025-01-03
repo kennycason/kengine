@@ -90,7 +90,7 @@ class ColorTest {
     @Test
     fun `test invert color`() {
         val color = Color(0u, 0u, 0u, 255u) // Black
-        val inverted = color.invert()
+        val inverted = Color.invert(color)
 
         expectThat(inverted.r).isEqualTo(255u.toUByte())
         expectThat(inverted.g).isEqualTo(255u.toUByte())
@@ -100,7 +100,7 @@ class ColorTest {
     @Test
     fun `test brightness adjustment`() {
         val color = Color(100u, 100u, 100u, 255u)
-        val brighter = color.adjustBrightness(1.5f)
+        val brighter = Color.adjustBrightness(color,1.5f)
 
         expectThat(brighter.r).isEqualTo(150u.toUByte())
         expectThat(brighter.g).isEqualTo(150u.toUByte())
@@ -111,7 +111,7 @@ class ColorTest {
     fun `test blending colors`() {
         val red = Color(255u, 0u, 0u, 255u)
         val blue = Color(0u, 0u, 255u, 255u)
-        val blended = red.blend(blue, 0.5f)
+        val blended = Color.blend(red, blue, 0.5f)
 
         expectThat(blended.r).isEqualTo(127u.toUByte())
         expectThat(blended.g).isEqualTo(0u.toUByte())
@@ -121,7 +121,7 @@ class ColorTest {
     @Test
     fun `test grayscale conversion`() {
         val color = Color(50u, 100u, 150u, 255u)
-        val gray = color.toGrayscale()
+        val gray = Color.toGrayscale(color)
 
         expectThat(gray.r).isEqualTo(gray.g).isEqualTo(gray.b)
     }

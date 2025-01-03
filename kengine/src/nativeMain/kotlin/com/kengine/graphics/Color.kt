@@ -11,39 +11,7 @@ data class Color(
     fun toUInt(): UInt =
         (r.toUInt() shl 24 or (g.toUInt() shl 16) or (b.toUInt() shl 8) or a.toUInt())
 
-    fun invert(): Color {
-        return Color(
-            (255u - r).toUByte(),
-            (255u - g).toUByte(),
-            (255u - b).toUByte(),
-            a
-        )
-    }
-
-    fun adjustBrightness(factor: Float): Color {
-        return Color(
-            ((r.toFloat() * factor).coerceIn(0f, 255f)).toInt().toUByte(),
-            ((g.toFloat() * factor).coerceIn(0f, 255f)).toInt().toUByte(),
-            ((b.toFloat() * factor).coerceIn(0f, 255f)).toInt().toUByte(),
-            a
-        )
-    }
-
-    fun blend(other: Color, t: Float): Color {
-        val clampedT = t.coerceIn(0f, 1f)
-        // notes on casting: Converting UByte to Float is a direct operation without intermediate steps like UByte → Int → Float.
-        return Color(
-            ((r.toFloat() * (1 - clampedT)) + (other.r.toFloat() * clampedT)).toInt().toUByte(),
-            ((g.toFloat() * (1 - clampedT)) + (other.g.toFloat() * clampedT)).toInt().toUByte(),
-            ((b.toFloat() * (1 - clampedT)) + (other.b.toFloat() * clampedT)).toInt().toUByte(),
-            ((a.toFloat() * (1 - clampedT)) + (other.a.toFloat() * clampedT)).toInt().toUByte()
-        )
-    }
-
-    fun toGrayscale(): Color {
-        val gray = ((r.toInt() * 0.299) + (g.toInt() * 0.587) + (b.toInt() * 0.114)).toInt().toUByte()
-        return Color(gray, gray, gray, a)
-    }
+    // keep lean
 
     companion object {
         fun fromUInt32(color: UInt): Color {
@@ -98,6 +66,41 @@ data class Color(
                 (alpha * 255).toInt().toUByte()
             )
         }
+
+        fun invert(c: Color): Color {
+            return Color(
+                (255u - c.r).toUByte(),
+                (255u - c.g).toUByte(),
+                (255u - c.b).toUByte(),
+                c.a
+            )
+        }
+
+        fun adjustBrightness(c: Color, factor: Float): Color {
+            return Color(
+                ((c.r.toFloat() * factor).coerceIn(0f, 255f)).toInt().toUByte(),
+                ((c.g.toFloat() * factor).coerceIn(0f, 255f)).toInt().toUByte(),
+                ((c.b.toFloat() * factor).coerceIn(0f, 255f)).toInt().toUByte(),
+                c.a
+            )
+        }
+
+        fun blend(c: Color, other: Color, t: Float): Color {
+            val clampedT = t.coerceIn(0f, 1f)
+            // notes on casting: Converting UByte to Float is a direct operation without intermediate steps like UByte → Int → Float.
+            return Color(
+                ((c.r.toFloat() * (1 - clampedT)) + (other.r.toFloat() * clampedT)).toInt().toUByte(),
+                ((c.g.toFloat() * (1 - clampedT)) + (other.g.toFloat() * clampedT)).toInt().toUByte(),
+                ((c.b.toFloat() * (1 - clampedT)) + (other.b.toFloat() * clampedT)).toInt().toUByte(),
+                ((c.a.toFloat() * (1 - clampedT)) + (other.a.toFloat() * clampedT)).toInt().toUByte()
+            )
+        }
+
+        fun toGrayscale(c: Color): Color {
+            val gray = ((c.r.toInt() * 0.299) + (c.g.toInt() * 0.587) + (c.b.toInt() * 0.114)).toInt().toUByte()
+            return Color(gray, gray, gray, c.a)
+        }
+
 
         // Color helpers, thanks ChatGPT :)
 
