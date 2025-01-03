@@ -29,6 +29,7 @@ import sdl3.SDL_GetNumJoystickAxes
 import sdl3.SDL_GetNumJoystickButtons
 import sdl3.SDL_GetNumJoystickHats
 import sdl3.SDL_OpenJoystick
+import kotlin.math.abs
 
 /**
  * Handles controller input events and maintains state for all connected controllers.
@@ -36,7 +37,7 @@ import sdl3.SDL_OpenJoystick
  * the first active controller.
  */
 class ControllerInputEventSubscriber(
-    val deadzone: Float = 0.05f
+    val deadzone: Float = 0.5f
 ) : Logging {
     private val controllerStates = mutableMapOf<UInt, ControllerState>()
     private val controllerMappings = mutableMapOf<UInt, ControllerMapping>()
@@ -98,9 +99,9 @@ class ControllerInputEventSubscriber(
         val value = event.jaxis.value.toFloat() / 32767.0f
 
         // Apply deadzone threshold
-        val adjustedValue = if (kotlin.math.abs(value) < deadzone) 0f else value
+        val adjustedValue = if (abs(value) < deadzone) 0f else value
 
-        if (logger.isDebugEnabled() && adjustedValue != 0f) {
+        if (logger.isDebugEnabled()) {
             logger.debug { "Axis Motion - JoystickID: $joystickID, Axis: $axis, Value: $adjustedValue" }
         }
 

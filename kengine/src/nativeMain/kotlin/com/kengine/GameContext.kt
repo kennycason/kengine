@@ -8,6 +8,7 @@ import com.kengine.graphics.SpriteContext
 import com.kengine.graphics.TextureContext
 import com.kengine.hooks.context.Context
 import com.kengine.hooks.context.ContextRegistry
+import com.kengine.hooks.effect.EffectContext
 import com.kengine.input.controller.ControllerContext
 import com.kengine.input.controller.getControllerContext
 import com.kengine.input.keyboard.KeyboardContext
@@ -42,6 +43,7 @@ class GameContext private constructor(
     val sound: SoundContext,
     val network: NetworkContext,
     val action: ActionContext,
+    val effect: EffectContext,
     val physics: PhysicsContext,
     val clock: ClockContext,
 ) : Context(), Logging {
@@ -85,6 +87,7 @@ class GameContext private constructor(
                 network = NetworkContext.get(),
                 geometry = GeometryContext.get(),
                 action = ActionContext.get(),
+                effect = EffectContext(),
                 physics = PhysicsContext.get(),
                 clock = ClockContext.get()
             )
@@ -98,9 +101,10 @@ class GameContext private constructor(
     }
 
     override fun cleanup() {
-        logger.info { "Cleaning up GameContext"}
+        logger.info { "Cleaning up GameContext" }
         log.cleanup()
         action.cleanup()
+        effect.cleanup()
         sdlEvent.cleanup()
         events.cleanup()
         keyboard.cleanup()
@@ -110,12 +114,13 @@ class GameContext private constructor(
         sprite.cleanup()
         geometry.cleanup()
         font.cleanup()
-         view.cleanup()
+        view.cleanup()
         sound.cleanup()
         network.cleanup()
         sdl.cleanup()
         clock.cleanup()
-//         physics.cleanup()
+        physics.cleanup()
+
         ContextRegistry.clearAll()
         currentContext = null
     }
@@ -137,6 +142,7 @@ class GameContext private constructor(
         ContextRegistry.register(sound)
         ContextRegistry.register(network)
         ContextRegistry.register(action)
+        ContextRegistry.register(effect)
         ContextRegistry.register(physics)
         ContextRegistry.register(clock)
         getKeyboardContext().init()

@@ -5,6 +5,11 @@ class EffectManager {
 
     fun addEffect(effect: Effect) {
         activeEffects.add(effect)
+        effect.execute() // Execute immediately on add
+    }
+
+    fun update() {
+        activeEffects.forEach { it.checkDependencies() } // Check dependency updates
     }
 
     fun cleanup() {

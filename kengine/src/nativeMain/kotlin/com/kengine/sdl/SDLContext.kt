@@ -1,5 +1,6 @@
 package com.kengine.sdl
 
+import com.kengine.graphics.Color
 import com.kengine.graphics.alphaFromRGBA
 import com.kengine.graphics.blueFromRGBA
 import com.kengine.graphics.greenFromRGBA
@@ -69,8 +70,18 @@ class SDLContext private constructor(
         }
     }
 
+    fun fillScreen(color: Color) {
+        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a)
+        SDL_RenderClear(renderer)
+    }
+
     fun fillScreen(r: UInt, g: UInt, b: UInt, a: UInt = 0xFFu) {
         SDL_SetRenderDrawColor(renderer, r.toUByte(), g.toUByte(), b.toUByte(), a.toUByte())
+        SDL_RenderClear(renderer)
+    }
+
+    fun fillScreen(r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu) {
+        SDL_SetRenderDrawColor(renderer, r, g, b, a)
         SDL_RenderClear(renderer)
     }
 

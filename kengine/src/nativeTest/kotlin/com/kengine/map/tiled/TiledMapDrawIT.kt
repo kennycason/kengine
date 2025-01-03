@@ -3,6 +3,7 @@ package com.kengine.map.tiled
 import com.kengine.Game
 import com.kengine.GameRunner
 import com.kengine.createGameContext
+import com.kengine.graphics.Color
 import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.log.Logger
 import com.kengine.sdl.useSDLContext
@@ -65,7 +66,7 @@ class TiledMapDrawIT {
                             }
                         }
                         useSDLContext {
-                            fillScreen(0u, 0u, 0u)
+                            fillScreen(Color.black)
                             val startTimeNs = getCurrentNanoseconds()
 //                            tiledMap.draw("bg")
                             tiledMap.draw()

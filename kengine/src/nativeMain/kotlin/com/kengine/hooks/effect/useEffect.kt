@@ -5,5 +5,7 @@ import com.kengine.hooks.state.State
 
 fun useEffect(effect: () -> Unit, vararg dependencies: State<*>) {
     val effectContext = getContext<EffectContext>()
-    effectContext.useEffect(effect, *dependencies)
+    val newEffect = Effect(effect, dependencies.toList())
+    effectContext.useEffect(newEffect)
+    newEffect.execute()
 }

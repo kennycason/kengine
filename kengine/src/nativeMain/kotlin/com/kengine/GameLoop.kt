@@ -39,6 +39,8 @@ class GameLoop(
             while (isRunning) {
                 // Poll events
                 eventContext.pollEvents()
+                action.update()
+
 
                 // Calculate delta time
                 val currentCounter = SDL_GetPerformanceCounter()

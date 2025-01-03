@@ -8,7 +8,7 @@ object Effects {
         p.color = p.color.copy(a = (fade * 255).toInt().toUByte())
     }
     val smoke = { p: Particle ->
-        p.size += 1.0
+        p.size += 0.1
         p.color = p.color.copy(a = ((1.0 - p.age / p.lifetime) * 255).toInt().toUByte())
     }
     val rainbow = { p: Particle ->

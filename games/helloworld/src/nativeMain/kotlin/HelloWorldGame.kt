@@ -63,6 +63,9 @@ class HelloWorldGame : Game {
         }
     }
 
+//    private val oscillator = Oscillator(fr)
+//    private val keyboard = Keyboard(oscillator)
+
     private val rainbowLinesEffect = RainbowLinesEffect(
         x = 100,
         y = 100,
@@ -88,9 +91,15 @@ class HelloWorldGame : Game {
                 )
             )
         }
+
+//        keyboard.playNote("A")  // Set oscillator frequency to A (440 Hz)
+//        println(oscillator.nextSample()) // Generate sample
+//        keyboard.playNote("C")  // Change to C (523.25 Hz)
+//        println(oscillator.nextSample()) // Generate sample
     }
 
     override fun update() {
+
         pidgies.forEach {
             it.update()
         }
@@ -112,7 +121,7 @@ class HelloWorldGame : Game {
     override fun draw() {
         useSDLContext {
             // clear screen
-            fillScreen(0x00u, 0x00u, 0x00u)
+            fillScreen(Color.black)
 
            getViewContext().render()
 

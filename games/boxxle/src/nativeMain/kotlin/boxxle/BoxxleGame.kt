@@ -9,6 +9,7 @@ import com.kengine.font.Font
 import com.kengine.font.getFontContext
 import com.kengine.font.useFontContext
 import com.kengine.getGameContext
+import com.kengine.graphics.Color
 import com.kengine.hooks.context.getContext
 import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.useControllerContext
@@ -59,7 +60,7 @@ class BoxxleGame : Game, Logging {
 
     override fun draw() {
         useSDLContext {
-            fillScreen(255u, 255u, 255u)
+            fillScreen(Color.white)
 
             useBoxxleContext {
                 level.draw()

@@ -3,6 +3,7 @@ package com.kengine.particle
 import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Color
 import com.kengine.math.Vec2
+import kotlin.math.abs
 
 class RainbowLinesEffect(
     private val x: Int,
@@ -13,7 +14,7 @@ class RainbowLinesEffect(
 ) {
     private val colors = Color.rainbow(numLines) // generate rainbow colors
     private val startPoints = mutableListOf<Vec2>()
-    private var offset = 0 // Tracks position for rotation
+    var offset = 0 // Tracks position for rotation
 
     init {
         // generate initial points
@@ -25,8 +26,12 @@ class RainbowLinesEffect(
     }
 
     fun update() {
-        // rotate the points clockwise
+        // Rotate the points clockwise
         offset = (offset + 1) % numLines
+    }
+
+    fun setOffset(newOffset: Int) {
+        offset = abs(newOffset) % numLines // Ensure offset wraps correctly
     }
 
     fun draw() {

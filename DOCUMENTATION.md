@@ -30,7 +30,7 @@ class BouncingBallGame : Game {
 
     override fun draw() {
         useSDLContext {
-            fillScreen(0u, 0u, 0u)
+            fillScreen(0u, 0u, 0u) // or fillScreen(Color.black)
             ball.draw()
             flipScreen()
         }

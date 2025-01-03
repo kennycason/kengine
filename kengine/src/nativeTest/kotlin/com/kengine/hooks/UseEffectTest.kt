@@ -5,7 +5,7 @@ import com.kengine.hooks.state.State
 import com.kengine.test.expectThat
 import kotlin.test.Test
 
-class EffectTest {
+class UseEffectTest {
     @Test
     fun `effect cleanup unsubscribes callbacks`() {
         val count = State(0)
@@ -18,15 +18,14 @@ class EffectTest {
 
         expectThat(effectCalls).isEqualTo(0)
 
-        effect.execute()
+        effect.execute() // Should run initially
         expectThat(effectCalls).isEqualTo(1)
 
-        count.set(2)
-        expectThat(effectCalls).isEqualTo(2) // triggered state change
+        count.set(1) // Trigger dependency change
+        expectThat(effectCalls).isEqualTo(2)
 
-        effect.cleanup() // unsubscribe all callbacks
-
-        count.set(2)
-        expectThat(effectCalls).isEqualTo(2) // no effect triggered after cleanup
+        effect.cleanup() // Remove callbacks
+        count.set(2) // Should not trigger again
+        expectThat(effectCalls).isEqualTo(2)
     }
 }
