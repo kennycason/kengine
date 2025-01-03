@@ -4,11 +4,14 @@ plugins {
 
 repositories {
     gradlePluginPortal()
+    google()
     mavenCentral()
 }
 
 dependencies {
     implementation(gradleApi())
+    compileOnly("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0")
+    compileOnly("org.jetbrains.kotlin:kotlin-gradle-plugin-api:2.1.0")
 }
 
 gradlePlugin {

@@ -68,7 +68,7 @@ class KengineNativePlugin : Plugin<Project> {
 //                compilerOptions {
 //                    freeCompilerArgs.addAll(
 //                        listOf(
-//                            "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
+//                            "-opt-in=kotlinx.c interop.ExperimentalForeignApi",
 //                            "-opt-in=kotlin.ExperimentalStdlibApi",
 //                            "-g",
 //                            "-ea"

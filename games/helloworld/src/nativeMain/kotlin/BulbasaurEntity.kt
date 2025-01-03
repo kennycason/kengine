@@ -68,8 +68,8 @@ class BulbasaurEntity : SpriteEntity(
         }
         useMouseContext {
             if (mouse.isLeftPressed() || mouse.isRightPressed()) {
-                p.x = mouse.getCursor().x - width / 2
-                p.y = mouse.getCursor().y - height / 2
+                p.x = mouse.cursor().x - width / 2
+                p.y = mouse.cursor().y - height / 2
             }
         }
         p.x += v.x

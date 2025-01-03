@@ -2,13 +2,14 @@
 import com.kengine.Game
 import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Color
-import com.kengine.graphics.Sprite
+import com.kengine.input.mouse.useMouseContext
 import com.kengine.map.tiled.TiledMapLoader
 import com.kengine.math.Vec2
 import com.kengine.particle.Effects
 import com.kengine.particle.Particle
 import com.kengine.sdl.getSDLContext
 import com.kengine.sdl.useSDLContext
+import com.kengine.ui.FlexDirection
 import com.kengine.ui.getViewContext
 import com.kengine.ui.useView
 import kotlin.random.Random
@@ -21,35 +22,44 @@ class HelloWorldGame : Game {
         .also { it.p.set(480.0, 0.0) }
     val particles = mutableListOf<Particle>()
 
-    val profile = useView(
-        id = "profileBar",
-        x = 0.0,
-        y = getSDLContext().screenHeight - 50.0,
-        w = 300.0,
-        h = 50.0,
+    // 10x2 rainbow grid
+    val clickableRainbowGrid = useView(
+        id = "rainbow",
+        x = 10.0,
+        y = getSDLContext().screenHeight - 80.0,
+        w = 32.0 * 20 + 10,
+        h = 64.0 + 10,
         padding = 5.0,
-        spacing = 5.0,
-        bgColor = Color.red
+        bgColor = Color.gray10
     ) {
-        view(
-            id = "leftBox",
-            w = 40.0,
-            h = 40.0,
-            bgColor = Color.orange
-        )
-        view(
-            id = "middleBox",
-            w = 200.0,
-            h = 40.0,
-            bgColor = Color.yellow
-        )
-        view(
-            id = "rightBox",
-            w = 40.0,
-            h = 40.0,
-            bgColor = Color.green,
-            bgImage = Sprite.fromFilePath("assets/sprites/pokeball.bmp")
-        )
+        val rainbow = Color.rainbow(40)
+        for (x in (0 until 20)) {
+            view(
+                id = "x$x",
+                w = 32.0,
+                h = 64.0,
+                direction = FlexDirection.COLUMN,
+                onClick = { logger.info("x$x clicked") },
+                onHover = { logger.info("Hovering over [x$x]") }
+            ) {
+                view(
+                    id = "x$x.y0",
+                    w = 32.0,
+                    h = 32.0,
+                    bgColor = rainbow[x * 2],
+                    onClick = { logger.info("x$x clicked") },
+                    onHover = { logger.info("Hovering over [x$x.y0]") }
+                )
+                view(
+                    id = "x$x.y1",
+                    w = 32.0,
+                    h = 32.0,
+                    bgColor = rainbow[x * 2 + 1],
+                    onClick = { logger.info("x$x clicked") },
+                    onHover = { logger.info("Hovering over [x$x.y1]") }
+                )
+            }
+        }
     }
 
     init {
@@ -81,6 +91,12 @@ class HelloWorldGame : Game {
         particles.forEach { it.update() }
         particles.removeAll { it.age > it.lifetime }
 
+        useMouseContext {
+            if (mouse.isLeftPressed()) {
+                getViewContext().click(mouse.cursor())
+            }
+            getViewContext().hover(mouse.cursor())
+        }
     }
 
     override fun draw() {
@@ -142,7 +158,7 @@ class HelloWorldGame : Game {
         particles.forEach { cleanup() }
         particles.clear()
         scytherEntity.cleanup()
-        profile.cleanup()
+        clickableRainbowGrid.cleanup()
     }
 
 }

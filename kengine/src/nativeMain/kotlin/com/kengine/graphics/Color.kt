@@ -20,7 +20,7 @@ data class Color(
         )
     }
 
-    inline fun adjustBrightness(factor: Float): Color {
+    fun adjustBrightness(factor: Float): Color {
         return Color(
             ((r.toFloat() * factor).coerceIn(0f, 255f)).toInt().toUByte(),
             ((g.toFloat() * factor).coerceIn(0f, 255f)).toInt().toUByte(),
@@ -29,7 +29,7 @@ data class Color(
         )
     }
 
-    inline fun blend(other: Color, t: Float): Color {
+    fun blend(other: Color, t: Float): Color {
         val clampedT = t.coerceIn(0f, 1f)
         // notes on casting: Converting UByte to Float is a direct operation without intermediate steps like UByte → Int → Float.
         return Color(
@@ -162,7 +162,6 @@ data class Color(
         val neonBlue = Color(0x1Fu, 0x51u, 0xFFu, 0xFFu)     // #1F51FF
         val electricLime = Color(0xCCu, 0xFFu, 0x00u, 0xFFu) // #CCFF00
         val hotPink = Color(0xFFu, 0x69u, 0xB4u, 0xFFu)     // #FF69B4
-
         val neonYellow = Color(0xFFu, 0xFFu, 0x00u, 0xFFu)      // #FFFF00
         val neonOrange = Color(0xFFu, 0xA5u, 0x00u, 0xFFu)      // #FFA500
         val neonCyan = Color(0x00u, 0xFFu, 0xFFu, 0xFFu)        // #00FFFF

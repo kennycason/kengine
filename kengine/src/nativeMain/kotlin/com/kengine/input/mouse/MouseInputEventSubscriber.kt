@@ -58,7 +58,7 @@ class MouseInputEventSubscriber {
     /**
      * Get mouse cursor (x,y) position
      */
-    fun getCursor(): Vec2 = mouseCursor
+    fun cursor(): Vec2 = mouseCursor
 
     /**
      * Check if a specific mouse button is currently pressed.
