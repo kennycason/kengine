@@ -28,11 +28,12 @@ object Playstation4 : ControllerMapping {
     const val L3 = 7
     const val R3 = 8
 
+    const val L2 = 4 // axis
+    const val R2 = 5
+
     // Shoulder buttons
     const val L1 = 9
     const val R1 = 10
-    const val L2 = 11
-    const val R2 = 12
 
     // D-Pad (using same logical IDs as before)
     const val DPAD_UP = 100
@@ -45,8 +46,8 @@ object Playstation4 : ControllerMapping {
     const val L_STICK_VERTICAL_AXIS = 1
     const val R_STICK_HORIZONTAL_AXIS = 2
     const val R_STICK_VERTICAL_AXIS = 3
-    const val L2_AXIS = 4
-    const val R2_AXIS = 5
+    private const val L2_AXIS = L2
+    private const val R2_AXIS = R2
 
     override val buttonMappings = mapOf(
         // Face buttons
@@ -66,6 +67,9 @@ object Playstation4 : ControllerMapping {
         // Shoulder buttons
         L1 to ButtonType.REGULAR,
         R1 to ButtonType.REGULAR,
+
+        L2 to ButtonType.REGULAR,
+        R2 to ButtonType.REGULAR,
 
         // D-Pad
         DPAD_UP to ButtonType.HAT_UP,
@@ -102,9 +106,8 @@ object Playstation4 : ControllerMapping {
         Buttons.DPAD_RIGHT to DPAD_RIGHT
     )
 
-
     // Optional: Add axis mappings if you want to normalize/configure axis handling
-    val axisMappings = mapOf(
+    override val axisMappings = mapOf(
         L_STICK_HORIZONTAL_AXIS to AxisType.STICK_X,
         L_STICK_VERTICAL_AXIS to AxisType.STICK_Y,
         R_STICK_HORIZONTAL_AXIS to AxisType.STICK_X,

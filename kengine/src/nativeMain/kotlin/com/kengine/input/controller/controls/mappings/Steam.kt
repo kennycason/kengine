@@ -1,6 +1,7 @@
 package com.kengine.input.controller.controls.mappings
 
 import com.kengine.input.controller.controls.AdvancedControllerMapping
+import com.kengine.input.controller.controls.AxisType
 import com.kengine.input.controller.controls.ButtonType
 import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.controls.TouchpadType
@@ -117,5 +118,14 @@ object Steam : AdvancedControllerMapping {
         AdvancedControllerMapping.Side.LEFT,
         AdvancedControllerMapping.Side.RIGHT,
         AdvancedControllerMapping.Side.BOTH
+    )
+
+    override val axisMappings = mapOf(
+        L_STICK_HORIZONTAL_AXIS to AxisType.STICK_X,
+        L_STICK_VERTICAL_AXIS to AxisType.STICK_Y,
+        R_STICK_HORIZONTAL_AXIS to AxisType.STICK_X,
+        R_STICK_VERTICAL_AXIS to AxisType.STICK_Y,
+        LB to AxisType.TRIGGER,
+        RB to AxisType.TRIGGER
     )
 }

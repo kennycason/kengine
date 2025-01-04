@@ -1,5 +1,6 @@
 package com.kengine.input.controller.controls.mappings
 
+import com.kengine.input.controller.controls.AxisType
 import com.kengine.input.controller.controls.ButtonType
 import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.controls.ControllerMapping
@@ -91,5 +92,14 @@ object XboxOne : ControllerMapping {
         Buttons.DPAD_DOWN to DPAD_DOWN,
         Buttons.DPAD_LEFT to DPAD_LEFT,
         Buttons.DPAD_RIGHT to DPAD_RIGHT
+    )
+
+    override val axisMappings = mapOf(
+        L_STICK_HORIZONTAL_AXIS to AxisType.STICK_X,
+        L_STICK_VERTICAL_AXIS to AxisType.STICK_Y,
+        R_STICK_HORIZONTAL_AXIS to AxisType.STICK_X,
+        R_STICK_VERTICAL_AXIS to AxisType.STICK_Y,
+        LT to AxisType.TRIGGER,
+        RT to AxisType.TRIGGER
     )
 }

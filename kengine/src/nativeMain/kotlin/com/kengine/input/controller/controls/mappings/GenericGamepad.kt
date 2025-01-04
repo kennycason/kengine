@@ -1,5 +1,6 @@
 package com.kengine.input.controller.controls.mappings
 
+import com.kengine.input.controller.controls.AxisType
 import com.kengine.input.controller.controls.ButtonType
 import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.controls.ControllerMapping
@@ -70,4 +71,6 @@ object GenericGamepad : ControllerMapping, Logging {
         Buttons.DPAD_LEFT to DPAD_LEFT,
         Buttons.DPAD_RIGHT to DPAD_RIGHT
     )
+
+    override val axisMappings: Map<Int, AxisType> = linkedMapOf()
 }

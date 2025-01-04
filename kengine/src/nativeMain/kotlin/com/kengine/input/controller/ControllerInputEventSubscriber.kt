@@ -101,7 +101,7 @@ class ControllerInputEventSubscriber(
         // Apply deadzone threshold
         val adjustedValue = if (abs(value) < deadzone) 0f else value
 
-        if (logger.isDebugEnabled()) {
+        if (logger.isDebugEnabled() && adjustedValue != 0f) {
             logger.debug { "Axis Motion - JoystickID: $joystickID, Axis: $axis, Value: $adjustedValue" }
         }
 

@@ -1,5 +1,6 @@
 package com.kengine.input.controller.controls.mappings
 
+import com.kengine.input.controller.controls.AxisType
 import com.kengine.input.controller.controls.ControllerMapping
 
 object XboxSeriesX : ControllerMapping {
@@ -42,4 +43,13 @@ object XboxSeriesX : ControllerMapping {
 
     override val buttonMappings = XboxOne.buttonMappings
     override val gamepadMappings = XboxOne.gamepadMappings
+
+    override val axisMappings = mapOf(
+        XboxOne.L_STICK_HORIZONTAL_AXIS to AxisType.STICK_X,
+        XboxOne.L_STICK_VERTICAL_AXIS to AxisType.STICK_Y,
+        XboxOne.R_STICK_HORIZONTAL_AXIS to AxisType.STICK_X,
+        XboxOne.R_STICK_VERTICAL_AXIS to AxisType.STICK_Y,
+        XboxOne.LT to AxisType.TRIGGER,
+        XboxOne.RT to AxisType.TRIGGER
+    )
 }

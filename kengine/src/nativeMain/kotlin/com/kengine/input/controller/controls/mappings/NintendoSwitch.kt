@@ -91,7 +91,7 @@ object NintendoSwitch : ControllerMapping {
         Buttons.DPAD_RIGHT to DPAD_RIGHT
     )
 
-    val axisMappings = mapOf(
+    override val axisMappings = mapOf(
         L_STICK_HORIZONTAL_AXIS to AxisType.STICK_X,
         L_STICK_VERTICAL_AXIS to AxisType.STICK_Y,
         R_STICK_HORIZONTAL_AXIS to AxisType.STICK_X,
