@@ -4,24 +4,43 @@ import com.kengine.math.Math
 
 class Oscillator(
     private var frequency: Double,
-    private val sampleRate: Int
+    private val sampleRate: Int,
+    private var waveform: Waveform = Waveform.SINE, // Default waveform
+    private var detune: Double = 0.0 // Detuning in Hz
 ) {
+    enum class Waveform { SINE, SQUARE, SAW, TRIANGLE } // Add waveforms
+
     private var phase = 0.0
     private var phaseIncrement = calculatePhaseIncrement()
 
-    // calculate phase increment based on frequency
     private fun calculatePhaseIncrement(): Double {
-        return 2.0 * Math.PI * frequency / sampleRate
+        val adjustedFrequency = frequency + detune // Apply detuning
+        return 2.0 * Math.PI * adjustedFrequency / sampleRate
     }
 
     fun setFrequency(newFrequency: Double) {
         frequency = newFrequency
-        phaseIncrement = calculatePhaseIncrement() // recalculate immediately
+        phaseIncrement = calculatePhaseIncrement()
+    }
+
+    fun setWaveform(newWaveform: Waveform) {
+        waveform = newWaveform
+    }
+
+    fun setDetune(newDetune: Double) {
+        detune = newDetune
+        phaseIncrement = calculatePhaseIncrement()
     }
 
     fun nextSample(): Float {
-        val sample = kotlin.math.sin(phase).toFloat()
-        phase = (phase + phaseIncrement) % (2.0 * Math.PI) // ensure phase wraps around
-        return sample
+        val sample = when (waveform) {
+            Waveform.SINE -> kotlin.math.sin(phase)
+            Waveform.SQUARE -> if (kotlin.math.sin(phase) >= 0) 1.0 else -1.0
+            Waveform.SAW -> 2.0 * (phase / (2.0 * Math.PI)) - 1.0
+            Waveform.TRIANGLE -> 2.0 * kotlin.math.abs(2.0 * (phase / (2.0 * Math.PI)) - 1.0) - 1.0
+        }
+
+        phase = (phase + phaseIncrement) % (2.0 * Math.PI) // Wrap phase
+        return sample.toFloat()
     }
 }

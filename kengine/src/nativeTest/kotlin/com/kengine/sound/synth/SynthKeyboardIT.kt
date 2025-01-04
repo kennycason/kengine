@@ -30,7 +30,10 @@ class SynthKeyboardIT : Logging {
         ) {
 
             val frequency = useState(440.0)
-            val audioStream = AudioStream(frequency = frequency.get())
+            val osc3x = Osc3x()
+            osc3x.setConfig(0, waveform = Oscillator.Waveform.SAW)
+            osc3x.setConfig(1, waveform = Oscillator.Waveform.SQUARE)
+            osc3x.setConfig(2, waveform = Oscillator.Waveform.SINE)
 
             val rainbowEffect = RainbowLinesEffect(
                 x = 0, y = 0,
@@ -44,7 +47,6 @@ class SynthKeyboardIT : Logging {
 
             useEffect({
                 logger.info("frequency update effect: ${frequency.get()}")
-                audioStream.setFrequency(frequency.get())
                 // nap frequency to color offset in the rainbow
                 val offset = ((frequency.get() - 100) / 10).toInt() % 256
                 rainbowEffect.setOffset(offset)
@@ -52,7 +54,6 @@ class SynthKeyboardIT : Logging {
 
             useEffect({
                 logger.info("frequency update effect: ${frequency.get()}")
-                audioStream.setFrequency(frequency.get())
                 wavePatternEffect.setFrequency(frequency.get()) // Update wave pattern
             }, frequency)
 
@@ -62,24 +63,73 @@ class SynthKeyboardIT : Logging {
 
                     override fun update() {
                         useControllerContext {
-                            if (controller.isButtonPressed(Buttons.L1)) {
-                                frequency.set(frequency.get() - 5.0)
+                            val osc1Selected = controller.isButtonPressed(Buttons.L1)
+                            val osc2Selected = controller.isButtonPressed(Buttons.L2)
+                            val osc3Selected = controller.isButtonPressed(Buttons.R1)
+                            val oscAllSelected = controller.isButtonPressed(Buttons.R2)
+
+                            // Adjust detune or frequency for the selected oscillator(s)
+                            val detuneChange = when {
+                                controller.isButtonPressed(Buttons.DPAD_UP) -> 1.0
+                                controller.isButtonPressed(Buttons.DPAD_DOWN) -> -1.0
+                                else -> 0.0
                             }
-                            if (controller.isButtonPressed(Buttons.R1)) {
-                                frequency.set(frequency.get() + 5.0)
+
+                            val frequencyChange = when {
+                                controller.isButtonPressed(Buttons.DPAD_LEFT) -> -10.0
+                                controller.isButtonPressed(Buttons.DPAD_RIGHT) -> 10.0
+                                else -> 0.0
                             }
-                            if (controller.isButtonPressed(Buttons.A)) {
-                                audioStream.pause()
+
+                            val newWaveform = when {
+                                controller.isButtonPressed(Buttons.X) -> Oscillator.Waveform.SINE
+                                controller.isButtonPressed(Buttons.Y) -> Oscillator.Waveform.SAW
+                                controller.isButtonPressed(Buttons.B) -> Oscillator.Waveform.SQUARE
+                                controller.isButtonPressed(Buttons.A) -> Oscillator.Waveform.TRIANGLE
+                                else -> null // No change if no waveform button is pressed
                             }
-                            if (controller.isButtonPressed(Buttons.B)) {
-                                audioStream.resume()
+
+                            val volumeChange = when {
+                                controller.isButtonPressed(Buttons.L3) -> -0.05 // Decrease volume
+                                controller.isButtonPressed(Buttons.R3) -> 0.05  // Increase volume
+                                else -> 0.0
+                            }
+
+                            // apply changes for the selected oscillator(s)
+                            fun applyUpdates(index: Int) {
+                                if (detuneChange != 0.0 || frequencyChange != 0.0) {
+                                    val config = osc3x.getConfig(index)
+                                    osc3x.setConfig(index,
+                                        detune = config.detune + detuneChange,
+                                        frequency = config.frequency + frequencyChange
+                                    )
+                                }
+                                newWaveform?.let { osc3x.setConfig(index, waveform = it) } // update waveform
+
+                                if (volumeChange != 0.0) {
+                                    val currentConfig = osc3x.getConfig(index)
+                                    val newVolume = (currentConfig.volume + volumeChange).coerceIn(0.0, 1.0)
+                                    osc3x.setConfig(index, volume = newVolume)
+                                }
+                            }
+
+                            if (osc1Selected) {
+                                applyUpdates(0)
+                            } else if (osc2Selected) {
+                                applyUpdates(1)
+                            } else if (osc3Selected) {
+                                applyUpdates(2)
+                            } else if (oscAllSelected) {
+                                applyUpdates(0) // apply to all oscillators
+                                applyUpdates(1)
+                                applyUpdates(2)
                             }
                         }
 
-                        audioStream.update()
-                        rainbowEffect.update()
+                        osc3x.update()
+                      //  rainbowEffect.update()
                         wavePatternEffect.update()
-                        SDL_Delay(1u) // Small delay to prevent CPU overuse
+                        SDL_Delay(1u) // small delay to prevent CPU overuse
                     }
 
                     override fun draw() {
@@ -94,6 +144,7 @@ class SynthKeyboardIT : Logging {
                     override fun cleanup() {
                         // audioStream.cleanup()
                     }
+
                 }
             }
         }

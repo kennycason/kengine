@@ -193,3 +193,12 @@ val Int.abs: Int
 
 val Long.abs: Long
     get() = if (this < 0L) -this else this
+
+
+inline fun <T> Iterable<T>.sumOf(selector: (T) -> Float): Float {
+    var sum: Float = 0.toFloat()
+    for (element in this) {
+        sum += selector(element)
+    }
+    return sum
+}
