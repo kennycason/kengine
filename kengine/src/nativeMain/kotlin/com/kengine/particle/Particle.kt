@@ -37,8 +37,8 @@ class Particle(
         if (age < lifetime) {
             useGeometryContext {
                 fillRectangle(
-                    position.x.toInt(), position.y.toInt(),
-                    size.toInt(), size.toInt(),
+                    position.x, position.y,
+                    size, size,
                  //   rotation,
                     color.r, color.g, color.b, color.a
                 )

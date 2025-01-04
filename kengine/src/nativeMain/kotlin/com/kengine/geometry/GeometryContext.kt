@@ -25,7 +25,7 @@ import sdl3.image.SDL_RenderPoint
 class GeometryContext private constructor() : Context(), Logging {
 
     fun drawCircle(
-        centerX: Int, centerY: Int,
+        centerX: Double, centerY: Double,
         radius: Int,
         rgba: UInt
     ) = drawCircle(
@@ -37,7 +37,7 @@ class GeometryContext private constructor() : Context(), Logging {
     )
 
     fun drawCircle(
-        centerX: Int, centerY: Int,
+        centerX: Double, centerY: Double,
         radius: Int,
         color: Color
     ) = drawCircle(
@@ -49,7 +49,7 @@ class GeometryContext private constructor() : Context(), Logging {
     )
 
     fun drawCircle(
-        centerX: Int, centerY: Int,
+        centerX: Double, centerY: Double,
         radius: Int,
         r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
@@ -61,13 +61,13 @@ class GeometryContext private constructor() : Context(), Logging {
     }
 
     private fun drawCirclePoints(
-        centerX: Int, centerY: Int, radius: Int,
+        centerX: Double, centerY: Double, radius: Int,
         r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
         // mid-point circle algorithm
-        var x = radius
-        var y = 0
-        var p = 1 - radius
+        var x = radius.toDouble()
+        var y = 0.0
+        var p = 1.0 - radius
 
         while (x >= y) {
             drawSymmetricCirclePoints(centerX, centerY, x, y, r, g, b, a)
@@ -82,7 +82,7 @@ class GeometryContext private constructor() : Context(), Logging {
     }
 
     private fun drawSymmetricCirclePoints(
-        centerX: Int, centerY: Int, x: Int, y: Int,
+        centerX: Double, centerY: Double, x: Double, y: Double,
         r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
         val points = listOf(
@@ -97,7 +97,7 @@ class GeometryContext private constructor() : Context(), Logging {
     }
 
     fun fillCircle(
-        centerX: Int, centerY: Int,
+        centerX: Double, centerY: Double,
         radius: Int,
         color: Color
     ) = fillCircle(
@@ -109,7 +109,7 @@ class GeometryContext private constructor() : Context(), Logging {
     )
 
     fun fillCircle(
-        centerX: Int, centerY: Int,
+        centerX: Double, centerY: Double,
         radius: Int,
         rgba: UInt
     ) = fillCircle(
@@ -121,7 +121,7 @@ class GeometryContext private constructor() : Context(), Logging {
     )
 
     fun fillCircle(
-        centerX: Int, centerY: Int,
+        centerX: Double, centerY: Double,
         radius: Int,
         r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
@@ -135,8 +135,8 @@ class GeometryContext private constructor() : Context(), Logging {
     }
 
     fun drawRectangle(
-        x: Int, y: Int,
-        width: Int, height: Int,
+        x: Double, y: Double,
+        width: Double, height: Double,
         color: Color
     ) = drawRectangle(
         x, y, width, height,
@@ -147,8 +147,8 @@ class GeometryContext private constructor() : Context(), Logging {
     )
 
     fun drawRectangle(
-        x: Int, y: Int,
-        width: Int, height: Int,
+        x: Double, y: Double,
+        width: Double, height: Double,
         rgba: UInt
     ) = drawRectangle(
         x, y, width, height,
@@ -159,8 +159,8 @@ class GeometryContext private constructor() : Context(), Logging {
     )
 
     fun drawRectangle(
-        x: Int, y: Int,
-        width: Int, height: Int,
+        x: Double, y: Double,
+        width: Double, height: Double,
         r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
         useSDLContext {
@@ -180,8 +180,8 @@ class GeometryContext private constructor() : Context(), Logging {
     }
 
     fun fillRectangle(
-        x: Int, y: Int,
-        width: Int, height: Int,
+        x: Double, y: Double,
+        width: Double, height: Double,
         color: Color
     ) = fillRectangle(
         x, y, width, height,
@@ -192,8 +192,8 @@ class GeometryContext private constructor() : Context(), Logging {
     )
 
     fun fillRectangle(
-        x: Int, y: Int,
-        width: Int, height: Int,
+        x: Double, y: Double,
+        width: Double, height: Double,
         rgba: UInt
     ) = fillRectangle(
         x, y, width, height,
@@ -204,8 +204,8 @@ class GeometryContext private constructor() : Context(), Logging {
     )
 
     fun fillRectangle(
-        x: Int, y: Int,
-        width: Int, height: Int,
+        x: Double, y: Double,
+        width: Double, height: Double,
         r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
         useSDLContext {
@@ -225,21 +225,16 @@ class GeometryContext private constructor() : Context(), Logging {
     }
 
     fun drawLine(
-        startX: Int, startY: Int,
-        endX: Int, endY: Int,
+        startX: Double, startY: Double,
+        endX: Double, endY: Double,
         color: Color
     ) {
-        useSDLContext {
-            SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a)
-            if (!SDL_RenderLine(renderer, startX.toFloat(), startY.toFloat(), endX.toFloat(), endY.toFloat())) {
-                logger.error("Error drawing line: ${SDL_GetError()?.toKString()}")
-            }
-        }
+        drawLine(startX, startY, endX, endY, color.r, color.g, color.b, color.a)
     }
 
     fun drawLine(
-        startX: Int, startY: Int,
-        endX: Int, endY: Int,
+        startX: Double, startY: Double,
+        endX: Double, endY: Double,
         r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
         useSDLContext {
@@ -254,16 +249,25 @@ class GeometryContext private constructor() : Context(), Logging {
         x: Int, y: Int,
         color: Color
     ) {
-        useSDLContext {
-            SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a)
-            if (!SDL_RenderPoint(renderer, x.toFloat(), y.toFloat())) {
-                logger.error("Error drawing pixel: ${SDL_GetError()?.toKString()}")
-            }
-        }
+        drawPixel(x.toDouble(), y.toDouble(), color)
+    }
+
+    fun drawPixel(
+        x: Double, y: Double,
+        color: Color
+    ) {
+        drawPixel(x, y, color.r, color.g, color.b, color.a)
     }
 
     fun drawPixel(
         x: Int, y: Int,
+        r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
+    ) {
+        drawPixel(x.toDouble(), y.toDouble(), r, g, b, a)
+    }
+
+    fun drawPixel(
+        x: Double, y: Double,
         r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu
     ) {
         useSDLContext {

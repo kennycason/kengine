@@ -39,7 +39,7 @@ class BasicGameIT {
                             fillScreen(0u, 0u, 0u)
 
                             useGeometryContext {
-                                fillRectangle(10, 10, 100, 100, 0x88u, 0x33u, 0xFFu)
+                                fillRectangle(10.0, 10.0, 100.0, 100.0, 0x88u, 0x33u, 0xFFu)
                             }
                             pokeball.draw()
 

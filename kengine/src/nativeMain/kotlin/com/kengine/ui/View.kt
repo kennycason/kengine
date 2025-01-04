@@ -4,6 +4,7 @@ import com.kengine.font.Font
 import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Color
 import com.kengine.graphics.Sprite
+import com.kengine.hooks.state.State
 import com.kengine.log.Logging
 import com.kengine.math.Vec2
 import com.kengine.time.getCurrentNanoseconds
@@ -96,7 +97,7 @@ open class View(
     private val children = mutableListOf<View>()
 
     // calculate dimensions based on parent constraints
-    private fun calculateDimensions() {
+    protected fun calculateDimensions() {
         if (children.isEmpty()) return
 
         // width calculation
@@ -111,14 +112,14 @@ open class View(
         val autoWidth = if (flexibleWidthChildren > 0) remainingWidth / flexibleWidthChildren else 0.0
 
         // height calculation
-        val parentHeight = h - padding * 2 // Parent's effective height
+        val parentHeight = h - padding * 2 // parent's effective height
         children.forEach { child ->
             if (child.w == 0.0) {
                 child.w = autoWidth
             }
-            if (child.h == 0.0) {
-                // Set height to parent height minus padding if undefined
-                child.h = parentHeight.coerceAtLeast(0.0)
+            children.forEach { child ->
+                if (child.w == 0.0) child.w = autoWidth
+                if (child.h == 0.0) child.h = parentHeight.coerceAtLeast(0.0)
             }
         }
     }
@@ -129,7 +130,7 @@ open class View(
         calculateDimensions() // recalculate sizes whenever a child is added
     }
 
-    fun draw(parentX: Double = 0.0, parentY: Double = 0.0) {
+    open fun draw(parentX: Double = 0.0, parentY: Double = 0.0) {
         if (!visible) return
 
         val absX = parentX + x
@@ -142,7 +143,7 @@ open class View(
         // draw this view
         if (bgColor != null) {
             useGeometryContext {
-                fillRectangle(absX.toInt(), absY.toInt(), w.toInt(), h.toInt(), bgColor)
+                fillRectangle(absX, absY, w, h, bgColor)
             }
         }
         bgImage?.draw(absX, absY)
@@ -164,7 +165,7 @@ open class View(
         click(p.x, p.y)
     }
 
-    fun click(x: Double, y: Double) {
+    open fun click(x: Double, y: Double) {
         if (!visible) return
 
         val absX = this.x
@@ -194,7 +195,7 @@ open class View(
         hover(p.x, p.y)
     }
 
-    fun hover(x: Double, y: Double) {
+    open fun hover(x: Double, y: Double) {
         if (!visible) return
 
         val absX = this.x
@@ -257,6 +258,39 @@ open class View(
             onHover = onHover,
             block = block
         )
+    }
+
+    fun slider(
+        id: String,
+        x: Double = 0.0,
+        y: Double = 0.0,
+        w: Double = 16.0,
+        h: Double = 100.0,
+        min: Double = 0.0,
+        max: Double = 100.0,
+        state: State<Double>,
+        padding: Double = 0.0,
+        bgColor: Color = Color.gray10,
+        handleColor: Color = Color.white,
+        onValueChanged: ((Double) -> Unit)? = null
+    ): Slider {
+        val slider = Slider(
+            id = id,
+            x = x,
+            y = y,
+            w = w,
+            h = h,
+            min = min,
+            max = max,
+            state = state,
+            padding = padding,
+            onValueChanged = onValueChanged,
+            bgColor = bgColor,
+            handleColor = handleColor,
+            parent = this // Attach to current parent View
+        )
+        addChild(slider) // Add slider as a child of the current view
+        return slider
     }
 
     fun cleanup() {

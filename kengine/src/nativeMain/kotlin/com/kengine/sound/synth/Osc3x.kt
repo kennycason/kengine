@@ -42,6 +42,8 @@ class Osc3x(
     }
 
     private var masterVolume = 1.0 // Global volume control
+        get
+
     private val buffer = FloatArray(bufferSize)
     private val stream: CPointer<cnames.structs.SDL_AudioStream>
 
@@ -101,7 +103,7 @@ class Osc3x(
 
     fun getConfig(oscillator: Int): OscillatorConfig = configs[oscillator]
 
-    // Update the audio stream
+    // update the audio stream
     fun update() {
         if (SDL_GetAudioStreamAvailable(stream) < bufferSize * Float.SIZE_BYTES) {
             for (i in buffer.indices) {
@@ -121,6 +123,10 @@ class Osc3x(
                 error("Failed to put audio data: ${SDL_GetError()}")
             }
         }
+    }
+
+    fun countEnabled(): Int {
+        return configs.filter { it.enabled }.size
     }
 
     // Pause, resume, clear, and cleanup methods

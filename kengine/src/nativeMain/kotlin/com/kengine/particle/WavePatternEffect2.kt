@@ -7,7 +7,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-class WavePatternEffect(
+class WavePatternEffect2(
     private val x: Int,
     private val y: Int,
     private val width: Int,
@@ -17,7 +17,7 @@ class WavePatternEffect(
     private val points = mutableListOf<Vec2>()
     private val colors = Color.rainbow(numWaves)
     private var time = 0.0
-    private var frequency = 440.0 // default frequency
+    private var frequency = 440.0 // Default frequency
 
     init {
         // generate initial points
@@ -27,6 +27,7 @@ class WavePatternEffect(
         }
     }
 
+    // update the frequency dynamically
     fun setFrequency(newFrequency: Double) {
         frequency = newFrequency
     }
@@ -37,12 +38,12 @@ class WavePatternEffect(
         for (i in points.indices) {
             val point = points[i]
 
-            // frequency-based amplitude and wave speed
-            val amplitude = (height * 0.4) * sin(frequency * 0.005) // Taller waves
-            val waveSpeed = (frequency * 0.002) // Faster movement for higher frequency
+            // wave-like distortion based on frequency and time
+            val amplitude = (height / 2.0 * sin(frequency * 0.01)) // oscillating amplitude
+            val waveSpeed = (frequency * 0.002) // faster movement for higher frequency
             val waveOffset = sin(i * waveSpeed + time) * amplitude
 
-            // apply distortion to each point
+            // distort Y-position with cosine waves and offsets
             point.y = height / 2.0 + waveOffset * cos(time + (PI * i / numWaves))
         }
     }
@@ -54,10 +55,9 @@ class WavePatternEffect(
                 val start = points[i - 1]
                 val end = points[i]
 
-                // draw wave line segment
                 drawLine(
-                    start.x, start.y,
-                    end.x, end.y,
+                    x + start.x, y + start.y,
+                    x + end.x, y + end.y,
                     color.r, color.g, color.b, 0xEEu
                 )
             }

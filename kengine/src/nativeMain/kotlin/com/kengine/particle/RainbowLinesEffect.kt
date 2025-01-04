@@ -43,8 +43,8 @@ class RainbowLinesEffect(
 
                 val color = colors[i]
                 drawLine(
-                    x + start.x.toInt(), y + start.y.toInt(),
-                    x + end.x.toInt(), y + end.y.toInt(),
+                    x + start.x, y + start.y,
+                    x + end.x, y + end.y,
                     color.r, color.g, color.b, 0xEEu
                 )
             }

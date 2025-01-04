@@ -127,16 +127,16 @@ class HelloWorldGame : Game {
 
             useGeometryContext {
                 // basic shapes
-                drawRectangle(16, 16, 16, 16, 0xFFu, 0xFFu, 0xFFu, 0xFFu)
-                fillRectangle(16 + 32, 16, 16, 16, 0xFFu, 0x00u, 0x00u, 0xFFu)
-                fillRectangle(480, 0, 320, 320, 0xFFu, 0xFFu, 0xFFu)
-                drawCircle(16 + 80, 24, 16, 0x00u, 0xFFu, 0x00u, 0xFFu)
-                fillCircle(16 + 128, 24, 16, 0x00u, 0x00u, 0xFFu, 0xFFu)
+                drawRectangle(16.0, 16.0, 16.0, 16.0, 0xFFu, 0xFFu, 0xFFu, 0xFFu)
+                fillRectangle(16 + 32.0, 16.0, 16.0, 16.0, 0xFFu, 0x00u, 0x00u, 0xFFu)
+                fillRectangle(480.0, 0.0, 320.0, 320.0, 0xFFu, 0xFFu, 0xFFu)
+                drawCircle(16 + 80.0, 24.0, 16, 0x00u, 0xFFu, 0x00u, 0xFFu)
+                fillCircle(16 + 12.08, 24.0, 16, 0x00u, 0x00u, 0xFFu, 0xFFu)
 
                 // draw overlapping, transparent red, blue, and green circles.
-                fillCircle(screenWidth / 2 - 32, screenWidth / 2 - 16, 64, 0xFFu, 0x00u, 0x00u, 0x77u)
-                fillCircle(screenWidth / 2 + 32, screenWidth / 2 - 16, 64, 0x00u, 0xFFu, 0x00u, 0x77u)
-                fillCircle(screenWidth / 2, screenWidth / 2 + 38, 64, 0x00u, 0x00u, 0xFFu, 0x77u)
+                fillCircle(screenWidth / 2.0 - 32, screenWidth / 2.0 - 16, 64, 0xFFu, 0x00u, 0x00u, 0x77u)
+                fillCircle(screenWidth / 2.0 + 32, screenWidth / 2.0 - 16, 64, 0x00u, 0xFFu, 0x00u, 0x77u)
+                fillCircle(screenWidth / 2.0, screenWidth / 2.0 + 38, 64, 0x00u, 0x00u, 0xFFu, 0x77u)
 
                 // draw patter with pixels
                 var r = 0u
@@ -151,8 +151,8 @@ class HelloWorldGame : Game {
                     }
                 }
 
-                drawLine(150, 50, 300, 50, 0xFFu, 0u, 0u, 0xFFu)
-                drawLine(160, 150, 310, 20, 0x57u, 0x23u, 0x5Eu, 0xFFu)
+                drawLine(150.0, 50.0, 300.0, 50.0, 0xFFu, 0u, 0u, 0xFFu)
+                drawLine(160.0, 150.0, 310.0, 20.0, 0x57u, 0x23u, 0x5Eu, 0xFFu)
             }
 
             tiledMap.draw()

@@ -145,8 +145,8 @@ class PhysicsDemoGame : Game, Logging {
                 is Shape.Circle -> {
                     val pos = obj.body.position
                     fillCircle(
-                        pos.x.toInt(),
-                        pos.y.toInt(),
+                        pos.x,
+                        pos.y,
                         shape.radius.toInt(),
                         color
                     )
@@ -155,10 +155,10 @@ class PhysicsDemoGame : Game, Logging {
                     val pos = obj.body.position
                     val rect = shape.rect
                     fillRectangle(
-                        pos.x.toInt() - (rect.w / 2).toInt(),
-                        pos.y.toInt() - (rect.h / 2).toInt(),
-                        rect.w.toInt(),
-                        rect.h.toInt(),
+                        pos.x - (rect.w / 2),
+                        pos.y - (rect.h / 2),
+                        rect.w,
+                        rect.h,
                         color
                     )
                 }
