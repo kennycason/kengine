@@ -340,6 +340,111 @@ open class View(
         return slider
     }
 
+    fun button(
+        id: String,
+        x: Double = 0.0,
+        y: Double = 0.0,
+        w: Double,  // Required
+        h: Double,  // Required
+        onClick: (() -> Unit)? = null,
+        onHover: (() -> Unit)? = null,
+        onRelease: (() -> Unit)? = null,
+        padding: Double = 0.0,
+        bgColor: Color? = null,
+        bgSprite: Sprite? = null,
+        hoverColor: Color? = null,
+        pressColor: Color? = null,
+        isCircle: Boolean = false
+    ): Button {
+        val button = Button(
+            id = id,
+            x = x,
+            y = y,
+            w = w,
+            h = h,
+            onClick = onClick,
+            onHover = onHover,
+            onRelease = onRelease,
+            padding = padding,
+            bgColor = bgColor,
+            bgSprite = bgSprite,
+            hoverColor = hoverColor,
+            pressColor = pressColor,
+            isCircle = isCircle,
+            parent = this
+        )
+        addChild(button)
+        return button
+    }
+
+    fun toggleButton(
+        id: String,
+        x: Double = 0.0,
+        y: Double = 0.0,
+        w: Double,  // Required
+        h: Double,  // Required
+        state: State<Boolean>,
+        onToggle: ((Boolean) -> Unit)? = null,
+        onHover: (() -> Unit)? = null,
+        padding: Double = 0.0,
+        bgColor: Color? = null,
+        bgSprite: Sprite? = null,
+        hoverColor: Color? = null,
+        activeColor: Color? = null,
+        activeHoverColor: Color? = null,
+        isCircle: Boolean = false
+    ): ToggleButton {
+        val button = ToggleButton(
+            id = id,
+            x = x,
+            y = y,
+            w = w,
+            h = h,
+            state = state,
+            onToggle = onToggle,
+            onHover = onHover,
+            padding = padding,
+            bgColor = bgColor,
+            bgSprite = bgSprite,
+            hoverColor = hoverColor,
+            activeColor = activeColor,
+            activeHoverColor = activeHoverColor,
+            isCircle = isCircle,
+            parent = this
+        )
+        addChild(button)
+        return button
+    }
+
+    fun image(
+        id: String,
+        x: Double = 0.0,
+        y: Double = 0.0,
+        w: Double,  // Required
+        h: Double,  // Required
+        sprite: Sprite,
+        padding: Double = 0.0,
+        bgColor: Color? = null,
+        onClick: (() -> Unit)? = null,
+        onHover: (() -> Unit)? = null
+    ): Image {
+        val image = Image(
+            id = id,
+            x = x,
+            y = y,
+            w = w,
+            h = h,
+            padding = padding,
+            sprite = sprite,
+            bgColor = bgColor,
+            onClick = onClick,
+            onHover = onHover,
+            parent = this
+        )
+        addChild(image)
+        return image
+    }
+
     fun cleanup() {
         children.forEach { it.cleanup() }
     }

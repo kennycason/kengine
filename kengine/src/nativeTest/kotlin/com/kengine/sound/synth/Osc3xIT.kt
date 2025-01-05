@@ -13,6 +13,7 @@ import com.kengine.particle.RainbowLinesEffect
 import com.kengine.particle.WavePatternEffect
 import com.kengine.particle.WavePatternEffect2
 import com.kengine.sdl.useSDLContext
+import com.kengine.ui.FlexDirection
 import com.kengine.ui.useView
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.SDL_Delay
@@ -55,8 +56,9 @@ class Osc3xIT : Logging {
             )
 
             val volumeSliderState = useState(0.5)
-            val frequencySlider2State = useState(444.0)
-            val detuneSlider2State = useState(0.0)
+            val frequencySliderState = useState(444.0)
+            val detuneSliderState = useState(0.0)
+            val toggleState = useState(false)
 
             val osc1View = useView(
                 id = "sliders",
@@ -94,7 +96,7 @@ class Osc3xIT : Logging {
                     min = -4000.0,
                     max = 4000.0,
                     padding = 5.0,
-                    state = frequencySlider2State,
+                    state = frequencySliderState,
                     bgColor = Color.neonPurple,
                     trackWidth = 3.0,
                     trackColor = Color.neonCyan,
@@ -113,7 +115,7 @@ class Osc3xIT : Logging {
                     min = -4000.0,
                     max = 4000.0,
                     padding = 5.0,
-                    state = detuneSlider2State,
+                    state = detuneSliderState,
                     bgColor = Color.neonPurple,
                     trackWidth = 3.0,
                     trackColor = Color.neonCyan,
@@ -125,6 +127,79 @@ class Osc3xIT : Logging {
                         osc3x.setConfig(detune = value)
                     }
                 )
+                view(
+                    direction = FlexDirection.COLUMN,
+                    w = 26.0,
+                    h = 64.0 + 6.0,
+                    spacing = 2.0
+                ) {
+                    button(
+                        id = "waveform-button1",
+                        w = 16.0,
+                        h = 16.0,
+                        bgColor = Color.neonPurple,
+                        hoverColor = Color.neonBlue,
+                        pressColor = Color.neonOrange,
+                        isCircle = true,
+                        onClick = {
+                            logger.info("Waveform saw button clicked")
+                            osc3x.setConfig(waveform = Oscillator.Waveform.SAW)
+                        }
+                    )
+                    button(
+                        id = "waveform-button2",
+                        w = 16.0,
+                        h = 16.0,
+                        bgColor = Color.neonPurple,
+                        hoverColor = Color.neonBlue,
+                        pressColor = Color.neonOrange,
+                        isCircle = true,
+                        onClick = {
+                            logger.info("Waveform sine button clicked")
+                            osc3x.setConfig(waveform = Oscillator.Waveform.SINE)
+                        }
+                    )
+                    button(
+                        id = "waveform-button3",
+                        w = 16.0,
+                        h = 16.0,
+                        bgColor = Color.neonPurple,
+                        hoverColor = Color.neonBlue,
+                        pressColor = Color.neonOrange,
+                        isCircle = true,
+                        onClick = {
+                            logger.info("Waveform triangle button clicked")
+                            osc3x.setConfig(waveform = Oscillator.Waveform.TRIANGLE)
+                        }
+                    )
+                    button(
+                        id = "waveform-button4",
+                        w = 16.0,
+                        h = 16.0,
+                        bgColor = Color.neonPurple,
+                        hoverColor = Color.neonBlue,
+                        pressColor = Color.neonOrange,
+                        isCircle = true,
+                        onClick = {
+                            logger.info("Waveform square button clicked")
+                            osc3x.setConfig(waveform = Oscillator.Waveform.SQUARE)
+                        }
+                    )
+                }
+//                toggleButton(
+//                    id = "toggle-button",
+//                    w = 48.0,
+//                    h = 48.0,
+//                    state = toggleState,
+//                    padding = 5.0,
+//                    bgColor = Color.neonPurple,
+//                    hoverColor = Color.neonBlue,
+//                    isCircle = true,
+//                    onToggle = { value ->
+//                        logger.info("Toggle button: $value")
+//                        osc3x.setConfig(waveform = Oscillator.Waveform.SINE)
+//                    }
+//                )
             }
 
             GameRunner(frameRate = 60) {
