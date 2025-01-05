@@ -69,6 +69,25 @@ class Osc3x(
         masterVolume = volume.coerceIn(0.0, 1.0)
     }
 
+    fun setConfig(
+        enabled: Boolean? = null,
+        frequency: Double? = null,
+        waveform: Oscillator.Waveform? = null,
+        detune: Double? = null,
+        volume: Double? = null
+    ) {
+        for (i in oscillators.indices) {
+            setConfig(
+                oscillator = i,
+                enabled = enabled,
+                frequency = frequency,
+                waveform = waveform,
+                detune = detune,
+                volume = volume
+            )
+        }
+    }
+
     // per-oscillator configuration
     fun setConfig(
         oscillator: Int,

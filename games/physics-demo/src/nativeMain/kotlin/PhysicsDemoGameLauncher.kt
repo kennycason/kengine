@@ -4,7 +4,7 @@ import com.kengine.log.Logger
 
 fun main() {
     createGameContext(
-        title = "Kengine - Phsyics Demo",
+        title = "Kengine - Physics Demo",
         width = 800,
         height = 600,
         logLevel = Logger.Level.DEBUG

@@ -7,7 +7,6 @@ import com.kengine.graphics.Color
 import com.kengine.hooks.state.useState
 import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.useControllerContext
-import com.kengine.input.mouse.useMouseContext
 import com.kengine.log.Logger
 import com.kengine.log.Logging
 import com.kengine.particle.RainbowLinesEffect
@@ -25,10 +24,10 @@ class Osc3xIT : Logging {
     @Test
     fun run() {
         createGameContext(
-            title = "Kengine - Osc3x - Synth",
+            title = "Kengine - Synth - Osc3x",
             width = 640,
             height = 480,
-            logLevel = Logger.Level.DEBUG
+            logLevel = Logger.Level.TRACE
         ) {
 
             val osc3x = Osc3x()
@@ -55,25 +54,75 @@ class Osc3xIT : Logging {
                 width = 640, height = 480, numLines = 640
             )
 
-            val sliderState = useState(0.5)
+            val volumeSliderState = useState(0.5)
+            val frequencySlider2State = useState(444.0)
+            val detuneSlider2State = useState(0.0)
 
             val osc1View = useView(
                 id = "sliders",
                 x = 0.0,
                 y = 0.0,
-                w = 64.0,
-                h = 64.0,
-                bgColor = Color.gray20,
-                padding = 10.0
+                w = 80.0,
+                h = 80.0,
+                bgColor = Color.neonBlue,
+                padding = 5.0,
+                spacing = 5.0
             ) {
                 slider(
                     id = "volume-slider",
+                    w = 20.0,
+                    h = 70.0,
                     min = 0.0,
                     max = 1.0,
-                    state = sliderState,
+                    padding = 5.0,
+                    state = volumeSliderState,
+                    bgColor = Color.neonPurple,
+                    trackWidth = 3.0,
+                    trackColor = Color.neonCyan,
+                    handleWidth = 14.0,
+                    handleHeight = 7.0,
+                    handleColor = Color.neonOrange,
                     onValueChanged = { value ->
-                        logger.info("Slider moved to $value")
+                        logger.info("slider moved to $value")
                         osc3x.setMasterVolume(value)
+                    }
+                )
+                slider(
+                    id = "frequency-slider",
+                    w = 20.0,
+                    h = 70.0,
+                    min = -4000.0,
+                    max = 4000.0,
+                    padding = 5.0,
+                    state = frequencySlider2State,
+                    bgColor = Color.neonPurple,
+                    trackWidth = 3.0,
+                    trackColor = Color.neonCyan,
+                    handleWidth = 14.0,
+                    handleHeight = 7.0,
+                    handleColor = Color.neonOrange,
+                    onValueChanged = { value ->
+                        logger.info("slider moved to $value")
+                        osc3x.setConfig(frequency = value)
+                    }
+                )
+                slider(
+                    id = "detune-slider",
+                    w = 20.0,
+                    h = 70.0,
+                    min = -4000.0,
+                    max = 4000.0,
+                    padding = 5.0,
+                    state = detuneSlider2State,
+                    bgColor = Color.neonPurple,
+                    trackWidth = 3.0,
+                    trackColor = Color.neonCyan,
+                    handleWidth = 14.0,
+                    handleHeight = 7.0,
+                    handleColor = Color.neonOrange,
+                    onValueChanged = { value ->
+                        logger.info("slider moved to $value")
+                        osc3x.setConfig(detune = value)
                     }
                 )
             }
@@ -113,10 +162,10 @@ class Osc3xIT : Logging {
                                 else -> 0.0
                             }
 
-                            logger.infoStream {
-                                write("o1: $osc1Selected o2: $osc2Selected, o3: $osc3Selected,")
-                                write("freq: $deltaFrequency, detune: $deltaDetune, vol=$deltaVolume, wav=$newWaveform")
-                            }
+//                            logger.infoStream {
+//                                write("o1: $osc1Selected o2: $osc2Selected, o3: $osc3Selected,")
+//                                write("freq: $deltaFrequency, detune: $deltaDetune, vol=$deltaVolume, wav=$newWaveform")
+//                            }
 
                             // apply changes for the selected oscillator(s)
                             fun applyUpdates(index: Int) {
@@ -163,15 +212,6 @@ class Osc3xIT : Logging {
                                 applyUpdates(0)
                                 applyUpdates(1)
                                 applyUpdates(2)
-                            }
-                        }
-
-                        useMouseContext {
-                            osc1View.hover(mouse.cursor())
-                            if (mouse.isLeftPressed()) {
-                                osc1View.click(mouse.cursor())
-                            } else {
-                              //  osc1View.release()
                             }
                         }
 

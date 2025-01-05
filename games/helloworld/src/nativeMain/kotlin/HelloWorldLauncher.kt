@@ -7,7 +7,7 @@ fun main() {
         title = "Kengine - Hello, World",
         width = 800,
         height = 600,
-        logLevel = Logger.Level.DEBUG
+        logLevel = Logger.Level.INFO
     ) {
         GameRunner(frameRate = -1) { // max fps
             HelloWorldGame()

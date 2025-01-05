@@ -11,6 +11,17 @@ class ViewContext private constructor(): Context(), Logging {
         rootViews.add(view)
     }
 
+    fun handleMouseEvents(mouseX: Double, mouseY: Double, isPressed: Boolean) {
+        if (isPressed) {
+            rootViews.forEach { it.click(mouseX, mouseY) }
+        }
+        rootViews.forEach { it.hover(mouseX, mouseY) }
+    }
+
+    fun releaseMouseEvents(mouseX: Double, mouseY: Double) {
+        rootViews.forEach { it.release(mouseX, mouseY) }
+    }
+
     fun render() {
         rootViews.forEach { rootView ->
             if (logger.isTraceEnabled()) {

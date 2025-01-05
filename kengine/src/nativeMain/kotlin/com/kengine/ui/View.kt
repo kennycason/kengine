@@ -92,6 +92,7 @@ open class View(
     val parent: View? = null,
     private val onClick: (() -> Unit)? = null,
     private val onHover: (() -> Unit)? = null,
+    private val onRelease: (() -> Unit)? = null
 ) : Logging {
 
     private val children = mutableListOf<View>()
@@ -104,23 +105,58 @@ open class View(
         var fixedWidth = 0.0
         var flexibleWidthChildren = 0
 
-        children.forEach { child ->
-            if (child.w == 0.0) flexibleWidthChildren++ else fixedWidth += child.w
-        }
-
-        val remainingWidth = w - padding * 2 - spacing * (children.size - 1) - fixedWidth
-        val autoWidth = if (flexibleWidthChildren > 0) remainingWidth / flexibleWidthChildren else 0.0
-
         // height calculation
-        val parentHeight = h - padding * 2 // parent's effective height
+        var fixedHeight = 0.0
+        var flexibleHeightChildren = 0
+
+        // First pass: count flexible children and sum fixed dimensions
         children.forEach { child ->
             if (child.w == 0.0) {
-                child.w = autoWidth
+                flexibleWidthChildren++
+            } else {
+                fixedWidth += child.w
             }
-            children.forEach { child ->
-                if (child.w == 0.0) child.w = autoWidth
-                if (child.h == 0.0) child.h = parentHeight.coerceAtLeast(0.0)
+
+            if (child.h == 0.0) {
+                flexibleHeightChildren++
+            } else {
+                fixedHeight += child.h
             }
+        }
+
+        // Calculate available space
+        val remainingWidth = w - padding * 2 - spacing * (children.size - 1) - fixedWidth
+        val remainingHeight = h - padding * 2 - spacing * (children.size - 1) - fixedHeight
+
+        // Calculate auto dimensions
+        val autoWidth = if (flexibleWidthChildren > 0) remainingWidth / flexibleWidthChildren else 0.0
+        val autoHeight = if (flexibleHeightChildren > 0) remainingHeight / flexibleHeightChildren else 0.0
+
+        // Second pass: assign dimensions to flexible children
+        children.forEach { child ->
+            if (child.w == 0.0) {
+                child.w = autoWidth.coerceAtLeast(0.0)
+            }
+            if (child.h == 0.0) {
+                child.h = autoHeight.coerceAtLeast(0.0)
+            }
+        }
+    }
+
+    open fun release(x: Double, y: Double) {
+        if (!visible) return
+
+        val absX = this.x
+        val absY = this.y
+
+        // Check bounds
+        if (x >= absX && x <= absX + w && y >= absY && y <= absY + h) {
+            onRelease?.invoke()
+        }
+
+        // Propagate release to children
+        children.forEach { child ->
+            child.release(x, y)
         }
     }
 
@@ -140,7 +176,6 @@ open class View(
             logger.trace { "Rendering view $id at ($absX, $absY) size: ${w}x${h}, parent: ${parent?.id}" }
         }
 
-        // draw this view
         if (bgColor != null) {
             useGeometryContext {
                 fillRectangle(absX, absY, w, h, bgColor)
@@ -264,14 +299,20 @@ open class View(
         id: String,
         x: Double = 0.0,
         y: Double = 0.0,
-        w: Double = 16.0,
-        h: Double = 100.0,
+        w: Double,  // Required
+        h: Double,  // Required
         min: Double = 0.0,
         max: Double = 100.0,
         state: State<Double>,
         padding: Double = 0.0,
-        bgColor: Color = Color.gray10,
+        bgColor: Color? = null,
+        bgSprite: Sprite? = null,
+        trackWidth: Double? = null,
+        trackColor: Color = Color.gray10,
+        handleWidth: Double? = null,
+        handleHeight: Double? = null,
         handleColor: Color = Color.white,
+        handleSprite: Sprite? = null,
         onValueChanged: ((Double) -> Unit)? = null
     ): Slider {
         val slider = Slider(
@@ -284,12 +325,18 @@ open class View(
             max = max,
             state = state,
             padding = padding,
-            onValueChanged = onValueChanged,
             bgColor = bgColor,
+            bgSprite = bgSprite,
+            trackWidth = trackWidth,
+            trackColor = trackColor,
+            handleWidth = handleWidth,
+            handleHeight = handleHeight,
             handleColor = handleColor,
-            parent = this // Attach to current parent View
+            handleSprite = handleSprite,
+            onValueChanged = onValueChanged,
+            parent = this
         )
-        addChild(slider) // Add slider as a child of the current view
+        addChild(slider)
         return slider
     }
 

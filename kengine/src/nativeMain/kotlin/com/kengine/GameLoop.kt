@@ -1,8 +1,10 @@
 package com.kengine
 
+import com.kengine.input.mouse.useMouseContext
 import com.kengine.log.Logging
 import com.kengine.sdl.SDLEventContext
 import com.kengine.time.getClockContext
+import com.kengine.ui.getViewContext
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.SDL_Delay
 import sdl3.SDL_GetPerformanceCounter
@@ -37,26 +39,42 @@ class GameLoop(
 
         useGameContext(cleanup = true) {
             while (isRunning) {
-                // Poll events
+                // poll events
                 eventContext.pollEvents()
                 action.update()
 
 
-                // Calculate delta time
+                // calculate delta time
                 val currentCounter = SDL_GetPerformanceCounter()
                 val deltaTimeNs = (currentCounter - lastCounter) * 1_000_000_000u / frequency
                 lastCounter = currentCounter
 
-                // Update ClockContext
+                // update ClockContext
                 clock.update((deltaTimeNs / 1_000_000u).toLong()) // Convert ns -> ms
 
-                // Update game state
+
+                useMouseContext {
+                    // handle release events only when state changes
+                    if (wasLeftReleased()) {
+                        getViewContext().releaseMouseEvents(
+                            mouse.cursor().x,
+                            mouse.cursor().y
+                        )
+                    }
+
+                    // handle mouse click and hover events
+                    getViewContext().handleMouseEvents(
+                        mouse.cursor().x,
+                        mouse.cursor().y,
+                        mouse.isLeftPressed()
+                    )
+                }
+
                 update()
 
-                // Render
                 draw()
 
-                // Apply frame delay if capped
+                // apply frame delay if capped
                 val elapsedNs = (SDL_GetPerformanceCounter() - currentCounter) * 1_000_000_000u / frequency
                 val delayNs = targetFrameNs - elapsedNs.toLong()
 
