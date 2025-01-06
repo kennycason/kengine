@@ -29,6 +29,10 @@ class ViewContext private constructor() : Context(), Logging {
         }
     }
 
+    fun isMousePressed(): Boolean {
+        return rootViews.any { it is Slider && it.isDragging }
+    }
+
     /**
      * Handles mouse release events
      */

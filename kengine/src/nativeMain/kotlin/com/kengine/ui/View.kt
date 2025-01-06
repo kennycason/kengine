@@ -226,22 +226,25 @@ open class View(
     open fun click(x: Double, y: Double) {
         if (!visible) return
 
-        // Block clicks if another view is already active
-        if (activeDragView != null && activeDragView != this) return
+        // Calculate absolute coordinates like in draw()
+        val absX = if (parent != null) x else 0.0
+        val absY = if (parent != null) y else 0.0
 
-        // Lock this view as active
-        activeDragView = this
+        var nextChildX = padding
+        var nextChildY = padding
 
-        val (absX, absY) = getAbsolutePosition()
+        children.forEach { child ->
+            child.click(x - (absX + nextChildX), y - (absY + nextChildY))
 
-        // Check bounds for the current view
-        if (x >= absX && x <= absX + w && y >= absY && y <= absY + h) {
-            onClick?.invoke()
+            if (direction == FlexDirection.ROW) {
+                nextChildX += child.w + spacing
+            } else {
+                nextChildY += child.h + spacing
+            }
         }
 
-        // Propagate click to children with relative offsets
-        children.forEach { child ->
-            child.click(x, y)
+        if (isWithinBounds(x, y)) {
+            onClick?.invoke()
         }
     }
 

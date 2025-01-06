@@ -30,14 +30,9 @@ class Osc3xIT : Logging {
             title = "Kengine - Synth - Osc3x",
             width = 640,
             height = 480,
-            logLevel = Logger.Level.TRACE
+            logLevel = Logger.Level.INFO
         ) {
 
-            val osc3x = Osc3x()
-            osc3x.setConfig(0, waveform = Oscillator.Waveform.SAW)
-            osc3x.setConfig(1, waveform = Oscillator.Waveform.SQUARE)
-            osc3x.setConfig(2, waveform = Oscillator.Waveform.SINE)
-            osc3x.setMasterVolume(0.3)
 
             var osc1Selected = false
             var osc2Selected = false
@@ -57,10 +52,18 @@ class Osc3xIT : Logging {
                 width = 640, height = 480, numLines = 640
             )
 
-            val volumeState = useState(0.5)
+            val volumeState = useState(0.01)
             val frequencyState = useState(444.0)
             val detuneState = useState(0.0)
             val knobState = useState(0.0)
+
+            val osc3x = Osc3x()
+            osc3x.setConfig(0, waveform = Oscillator.Waveform.SAW)
+            osc3x.setConfig(1, waveform = Oscillator.Waveform.SQUARE)
+            osc3x.setConfig(2, waveform = Oscillator.Waveform.SINE)
+            osc3x.setMasterVolume(volumeState.get())
+            osc3x.setConfig(frequency = frequencyState.get(), detune = detuneState.get())
+
 
             val osc1View = useView(
                 id = "sliders",
@@ -156,50 +159,49 @@ class Osc3xIT : Logging {
                     buildWaveFormButton(Oscillator.Waveform.SQUARE)
                 }
 
-                view(
-                    direction = FlexDirection.COLUMN,
-                    align = Align.LEFT,
-                    w = 35.0,
-                    h = 70.0,
-                    padding = 0.0,
-                    bgColor = Color.neonMagenta,
-                ) {
-                    knob(
-                        id = "frequency-knob",
-                        w = 35.0,
-                        h = 35.0,
-                        padding = 5.0,
-                        min = -4000.0,
-                        max = 4000.0,
-                        stepSize = 100.0,
-                        state = knobState,
-                        bgColor = Color.neonPeach,
-                        knobColor = Color.neonCyan,
-                        indicatorColor = Color.neonOrange,
-                        onValueChanged = { value ->
-                            logger.info("Knob moved to $value")
-                            osc3x.setConfig(frequency = value)
-                        }
-                    )
-                    knob(
-                        id = "volume-knob",
-                        w = 35.0,
-                        h = 35.0,
-                        padding = 5.0,
-                        min = 0.0,
-                        max = 1.0,
-                        stepSize = 0.001,  // Will change by 0.01 per step
-                        state = volumeState,
-                        bgColor = Color.neonPurple,
-                        knobColor = Color.neonCyan,
-                        indicatorColor = Color.neonOrange,
-                        onValueChanged = { value ->
-                            logger.info("Volume knob moved to $value")
-                            osc3x.setMasterVolume(value)
-                        }
-                    )
-                }
-
+//                view(
+//                    direction = FlexDirection.COLUMN,
+//                    align = Align.LEFT,
+//                    w = 35.0,
+//                    h = 70.0,
+//                    padding = 0.0,
+//                    bgColor = Color.neonMagenta,
+//                ) {
+//                    knob(
+//                        id = "frequency-knob",
+//                        w = 35.0,
+//                        h = 35.0,
+//                        padding = 5.0,
+//                        min = -4000.0,
+//                        max = 4000.0,
+//                        stepSize = 100.0,
+//                        state = knobState,
+//                        bgColor = Color.neonPeach,
+//                        knobColor = Color.neonCyan,
+//                        indicatorColor = Color.neonOrange,
+//                        onValueChanged = { value ->
+//                            logger.info("Knob moved to $value")
+//                            osc3x.setConfig(frequency = value)
+//                        }
+//                    )
+//                    knob(
+//                        id = "volume-knob",
+//                        w = 35.0,
+//                        h = 35.0,
+//                        padding = 5.0,
+//                        min = 0.0,
+//                        max = 1.0,
+//                        stepSize = 0.001,  // Will change by 0.01 per step
+//                        state = volumeState,
+//                        bgColor = Color.neonPurple,
+//                        knobColor = Color.neonCyan,
+//                        indicatorColor = Color.neonOrange,
+//                        onValueChanged = { value ->
+//                            logger.info("Volume knob moved to $value")
+//                            osc3x.setMasterVolume(value)
+//                        }
+//                    )
+//                }
             }
 
 //            val testView = useView(

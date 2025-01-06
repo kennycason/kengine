@@ -34,24 +34,23 @@ class Button(
     private var isHovered: Boolean = false
     private var isPressed: Boolean = false
 
-    /**
-     * Renders the button with its visual state (normal, hover, press)
-     */
     override fun draw(parentX: Double, parentY: Double) {
         if (!visible) return
 
-        // Compute absolute position
         val absX = parentX + x
         val absY = parentY + y
 
-        // Determine the current color based on the button's state
+        if (logger.isTraceEnabled()) {
+            logger.trace { "Rendering view $id at ($absX, $absY) size: ${w}x${h}, parent: ${parent?.id}" }
+        }
+
+        // Determine current color based on state
         val currentColor = when {
-            isPressed && View.activeDragView == this -> pressColor
+            isPressed -> pressColor
             isHovered -> hoverColor
             else -> bgColor
         }
 
-        // Render the button
         if (currentColor != null) {
             useGeometryContext {
                 if (isCircle) {
@@ -67,78 +66,89 @@ class Button(
 
         bgImage?.draw(absX, absY)
     }
-
     /**
-     * Handles click events
+     * Handles click events based on absolute positions.
      */
-    override fun click(x: Double, y: Double) {
+    override fun click(mouseX: Double, mouseY: Double) {
         if (!visible) return
 
-        // Check if another view is already active
-        if (View.activeDragView != null && View.activeDragView != this) return
-
-        // Get absolute position
+        // Compute absolute and relative positions for logging
         val (absX, absY) = getAbsolutePosition()
+        val relX = mouseX - absX
+        val relY = mouseY - absY
 
-        // Verify bounds
-        if (!isWithinBounds(x, y)) return
+        if (logger.isInfoEnabled()) {
+            logger.info("Button $id - CLICK event at ($mouseX, $mouseY). " +
+                "AbsPos=($absX, $absY), RelPos=($relX, $relY)")
+        }
 
-        // Activate this view as the current drag view
-        View.activeDragView = this
-        isPressed = true
-        onClick?.invoke()
+        // Check if the pointer is within bounds
+        if (isWithinBounds(mouseX, mouseY)) {
+            isPressed = true
+            onClick?.invoke()
+            if (logger.isInfoEnabled()) {
+                logger.info("Button $id isPressed=true after click, onClick invoked.")
+            }
+        }
     }
 
-    /**
-     * Handles hover events
-     */
-    override fun hover(x: Double, y: Double) {
+    override fun hover(mouseX: Double, mouseY: Double) {
         if (!visible) return
 
-        // Compute absolute position
         val (absX, absY) = getAbsolutePosition()
+        val relX = mouseX - absX
+        val relY = mouseY - absY
 
-        // Check hover state
+        if (logger.isInfoEnabled()) {
+            logger.info("Button $id - HOVER event at ($mouseX, $mouseY). " +
+                "AbsPos=($absX, $absY), RelPos=($relX, $relY)")
+        }
+
         val wasHovered = isHovered
-        isHovered = isWithinBounds(x, y)
+        isHovered = isWithinBounds(mouseX, mouseY)
 
-        // Trigger hover event if the state changed
+        // Only trigger onHover if hover state changes
         if (isHovered != wasHovered) {
             onHover?.invoke()
+            if (logger.isInfoEnabled()) {
+                logger.info("Button $id isHovered=$isHovered, onHover invoked.")
+            }
         }
     }
 
-    /**
-     * Handles release events
-     */
-    override fun release(x: Double, y: Double) {
-        if (isPressed && View.activeDragView == this) {
-            isPressed = false
+    override fun release(mouseX: Double, mouseY: Double) {
+        if (logger.isInfoEnabled()) {
+            logger.info("Button $id - RELEASE event at ($mouseX, $mouseY). Pressed=$isPressed")
+        }
+
+        if (isPressed) {
             onRelease?.invoke()
-            View.activeDragView = null
+            if (logger.isInfoEnabled()) {
+                logger.info("Button $id onRelease invoked, isPressed=false.")
+            }
         }
-        super.release(x, y)
+
+        isPressed = false
+        super.release(mouseX, mouseY)
     }
 
-    /**
-     * Checks whether the mouse coordinates are within the button bounds
-     */
     override fun isWithinBounds(mouseX: Double, mouseY: Double): Boolean {
+        // We compute absolute position and transform mouseX/Y to relative
         val (absX, absY) = getAbsolutePosition()
+        val relX = mouseX - absX
+        val relY = mouseY - absY
 
         return if (isCircle) {
-            // Circle bounds check
-            val centerX = absX + w / 2.0
-            val centerY = absY + h / 2.0
             val radius = kotlin.math.min(w, h) / 2.0
-
-            val distSquared = (mouseX - centerX) * (mouseX - centerX) +
-                (mouseY - centerY) * (mouseY - centerY)
-            distSquared <= radius * radius
+            val centerX = w / 2.0
+            val centerY = h / 2.0
+            val dx = relX - centerX
+            val dy = relY - centerY
+            (dx * dx + dy * dy) <= (radius * radius)
         } else {
-            // Rectangle bounds check
-            mouseX >= absX && mouseX <= absX + w &&
-                mouseY >= absY && mouseY <= absY + h
+            relX >= 0 && relX <= w &&
+                relY >= 0 && relY <= h
         }
     }
+
 }

@@ -36,6 +36,8 @@ class Slider(
     bgImage = bgSprite,
     parent = parent
 ) {
+    var isDragging = false
+
     // Dimensions
     private val trackWidth: Double = trackWidth ?: (w * 0.2)
     private val handleWidth: Double = handleWidth ?: (w * 0.4)
@@ -58,22 +60,22 @@ class Slider(
      * Computes the slider value at a given position.
      */
     private fun valueAt(absMouseY: Double): Double {
-        val (_, absY) = getAbsolutePosition() // Compute absolute position
-        val relativeY = absMouseY - absY      // Translate to local coordinates
+        val (_, absY) = getAbsolutePosition()
+        val trackStart = absY + padding
+        val trackEnd = absY + effectiveTrackHeight
 
-        val availableHeight = effectiveTrackHeight - handleHeight
-        val clampedY = (relativeY - padding).coerceIn(0.0, availableHeight)
-        val range = max - min
-        return max - (clampedY / availableHeight) * range
+        val normalizedY = (absMouseY - trackStart) / (trackEnd - trackStart)
+        val clampedY = normalizedY.coerceIn(0.0, 1.0)
+
+        return max - clampedY * (max - min)
     }
 
     override fun isWithinBounds(mouseX: Double, mouseY: Double): Boolean {
-        val (absX, absY) = getAbsolutePosition() // Compute absolute position
-        val handleY = absY + calculateHandlePosition()
+        val (absX, absY) = getAbsolutePosition()
+        // Allow clicks on full track height
         val handleX = absX + (w / 2.0) - (handleWidth / 2.0)
-
         return mouseX >= handleX && mouseX <= handleX + handleWidth &&
-            mouseY >= handleY && mouseY <= handleY + handleHeight
+            mouseY >= absY + padding && mouseY <= absY + effectiveTrackHeight
     }
 
     override fun draw(parentX: Double, parentY: Double) {
@@ -109,37 +111,37 @@ class Slider(
      * Handles click events, calculates value based on mouse position, and triggers change events.
      */
     override fun click(x: Double, y: Double) {
-        val (absX, absY) = getAbsolutePosition()
-        if (!isWithinBounds(x, y)) return
-
-        // Set active drag view
-        activeDragView = this
-
-        // Update value based on click position
-        val newValue = valueAt(y)
-        state.set(newValue.coerceIn(min, max))
-        onValueChanged?.invoke(state.get())
+        if (!visible || !isWithinBounds(x, y)) return
+        isDragging = true
+        updateValue(y)
     }
 
     /**
      * Handles hover events while dragging the handle.
      */
     override fun hover(x: Double, y: Double) {
-        if (activeDragView != this) return // Only update while dragging
-
-        // Update value based on hover position
-        val newValue = valueAt(y)
-        state.set(newValue.coerceIn(min, max))
-        onValueChanged?.invoke(state.get())
+        if (!visible) return
+        if (!getViewContext().isMousePressed()) {
+            isDragging = false
+            return
+        }
+        if (isDragging) {
+            updateValue(y)
+        }
     }
 
     /**
      * Handles release events, clearing active drag state.
      */
     override fun release(x: Double, y: Double) {
-        if (activeDragView == this) {
-            activeDragView = null // Clear drag state
-        }
+        isDragging = false
         super.release(x, y)
     }
+
+    private fun updateValue(y: Double) {
+        val newValue = valueAt(y)
+        state.set(newValue.coerceIn(min, max))
+        onValueChanged?.invoke(state.get())
+    }
+
 }
