@@ -12,14 +12,27 @@ class ViewContext private constructor() : Context(), Logging {
     }
 
     /**
-     * Handles mouse events based on position and press state
+     * Optionally call this each frame or whenever
+     * the layout might need to be re-flowed.
+     */
+    fun performLayout() {
+        rootViews.forEach { root ->
+            // Start each root at (0,0) or some parent offset
+            root.performLayout(offsetX = 0.0, offsetY = 0.0)
+        }
+    }
+
+    /**
+     * Handles mouse events based on position and press state.
+     * We do not do the layout logic here—this just routes input
+     * to the correct views.
      */
     fun handleMouseEvents(mouseX: Double, mouseY: Double, isPressed: Boolean) {
         if (logger.isTraceEnabled()) {
             logger.trace { "Mouse event at ($mouseX, $mouseY) - Pressed: $isPressed" }
         }
 
-        // Handle click or hover based on the press state
+        // If pressed, treat as click; otherwise, treat as hover
         rootViews.forEach { view ->
             if (isPressed) {
                 view.click(mouseX, mouseY)
@@ -29,7 +42,12 @@ class ViewContext private constructor() : Context(), Logging {
         }
     }
 
+    /**
+     * If you’re using e.g. Sliders that track dragging,
+     * you can check if any is dragging.
+     */
     fun isMousePressed(): Boolean {
+        // If you wanted to check any view is dragging:
         return rootViews.any { it is Slider && it.isDragging }
     }
 
@@ -40,19 +58,22 @@ class ViewContext private constructor() : Context(), Logging {
         if (logger.isTraceEnabled()) {
             logger.trace { "Mouse release at ($mouseX, $mouseY)" }
         }
-
-        // Handle release events for all root views
         rootViews.forEach { view ->
             view.release(mouseX, mouseY)
         }
     }
 
     /**
-     * Renders all views in the context
+     * Renders all views in the context.
+     * Optionally call `performLayout()` first each frame
+     * if your UI layout changes dynamically.
      */
     fun render() {
+        // If you want to re-flow each frame:
+        // performLayout()
+
         rootViews.forEach { rootView ->
-            rootView.draw()
+            rootView.draw() // uses final layout geometry
         }
     }
 
@@ -69,18 +90,12 @@ class ViewContext private constructor() : Context(), Logging {
     fun click(p: Vec2) = click(p.x, p.y)
     fun hover(p: Vec2) = hover(p.x, p.y)
 
-    /**
-     * Click handling without dragging checks
-     */
     fun click(x: Double, y: Double) {
         rootViews.forEach { view ->
             view.click(x, y)
         }
     }
 
-    /**
-     * Hover handling without dragging checks
-     */
     fun hover(x: Double, y: Double) {
         rootViews.forEach { view ->
             view.hover(x, y)

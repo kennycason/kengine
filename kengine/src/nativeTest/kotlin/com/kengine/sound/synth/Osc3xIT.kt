@@ -67,8 +67,8 @@ class Osc3xIT : Logging {
 
             val osc1View = useView(
                 id = "sliders",
-                x = 0.0,
-                y = 0.0,
+                x = 10.0,
+                y = 10.0,
                 w = 145.0,
                 h = 80.0,
                 bgColor = Color.neonBlue,
@@ -204,35 +204,6 @@ class Osc3xIT : Logging {
 //                }
             }
 
-//            val testView = useView(
-//                id = "parent",
-//                x = 300.0,
-//                y = 100.0,
-//                w = 200.0,
-//                h = 200.0,
-//                padding = 10.0,
-//                bgColor = Color.gray40
-//            ) {
-//                button(
-//                    id = "nested1",
-//                    x = 20.0,
-//                    y = 20.0,
-//                    w = 50.0,
-//                    h = 50.0,
-//                    bgColor = Color.green,
-//                    onClick = { println("Nested button 1 clicked") }
-//                )
-//                button(
-//                    id = "nested2",
-//                    x = 100.0,
-//                    y = 20.0,
-//                    w = 50.0,
-//                    h = 50.0,
-//                    bgColor = Color.yellow,
-//                    onClick = { println("Nested button 2 clicked") }
-//                )
-//            }
-
             GameRunner(frameRate = 60) {
                 object : Game {
 
@@ -337,7 +308,6 @@ class Osc3xIT : Logging {
 //                            wavePattern2.draw()
 
                             osc1View.draw()
-//                            testView.draw()
                             flipScreen()
                         }
                     }

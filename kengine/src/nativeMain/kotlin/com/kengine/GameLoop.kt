@@ -51,25 +51,24 @@ class GameLoop(
                 // update ClockContext
                 clock.update((deltaTimeNs / 1_000_000u).toLong()) // Convert ns -> ms
 
-
                 useMouseContext {
                     val cursor = mouse.cursor()
 
+                    // Release if left was just released
                     if (wasLeftReleased()) {
-                        getViewContext().releaseMouseEvents(
-                            cursor.x,
-                            cursor.y
-                        )
+                        getViewContext().releaseMouseEvents(cursor.x, cursor.y)
                     }
-
+                    // Press or hover
                     getViewContext().handleMouseEvents(
-                        cursor.x,  // Pass absolute coordinates
+                        cursor.x,
                         cursor.y,
                         mouse.isLeftPressed()
                     )
                 }
 
                 update()
+
+                getViewContext().performLayout()
 
                 draw()
 
