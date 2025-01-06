@@ -4,6 +4,7 @@ import com.kengine.Game
 import com.kengine.GameRunner
 import com.kengine.createGameContext
 import com.kengine.graphics.Color
+import com.kengine.hooks.state.State
 import com.kengine.hooks.state.useState
 import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.useControllerContext
@@ -13,6 +14,7 @@ import com.kengine.particle.RainbowLinesEffect
 import com.kengine.particle.WavePatternEffect
 import com.kengine.particle.WavePatternEffect2
 import com.kengine.sdl.useSDLContext
+import com.kengine.ui.Align
 import com.kengine.ui.FlexDirection
 import com.kengine.ui.useView
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -55,152 +57,179 @@ class Osc3xIT : Logging {
                 width = 640, height = 480, numLines = 640
             )
 
-            val volumeSliderState = useState(0.5)
-            val frequencySliderState = useState(444.0)
-            val detuneSliderState = useState(0.0)
-            val toggleState = useState(false)
+            val volumeState = useState(0.5)
+            val frequencyState = useState(444.0)
+            val detuneState = useState(0.0)
+            val knobState = useState(0.0)
 
             val osc1View = useView(
                 id = "sliders",
                 x = 0.0,
                 y = 0.0,
-                w = 80.0,
+                w = 145.0,
                 h = 80.0,
                 bgColor = Color.neonBlue,
                 padding = 5.0,
                 spacing = 5.0
             ) {
-                slider(
+                fun buildSlider(
+                    id: String,
+                    min: Double, max: Double,
+                    state: State<Double>,
+                    onValueChanged: (newValue: Double) -> Unit
+                ) {
+                    slider(
+                        id = id,
+                        w = 20.0,
+                        h = 70.0,
+                        min = min,
+                        max = max,
+                        padding = 5.0,
+                        state = state,
+                        bgColor = Color.neonPurple,
+                        trackWidth = 3.0,
+                        trackColor = Color.neonCyan,
+                        handleWidth = 14.0,
+                        handleHeight = 7.0,
+                        handleColor = Color.neonOrange,
+                        onValueChanged = onValueChanged
+                    )
+                }
+                buildSlider(
                     id = "volume-slider",
-                    w = 20.0,
-                    h = 70.0,
                     min = 0.0,
                     max = 1.0,
-                    padding = 5.0,
-                    state = volumeSliderState,
-                    bgColor = Color.neonPurple,
-                    trackWidth = 3.0,
-                    trackColor = Color.neonCyan,
-                    handleWidth = 14.0,
-                    handleHeight = 7.0,
-                    handleColor = Color.neonOrange,
+                    state = volumeState,
                     onValueChanged = { value ->
                         logger.info("slider moved to $value")
                         osc3x.setMasterVolume(value)
                     }
                 )
-                slider(
+                buildSlider(
                     id = "frequency-slider",
-                    w = 20.0,
-                    h = 70.0,
                     min = -4000.0,
                     max = 4000.0,
-                    padding = 5.0,
-                    state = frequencySliderState,
-                    bgColor = Color.neonPurple,
-                    trackWidth = 3.0,
-                    trackColor = Color.neonCyan,
-                    handleWidth = 14.0,
-                    handleHeight = 7.0,
-                    handleColor = Color.neonOrange,
+                    state = frequencyState,
                     onValueChanged = { value ->
                         logger.info("slider moved to $value")
                         osc3x.setConfig(frequency = value)
                     }
                 )
-                slider(
+                buildSlider(
                     id = "detune-slider",
-                    w = 20.0,
-                    h = 70.0,
                     min = -4000.0,
                     max = 4000.0,
-                    padding = 5.0,
-                    state = detuneSliderState,
-                    bgColor = Color.neonPurple,
-                    trackWidth = 3.0,
-                    trackColor = Color.neonCyan,
-                    handleWidth = 14.0,
-                    handleHeight = 7.0,
-                    handleColor = Color.neonOrange,
+                    state = detuneState,
                     onValueChanged = { value ->
                         logger.info("slider moved to $value")
                         osc3x.setConfig(detune = value)
                     }
                 )
+
                 view(
                     direction = FlexDirection.COLUMN,
-                    w = 26.0,
-                    h = 64.0 + 6.0,
-                    spacing = 2.0
+                    align = Align.LEFT,
+                    w = 20.0,
+                    h = 70.0,
+                    padding = 2.0,
+                    bgColor = Color.neonLime,
+                    spacing = 3.0
                 ) {
-                    button(
-                        id = "waveform-button1",
-                        w = 16.0,
-                        h = 16.0,
-                        bgColor = Color.neonPurple,
-                        hoverColor = Color.neonBlue,
-                        pressColor = Color.neonOrange,
-                        isCircle = true,
-                        onClick = {
-                            logger.info("Waveform saw button clicked")
-                            osc3x.setConfig(waveform = Oscillator.Waveform.SAW)
+                    fun buildWaveFormButton(waveform: Oscillator.Waveform) {
+                        button(
+                            id = "waveform-button-$waveform",
+                            w = 14.0,
+                            h = 14.0,
+                            bgColor = Color.neonPurple,
+                            hoverColor = Color.neonBlue,
+                            pressColor = Color.neonOrange,
+                            isCircle = true,
+                            onClick = {
+                                logger.info("Waveform $waveform button clicked")
+                                osc3x.setConfig(waveform = waveform)
+                            }
+                        )
+                    }
+                    buildWaveFormButton(Oscillator.Waveform.SAW)
+                    buildWaveFormButton(Oscillator.Waveform.SINE)
+                    buildWaveFormButton(Oscillator.Waveform.TRIANGLE)
+                    buildWaveFormButton(Oscillator.Waveform.SQUARE)
+                }
+
+                view(
+                    direction = FlexDirection.COLUMN,
+                    align = Align.LEFT,
+                    w = 35.0,
+                    h = 70.0,
+                    padding = 0.0,
+                    bgColor = Color.neonMagenta,
+                ) {
+                    knob(
+                        id = "frequency-knob",
+                        w = 35.0,
+                        h = 35.0,
+                        padding = 5.0,
+                        min = -4000.0,
+                        max = 4000.0,
+                        stepSize = 100.0,
+                        state = knobState,
+                        bgColor = Color.neonPeach,
+                        knobColor = Color.neonCyan,
+                        indicatorColor = Color.neonOrange,
+                        onValueChanged = { value ->
+                            logger.info("Knob moved to $value")
+                            osc3x.setConfig(frequency = value)
                         }
                     )
-                    button(
-                        id = "waveform-button2",
-                        w = 16.0,
-                        h = 16.0,
+                    knob(
+                        id = "volume-knob",
+                        w = 35.0,
+                        h = 35.0,
+                        padding = 5.0,
+                        min = 0.0,
+                        max = 1.0,
+                        stepSize = 0.001,  // Will change by 0.01 per step
+                        state = volumeState,
                         bgColor = Color.neonPurple,
-                        hoverColor = Color.neonBlue,
-                        pressColor = Color.neonOrange,
-                        isCircle = true,
-                        onClick = {
-                            logger.info("Waveform sine button clicked")
-                            osc3x.setConfig(waveform = Oscillator.Waveform.SINE)
-                        }
-                    )
-                    button(
-                        id = "waveform-button3",
-                        w = 16.0,
-                        h = 16.0,
-                        bgColor = Color.neonPurple,
-                        hoverColor = Color.neonBlue,
-                        pressColor = Color.neonOrange,
-                        isCircle = true,
-                        onClick = {
-                            logger.info("Waveform triangle button clicked")
-                            osc3x.setConfig(waveform = Oscillator.Waveform.TRIANGLE)
-                        }
-                    )
-                    button(
-                        id = "waveform-button4",
-                        w = 16.0,
-                        h = 16.0,
-                        bgColor = Color.neonPurple,
-                        hoverColor = Color.neonBlue,
-                        pressColor = Color.neonOrange,
-                        isCircle = true,
-                        onClick = {
-                            logger.info("Waveform square button clicked")
-                            osc3x.setConfig(waveform = Oscillator.Waveform.SQUARE)
+                        knobColor = Color.neonCyan,
+                        indicatorColor = Color.neonOrange,
+                        onValueChanged = { value ->
+                            logger.info("Volume knob moved to $value")
+                            osc3x.setMasterVolume(value)
                         }
                     )
                 }
-//                toggleButton(
-//                    id = "toggle-button",
-//                    w = 48.0,
-//                    h = 48.0,
-//                    state = toggleState,
-//                    padding = 5.0,
-//                    bgColor = Color.neonPurple,
-//                    hoverColor = Color.neonBlue,
-//                    isCircle = true,
-//                    onToggle = { value ->
-//                        logger.info("Toggle button: $value")
-//                        osc3x.setConfig(waveform = Oscillator.Waveform.SINE)
-//                    }
-//                )
+
             }
+
+//            val testView = useView(
+//                id = "parent",
+//                x = 300.0,
+//                y = 100.0,
+//                w = 200.0,
+//                h = 200.0,
+//                padding = 10.0,
+//                bgColor = Color.gray40
+//            ) {
+//                button(
+//                    id = "nested1",
+//                    x = 20.0,
+//                    y = 20.0,
+//                    w = 50.0,
+//                    h = 50.0,
+//                    bgColor = Color.green,
+//                    onClick = { println("Nested button 1 clicked") }
+//                )
+//                button(
+//                    id = "nested2",
+//                    x = 100.0,
+//                    y = 20.0,
+//                    w = 50.0,
+//                    h = 50.0,
+//                    bgColor = Color.yellow,
+//                    onClick = { println("Nested button 2 clicked") }
+//                )
+//            }
 
             GameRunner(frameRate = 60) {
                 object : Game {
@@ -306,6 +335,7 @@ class Osc3xIT : Logging {
 //                            wavePattern2.draw()
 
                             osc1View.draw()
+//                            testView.draw()
                             flipScreen()
                         }
                     }

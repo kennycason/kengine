@@ -1,5 +1,6 @@
 package com.kengine.input.mouse
 
+import com.kengine.log.Logging
 import com.kengine.math.Vec2
 import com.kengine.sdl.SDLEventContext
 import com.kengine.sdl.useSDLEventContext
@@ -15,8 +16,12 @@ import sdl3.SDL_Event
 
 
 @OptIn(ExperimentalForeignApi::class)
-class MouseInputEventSubscriber {
-    private val buttonStates = mutableMapOf<Int, ButtonState>()
+class MouseInputEventSubscriber : Logging {
+    private val buttonStates = mutableMapOf(
+        SDL_BUTTON_LEFT to ButtonState(),
+        SDL_BUTTON_MIDDLE to ButtonState(),
+        SDL_BUTTON_RIGHT to ButtonState()
+    )
     private var mouseCursor: Vec2 = Vec2()
 
     data class ButtonState(
@@ -36,8 +41,8 @@ class MouseInputEventSubscriber {
         when (event.type) {
             SDL_EVENT_MOUSE_BUTTON_DOWN -> {
                 val button = event.button.button.toInt()
-                if (!buttonStates.containsKey(button)) {
-                    buttonStates[button] = ButtonState()
+                if (logger.isDebugEnabled()) {
+                    logger.debug { "Button $button pressed" }
                 }
                 buttonStates[button]?.apply {
                     isPressed = true
@@ -46,11 +51,17 @@ class MouseInputEventSubscriber {
             }
             SDL_EVENT_MOUSE_BUTTON_UP -> {
                 val button = event.button.button.toInt()
+                if (logger.isDebugEnabled()) {
+                    logger.debug { "Button $button released" }
+                }
                 buttonStates[button]?.isPressed = false
             }
             SDL_EVENT_MOUSE_MOTION -> {
                 mouseCursor.x = event.motion.x.toDouble()
                 mouseCursor.y = event.motion.y.toDouble()
+                if (logger.isDebugEnabled()) {
+                    logger.debug { "Mouse moved to (${mouseCursor.x}, ${mouseCursor.y})" }
+                }
             }
         }
     }

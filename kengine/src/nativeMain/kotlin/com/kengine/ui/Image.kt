@@ -1,5 +1,6 @@
 package com.kengine.ui
 
+import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Color
 import com.kengine.graphics.Sprite
 
@@ -11,7 +12,7 @@ class Image(
     h: Double,  // Required height
     padding: Double = 0.0,
     private val sprite: Sprite,
-    bgColor: Color? = null,  // Optional background color behind the sprite
+    bgColor: Color? = null,
     onClick: (() -> Unit)? = null,
     onHover: (() -> Unit)? = null,
     parent: View? = null
@@ -23,8 +24,28 @@ class Image(
     h = h,
     padding = padding,
     bgColor = bgColor,
-    bgImage = sprite,
+    parent = parent,
     onClick = onClick,
-    onHover = onHover,
-    parent = parent
-)
+    onHover = onHover
+) {
+    private var isHovered: Boolean = false
+
+    override fun draw(parentX: Double, parentY: Double) {
+        if (!visible) return
+
+        val absX = parentX + x
+        val absY = parentY + y
+
+        // Draw background color if specified
+        if (bgColor != null) {
+            useGeometryContext {
+                fillRectangle(absX, absY, w, h, bgColor)
+            }
+        }
+
+        // Draw the sprite
+        sprite.draw(absX, absY)
+    }
+
+
+}

@@ -35,17 +35,16 @@ class ToggleButton(
 ) {
     private var isHovered: Boolean = false
 
+    /**
+     * Draws the toggle button with the appropriate colors based on state.
+     */
     override fun draw(parentX: Double, parentY: Double) {
         if (!visible) return
 
         val absX = parentX + x
         val absY = parentY + y
 
-        if (logger.isTraceEnabled()) {
-            logger.trace { "Rendering view $id at ($absX, $absY) size: ${w}x${h}, parent: ${parent?.id}" }
-        }
-
-        // Determine current color based on state
+        // Determine current color based on state and hover
         val currentColor = when {
             state.get() && isHovered -> activeHoverColor
             state.get() -> activeColor
@@ -66,46 +65,66 @@ class ToggleButton(
             }
         }
 
+        // Draw background image if specified
         bgImage?.draw(absX, absY)
     }
 
+    /**
+     * Handles click events to toggle state.
+     */
     override fun click(x: Double, y: Double) {
-        if (!visible) return
+        if (!visible || !isWithinBounds(x, y)) return
 
-        val relativeX = x - this.x
-        val relativeY = y - this.y
-
-        if (isWithinBounds(relativeX, relativeY)) {
-            val newState = !state.get()
-            state.set(newState)
-            onToggle?.invoke(newState)
-        }
+        // Toggle state and notify
+        val newState = !state.get()
+        state.set(newState)
+        onToggle?.invoke(newState)
     }
 
+    /**
+     * Handles hover events to update hover state.
+     */
     override fun hover(x: Double, y: Double) {
         if (!visible) return
 
-        val relativeX = x - this.x
-        val relativeY = y - this.y
-
+        // Update hover state
         val wasHovered = isHovered
-        isHovered = isWithinBounds(relativeX, relativeY)
+        isHovered = isWithinBounds(x, y)
 
+        // Notify only when hover state changes
         if (isHovered != wasHovered) {
             onHover?.invoke()
         }
     }
 
-    private fun isWithinBounds(relativeX: Double, relativeY: Double): Boolean {
+    /**
+     * Handles release events to clear active state.
+     */
+    override fun release(x: Double, y: Double) {
+        if (activeDragView == this) {
+            activeDragView = null // Clear drag state
+        }
+        super.release(x, y)
+    }
+
+    /**
+     * Determines if a point is within the toggle button's bounds.
+     */
+    override fun isWithinBounds(mouseX: Double, mouseY: Double): Boolean {
+        val (absX, absY) = getAbsolutePosition()
+
         return if (isCircle) {
+            // Calculate distance from center for circular bounds
             val radius = kotlin.math.min(w, h) / 2.0
-            val centerX = w / 2.0
-            val centerY = h / 2.0
-            val dx = relativeX - centerX
-            val dy = relativeY - centerY
+            val centerX = absX + w / 2.0
+            val centerY = absY + h / 2.0
+            val dx = mouseX - centerX
+            val dy = mouseY - centerY
             (dx * dx + dy * dy) <= (radius * radius)
         } else {
-            relativeX >= 0 && relativeX <= w && relativeY >= 0 && relativeY <= h
+            // Rectangular bounds check
+            mouseX >= absX && mouseX <= absX + w &&
+                mouseY >= absY && mouseY <= absY + h
         }
     }
 }

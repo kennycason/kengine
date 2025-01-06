@@ -3,47 +3,31 @@ package com.kengine.input.mouse
 import com.kengine.hooks.context.Context
 import com.kengine.log.Logging
 
-class MouseState {
-    var isLeftPressed = false
-    var isRightPressed = false
-    var wasLeftPressed = false
-    var wasRightPressed = false
-}
-
 class MouseContext private constructor(
     val mouse: MouseInputEventSubscriber
 ) : Context(), Logging {
 
-    private val state = MouseState()
-
-    fun wasLeftReleased(): Boolean {
-        val wasPressed = state.wasLeftPressed
-        val isPressed = mouse.isLeftPressed()
-        state.wasLeftPressed = isPressed
-        return wasPressed && !isPressed
-    }
-
-    fun wasRightReleased(): Boolean {
-        val wasPressed = state.wasRightPressed
-        val isPressed = mouse.isRightPressed()
-        state.wasRightPressed = isPressed
-        return wasPressed && !isPressed
-    }
-
-    fun isLeftDragging(): Boolean {
-        return state.isLeftPressed && mouse.isLeftPressed()
-    }
-
-    fun isRightDragging(): Boolean {
-        return state.isRightPressed && mouse.isRightPressed()
-    }
+    // Track button states
+    private var wasLeftPressed: Boolean = false
+    private var isLeftPressed: Boolean = false
 
     override fun cleanup() {
-        logger.info { "Cleaning up MouseContext" }
+        logger.debug { "Cleaning up MouseContext" }
         currentContext = null
     }
 
+    fun wasLeftPressed(): Boolean {
+        return wasLeftPressed
+    }
+
+    fun wasLeftReleased(): Boolean {
+        return wasLeftPressed && !isLeftPressed
+    }
+
     fun init() {
+        if (logger.isTraceEnabled()) {
+            logger.trace { "Initializing MouseContext" }
+        }
         mouse.init()
     }
 
@@ -52,11 +36,10 @@ class MouseContext private constructor(
 
         fun get(): MouseContext {
             return currentContext ?: MouseContext(
-                mouse = MouseInputEventSubscriber(),
+                mouse = MouseInputEventSubscriber()
             ).also {
                 currentContext = it
             }
         }
     }
-
 }

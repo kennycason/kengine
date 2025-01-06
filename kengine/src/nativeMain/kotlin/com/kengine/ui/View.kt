@@ -67,6 +67,7 @@ fun useView(
 
     view.apply(block)
     return view
+
 }
 
 open class View(
@@ -143,13 +144,20 @@ open class View(
         }
     }
 
+    /**
+     * Handles release events, adjusted for absolute positioning.
+     */
     open fun release(x: Double, y: Double) {
-        if (!visible) return
+        // Clear active drag lock if this view was active
+        if (activeDragView == this) {
+            activeDragView = null
+        }
 
-        val absX = this.x
-        val absY = this.y
+        if (!visible) return // Don't process further if invisible
 
-        // Check bounds
+        val (absX, absY) = getAbsolutePosition()
+
+        // Trigger release callback
         if (x >= absX && x <= absX + w && y >= absY && y <= absY + h) {
             onRelease?.invoke()
         }
@@ -169,6 +177,7 @@ open class View(
     open fun draw(parentX: Double = 0.0, parentY: Double = 0.0) {
         if (!visible) return
 
+        // Calculate absolute coordinates including any x/y offset
         val absX = parentX + x
         val absY = parentY + y
 
@@ -176,6 +185,7 @@ open class View(
             logger.trace { "Rendering view $id at ($absX, $absY) size: ${w}x${h}, parent: ${parent?.id}" }
         }
 
+        // Draw background and image
         if (bgColor != null) {
             useGeometryContext {
                 fillRectangle(absX, absY, w, h, bgColor)
@@ -183,15 +193,25 @@ open class View(
         }
         bgImage?.draw(absX, absY)
 
-        var childX = absX + padding
-        var childY = absY + padding
+        // Track relative position for child layout
+        var nextChildX = 0.0
+        var nextChildY = 0.0
+
+        // Add padding only once at the start of child positioning
+        if (children.isNotEmpty()) {
+            nextChildX += padding
+            nextChildY += padding
+        }
 
         children.forEach { child ->
-            child.draw(childX, childY)
+            // Pass absolute coordinates to child
+            child.draw(absX + nextChildX, absY + nextChildY)
+
+            // Update next position based on direction
             if (direction == FlexDirection.ROW) {
-                childX += child.w + spacing
+                nextChildX += child.w + spacing
             } else {
-                childY += child.h + spacing
+                nextChildY += child.h + spacing
             }
         }
     }
@@ -200,29 +220,28 @@ open class View(
         click(p.x, p.y)
     }
 
+    /**
+     * Handles click events, adjusted for absolute positioning.
+     */
     open fun click(x: Double, y: Double) {
         if (!visible) return
 
-        val absX = this.x
-        val absY = this.y
+        // Block clicks if another view is already active
+        if (activeDragView != null && activeDragView != this) return
 
-        // check bounds for the current view
+        // Lock this view as active
+        activeDragView = this
+
+        val (absX, absY) = getAbsolutePosition()
+
+        // Check bounds for the current view
         if (x >= absX && x <= absX + w && y >= absY && y <= absY + h) {
             onClick?.invoke()
         }
 
-        // propagate click to children with relative offsets
-        var childX = absX + padding
-        var childY = absY + padding
-
+        // Propagate click to children with relative offsets
         children.forEach { child ->
-            child.click(x - childX, y - childY)
-
-            if (direction == FlexDirection.ROW) {
-                childX += child.w + spacing
-            } else {
-                childY += child.h + spacing
-            }
+            child.click(x, y)
         }
     }
 
@@ -230,30 +249,51 @@ open class View(
         hover(p.x, p.y)
     }
 
+    /**
+     * Handles hover events, adjusted for absolute positioning.
+     */
     open fun hover(x: Double, y: Double) {
         if (!visible) return
 
-        val absX = this.x
-        val absY = this.y
+        // Ignore hover events if another view is active
+        if (activeDragView != null && activeDragView != this) return
 
-        // check bounds for the current view
+        val (absX, absY) = getAbsolutePosition()
+
+        // Check bounds for the current view
         if (x >= absX && x <= absX + w && y >= absY && y <= absY + h) {
             onHover?.invoke()
         }
 
-        // propagate hover to children with relative offsets
-        var childX = absX + padding
-        var childY = absY + padding
-
+        // Propagate hover to children with relative offsets
         children.forEach { child ->
-            child.hover(x - childX, y - childY)
-
-            if (direction == FlexDirection.ROW) {
-                childX += child.w + spacing
-            } else {
-                childY += child.h + spacing
-            }
+            child.hover(x, y)
         }
+    }
+
+    /**
+     * Checks if a point (mouseX, mouseY) is within this view's bounds, using absolute position.
+     */
+    open fun isWithinBounds(mouseX: Double, mouseY: Double): Boolean {
+        val (absX, absY) = getAbsolutePosition()
+        return mouseX >= absX && mouseX <= absX + w &&
+            mouseY >= absY && mouseY <= absY + h
+    }
+
+    /**
+     * Computes the absolute position by traversing up the parent hierarchy.
+     */
+    fun getAbsolutePosition(): Pair<Double, Double> {
+        var absX = x
+        var absY = y
+        var parentView = parent
+
+        while (parentView != null) {
+            absX += parentView.x
+            absY += parentView.y
+            parentView = parentView.parent
+        }
+        return Pair(absX, absY)
     }
 
     fun view(
@@ -416,6 +456,45 @@ open class View(
         return button
     }
 
+    fun knob(
+        id: String,
+        x: Double = 0.0,
+        y: Double = 0.0,
+        w: Double,  // Required
+        h: Double,  // Required
+        min: Double = 0.0,
+        max: Double = 100.0,
+        stepSize: Double? = null,
+        state: State<Double>,
+        padding: Double = 0.0,
+        bgColor: Color? = null,
+        bgSprite: Sprite? = null,
+        knobColor: Color = Color.gray10,
+        indicatorColor: Color = Color.white,
+        onValueChanged: ((Double) -> Unit)? = null
+    ): Knob {
+        val knob = Knob(
+            id = id,
+            x = x,
+            y = y,
+            w = w,
+            h = h,
+            min = min,
+            max = max,
+            stepSize = stepSize,
+            state = state,
+            padding = padding,
+            bgColor = bgColor,
+            bgSprite = bgSprite,
+            knobColor = knobColor,
+            indicatorColor = indicatorColor,
+            onValueChanged = onValueChanged,
+            parent = this
+        )
+        addChild(knob)
+        return knob
+    }
+
     fun image(
         id: String,
         x: Double = 0.0,
@@ -447,5 +526,9 @@ open class View(
 
     fun cleanup() {
         children.forEach { it.cleanup() }
+    }
+
+    companion object {
+        var activeDragView: View? = null // Tracks the currently active view
     }
 }
