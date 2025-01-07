@@ -8,8 +8,8 @@ import com.kengine.math.Vec2
 class ActionContext private constructor() : Context(), Logging {
     private val actions = ArrayDeque<Action>()
 
-    fun moveTo(entity: Entity, destination: Vec2, speed: Double, onComplete: (() -> Unit)) {
-        actions.add(MoveAction(entity, destination, speed, onComplete))
+    fun moveTo(entity: Entity, destination: Vec2, durationMs: Long, onComplete: (() -> Unit)) {
+        actions.add(MoveAction(entity, destination, durationMs, onComplete))
     }
 
     fun timer(delayMs: Long, onComplete: (() -> Unit)) {

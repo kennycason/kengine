@@ -10,6 +10,7 @@ import com.kengine.graphics.useSpriteContext
 import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.useControllerContext
 import com.kengine.input.keyboard.useKeyboardContext
+import com.kengine.log.Logging
 import com.kengine.math.Vec2
 import com.kengine.time.getCurrentMilliseconds
 import com.kengine.time.timeSinceMs
@@ -24,7 +25,7 @@ class Player(
     private var scale: Double = 1.0
 ) : Entity(
     p = p, width = 32, height = 32,
-) {
+), Logging {
     private val spriteSheet = SpriteContext.get().getSpriteSheet(Sprites.BOXXLE_SHEET)
     private val playerSpriteUp = spriteSheet.getTile(0, 1)
     private val playerSpriteDown = spriteSheet.getTile(1, 1)
@@ -33,7 +34,8 @@ class Player(
     private var face: Direction = Direction.DOWN
     private var lastMovedMs = 0L
     private var isMoving = false
-    private var speed = 7.0
+    private val inputDelayMs = 100L
+    private val moveDurationMs = 200L
 
     init {
         setScale(scale)
@@ -41,7 +43,7 @@ class Player(
 
     override fun update() {
         useKeyboardContext {
-            if (!isMoving && timeSinceMs(lastMovedMs) > 300) {
+            if (!isMoving && timeSinceMs(lastMovedMs) > inputDelayMs) {
                 if (keyboard.isLeftPressed() || keyboard.isAPressed()) {
                     face = Direction.LEFT
                     tryMove(Vec2(-1.0, 0.0))
@@ -67,7 +69,7 @@ class Player(
             }
         }
         useControllerContext {
-            if (!isMoving && timeSinceMs(lastMovedMs) > 300) {
+            if (!isMoving && timeSinceMs(lastMovedMs) > inputDelayMs) {
                 if (controller.isButtonPressed(Buttons.DPAD_LEFT)) {
                     face = Direction.LEFT
                     tryMove(Vec2(-1.0, 0.0))
@@ -108,9 +110,13 @@ class Player(
                         // move both the player and the box
                         isMoving = true
                         lastMovedMs = getCurrentMilliseconds()
+
                         return useActionContext {
-                            moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
-                            moveTo(box, box.p + delta, speed, onComplete = { box.afterPush() })
+                            moveTo(this@Player, newP, moveDurationMs, onComplete = {
+                                isMoving = false
+                                lastMovedMs = 0L
+                            })
+                            moveTo(box, box.p + delta, moveDurationMs, onComplete = { box.afterPush() })
                         }
                     }
                     return // player can't move if the box can't be pushed
@@ -119,7 +125,10 @@ class Player(
 
             // if no box is being pushed, just move the player
             isMoving = true
-            getActionContext().moveTo(this@Player, newP, speed, onComplete = { isMoving = false })
+            getActionContext().moveTo(this@Player, newP, moveDurationMs, onComplete = {
+                isMoving = false
+                lastMovedMs = 0L
+            })
             lastMovedMs = getCurrentMilliseconds()
         }
     }

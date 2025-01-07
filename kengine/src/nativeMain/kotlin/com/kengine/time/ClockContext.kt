@@ -38,10 +38,10 @@ data class ClockContext private constructor(
 
     // moving average FPS
     private var avgFps = 60.0 // initial approximation
-    private var frameWeight = 0.1 // weight for current frame in moving average
+    private var frameWeight = 0.1 // Recent frames have 10% weight
 
-    // Frame timing
-    private var targetFrameTime = 0.0
+    // frame timing
+    private var targetFrameTime = 16.67 // Default ~60 FPS
     private var frameTimeErrorMs = 0.0 // Drift compensation
 
     /**
