@@ -7,21 +7,9 @@ class MouseContext private constructor(
     val mouse: MouseInputEventSubscriber
 ) : Context(), Logging {
 
-    // Track button states
-    private var wasLeftPressed: Boolean = false
-    private var isLeftPressed: Boolean = false
-
     override fun cleanup() {
         logger.debug { "Cleaning up MouseContext" }
         currentContext = null
-    }
-
-    fun wasLeftPressed(): Boolean {
-        return wasLeftPressed
-    }
-
-    fun wasLeftReleased(): Boolean {
-        return wasLeftPressed && !isLeftPressed
     }
 
     fun init() {

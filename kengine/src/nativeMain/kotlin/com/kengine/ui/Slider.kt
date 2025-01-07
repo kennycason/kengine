@@ -170,18 +170,22 @@ class Slider(
     override fun click(mouseX: Double, mouseY: Double) {
         if (!visible) return
 
-        // Only start dragging if we actually clicked inside the slider track/handle
+        // If user clicked anywhere within the slider’s bounding box,
+        // we consider that a drag begin:
         if (isWithinBounds(mouseX, mouseY)) {
             isDragging = true
+
+            // Claim exclusive drag focus so we can keep updating
+            // even if mouse moves outside slider bounds:
+            getViewContext().setDragFocus(this)
+
             onClick?.invoke()
-            if (logger.isInfoEnabled()) {
-                logger.info("Slider `$id` click => isDragging=true")
-            }
-            // Optionally update value immediately on click
+            logger.info("Slider `$id` => click => isDragging=true")
+
+            // Optionally jump the handle right away:
             updateValue(mouseX, mouseY)
         }
     }
-
 
     /**
      * If the user is dragging, update the state on each hover call.
@@ -189,23 +193,20 @@ class Slider(
     override fun hover(mouseX: Double, mouseY: Double) {
         if (!visible) return
 
-        // If the user isn't pressing the mouse at all, end drag
-        if (!getViewContext().isMousePressed()) {
+        // If we lost drag focus, forcibly end drag
+        if (!getViewContext().isDragging(this)) {
             if (isDragging) {
                 isDragging = false
-                if (logger.isInfoEnabled()) {
-                    logger.info("Slider `$id` forced drag end because mouse not pressed.")
-                }
+                logger.info("Slider `$id` => forcibly ended drag (lost focus).")
             }
             return
         }
 
-        // If we *are* currently dragging, update slider's value
+        // If *are* still the dragFocus => update value
         if (isDragging) {
             updateValue(mouseX, mouseY)
         }
     }
-
 
     /**
      * Release ends the drag.
@@ -214,33 +215,31 @@ class Slider(
     override fun release(mouseX: Double, mouseY: Double) {
         if (!visible) return
 
-        // As soon as user releases anywhere, we end dragging
         if (isDragging) {
             isDragging = false
-            if (logger.isInfoEnabled()) {
-                logger.info("Slider `$id` release => isDragging=false")
-            }
+            logger.info("Slider `$id` => release => isDragging=false")
         }
+
+        // Release the dragFocus if we had it
+        getViewContext().clearDragFocus(this)
+
+        // Then call our optional onRelease and pass it to children
         super.release(mouseX, mouseY)
     }
-
 
     /**
      * For the "click" or "hover" or "release" to consider the entire track+handle,
      * you could define isWithinBounds() to check the entire track area or just the handle area.
      */
     override fun isWithinBounds(mouseX: Double, mouseY: Double): Boolean {
-        // For a typical vertical slider, let's say the entire track is interactive:
-        // from layoutX..layoutX+layoutW, layoutY+padding..layoutY+layoutH-padding
-        // If you only want handle grabs, do a handle-based check.
-        val left   = layoutX + (layoutW / 2.0) - (actualTrackWidth / 2.0)
-        val right  = left + actualTrackWidth
-        val top    = layoutY + padding
-        val bottom = layoutY + layoutH - padding
+        val left   = layoutX
+        val right  = layoutX + layoutW
+        val top    = layoutY
+        val bottom = layoutY + layoutH
 
         return (
             mouseX >= left && mouseX <= right &&
-                mouseY >= top && mouseY <= bottom
+                mouseY >= top  && mouseY <= bottom
             )
     }
 
@@ -248,8 +247,7 @@ class Slider(
      * Helper to set state & call onValueChanged.
      */
     private fun updateValue(mouseX: Double, mouseY: Double) {
-        // e.g. do your clamp logic
-        val newVal = valueAt(mouseY)  // or (mouseY) if vertical
+        val newVal = valueAt(mouseY)
         state.set(newVal)
         onValueChanged?.invoke(newVal)
     }

@@ -54,16 +54,9 @@ class GameLoop(
                 useMouseContext {
                     val cursor = mouse.cursor()
 
-                    // Release if left was just released
-                    if (wasLeftReleased()) {
-                        getViewContext().releaseMouseEvents(cursor.x, cursor.y)
-                    }
+                    // Release if left was just released.handleMouseEvents(cursor.x, cursor.y, mouse.isLeftPressed())
                     // Press or hover
-                    getViewContext().handleMouseEvents(
-                        cursor.x,
-                        cursor.y,
-                        mouse.isLeftPressed()
-                    )
+                    getViewContext().handleMouseEvents(cursor.x, cursor.y, mouse.isLeftPressed())
                 }
 
                 update()
@@ -84,7 +77,6 @@ class GameLoop(
 
         logger.info { "Game loop exited cleanly." }
     }
-
 
     companion object {
         operator fun invoke(

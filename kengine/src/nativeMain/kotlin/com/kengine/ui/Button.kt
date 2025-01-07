@@ -6,11 +6,10 @@ import com.kengine.graphics.Sprite
 
 class Button(
     id: String,
-    // For the new layout approach, these are the "desired" values:
     x: Double = 0.0,
     y: Double = 0.0,
-    w: Double,  // Required width
-    h: Double,  // Required height
+    w: Double,  // Required
+    h: Double,  // Required
     padding: Double = 5.0,
     onClick: (() -> Unit)? = null,
     onHover: (() -> Unit)? = null,
@@ -28,16 +27,21 @@ class Button(
     desiredY = y,
     desiredW = w,
     desiredH = h,
+    padding = padding,
     bgColor = bgColor,
     bgImage = bgSprite,
-    padding = padding,
     onClick = onClick,
     onHover = onHover,
     onRelease = onRelease,
     parent = parent
 ) {
-    private var isHovered: Boolean = false
-    private var isPressed: Boolean = false
+    private var isHovered = false
+    private var isPressed = false
+
+    // Optionally use dragFocus if you want the button
+    // to remain "pressed" while the mouse is down, even if the pointer leaves:
+    // (Uncomment if you want "OS-like" button press behavior.)
+    // private var isDragging = false
 
     override fun draw() {
         // Don’t draw if invisible
@@ -49,7 +53,7 @@ class Button(
 
         if (logger.isTraceEnabled()) {
             logger.trace(
-                "Drawing Button `$id` at ($absX, $absY) size=(${layoutW} x $layoutH), parent=${parent?.id}"
+                "Drawing Button $id at ($absX, $absY) size=(${layoutW} x $layoutH), parent=${parent?.id}"
             )
         }
 
@@ -81,13 +85,14 @@ class Button(
     override fun click(mouseX: Double, mouseY: Double) {
         if (!visible) return
 
-        // If in bounds => press
+        // If inside bounds => press
         if (isWithinBounds(mouseX, mouseY)) {
             isPressed = true
             onClick?.invoke()
-            if (logger.isInfoEnabled()) {
-                logger.info("Button `$id` => isPressed=true, onClick invoked.")
-            }
+
+            // If you want to hold dragFocus so the button remains pressed
+            // until release:
+            // ViewContext.get().setDragFocus(this)
         }
     }
 
@@ -96,48 +101,35 @@ class Button(
 
         val wasHovered = isHovered
         isHovered = isWithinBounds(mouseX, mouseY)
-
         if (isHovered != wasHovered) {
             onHover?.invoke()
-            if (logger.isInfoEnabled()) {
-                logger.info("Button `$id` => isHovered=$isHovered, onHover invoked.")
-            }
         }
     }
 
     override fun release(mouseX: Double, mouseY: Double) {
-        if (logger.isInfoEnabled()) {
-            logger.info("Button `$id` => release, wasPressed=$isPressed")
-        }
-
-        // If it was pressed, call onRelease
         if (isPressed) {
+            // We can call onRelease no matter what
             onRelease?.invoke()
-            if (logger.isInfoEnabled()) {
-                logger.info("Button `$id` => onRelease invoked, isPressed=false.")
-            }
-        }
-        // Always un-press on release (not a toggle)
-        isPressed = false
+            isPressed = false
 
+            // If using dragFocus:
+            // ViewContext.get().clearDragFocus(this)
+        }
         super.release(mouseX, mouseY)
     }
 
     override fun isWithinBounds(mouseX: Double, mouseY: Double): Boolean {
-        // Compare to final layout position & size
         val relX = mouseX - layoutX
         val relY = mouseY - layoutY
 
         return if (isCircle) {
-            // Check distance from center
             val radius = kotlin.math.min(layoutW, layoutH) / 2.0
             val centerX = layoutW / 2.0
             val centerY = layoutH / 2.0
             val dx = relX - centerX
             val dy = relY - centerY
-            (dx * dx + dy * dy) <= radius * radius
+            (dx * dx + dy * dy) <= (radius * radius)
         } else {
-            // Check rectangular bounds
             relX in 0.0..layoutW &&
                 relY in 0.0..layoutH
         }

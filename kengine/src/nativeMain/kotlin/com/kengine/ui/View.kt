@@ -433,44 +433,44 @@ open class View(
 //        return button
 //    }
 
-//    fun knob(
-//        id: String,
-//        x: Double = 0.0,
-//        y: Double = 0.0,
-//        w: Double,  // Required
-//        h: Double,  // Required
-//        min: Double = 0.0,
-//        max: Double = 100.0,
-//        stepSize: Double? = null,
-//        state: State<Double>,
-//        padding: Double = 0.0,
-//        bgColor: Color? = null,
-//        bgSprite: Sprite? = null,
-//        knobColor: Color = Color.gray10,
-//        indicatorColor: Color = Color.white,
-//        onValueChanged: ((Double) -> Unit)? = null
-//    ): Knob {
-//        val knob = Knob(
-//            id = id,
-//            x = x,
-//            y = y,
-//            w = w,
-//            h = h,
-//            min = min,
-//            max = max,
-//            stepSize = stepSize,
-//            state = state,
-//            padding = padding,
-//            bgColor = bgColor,
-//            bgSprite = bgSprite,
-//            knobColor = knobColor,
-//            indicatorColor = indicatorColor,
-//            onValueChanged = onValueChanged,
-//            parent = this
-//        )
-//        addChild(knob)
-//        return knob
-//    }
+    fun knob(
+        id: String,
+        x: Double = 0.0,
+        y: Double = 0.0,
+        w: Double,  // Required
+        h: Double,  // Required
+        min: Double = 0.0,
+        max: Double = 100.0,
+        stepSize: Double? = null,
+        state: State<Double>,
+        padding: Double = 0.0,
+        bgColor: Color? = null,
+        bgSprite: Sprite? = null,
+        knobColor: Color = Color.gray10,
+        indicatorColor: Color = Color.white,
+        onValueChanged: ((Double) -> Unit)? = null
+    ): Knob {
+        val knob = Knob(
+            id = id,
+            x = x,
+            y = y,
+            w = w,
+            h = h,
+            min = min,
+            max = max,
+            stepSize = stepSize,
+            state = state,
+            padding = padding,
+            bgColor = bgColor,
+            bgSprite = bgSprite,
+            knobColor = knobColor,
+            indicatorColor = indicatorColor,
+            onValueChanged = onValueChanged,
+            parent = this
+        )
+        addChild(knob)
+        return knob
+    }
 
 //    fun image(
 //        id: String,
@@ -505,7 +505,4 @@ open class View(
         children.forEach { it.cleanup() }
     }
 
-    companion object {
-        var activeDragView: View? = null // Tracks the currently active view
-    }
 }

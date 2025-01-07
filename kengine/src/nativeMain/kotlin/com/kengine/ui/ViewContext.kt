@@ -7,107 +7,131 @@ import com.kengine.math.Vec2
 class ViewContext private constructor() : Context(), Logging {
     private val rootViews = mutableListOf<View>()
 
+    /**
+     * This will track whichever View is actively dragging.
+     * If null, then no View has captured the mouse.
+     */
+    private var dragFocus: View? = null
+
+    /**
+     * This tracks whether the mouse was pressed during the previous handleMouseEvents() call.
+     */
+    private var wasPressed: Boolean = false
+
     fun addView(view: View) {
         rootViews.add(view)
     }
 
-    /**
-     * Optionally call this each frame or whenever
-     * the layout might need to be re-flowed.
-     */
     fun performLayout() {
-        rootViews.forEach { root ->
-            // Start each root at (0,0) or some parent offset
+        for (root in rootViews) {
             root.performLayout(offsetX = 0.0, offsetY = 0.0)
         }
     }
 
     /**
-     * Handles mouse events based on position and press state.
-     * We do not do the layout logic here—this just routes input
-     * to the correct views.
+     * A single method to handle mouse input each frame.
+     *
+     * @param mouseX current mouse X
+     * @param mouseY current mouse Y
+     * @param isCurrentlyPressed whether the left mouse button is down *this* frame
      */
-    fun handleMouseEvents(mouseX: Double, mouseY: Double, isPressed: Boolean) {
+    fun handleMouseEvents(
+        mouseX: Double,
+        mouseY: Double,
+        isCurrentlyPressed: Boolean
+    ) {
         if (logger.isTraceEnabled()) {
-            logger.trace { "Mouse event at ($mouseX, $mouseY) - Pressed: $isPressed" }
+            logger.trace {
+                "handleMouseEvents: mouse=($mouseX, $mouseY), pressed=$isCurrentlyPressed, wasPressed=$wasPressed"
+            }
         }
 
-        // If pressed, treat as click; otherwise, treat as hover
-        rootViews.forEach { view ->
-            if (isPressed) {
-                view.click(mouseX, mouseY)
-            } else {
-                view.hover(mouseX, mouseY)
+        when {
+            // 1) Just pressed
+            !wasPressed && isCurrentlyPressed -> {
+                // We do a click pass. If a child claims focus, store dragFocus.
+                dragFocus = null
+                for (view in rootViews) {
+                    view.click(mouseX, mouseY)
+                    if (dragFocus != null) break
+                }
+            }
+
+            // 2) Just released
+            wasPressed && !isCurrentlyPressed -> {
+                // If we had a dragFocus, let it handle release. Then clear focus.
+                if (dragFocus != null) {
+                    dragFocus?.release(mouseX, mouseY)
+                    dragFocus = null
+                } else {
+                    // No dragFocus => pass release to everyone
+                    rootViews.forEach { it.release(mouseX, mouseY) }
+                }
+            }
+
+            // 3) Still pressed (held)
+            wasPressed && isCurrentlyPressed -> {
+                // If we have a dragFocus, it alone sees hover (drag).
+                dragFocus?.hover(mouseX, mouseY)
+            }
+
+            // 4) Not pressed both frames => normal hover
+            else -> {
+                if (dragFocus != null) {
+                    // Either let the dragFocus handle hover, or do nothing
+                    dragFocus?.hover(mouseX, mouseY)
+                } else {
+                    // Hover for all
+                    for (view in rootViews) {
+                        view.hover(mouseX, mouseY)
+                    }
+                }
+            }
+        }
+
+        // Update wasPressed at the *end*, so next frame we can see transitions
+        wasPressed = isCurrentlyPressed
+    }
+
+    /**
+     * Called by a control that wants to capture mouse until release.
+     */
+    fun setDragFocus(view: View) {
+        dragFocus = view
+        if (logger.isDebugEnabled()) {
+            logger.debug("setDragFocus -> ${view.id}")
+        }
+    }
+
+    fun clearDragFocus(view: View) {
+        if (dragFocus == view) {
+            dragFocus = null
+            if (logger.isDebugEnabled()) {
+                logger.debug("clearDragFocus -> ${view.id}")
             }
         }
     }
 
-    /**
-     * If you’re using e.g. Sliders that track dragging,
-     * you can check if any is dragging.
-     */
-    fun isMousePressed(): Boolean {
-        // If you wanted to check any view is dragging:
-        return rootViews.any { it is Slider && it.isDragging }
-    }
+    fun isDragging(view: View): Boolean = (dragFocus == view)
 
-    /**
-     * Handles mouse release events
-     */
-    fun releaseMouseEvents(mouseX: Double, mouseY: Double) {
-        if (logger.isTraceEnabled()) {
-            logger.trace { "Mouse release at ($mouseX, $mouseY)" }
-        }
-        rootViews.forEach { view ->
-            view.release(mouseX, mouseY)
-        }
-    }
-
-    /**
-     * Renders all views in the context.
-     * Optionally call `performLayout()` first each frame
-     * if your UI layout changes dynamically.
-     */
     fun render() {
-        // If you want to re-flow each frame:
-        // performLayout()
-
-        rootViews.forEach { rootView ->
-            rootView.draw() // uses final layout geometry
+        for (root in rootViews) {
+            root.draw()
         }
     }
 
-    /**
-     * Clears all views from the context
-     */
     fun clear() {
         rootViews.clear()
+        dragFocus = null
+        wasPressed = false
     }
 
-    /**
-     * Convenience methods for Vec2 input handling
-     */
-    fun click(p: Vec2) = click(p.x, p.y)
-    fun hover(p: Vec2) = hover(p.x, p.y)
+    // Optional Vec2 helpers
+    fun click(p: Vec2) = handleMouseEvents(p.x, p.y, true)
+    fun hover(p: Vec2) = handleMouseEvents(p.x, p.y, false)
 
-    fun click(x: Double, y: Double) {
-        rootViews.forEach { view ->
-            view.click(x, y)
-        }
-    }
-
-    fun hover(x: Double, y: Double) {
-        rootViews.forEach { view ->
-            view.hover(x, y)
-        }
-    }
-
-    /**
-     * Cleanup resources
-     */
     override fun cleanup() {
-        rootViews.forEach { it.cleanup() }
-        rootViews.clear()
+        clear()
     }
 
     companion object {

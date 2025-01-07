@@ -4,7 +4,6 @@ import com.kengine.Game
 import com.kengine.GameRunner
 import com.kengine.createGameContext
 import com.kengine.graphics.Color
-import com.kengine.hooks.state.State
 import com.kengine.hooks.state.useState
 import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.useControllerContext
@@ -14,25 +13,21 @@ import com.kengine.particle.RainbowLinesEffect
 import com.kengine.particle.WavePatternEffect
 import com.kengine.particle.WavePatternEffect2
 import com.kengine.sdl.useSDLContext
-import com.kengine.ui.Align
-import com.kengine.ui.FlexDirection
-import com.kengine.ui.useView
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.SDL_Delay
 import kotlin.test.Test
 
-class Osc3xIT : Logging {
+class Osc3xSynthControllerDemo : Logging {
 
     @OptIn(ExperimentalForeignApi::class)
     @Test
     fun run() {
         createGameContext(
-            title = "Kengine - Synth - Osc3x",
+            title = "Kengine - Synth - Osc3x - Controller Demo",
             width = 640,
             height = 480,
             logLevel = Logger.Level.INFO
         ) {
-
 
             var osc1Selected = false
             var osc2Selected = false
@@ -52,10 +47,9 @@ class Osc3xIT : Logging {
                 width = 640, height = 480, numLines = 640
             )
 
-            val volumeState = useState(0.01)
+            val volumeState = useState(0.05)
             val frequencyState = useState(444.0)
             val detuneState = useState(0.0)
-            val knobState = useState(0.0)
 
             val osc3x = Osc3x()
             osc3x.setConfig(0, waveform = Oscillator.Waveform.SAW)
@@ -63,146 +57,6 @@ class Osc3xIT : Logging {
             osc3x.setConfig(2, waveform = Oscillator.Waveform.SINE)
             osc3x.setMasterVolume(volumeState.get())
             osc3x.setConfig(frequency = frequencyState.get(), detune = detuneState.get())
-
-
-            val osc1View = useView(
-                id = "sliders",
-                x = 10.0,
-                y = 10.0,
-                w = 145.0,
-                h = 80.0,
-                bgColor = Color.neonBlue,
-                padding = 5.0,
-                spacing = 5.0
-            ) {
-                fun buildSlider(
-                    id: String,
-                    min: Double, max: Double,
-                    state: State<Double>,
-                    onValueChanged: (newValue: Double) -> Unit
-                ) {
-                    slider(
-                        id = id,
-                        w = 20.0,
-                        h = 70.0,
-                        min = min,
-                        max = max,
-                        padding = 5.0,
-                        state = state,
-                        bgColor = Color.neonPurple,
-                        trackWidth = 3.0,
-                        trackColor = Color.neonCyan,
-                        handleWidth = 14.0,
-                        handleHeight = 7.0,
-                        handleColor = Color.neonOrange,
-                        onValueChanged = onValueChanged
-                    )
-                }
-                buildSlider(
-                    id = "volume-slider",
-                    min = 0.0,
-                    max = 1.0,
-                    state = volumeState,
-                    onValueChanged = { value ->
-                        logger.info("slider moved to $value")
-                        osc3x.setMasterVolume(value)
-                    }
-                )
-                buildSlider(
-                    id = "frequency-slider",
-                    min = -4000.0,
-                    max = 4000.0,
-                    state = frequencyState,
-                    onValueChanged = { value ->
-                        logger.info("slider moved to $value")
-                        osc3x.setConfig(frequency = value)
-                    }
-                )
-                buildSlider(
-                    id = "detune-slider",
-                    min = -4000.0,
-                    max = 4000.0,
-                    state = detuneState,
-                    onValueChanged = { value ->
-                        logger.info("slider moved to $value")
-                        osc3x.setConfig(detune = value)
-                    }
-                )
-
-                view(
-                    direction = FlexDirection.COLUMN,
-                    align = Align.LEFT,
-                    w = 20.0,
-                    h = 70.0,
-                    padding = 2.0,
-                    bgColor = Color.neonLime,
-                    spacing = 3.0
-                ) {
-                    fun buildWaveFormButton(waveform: Oscillator.Waveform) {
-                        button(
-                            id = "waveform-button-$waveform",
-                            w = 14.0,
-                            h = 14.0,
-                            bgColor = Color.neonPurple,
-                            hoverColor = Color.neonBlue,
-                            pressColor = Color.neonOrange,
-                            isCircle = true,
-                            onClick = {
-                                logger.info("Waveform $waveform button clicked")
-                                osc3x.setConfig(waveform = waveform)
-                            }
-                        )
-                    }
-                    buildWaveFormButton(Oscillator.Waveform.SAW)
-                    buildWaveFormButton(Oscillator.Waveform.SINE)
-                    buildWaveFormButton(Oscillator.Waveform.TRIANGLE)
-                    buildWaveFormButton(Oscillator.Waveform.SQUARE)
-                }
-
-//                view(
-//                    direction = FlexDirection.COLUMN,
-//                    align = Align.LEFT,
-//                    w = 35.0,
-//                    h = 70.0,
-//                    padding = 0.0,
-//                    bgColor = Color.neonMagenta,
-//                ) {
-//                    knob(
-//                        id = "frequency-knob",
-//                        w = 35.0,
-//                        h = 35.0,
-//                        padding = 5.0,
-//                        min = -4000.0,
-//                        max = 4000.0,
-//                        stepSize = 100.0,
-//                        state = knobState,
-//                        bgColor = Color.neonPeach,
-//                        knobColor = Color.neonCyan,
-//                        indicatorColor = Color.neonOrange,
-//                        onValueChanged = { value ->
-//                            logger.info("Knob moved to $value")
-//                            osc3x.setConfig(frequency = value)
-//                        }
-//                    )
-//                    knob(
-//                        id = "volume-knob",
-//                        w = 35.0,
-//                        h = 35.0,
-//                        padding = 5.0,
-//                        min = 0.0,
-//                        max = 1.0,
-//                        stepSize = 0.001,  // Will change by 0.01 per step
-//                        state = volumeState,
-//                        bgColor = Color.neonPurple,
-//                        knobColor = Color.neonCyan,
-//                        indicatorColor = Color.neonOrange,
-//                        onValueChanged = { value ->
-//                            logger.info("Volume knob moved to $value")
-//                            osc3x.setMasterVolume(value)
-//                        }
-//                    )
-//                }
-            }
 
             GameRunner(frameRate = 60) {
                 object : Game {
@@ -239,10 +93,12 @@ class Osc3xIT : Logging {
                                 else -> 0.0
                             }
 
-//                            logger.infoStream {
-//                                write("o1: $osc1Selected o2: $osc2Selected, o3: $osc3Selected,")
-//                                write("freq: $deltaFrequency, detune: $deltaDetune, vol=$deltaVolume, wav=$newWaveform")
-//                            }
+                            if (logger.isDebugEnabled()) {
+                                logger.debugStream {
+                                    write("o1: $osc1Selected o2: $osc2Selected, o3: $osc3Selected,")
+                                    write("freq: $deltaFrequency, detune: $deltaDetune, vol=$deltaVolume, wav=$newWaveform")
+                                }
+                            }
 
                             // apply changes for the selected oscillator(s)
                             fun applyUpdates(index: Int) {
@@ -293,27 +149,20 @@ class Osc3xIT : Logging {
                         }
 
                         osc3x.update()
-
-//                        rainbowEffect.update()
                         wavePattern.update()
-                        wavePattern2.update()
                         SDL_Delay(1u) // small delay to prevent CPU overuse
                     }
 
                     override fun draw() {
                         useSDLContext {
                             fillScreen(Color.black)
-//                            rainbowEffect.draw()
                             wavePattern.draw()
-//                            wavePattern2.draw()
 
-                            osc1View.draw()
                             flipScreen()
                         }
                     }
 
                     override fun cleanup() {
-                        // audioStream.cleanup()
                     }
                 }
             }

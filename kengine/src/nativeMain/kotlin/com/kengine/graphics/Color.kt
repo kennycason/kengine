@@ -6,7 +6,7 @@ data class Color(
     val r: UByte,
     val g: UByte,
     val b: UByte,
-    val a: UByte
+    val a: UByte = 0xFFu
 ) {
     fun toUInt(): UInt =
         (r.toUInt() shl 24 or (g.toUInt() shl 16) or (b.toUInt() shl 8) or a.toUInt())

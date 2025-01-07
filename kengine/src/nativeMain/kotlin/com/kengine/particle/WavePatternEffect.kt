@@ -1,5 +1,6 @@
 package com.kengine.particle
 
+import com.kengine.entity.Actor
 import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Color
 import com.kengine.math.Vec2
@@ -13,7 +14,7 @@ class WavePatternEffect(
     private val width: Int,
     private val height: Int,
     private val numWaves: Int = 256
-) {
+) : Actor {
     private val points = mutableListOf<Vec2>()
     private val colors = Color.rainbow(numWaves)
     private var time = 0.0
@@ -31,7 +32,7 @@ class WavePatternEffect(
         frequency = newFrequency
     }
 
-    fun update() {
+    override fun update() {
         time += 0.1 // increment time for animation
 
         for (i in points.indices) {
@@ -47,7 +48,7 @@ class WavePatternEffect(
         }
     }
 
-    fun draw() {
+    override fun draw() {
         useGeometryContext {
             for (i in 1 until points.size) {
                 val color = colors[i % colors.size]
@@ -56,8 +57,8 @@ class WavePatternEffect(
 
                 // draw wave line segment
                 drawLine(
-                    start.x, start.y,
-                    end.x, end.y,
+                    x + start.x, y + start.y,
+                   x + end.x, y + end.y,
                     color.r, color.g, color.b, 0xEEu
                 )
             }

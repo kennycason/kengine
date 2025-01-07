@@ -6,12 +6,13 @@ import com.kengine.graphics.Color
 import com.kengine.math.Vec2
 import kotlin.math.abs
 
-class RainbowLinesEffect(
+class RainbowLinesWithFrequencyEffect(
     private val x: Int,
     private val y: Int,
     private val width: Int,
     private val height: Int,
     private val numLines: Int = 256,
+    private var frequency: Double = 0.0
 ) : Actor {
     private val colors = Color.rainbow(numLines) // generate rainbow colors
     private val startPoints = mutableListOf<Vec2>()
@@ -35,17 +36,37 @@ class RainbowLinesEffect(
         offset = abs(newOffset) % numLines // Ensure offset wraps correctly
     }
 
+    fun setFrequency(frequency: Double) {
+      //  this.frequency = frequency
+    }
+
     override fun draw() {
         useGeometryContext {
             for (i in 0 until numLines) {
+                // The line index we start from, considering the 'offset'
                 val startIdx = (i + offset) % numLines
-                val start = startPoints[startIdx]
-                val end = Vec2(start.x, height.toDouble()) // End directly below start
-
+                val startBase = startPoints[startIdx]
                 val color = colors[i]
+
+                // We'll do a horizontal wave effect by shifting the line's X a bit,
+                // based on frequency and the line index.
+                // If you want a vertical wave, you can do it on y or both.
+                val wave = kotlin.math.sin((startBase.x + i) * 0.05 + frequency * 0.01)
+                val waveShift = wave * (frequency * 0.25)   // amplitude scale
+
+                // Then compute final start/end points.
+                // 1) The "base" position is x + startBase.x for X, y + startBase.y for Y.
+                // 2) We'll add waveShift to the X coordinates to create side-to-side wobble.
+                val startX = x + startBase.x + waveShift
+                val startY = y + startBase.y
+
+                val endX = x + startBase.x + waveShift
+                val endY = y + height.toDouble()   // Directly below, ignoring wave for Y
+
+                // Draw the line
                 drawLine(
-                    x + start.x, y + start.y,
-                    x + end.x, y + end.y,
+                    startX, startY,
+                    endX,   endY,
                     color.r, color.g, color.b, 0xEEu
                 )
             }
