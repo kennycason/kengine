@@ -15,12 +15,12 @@ import com.kengine.particle.WavePatternEffect2
 import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.SDL_Delay
-import kotlin.test.Test
+import kotlin.test.Ignore
 
 class Osc3xSynthControllerDemo : Logging {
 
     @OptIn(ExperimentalForeignApi::class)
-    @Test
+    @Ignore // @Test to demo
     fun run() {
         createGameContext(
             title = "Kengine - Synth - Osc3x - Controller Demo",

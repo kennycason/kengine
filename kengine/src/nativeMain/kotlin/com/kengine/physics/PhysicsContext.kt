@@ -62,9 +62,11 @@ class PhysicsContext private constructor() : Context(), Logging {
     }
 
     fun removeObject(obj: PhysicsObject) {
-        logger.debug { "Remove object begin" }
-        logger.debug { "Removing object: $obj" }
-        logger.debug { "Body destroyed: ${obj.body.isDestroyed}, Shape destroyed: ${obj.shape.isDestroyed}" }
+        if (logger.isDebugEnabled()) {
+            logger.debug { "Removing object: $obj" }
+            logger.debug { "Body destroyed: ${obj.body.isDestroyed}, Shape destroyed: ${obj.shape.isDestroyed}" }
+        }
+
         cpSpaceRemoveBody(space, obj.body.handle)
         cpSpaceRemoveShape(space, obj.shape.handle)
 
@@ -82,9 +84,6 @@ class PhysicsContext private constructor() : Context(), Logging {
         // finally, remove from lists if still present
         dynamicObjects.remove(obj)
         staticObjects.remove(obj)
-
-        logger.debug { "Removing object: $obj" }
-        logger.debug { "Body destroyed: ${obj.body.isDestroyed}, Shape destroyed: ${obj.shape.isDestroyed}" }
     }
 
     fun getDynamicObjects(): List<PhysicsObject> = dynamicObjects

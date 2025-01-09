@@ -24,6 +24,7 @@ modules.addAll(
         "games:boxxle",
         "games:helloworld",
         "games:image-shuffle",
+        "games:osc3x-synth",
         "games:physics-demo"
     )
 )
