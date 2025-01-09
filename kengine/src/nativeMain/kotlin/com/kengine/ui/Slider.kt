@@ -4,132 +4,252 @@ import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Color
 import com.kengine.graphics.Sprite
 import com.kengine.hooks.state.State
+import kotlin.math.max
+import kotlin.math.min
 
 class Slider(
     id: String,
-    x: Double,
-    y: Double,
+    // "desired" positioning & size
+    x: Double = 0.0,
+    y: Double = 0.0,
     w: Double,  // Required width
     h: Double,  // Required height
-    padding: Double = 5.0,
+
+    // Extra slider fields
     val min: Double = 0.0,
     val max: Double = 100.0,
     private val state: State<Double>,
     private val onValueChanged: ((Double) -> Unit)? = null,
+
+    padding: Double = 5.0,
     bgColor: Color? = null,
     bgSprite: Sprite? = null,
-    trackWidth: Double? = null,
+
+    // Track / handle customization
+    private val trackWidth: Double? = null,
     private val trackColor: Color = Color.gray10,
-    handleWidth: Double? = null,
-    handleHeight: Double? = null,
+    private val handleWidth: Double? = null,
+    private val handleHeight: Double? = null,
     private val handleColor: Color = Color.white,
     private val handleSprite: Sprite? = null,
+
     parent: View? = null
 ) : View(
     id = id,
-    x = x,
-    y = y,
-    w = w,
-    h = h,
-    padding = padding,
+    desiredX = x,
+    desiredY = y,
+    desiredW = w,
+    desiredH = h,
     bgColor = bgColor,
-    bgImage = bgSprite,
+    bgSprite = bgSprite,
+    padding = padding,
     parent = parent
 ) {
-    // Track dimensions
-    private val trackWidth: Double = trackWidth ?: (w * 0.2)
+    /**
+     * True while user is dragging this slider's handle.
+     */
+    var isDragging: Boolean = false
+        private set
 
-    // Handle dimensions - default to square based on track width if not specified
-    private val handleWidth: Double = handleWidth ?: (w * 0.4)
-    private val handleHeight: Double = handleHeight ?: handleWidth!!
+    /**
+     * If user sets no custom trackWidth, we’ll default to a fraction of layoutW.
+     */
+    private val actualTrackWidth: Double
+        get() = trackWidth ?: (layoutW * 0.2)  // e.g. 20% of total width
 
-    private var dragging: Boolean = false
+    /**
+     * Similarly for handle dimensions, if not specified:
+     */
+    private val actualHandleWidth: Double
+        get() = handleWidth ?: (layoutW * 0.4) // e.g. 40% of total width
 
-    // The actual usable track height considering padding
-    private val effectiveTrackHeight: Double get() = h - (padding * 2)
+    private val actualHandleHeight: Double
+        get() = handleHeight ?: actualHandleWidth // or just a square handle
 
-    private fun calculateHandlePosition(): Double {
+    /**
+     * The vertical space for the slider track. We'll assume it's fully vertical.
+     */
+    private val effectiveTrackHeight: Double
+        get() = layoutH - (padding * 2.0)
+
+    /**
+     * Returns the top Y offset of the handle in final layout coordinates.
+     * By default, we interpret "slider" as vertical: top-to-bottom.
+     *
+     *   - state.get() in [min.. max]
+     *   - handle is at top for "max," at bottom for "min."
+     *   - You can invert if you prefer the opposite direction.
+     */
+    private fun calculateHandleY(): Double {
         val range = max - min
-        val normalizedValue = (state.get() - min) / range
-        val availableHeight = effectiveTrackHeight - handleHeight
-        return padding + ((1.0 - normalizedValue) * availableHeight)
+        val fraction = (state.get() - min) / range   // [0..1]
+        val available = effectiveTrackHeight - actualHandleHeight
+
+        // If we want the "max" at top, we do (1 - fraction).
+        val topOffset = padding + (1.0 - fraction) * available
+        return layoutY + topOffset
     }
 
-    private fun valueAt(absY: Double, parentY: Double): Double {
-        val relativeY = absY - parentY - y
-        val availableHeight = effectiveTrackHeight - handleHeight
-        val clampedY = (relativeY - padding).coerceIn(0.0, availableHeight)
+    /**
+     * We'll place the track in the center (horizontal) by default:
+     */
+    private fun trackX(): Double = layoutX + (layoutW / 2.0) - (actualTrackWidth / 2.0)
+    private fun trackY(): Double = layoutY + padding
+
+    /**
+     * We center the handle horizontally:
+     */
+    private fun handleX(): Double = layoutX + (layoutW / 2.0) - (actualHandleWidth / 2.0)
+    private fun handleY(): Double = calculateHandleY()
+
+    /**
+     * Convert an absolute mouseY coordinate into a slider value [min.. max].
+     * We clamp the result so it doesn't overshoot.
+     */
+    private fun valueAt(absMouseY: Double): Double {
+        // 1) Identify top/bottom (the track region)
+        val topY    = layoutY + padding
+        val bottomY = layoutY + layoutH - padding - actualHandleHeight
+
+        // 2) Always reorder them to (yMin..yMax)
+        val yMin = min(topY, bottomY)
+        val yMax = max(topY, bottomY)
+
+        // 3) Clamp the mouse to that range
+        val clampedY = absMouseY.coerceIn(yMin, yMax)
+
+        // 4) Suppose we want top=“max” and bottom=“min”.
         val range = max - min
-        return max - (clampedY / availableHeight) * range
+        // fraction=1 means clampedY==yMin => “top”
+        val fraction = 1.0 - (clampedY - yMin) / (yMax - yMin)
+        val newVal = min + fraction * range
+        return newVal.coerceIn(min, max)
     }
 
-    override fun draw(parentX: Double, parentY: Double) {
+    override fun draw() {
+        // Return early if hidden
         if (!visible) return
 
-        val absX = parentX + x
-        val absY = parentY + y
+        // 1) Draw our background if we want (this uses layoutX/Y/W/H)
+        super.draw()  // Optionally let the parent do "fillRectangle()" for bg
 
-        if (logger.isTraceEnabled()) {
-            logger.trace { "Rendering view $id at ($absX, $absY) size: ${w}x${h}, parent: ${parent?.id}" }
-        }
-
-        // Draw background if specified
-        super.draw(parentX, parentY)
-
-        // Center the track horizontally
-        val trackX = absX + (w / 2.0) - (trackWidth / 2.0)
-        val trackY = absY + padding
+        // 2) We'll draw the "track"
+        val xTrack = trackX()
+        val yTrack = trackY()
+        val hTrack = effectiveTrackHeight
 
         useGeometryContext {
-            // Draw slider track within padded area
-            fillRectangle(trackX, trackY, trackWidth, effectiveTrackHeight, trackColor)
+            fillRectangle(
+                xTrack,  // left
+                yTrack,  // top
+                actualTrackWidth,
+                hTrack,
+                trackColor
+            )
+        }
 
-            // Draw slider handle
-            val handleY = absY + calculateHandlePosition()
-            val handleX = absX + (w / 2.0) - (handleWidth / 2.0)
+        // 3) Draw the handle
+        val hx = handleX()
+        val hy = handleY()
 
+        useGeometryContext {
             if (handleSprite != null) {
-                handleSprite.draw(handleX, handleY)
+                // If we have a custom sprite, draw that
+                handleSprite.draw(hx, hy)
             } else {
-                fillRectangle(handleX, handleY, handleWidth, handleHeight, handleColor)
+                // Otherwise, fill a rectangle or circle
+                fillRectangle(hx, hy, actualHandleWidth, actualHandleHeight, handleColor)
             }
         }
     }
 
-    override fun click(x: Double, y: Double) {
-        val relativeX = x - this.x
-        val relativeY = y - this.y
+    /**
+     * When user clicks inside the slider area, let's see if they clicked the handle.
+     * Or, if you want track-click behavior, you can jump the handle there.
+     */
+    override fun click(mouseX: Double, mouseY: Double) {
+        if (!visible) return
 
-        val trackX = (w / 2.0) - (trackWidth / 2.0)
-        val handleY = calculateHandlePosition()
-        val handleX = (w / 2.0) - (handleWidth / 2.0)
+        // If user clicked anywhere within the slider’s bounding box,
+        // we consider that a drag begin:
+        if (isWithinBounds(mouseX, mouseY)) {
+            isDragging = true
 
-        // Check if click is within handle bounds
-        val isWithinHandle = relativeX >= handleX && relativeX <= handleX + handleWidth &&
-            relativeY >= handleY && relativeY <= handleY + handleHeight
+            // Claim exclusive drag focus so we can keep updating
+            // even if mouse moves outside slider bounds:
+            getViewContext().setDragFocus(this)
 
-        // Check if click is within track bounds (respecting padding)
-        val isWithinTrack = relativeX >= trackX && relativeX <= trackX + trackWidth &&
-            relativeY >= padding && relativeY <= h - padding
+            onClick?.invoke()
+            logger.info("Slider `$id` => click => isDragging=true")
 
-        if (isWithinHandle) {
-            dragging = true
-        } else if (isWithinTrack) {
-            val newValue = valueAt(y, 0.0)
-            state.set(newValue.coerceIn(min, max))
-            onValueChanged?.invoke(state.get())
+            // Optionally jump the handle right away:
+            updateValue(mouseX, mouseY)
         }
     }
 
-    override fun hover(x: Double, y: Double) {
-        if (!dragging) return
-        val newValue = valueAt(y, 0.0)
-        state.set(newValue.coerceIn(min, max))
-        onValueChanged?.invoke(state.get())
+    /**
+     * If the user is dragging, update the state on each hover call.
+     */
+    override fun hover(mouseX: Double, mouseY: Double) {
+        if (!visible) return
+
+        // If we lost drag focus, forcibly end drag
+        if (!getViewContext().isDragging(this)) {
+            if (isDragging) {
+                isDragging = false
+                logger.info("Slider `$id` => forcibly ended drag (lost focus).")
+            }
+            return
+        }
+
+        // If *are* still the dragFocus => update value
+        if (isDragging) {
+            updateValue(mouseX, mouseY)
+        }
     }
 
-    override fun release(x: Double, y: Double) {
-        dragging = false
-        super.release(x, y)
+    /**
+     * Release ends the drag.
+     * (Though, you might require they release inside the handle? It's up to you.)
+     */
+    override fun release(mouseX: Double, mouseY: Double) {
+        if (!visible) return
+
+        if (isDragging) {
+            isDragging = false
+            logger.info("Slider `$id` => release => isDragging=false")
+        }
+
+        // Release the dragFocus if we had it
+        getViewContext().clearDragFocus(this)
+
+        // Then call our optional onRelease and pass it to children
+        super.release(mouseX, mouseY)
     }
+
+    /**
+     * For the "click" or "hover" or "release" to consider the entire track+handle,
+     * you could define isWithinBounds() to check the entire track area or just the handle area.
+     */
+    override fun isWithinBounds(mouseX: Double, mouseY: Double): Boolean {
+        val left   = layoutX
+        val right  = layoutX + layoutW
+        val top    = layoutY
+        val bottom = layoutY + layoutH
+
+        return (
+            mouseX >= left && mouseX <= right &&
+                mouseY >= top  && mouseY <= bottom
+            )
+    }
+
+    /**
+     * Helper to set state & call onValueChanged.
+     */
+    private fun updateValue(mouseX: Double, mouseY: Double) {
+        val newVal = valueAt(mouseY)
+        state.set(newVal)
+        onValueChanged?.invoke(newVal)
+    }
+
 }

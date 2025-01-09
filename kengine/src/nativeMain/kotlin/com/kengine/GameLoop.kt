@@ -43,7 +43,6 @@ class GameLoop(
                 eventContext.pollEvents()
                 action.update()
 
-
                 // calculate delta time
                 val currentCounter = SDL_GetPerformanceCounter()
                 val deltaTimeNs = (currentCounter - lastCounter) * 1_000_000_000u / frequency
@@ -52,25 +51,17 @@ class GameLoop(
                 // update ClockContext
                 clock.update((deltaTimeNs / 1_000_000u).toLong()) // Convert ns -> ms
 
-
                 useMouseContext {
-                    // handle release events only when state changes
-                    if (wasLeftReleased()) {
-                        getViewContext().releaseMouseEvents(
-                            mouse.cursor().x,
-                            mouse.cursor().y
-                        )
-                    }
+                    val cursor = mouse.cursor()
 
-                    // handle mouse click and hover events
-                    getViewContext().handleMouseEvents(
-                        mouse.cursor().x,
-                        mouse.cursor().y,
-                        mouse.isLeftPressed()
-                    )
+                    // Release if left was just released.handleMouseEvents(cursor.x, cursor.y, mouse.isLeftPressed())
+                    // Press or hover
+                    getViewContext().handleMouseEvents(cursor.x, cursor.y, mouse.isLeftPressed())
                 }
 
                 update()
+
+                getViewContext().performLayout()
 
                 draw()
 
@@ -86,7 +77,6 @@ class GameLoop(
 
         logger.info { "Game loop exited cleanly." }
     }
-
 
     companion object {
         operator fun invoke(

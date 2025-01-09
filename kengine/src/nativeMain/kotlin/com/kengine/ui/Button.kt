@@ -6,47 +6,45 @@ import com.kengine.graphics.Sprite
 
 class Button(
     id: String,
-    x: Double,
-    y: Double,
-    w: Double,  // Required width
-    h: Double,  // Required height
+    x: Double = 0.0,
+    y: Double = 0.0,
+    w: Double,
+    h: Double,
     padding: Double = 5.0,
-    private val onClick: (() -> Unit)? = null,
-    private val onHover: (() -> Unit)? = null,
-    private val onRelease: (() -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
+    onHover: (() -> Unit)? = null,
+    onRelease: (() -> Unit)? = null,
     bgColor: Color? = null,
     bgSprite: Sprite? = null,
     private val hoverColor: Color? = null,
     private val pressColor: Color? = null,
     private val isCircle: Boolean = false,
+    private val isToggle: Boolean = false,
+    private val onToggle: ((Boolean) -> Unit)? = null,
     parent: View? = null
 ) : View(
     id = id,
-    x = x,
-    y = y,
-    w = w,
-    h = h,
+    desiredX = x,
+    desiredY = y,
+    desiredW = w,
+    desiredH = h,
     padding = padding,
     bgColor = bgColor,
-    bgImage = bgSprite,
+    bgSprite = bgSprite,
+    onClick = onClick,
+    onHover = onHover,
+    onRelease = onRelease,
     parent = parent
 ) {
-    private var isHovered: Boolean = false
-    private var isPressed: Boolean = false
+    private var isHovered = false
+    private var isPressed = false
+        private set
 
-    override fun draw(parentX: Double, parentY: Double) {
+    override fun draw() {
         if (!visible) return
 
-        val absX = parentX + x
-        val absY = parentY + y
-
-        if (logger.isTraceEnabled()) {
-            logger.trace { "Rendering view $id at ($absX, $absY) size: ${w}x${h}, parent: ${parent?.id}" }
-        }
-
-        // Determine current color based on state
         val currentColor = when {
-            isPressed -> pressColor
+            isToggle && isPressed -> pressColor ?: hoverColor ?: bgColor
             isHovered -> hoverColor
             else -> bgColor
         }
@@ -54,63 +52,63 @@ class Button(
         if (currentColor != null) {
             useGeometryContext {
                 if (isCircle) {
-                    val radius = kotlin.math.min(w, h) / 2.0
-                    val centerX = absX + w / 2.0
-                    val centerY = absY + h / 2.0
+                    val radius = kotlin.math.min(layoutW, layoutH) / 2.0
+                    val centerX = layoutX + (layoutW / 2.0)
+                    val centerY = layoutY + (layoutH / 2.0)
                     fillCircle(centerX, centerY, radius.toInt(), currentColor)
                 } else {
-                    fillRectangle(absX, absY, w, h, currentColor)
+                    fillRectangle(layoutX, layoutY, layoutW, layoutH, currentColor)
                 }
             }
         }
 
-        bgImage?.draw(absX, absY)
+        bgSprite?.draw(layoutX, layoutY)
     }
 
-    override fun click(x: Double, y: Double) {
-        if (!visible) return
+    override fun click(mouseX: Double, mouseY: Double) {
+        if (!visible || !isWithinBounds(mouseX, mouseY)) return
 
-        val relativeX = x - this.x
-        val relativeY = y - this.y
-
-        if (isWithinBounds(relativeX, relativeY)) {
-            isPressed = true
+        if (isToggle) {
+            // toggle the state and invoke the callback
+            isPressed = !isPressed
+            onToggle?.invoke(isPressed)
+        } else {
             onClick?.invoke()
         }
     }
 
-    override fun hover(x: Double, y: Double) {
+    override fun hover(mouseX: Double, mouseY: Double) {
         if (!visible) return
 
-        val relativeX = x - this.x
-        val relativeY = y - this.y
-
         val wasHovered = isHovered
-        isHovered = isWithinBounds(relativeX, relativeY)
-
+        isHovered = isWithinBounds(mouseX, mouseY)
         if (isHovered != wasHovered) {
             onHover?.invoke()
         }
     }
 
-    override fun release(x: Double, y: Double) {
-        if (isPressed) {
+    override fun release(mouseX: Double, mouseY: Double) {
+        if (!isToggle) {
             onRelease?.invoke()
         }
-        isPressed = false
-        super.release(x, y)
+        super.release(mouseX, mouseY)
     }
 
-    private fun isWithinBounds(relativeX: Double, relativeY: Double): Boolean {
+    override fun isWithinBounds(mouseX: Double, mouseY: Double): Boolean {
+        val relX = mouseX - layoutX
+        val relY = mouseY - layoutY
+
         return if (isCircle) {
-            val radius = kotlin.math.min(w, h) / 2.0
-            val centerX = w / 2.0
-            val centerY = h / 2.0
-            val dx = relativeX - centerX
-            val dy = relativeY - centerY
+            val radius = kotlin.math.min(layoutW, layoutH) / 2.0
+            val centerX = layoutW / 2.0
+            val centerY = layoutH / 2.0
+            val dx = relX - centerX
+            val dy = relY - centerY
             (dx * dx + dy * dy) <= (radius * radius)
         } else {
-            relativeX >= 0 && relativeX <= w && relativeY >= 0 && relativeY <= h
+            relX in 0.0..layoutW &&
+                relY in 0.0..layoutH
         }
     }
+
 }

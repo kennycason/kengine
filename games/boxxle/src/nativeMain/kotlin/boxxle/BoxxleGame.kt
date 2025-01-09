@@ -4,7 +4,6 @@ import boxxle.context.BoxxleContext
 import boxxle.context.getBoxxleContext
 import boxxle.context.useBoxxleContext
 import com.kengine.Game
-import com.kengine.action.getActionContext
 import com.kengine.font.Font
 import com.kengine.font.getFontContext
 import com.kengine.font.useFontContext
@@ -20,6 +19,7 @@ import com.kengine.sound.Sound
 import com.kengine.sound.useSoundContext
 import com.kengine.time.getCurrentMilliseconds
 import com.kengine.time.timeSinceMs
+import com.kengine.time.useTimer
 
 class BoxxleGame : Game, Logging {
     enum class State {
@@ -33,6 +33,7 @@ class BoxxleGame : Game, Logging {
     private val menuFont: Font by lazy {
         getFontContext().getFont(Fonts.ARCADE_CLASSIC, 32f)
     }
+    private val inputDelayMs = 100L
 
     init {
         getGameContext().registerContext(BoxxleContext.get())
@@ -84,15 +85,15 @@ class BoxxleGame : Game, Logging {
             player.update()
 
             useKeyboardContext {
-                if ((keyboard.isRPressed()) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                if ((keyboard.isRPressed()) && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
                     timeSinceOptionChangeMs = getCurrentMilliseconds()
                     reloadLevel()
                 }
-                if (keyboard.isReturnPressed() && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                if (keyboard.isReturnPressed() && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
                     timeSinceOptionChangeMs = getCurrentMilliseconds()
                     loadLevel((level.levelNumber + 1) % LEVEL_DATA.size)
                 }
-                if (keyboard.isSpacePressed() && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                if (keyboard.isSpacePressed() && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
                     timeSinceOptionChangeMs = getCurrentMilliseconds()
                     loadLevel((level.levelNumber - 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
                 }
@@ -107,15 +108,15 @@ class BoxxleGame : Game, Logging {
             }
 
             useControllerContext {
-                if (controller.isButtonPressed(Buttons.X) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                if (controller.isButtonPressed(Buttons.X) && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
                     timeSinceOptionChangeMs = getCurrentMilliseconds()
                     reloadLevel()
                 }
-                if (controller.isButtonPressed(Buttons.R1) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                if (controller.isButtonPressed(Buttons.R1) && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
                     timeSinceOptionChangeMs = getCurrentMilliseconds()
                     loadLevel((level.levelNumber + 1) % LEVEL_DATA.size)
                 }
-                if (controller.isButtonPressed(Buttons.L1) && timeSinceMs(timeSinceOptionChangeMs) > 300) {
+                if (controller.isButtonPressed(Buttons.L1) && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
                     timeSinceOptionChangeMs = getCurrentMilliseconds()
                     loadLevel((level.levelNumber - 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
                 }
@@ -132,7 +133,7 @@ class BoxxleGame : Game, Logging {
             if (isLevelComplete()) {
                 mainSound.stop()
                 finishSound.play()
-                getActionContext().timer(6000) {
+                useTimer(6000) {
                     state = State.INIT
                     loadLevel((level.levelNumber + 1 + LEVEL_DATA.size) % LEVEL_DATA.size)
                 }

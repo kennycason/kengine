@@ -1,46 +1,43 @@
-
 package com.kengine.action
 
 import com.kengine.GameContext
-import com.kengine.hooks.context.getContext
 import com.kengine.entity.Entity
+import com.kengine.hooks.context.getContext
 import com.kengine.log.Logging
 import com.kengine.math.Vec2
-import com.kengine.time.timeSinceMs
 
 data class MoveAction(
     val entity: Entity,
     val destination: Vec2,
-    val speed: Double,
+    val durationMs: Long,
     val onComplete: (() -> Unit)? = null
 ) : Action, Logging {
     private val clock = getContext<GameContext>().clock
     private val startTimeMs = clock.totalTimeMs
-    private val expireInMs = 5000L
+    private val startPoint = entity.p.copy()
 
     override fun update(): Boolean {
-        if (timeSinceMs(startTimeMs) > expireInMs) {
-            logger.warn { "expiring move action: ${entity::class.simpleName} after ${expireInMs}ms" }
+        val elapsedMs = clock.totalTimeMs - startTimeMs // Use global clock for consistency
+        val frameTime = clock.deltaTimeMs // Access frame timing for drift checks
+
+        // allow minor drift to handle sub-frame precision
+        if (elapsedMs + frameTime >= durationMs) {
+            logger.warn { "expiring move action: ${entity::class.simpleName} after ${elapsedMs}ms. Current time: ${clock.totalTimeMs}" }
+            entity.p.set(destination) // Snap to destination for precision
+            onComplete?.invoke()
             return true
         }
 
-        // calculate direction vector and distance to destination
-        val direction = destination - entity.p
-        val distance = direction.magnitude()
+        // calculate progress and interpolate position
+        val progress = (elapsedMs / durationMs.toDouble()).coerceIn(0.0, 1.0)
+        entity.p.set(startPoint.linearInterpolate(destination, progress))
 
-        if (distance > 0.1) { // continue moving if not close enough
-            val moveDistance = (speed * clock.deltaTimeSec).coerceAtMost(distance)
-            val normalizedDirection = direction.normalized()
-            entity.p += normalizedDirection * moveDistance
+        // predicted remaining time and log output
+        val predictedRemaining = durationMs - elapsedMs - frameTime
+        logger.debug {
+            "elapsed: ${elapsedMs + frameTime} ms | progress: ${(progress * 100).toInt()}% | predicted remaining: $predictedRemaining ms"
         }
 
-        // check if the entity has reached its destination
-        val reachedDestination = distance <= 0.1
-        if (reachedDestination) {
-            entity.p.set(destination) // snap to the destination to avoid precision issues
-            onComplete?.invoke()
-        }
-
-        return reachedDestination // return true if movement is complete
+        return false
     }
 }

@@ -9,9 +9,12 @@ abstract class Entity(
     val width: Int,
     val height: Int,
     val active: Boolean = true
-) {
-    abstract fun update()
-    abstract fun draw()
+) : Actor {
     open fun overlaps(entity: Entity): Boolean = false
     abstract fun cleanup()
+}
+
+interface Actor {
+    fun update()
+    fun draw()
 }

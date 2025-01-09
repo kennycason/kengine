@@ -12,6 +12,11 @@ import com.kengine.time.getCurrentNanoseconds
 enum class Align { LEFT, CENTER, RIGHT }
 enum class FlexDirection { ROW, COLUMN }
 
+/**
+ * Creates a new View and attaches it to the parent or root context.
+ * After building the tree, call `parent.performLayout()` on the top-level
+ * or root views to finalize layout.
+ */
 fun useView(
     id: String? = null,
     x: Double = 0.0,
@@ -37,12 +42,12 @@ fun useView(
 ): View {
     val view = View(
         id = id ?: "view-${getCurrentNanoseconds()}",
-        x = x,
-        y = y,
-        w = w,
-        h = h,
+        desiredX = x,
+        desiredY = y,
+        desiredW = w,
+        desiredH = h,
         bgColor = bgColor,
-        bgImage = bgImage,
+        bgSprite = bgImage,
         text = text,
         textColor = textColor,
         align = align,
@@ -58,7 +63,6 @@ fun useView(
         parent = parent
     )
 
-    // attach to parent or root context
     if (parent != null) {
         parent.addChild(view)
     } else {
@@ -71,12 +75,17 @@ fun useView(
 
 open class View(
     val id: String = "",
-    val x: Double = 0.0,
-    val y: Double = 0.0,
-    var w: Double = 0.0,
-    var h: Double = 0.0,
+    /**
+     * User-specified or "desired" position and size.
+     * We'll store final computed layout in layoutX, layoutY, layoutW, layoutH.
+     */
+    var desiredX: Double = 0.0,
+    var desiredY: Double = 0.0,
+    var desiredW: Double = 0.0,
+    var desiredH: Double = 0.0,
+
     val bgColor: Color? = null,
-    val bgImage: Sprite? = null,
+    val bgSprite: Sprite? = null,
     val textColor: Color = Color.white,
     val text: String? = null,
     val textFont: Font? = null,
@@ -90,170 +99,167 @@ open class View(
     val maxHeight: Double = Double.MAX_VALUE,
     val visible: Boolean = true,
     val parent: View? = null,
-    private val onClick: (() -> Unit)? = null,
-    private val onHover: (() -> Unit)? = null,
-    private val onRelease: (() -> Unit)? = null
+    protected val onClick: (() -> Unit)? = null,
+    protected val onHover: (() -> Unit)? = null,
+    protected val onRelease: (() -> Unit)? = null
 ) : Logging {
 
-    private val children = mutableListOf<View>()
+    /**
+     * Final computed layout position and size after performing layout.
+     * By default, these start at zero until `performLayout()` is called.
+     */
+    var layoutX: Double = 0.0
+    var layoutY: Double = 0.0
+    var layoutW: Double = 0.0
+    var layoutH: Double = 0.0
 
-    // calculate dimensions based on parent constraints
-    protected fun calculateDimensions() {
-        if (children.isEmpty()) return
+    val children = mutableListOf<View>()
 
-        // width calculation
-        var fixedWidth = 0.0
-        var flexibleWidthChildren = 0
-
-        // height calculation
-        var fixedHeight = 0.0
-        var flexibleHeightChildren = 0
-
-        // First pass: count flexible children and sum fixed dimensions
-        children.forEach { child ->
-            if (child.w == 0.0) {
-                flexibleWidthChildren++
-            } else {
-                fixedWidth += child.w
-            }
-
-            if (child.h == 0.0) {
-                flexibleHeightChildren++
-            } else {
-                fixedHeight += child.h
-            }
-        }
-
-        // Calculate available space
-        val remainingWidth = w - padding * 2 - spacing * (children.size - 1) - fixedWidth
-        val remainingHeight = h - padding * 2 - spacing * (children.size - 1) - fixedHeight
-
-        // Calculate auto dimensions
-        val autoWidth = if (flexibleWidthChildren > 0) remainingWidth / flexibleWidthChildren else 0.0
-        val autoHeight = if (flexibleHeightChildren > 0) remainingHeight / flexibleHeightChildren else 0.0
-
-        // Second pass: assign dimensions to flexible children
-        children.forEach { child ->
-            if (child.w == 0.0) {
-                child.w = autoWidth.coerceAtLeast(0.0)
-            }
-            if (child.h == 0.0) {
-                child.h = autoHeight.coerceAtLeast(0.0)
-            }
-        }
-    }
-
-    open fun release(x: Double, y: Double) {
-        if (!visible) return
-
-        val absX = this.x
-        val absY = this.y
-
-        // Check bounds
-        if (x >= absX && x <= absX + w && y >= absY && y <= absY + h) {
-            onRelease?.invoke()
-        }
-
-        // Propagate release to children
-        children.forEach { child ->
-            child.release(x, y)
-        }
-    }
-
+    /**
+     * Add child, then possibly recalc layout if you want immediate results.
+     */
     fun addChild(view: View) {
-        logger.debug { "Adding child ${view.id} to parent ${this.id}" }
+        logger.debug { "Adding child ${view.id} to parent $id" }
         children.add(view)
-        calculateDimensions() // recalculate sizes whenever a child is added
+        // Optionally call performLayout() here if you want incremental relayout.
     }
 
-    open fun draw(parentX: Double = 0.0, parentY: Double = 0.0) {
-        if (!visible) return
+    /**
+     * A top-down recursive layout pass:
+     *  - sets this view's layoutX/Y/W/H from `desiredX/Y/W/H` (or parent's arrangement).
+     *  - arranges children according to direction, padding, spacing, etc.
+     *  - calls each child's performLayout() so they place themselves/descendants.
+     */
+    open fun performLayout(offsetX: Double = 0.0, offsetY: Double = 0.0) {
+        // 1) This view’s final layout is: offset + desired
+        layoutX = offsetX + desiredX
+        layoutY = offsetY + desiredY
+        // If you want a minWidth..maxWidth clamp:
+        layoutW = desiredW.coerceIn(minWidth, maxWidth)
+        layoutH = desiredH.coerceIn(minHeight, maxHeight)
 
-        val absX = parentX + x
-        val absY = parentY + y
+        // 2) Now arrange children
+        //    We'll do a simple "flex row" or "flex column" approach:
+        //    Start childOffsetX/Y at our content area
+        var childOffsetX = layoutX + padding
+        var childOffsetY = layoutY + padding
+
+        // First, we can do the "auto dimension" logic
+        if (children.isNotEmpty()) {
+            computeAutoDimensionsForChildren()
+        }
+
+        // Then position each child
+        children.forEach { child ->
+            child.performLayout(childOffsetX, childOffsetY)
+
+            if (direction == FlexDirection.ROW) {
+                // Move offset right by child’s layoutW + spacing
+                childOffsetX += child.layoutW + spacing
+            } else {
+                // Move offset down by child’s layoutH + spacing
+                childOffsetY += child.layoutH + spacing
+            }
+        }
+    }
+
+    /**
+     * (Optional) If you want that "auto dimension" logic for children that have 0.0 w/h
+     * we can do it similarly to your old logic:
+     */
+    protected fun computeAutoDimensionsForChildren() {
+        // Calculate how many children need flexible width, etc.
+        var fixedW = 0.0
+        var flexibleCountW = 0
+        var fixedH = 0.0
+        var flexibleCountH = 0
+
+        children.forEach { c ->
+            if (c.desiredW == 0.0) flexibleCountW++ else fixedW += c.desiredW
+            if (c.desiredH == 0.0) flexibleCountH++ else fixedH += c.desiredH
+        }
+
+        // Available space for children inside this view:
+        val contentW = layoutW - padding * 2 - spacing * (children.size - 1)
+        val contentH = layoutH - padding * 2 - spacing * (children.size - 1)
+
+        val remainW = (contentW - fixedW).coerceAtLeast(0.0)
+        val remainH = (contentH - fixedH).coerceAtLeast(0.0)
+
+        // Assign each child's desiredW / desiredH if needed
+        children.forEach { c ->
+            if (c.desiredW == 0.0 && flexibleCountW > 0) {
+                c.desiredW = remainW / flexibleCountW
+            }
+            if (c.desiredH == 0.0 && flexibleCountH > 0) {
+                c.desiredH = remainH / flexibleCountH
+            }
+        }
+    }
+
+    /**
+     * A separate pass for actually rendering, reading from layoutX, layoutY, etc.
+     */
+    open fun draw() {
+        if (!visible) return
 
         if (logger.isTraceEnabled()) {
-            logger.trace { "Rendering view $id at ($absX, $absY) size: ${w}x${h}, parent: ${parent?.id}" }
+            logger.trace {
+                "Drawing view $id at " +
+                    "($layoutX, $layoutY), size: ${layoutW}x${layoutH}, parent=$parent"
+            }
         }
 
+        // 1) Draw background
         if (bgColor != null) {
             useGeometryContext {
-                fillRectangle(absX, absY, w, h, bgColor)
+                fillRectangle(layoutX, layoutY, layoutW, layoutH, bgColor)
             }
         }
-        bgImage?.draw(absX, absY)
+        bgSprite?.draw(layoutX, layoutY)
 
-        var childX = absX + padding
-        var childY = absY + padding
-
+        // 2) Draw children
         children.forEach { child ->
-            child.draw(childX, childY)
-            if (direction == FlexDirection.ROW) {
-                childX += child.w + spacing
-            } else {
-                childY += child.h + spacing
-            }
+            child.draw()
         }
     }
 
-    fun click(p: Vec2) {
-        click(p.x, p.y)
-    }
+    // ----------------------------------------------------------
+    // Input Handling
+    // ----------------------------------------------------------
 
-    open fun click(x: Double, y: Double) {
+    fun click(p: Vec2) = click(p.x, p.y)
+
+    open fun click(mouseX: Double, mouseY: Double) {
         if (!visible) return
-
-        val absX = this.x
-        val absY = this.y
-
-        // check bounds for the current view
-        if (x >= absX && x <= absX + w && y >= absY && y <= absY + h) {
+        if (isWithinBounds(mouseX, mouseY)) {
             onClick?.invoke()
         }
-
-        // propagate click to children with relative offsets
-        var childX = absX + padding
-        var childY = absY + padding
-
-        children.forEach { child ->
-            child.click(x - childX, y - childY)
-
-            if (direction == FlexDirection.ROW) {
-                childX += child.w + spacing
-            } else {
-                childY += child.h + spacing
-            }
-        }
+        // Pass to children
+        children.forEach { it.click(mouseX, mouseY) }
     }
 
-    fun hover(p: Vec2) {
-        hover(p.x, p.y)
-    }
+    fun hover(p: Vec2) = hover(p.x, p.y)
 
-    open fun hover(x: Double, y: Double) {
+    open fun hover(mouseX: Double, mouseY: Double) {
         if (!visible) return
-
-        val absX = this.x
-        val absY = this.y
-
-        // check bounds for the current view
-        if (x >= absX && x <= absX + w && y >= absY && y <= absY + h) {
+        if (isWithinBounds(mouseX, mouseY)) {
             onHover?.invoke()
         }
+        children.forEach { it.hover(mouseX, mouseY) }
+    }
 
-        // propagate hover to children with relative offsets
-        var childX = absX + padding
-        var childY = absY + padding
-
-        children.forEach { child ->
-            child.hover(x - childX, y - childY)
-
-            if (direction == FlexDirection.ROW) {
-                childX += child.w + spacing
-            } else {
-                childY += child.h + spacing
-            }
+    open fun release(mouseX: Double, mouseY: Double) {
+        if (!visible) return
+        if (isWithinBounds(mouseX, mouseY)) {
+            onRelease?.invoke()
         }
+        children.forEach { it.release(mouseX, mouseY) }
+    }
+
+    open fun isWithinBounds(mouseX: Double, mouseY: Double): Boolean {
+        return mouseX >= layoutX && mouseX <= layoutX + layoutW &&
+            mouseY >= layoutY && mouseY <= layoutY + layoutH
     }
 
     fun view(
@@ -344,8 +350,8 @@ open class View(
         id: String,
         x: Double = 0.0,
         y: Double = 0.0,
-        w: Double,  // Required
-        h: Double,  // Required
+        w: Double,
+        h: Double,
         onClick: (() -> Unit)? = null,
         onHover: (() -> Unit)? = null,
         onRelease: (() -> Unit)? = null,
@@ -354,7 +360,9 @@ open class View(
         bgSprite: Sprite? = null,
         hoverColor: Color? = null,
         pressColor: Color? = null,
-        isCircle: Boolean = false
+        isCircle: Boolean = false,
+        isToggle: Boolean = false,
+        onToggle: ((Boolean) -> Unit)? = null,
     ): Button {
         val button = Button(
             id = id,
@@ -371,64 +379,66 @@ open class View(
             hoverColor = hoverColor,
             pressColor = pressColor,
             isCircle = isCircle,
+            isToggle = isToggle,
+            onToggle = onToggle,
             parent = this
         )
         addChild(button)
         return button
     }
 
-    fun toggleButton(
+    fun knob(
         id: String,
         x: Double = 0.0,
         y: Double = 0.0,
         w: Double,  // Required
         h: Double,  // Required
-        state: State<Boolean>,
-        onToggle: ((Boolean) -> Unit)? = null,
-        onHover: (() -> Unit)? = null,
+        min: Double = 0.0,
+        max: Double = 100.0,
+        state: State<Double>,
         padding: Double = 0.0,
         bgColor: Color? = null,
         bgSprite: Sprite? = null,
-        hoverColor: Color? = null,
-        activeColor: Color? = null,
-        activeHoverColor: Color? = null,
-        isCircle: Boolean = false
-    ): ToggleButton {
-        val button = ToggleButton(
+        knobColor: Color = Color.gray10,
+        indicatorColor: Color = Color.white,
+        onValueChanged: ((Double) -> Unit)? = null,
+        dragScale: Double = 200.0,
+    ): Knob {
+        val knob = Knob(
             id = id,
             x = x,
             y = y,
             w = w,
             h = h,
+            min = min,
+            max = max,
             state = state,
-            onToggle = onToggle,
-            onHover = onHover,
             padding = padding,
             bgColor = bgColor,
             bgSprite = bgSprite,
-            hoverColor = hoverColor,
-            activeColor = activeColor,
-            activeHoverColor = activeHoverColor,
-            isCircle = isCircle,
+            knobColor = knobColor,
+            indicatorColor = indicatorColor,
+            onValueChanged = onValueChanged,
+            dragScale = dragScale,
             parent = this
         )
-        addChild(button)
-        return button
+        addChild(knob)
+        return knob
     }
 
-    fun image(
+    fun sprite(
         id: String,
         x: Double = 0.0,
         y: Double = 0.0,
-        w: Double,  // Required
-        h: Double,  // Required
+        w: Double,
+        h: Double,
         sprite: Sprite,
         padding: Double = 0.0,
         bgColor: Color? = null,
         onClick: (() -> Unit)? = null,
         onHover: (() -> Unit)? = null
-    ): Image {
-        val image = Image(
+    ): SpriteView {
+        val spriteView = SpriteView(
             id = id,
             x = x,
             y = y,
@@ -441,11 +451,12 @@ open class View(
             onHover = onHover,
             parent = this
         )
-        addChild(image)
-        return image
+        addChild(spriteView)
+        return spriteView
     }
 
     fun cleanup() {
         children.forEach { it.cleanup() }
     }
+
 }

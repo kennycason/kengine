@@ -7,7 +7,7 @@ A simple demonstration of various features.
 - **WASD or Arrows:** Movement
 - **Space:** Bulbasaur roars and the Pidgeys will fly faster.
 
-<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/helloworld/helloworld.png" />
+<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/helloworld/helloworld01.png" />
 
 ## Build and Run
 

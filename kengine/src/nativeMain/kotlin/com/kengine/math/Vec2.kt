@@ -27,6 +27,13 @@ data class Vec2(
         return if (mag == 0.0) Vec2(0.0, 0.0) else Vec2(this.x / mag, this.y / mag)
     }
 
+    fun linearInterpolate(target: Vec2, alpha: Double): Vec2 {
+        return Vec2(
+            x + (target.x - x) * alpha,
+            y + (target.y - y) * alpha
+        )
+    }
+
     operator fun plus(other: Vec2): Vec2 {
         return Vec2(this.x + other.x, this.y + other.y)
     }

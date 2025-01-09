@@ -6,7 +6,7 @@ data class Color(
     val r: UByte,
     val g: UByte,
     val b: UByte,
-    val a: UByte
+    val a: UByte = 0xFFu
 ) {
     fun toUInt(): UInt =
         (r.toUInt() shl 24 or (g.toUInt() shl 16) or (b.toUInt() shl 8) or a.toUInt())
@@ -164,7 +164,7 @@ data class Color(
         val neonGreen = Color(0x39u, 0xFFu, 0x14u, 0xFFu)    // #39FF14
         val neonBlue = Color(0x1Fu, 0x51u, 0xFFu, 0xFFu)     // #1F51FF
         val electricLime = Color(0xCCu, 0xFFu, 0x00u, 0xFFu) // #CCFF00
-        val hotPink = Color(0xFFu, 0x69u, 0xB4u, 0xFFu)     // #FF69B4
+        val hotPink = Color(0xFFu, 0x69u, 0xB4u, 0xFFu)      // #FF69B4
         val neonYellow = Color(0xFFu, 0xFFu, 0x00u, 0xFFu)      // #FFFF00
         val neonOrange = Color(0xFFu, 0xA5u, 0x00u, 0xFFu)      // #FFA500
         val neonCyan = Color(0x00u, 0xFFu, 0xFFu, 0xFFu)        // #00FFFF
