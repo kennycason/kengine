@@ -47,7 +47,7 @@ fun useView(
         desiredW = w,
         desiredH = h,
         bgColor = bgColor,
-        bgImage = bgImage,
+        bgSprite = bgImage,
         text = text,
         textColor = textColor,
         align = align,
@@ -85,7 +85,7 @@ open class View(
     var desiredH: Double = 0.0,
 
     val bgColor: Color? = null,
-    val bgImage: Sprite? = null,
+    val bgSprite: Sprite? = null,
     val textColor: Color = Color.white,
     val text: String? = null,
     val textFont: Font? = null,
@@ -216,7 +216,7 @@ open class View(
                 fillRectangle(layoutX, layoutY, layoutW, layoutH, bgColor)
             }
         }
-        bgImage?.draw(layoutX, layoutY)
+        bgSprite?.draw(layoutX, layoutY)
 
         // 2) Draw children
         children.forEach { child ->
@@ -261,17 +261,6 @@ open class View(
         return mouseX >= layoutX && mouseX <= layoutX + layoutW &&
             mouseY >= layoutY && mouseY <= layoutY + layoutH
     }
-
-    /**
-     * If you need the parent's final offset for any reason, you can still do so,
-     * but now we rely on layoutX/Y as the final absolute coords.
-     */
-    fun getAbsolutePosition(): Pair<Double, Double> {
-        // If you'd like to walk up the chain for a truly "screen" position,
-        // you can do so. But typically layoutX/Y is final.
-        return layoutX to layoutY
-    }
-
 
     fun view(
         id: String? = null,
@@ -361,8 +350,8 @@ open class View(
         id: String,
         x: Double = 0.0,
         y: Double = 0.0,
-        w: Double,  // Required
-        h: Double,  // Required
+        w: Double,
+        h: Double,
         onClick: (() -> Unit)? = null,
         onHover: (() -> Unit)? = null,
         onRelease: (() -> Unit)? = null,
@@ -371,7 +360,9 @@ open class View(
         bgSprite: Sprite? = null,
         hoverColor: Color? = null,
         pressColor: Color? = null,
-        isCircle: Boolean = false
+        isCircle: Boolean = false,
+        isToggle: Boolean = false,
+        onToggle: ((Boolean) -> Unit)? = null,
     ): Button {
         val button = Button(
             id = id,
@@ -388,50 +379,13 @@ open class View(
             hoverColor = hoverColor,
             pressColor = pressColor,
             isCircle = isCircle,
+            isToggle = isToggle,
+            onToggle = onToggle,
             parent = this
         )
         addChild(button)
         return button
     }
-
-//    fun toggleButton(
-//        id: String,
-//        x: Double = 0.0,
-//        y: Double = 0.0,
-//        w: Double,  // Required
-//        h: Double,  // Required
-//        state: State<Boolean>,
-//        onToggle: ((Boolean) -> Unit)? = null,
-//        onHover: (() -> Unit)? = null,
-//        padding: Double = 0.0,
-//        bgColor: Color? = null,
-//        bgSprite: Sprite? = null,
-//        hoverColor: Color? = null,
-//        activeColor: Color? = null,
-//        activeHoverColor: Color? = null,
-//        isCircle: Boolean = false
-//    ): ToggleButton {
-//        val button = ToggleButton(
-//            id = id,
-//            x = x,
-//            y = y,
-//            w = w,
-//            h = h,
-//            state = state,
-//            onToggle = onToggle,
-//            onHover = onHover,
-//            padding = padding,
-//            bgColor = bgColor,
-//            bgSprite = bgSprite,
-//            hoverColor = hoverColor,
-//            activeColor = activeColor,
-//            activeHoverColor = activeHoverColor,
-//            isCircle = isCircle,
-//            parent = this
-//        )
-//        addChild(button)
-//        return button
-//    }
 
     fun knob(
         id: String,
@@ -441,14 +395,14 @@ open class View(
         h: Double,  // Required
         min: Double = 0.0,
         max: Double = 100.0,
-        stepSize: Double? = null,
         state: State<Double>,
         padding: Double = 0.0,
         bgColor: Color? = null,
         bgSprite: Sprite? = null,
         knobColor: Color = Color.gray10,
         indicatorColor: Color = Color.white,
-        onValueChanged: ((Double) -> Unit)? = null
+        onValueChanged: ((Double) -> Unit)? = null,
+        dragScale: Double = 200.0,
     ): Knob {
         val knob = Knob(
             id = id,
@@ -458,7 +412,6 @@ open class View(
             h = h,
             min = min,
             max = max,
-            stepSize = stepSize,
             state = state,
             padding = padding,
             bgColor = bgColor,
@@ -466,40 +419,41 @@ open class View(
             knobColor = knobColor,
             indicatorColor = indicatorColor,
             onValueChanged = onValueChanged,
+            dragScale = dragScale,
             parent = this
         )
         addChild(knob)
         return knob
     }
 
-//    fun image(
-//        id: String,
-//        x: Double = 0.0,
-//        y: Double = 0.0,
-//        w: Double,  // Required
-//        h: Double,  // Required
-//        sprite: Sprite,
-//        padding: Double = 0.0,
-//        bgColor: Color? = null,
-//        onClick: (() -> Unit)? = null,
-//        onHover: (() -> Unit)? = null
-//    ): Image {
-//        val image = Image(
-//            id = id,
-//            x = x,
-//            y = y,
-//            w = w,
-//            h = h,
-//            padding = padding,
-//            sprite = sprite,
-//            bgColor = bgColor,
-//            onClick = onClick,
-//            onHover = onHover,
-//            parent = this
-//        )
-//        addChild(image)
-//        return image
-//    }
+    fun sprite(
+        id: String,
+        x: Double = 0.0,
+        y: Double = 0.0,
+        w: Double,
+        h: Double,
+        sprite: Sprite,
+        padding: Double = 0.0,
+        bgColor: Color? = null,
+        onClick: (() -> Unit)? = null,
+        onHover: (() -> Unit)? = null
+    ): SpriteView {
+        val spriteView = SpriteView(
+            id = id,
+            x = x,
+            y = y,
+            w = w,
+            h = h,
+            padding = padding,
+            sprite = sprite,
+            bgColor = bgColor,
+            onClick = onClick,
+            onHover = onHover,
+            parent = this
+        )
+        addChild(spriteView)
+        return spriteView
+    }
 
     fun cleanup() {
         children.forEach { it.cleanup() }

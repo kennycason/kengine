@@ -9,7 +9,7 @@ fun main() {
         height = 600,
         logLevel = Logger.Level.INFO
     ) {
-        GameRunner(frameRate = -1) { // max fps
+        GameRunner(frameRate = 60) { // max fps
             HelloWorldGame()
         }
     }

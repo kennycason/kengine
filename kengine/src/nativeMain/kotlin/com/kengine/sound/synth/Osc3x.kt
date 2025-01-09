@@ -22,6 +22,7 @@ class Osc3x(
     private val sampleRate: Int = 44100,
     private val bufferSize: Int = 512
 ) {
+
     // individual oscillator settings
     data class OscillatorConfig(
         var enabled: Boolean = true,

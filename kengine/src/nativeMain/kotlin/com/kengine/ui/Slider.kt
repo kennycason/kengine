@@ -41,7 +41,7 @@ class Slider(
     desiredW = w,
     desiredH = h,
     bgColor = bgColor,
-    bgImage = bgSprite,
+    bgSprite = bgSprite,
     padding = padding,
     parent = parent
 ) {
