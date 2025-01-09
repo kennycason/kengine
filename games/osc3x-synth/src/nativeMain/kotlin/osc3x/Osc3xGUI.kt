@@ -10,7 +10,7 @@ import com.kengine.sound.synth.Osc3xVfx
 class Osc3xGUI : Game, Logging {
 
     private val osc3xSynth = Osc3xSynth(
-        x = 0.0, y = 0.0, defaultVolume = 0.05
+        x = 0.0, y = 0.0, defaultVolume = 0.25
     )
     private val osc3XVfx = Osc3xVfx(
         x = 0, y = osc3xSynth.height.toInt(),
