@@ -4,6 +4,45 @@ Kengine is a lightweight, game framework built in Kotlin Native + SDL3, designed
 
 The project is still in early dev mode, contributors welcome.
 
+# Table of Contents
+
+- [Kengine](#kengine)
+  - [Introduction](#introduction)
+  - [Example Games](#example-games)
+    - [Hello, World](#hello-world)
+    - [Boxxle](#boxxle)
+    - [Osc3x Synth](#osc3x-synth)
+  - [Documentation](#documentation)
+    - [Graphics](#graphics)
+      - [Textures](#textures)
+      - [Sprites](#sprites)
+      - [Animated Sprites](#animated-sprites)
+      - [Geometry](#geometry)
+    - [Time](#time)
+    - [Input](#input)
+      - [Mouse Input](#mouse-input)
+      - [Keyboard Input](#keyboard-input)
+      - [Controller Input](#controller-input)
+    - [Entities](#entities)
+    - [Event Handling](#event-handling)
+- [Tiled Map](#tiled-map)
+- [Functional Hooks](#functional-hooks)
+  - [useState](#usestate)
+  - [useContext](#usecontext)
+  - [useEffect](#useeffect)
+  - [useMemo](#usememo)
+  - [useReducer](#usereducer)
+  - [Logging](#logging)
+  - [Actions](#actions)
+  - [Math Utilities](#math-utilities)
+- [Unit Testing](kengine-test/)
+- [Dev](#dev)
+  - [Project structure](#project-structure)
+  - [Project structure for a Kengine game](#project-structure-for-a-kengine-game)
+  - [Installation](#installation)
+- [Roadmap](#roadmap)
+
+
 ## Introduction
 
 A Simple Example
