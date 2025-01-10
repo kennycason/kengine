@@ -1,6 +1,6 @@
-# Kengine Documentation
+# Kengine
 
-Kengine is a lightweight, Kotlin Native game framework built on top of SDL3, designed for easy/simple game development.
+Kengine is a lightweight, game framework built in Kotlin Native + SDL3, designed for easy/simple game development.
 
 The project is still in early dev mode, contributors welcome.
 
