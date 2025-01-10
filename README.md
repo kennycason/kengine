@@ -161,6 +161,8 @@ Explore sound synthesis with a3x Oscillator and a variety of visual effects. Thi
 
 <img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/images/osc3x-2.png" width="48%"/><img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/images/osc3x-7.png" width="48%"/>
 
+[Video of Synth on IG](https://www.instagram.com/p/DEnebatzN3V/?igsh=MTZ0ZTJ1ZDE4ejVuag==)
+
 
 ## Documentation
 
@@ -441,8 +443,6 @@ The **TiledMapLoader** is a utility for loading and rendering maps in the **Tile
 Here is an example of loading and rendering a map:
 
 <img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/images/tiled_map.gif" width="65%" />
-
-[Video of Synth on IG](https://www.instagram.com/p/DEnebatzN3V/?igsh=MTZ0ZTJ1ZDE4ejVuag==)
 
 ```kotlin
 val tiledMap = TiledMapLoader()
