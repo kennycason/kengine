@@ -442,6 +442,8 @@ Here is an example of loading and rendering a map:
 
 <img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/images/tiled_map.png" width="65%" />
 
+[Video of Synth on IG](https://www.instagram.com/p/DEnebatzN3V/?igsh=MTZ0ZTJ1ZDE4ejVuag==)
+
 ```kotlin
 val tiledMap = TiledMapLoader()
     .loadMap("src/nativeTest/resources/ninjaturdle/lungs_25.tmj")
