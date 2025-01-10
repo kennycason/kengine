@@ -155,7 +155,7 @@ fun main() {
 }
 ```
 
-### [Osc3x Synth](osc3x-synth/)
+### [Osc3x Synth](games/osc3x-synth/)
 
 Explore sound synthesis with a3x Oscillator and a variety of visual effects. This also showcases the `UI` library and state handling via `useState`.
 
