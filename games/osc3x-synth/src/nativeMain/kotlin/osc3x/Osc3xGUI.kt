@@ -6,6 +6,7 @@ import com.kengine.log.Logging
 import com.kengine.sdl.useSDLContext
 import com.kengine.sound.synth.Osc3xSynth
 import com.kengine.sound.synth.Osc3xVfx
+import com.kengine.time.getClockContext
 
 class Osc3xGUI : Game, Logging {
 
@@ -20,13 +21,14 @@ class Osc3xGUI : Game, Logging {
     override fun update() {
         osc3xSynth.update()
         osc3XVfx.update()
+        logger.info { "FPS: ${getClockContext().fps}" }
     }
 
     override fun draw() {
         useSDLContext {
             fillScreen(Color.black)
-            osc3xSynth.draw()
             osc3XVfx.draw()
+            osc3xSynth.draw()
             flipScreen()
         }
     }

@@ -33,7 +33,7 @@ class Osc3xSynth(
     private var lastMasterFrequency = frequencies.map { it.get() }.average()
 
     init {
-        useEffect({ println("hello") }, masterVolume)
+        useEffect({ println("Master Volume changed - useEffect") }, masterVolume)
 
         // Initialize oscillators with default configs
         osc3x.setMasterVolume(masterVolume.get())
@@ -247,6 +247,7 @@ class Osc3xSynth(
                     padding = 5.0,
                     min = 20.0,
                     max = 20000.0,
+                    dragScale = 1000.0,
                     state = frequencies[i],
                     bgColor = Color.neonPeach,
                     onValueChanged = { value ->
@@ -263,6 +264,7 @@ class Osc3xSynth(
                     padding = 5.0,
                     min = -100.0,
                     max = 100.0,
+                    dragScale = 400.0,
                     state = detunes[i],
                     bgColor = Color.neonPeach,
                     onValueChanged = { value ->

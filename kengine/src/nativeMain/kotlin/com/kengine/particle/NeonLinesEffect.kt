@@ -6,14 +6,14 @@ import com.kengine.graphics.Color
 import com.kengine.math.Vec2
 import kotlin.math.abs
 
-class RainbowLinesEffect(
+class NeonLinesEffect(
     private val x: Int,
     private val y: Int,
     private val width: Int,
     private val height: Int,
     private val numLines: Int = 256,
 ) : Actor {
-    private val colors = Color.rainbow(numLines, maxHue = 360f) // generate rainbow colors
+    private val colors = Color.neon(numLines) // generate neon colors
     private val startPoints = mutableListOf<Vec2>()
     var offset = 0 // Tracks position for rotation
 

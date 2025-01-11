@@ -14,7 +14,7 @@ class RainbowLinesWithFrequencyEffect(
     private val numLines: Int = 256,
     private var frequency: Double = 0.0
 ) : Actor {
-    private val colors = Color.rainbow(numLines) // generate rainbow colors
+    private val colors = Color.rainbow(numLines, maxHue = 360f) // generate rainbow colors
     private val startPoints = mutableListOf<Vec2>()
     var offset = 0 // Tracks position for rotation
 

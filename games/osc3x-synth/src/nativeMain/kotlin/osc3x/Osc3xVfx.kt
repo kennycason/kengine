@@ -4,14 +4,19 @@ import com.kengine.graphics.Color
 import com.kengine.hooks.state.useState
 import com.kengine.log.Logging
 import com.kengine.particle.FrequencyCircleEffect
+import com.kengine.particle.NeonLinesEffect
 import com.kengine.particle.RainbowLinesEffect
 import com.kengine.particle.RainbowLinesWithFrequencyEffect
+import com.kengine.particle.SacredGeometryOscillation
+import com.kengine.particle.SpectrographVisualizer
 import com.kengine.particle.WavePatternEffect
 import com.kengine.particle.WavePatternEffect2
+import com.kengine.particle.WaveformGalaxy
 import com.kengine.ui.FlexDirection
 import com.kengine.ui.useView
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.SDL_Delay
+import kotlin.math.abs
 
 /**
  * A UI wrapper for controlling an Osc3x synth with sliders, knobs, and waveform buttons.
@@ -27,11 +32,15 @@ class Osc3xVfx(
     private val height: Int = 480
 
     val effects = listOf(
-        WavePatternEffect(
+        SacredGeometryOscillation(
             x = 0, y = osc3xSynth.height.toInt(),
             width = width, height = height - osc3xSynth.height.toInt(),
         ),
-        FrequencyCircleEffect(
+        WaveformGalaxy(
+            x = 0, y = osc3xSynth.height.toInt(),
+            width = width, height = height - osc3xSynth.height.toInt(),
+        ),
+        WavePatternEffect(
             x = 0, y = osc3xSynth.height.toInt(),
             width = width, height = height - osc3xSynth.height.toInt(),
         ),
@@ -44,7 +53,19 @@ class Osc3xVfx(
             x = 0, y = osc3xSynth.height.toInt(),
             width = width, height = height - osc3xSynth.height.toInt(),
             numLines = width, frequency = 444.0
-        )
+        ),
+        SpectrographVisualizer(
+            x = 0, y = osc3xSynth.height.toInt(),
+            width = width, height = height - osc3xSynth.height.toInt(),
+        ),
+        NeonLinesEffect(
+            x = 0, y = osc3xSynth.height.toInt(),
+            width = width, height = height - osc3xSynth.height.toInt(),
+        ),
+        FrequencyCircleEffect(
+            x = 0, y = osc3xSynth.height.toInt(),
+            width = width, height = height - osc3xSynth.height.toInt(),
+        ),
     )
     private val currentEffect = useState(0)
 
@@ -177,6 +198,50 @@ class Osc3xVfx(
                     (if (osc2.volume > 0.0) osc2.frequency else 0.0) +
                     (if (osc3.volume > 0.0) osc3.frequency else 0.0)
             )
+        } else if (effect is SpectrographVisualizer) {
+            effect.setFrequency(
+                (if (osc1.volume > 0.0) osc1.frequency else 0.0) +
+                    (if (osc2.volume > 0.0) osc2.frequency else 0.0) +
+                    (if (osc3.volume > 0.0) osc3.frequency else 0.0)
+            )
+            effect.setDetune(
+                (if (osc1.volume > 0.0) osc1.detune else 0.0) +
+                    (if (osc2.volume > 0.0) osc2.detune else 0.0) +
+                    (if (osc3.volume > 0.0) osc3.detune else 0.0)
+            )
+        }
+        else if (effect is WaveformGalaxy) {
+            val combinedFrequency = (if (osc1.volume > 0.0) osc1.frequency else 0.0) +
+                (if (osc2.volume > 0.0) osc2.frequency else 0.0) +
+                (if (osc3.volume > 0.0) osc3.frequency else 0.0)
+
+            val normalizedIndex = ((combinedFrequency / 2000.0) * effect.numStars).toInt().coerceIn(0, effect.numStars - 1)
+
+            // Adjust amplitude for all stars based on frequency
+            effect.stars.forEachIndexed { index, _ ->
+                val distanceFromIndex = abs(index - normalizedIndex)
+                val influence = (1.0 - (distanceFromIndex / effect.numStars.toDouble())).coerceAtLeast(0.0)
+                val frequencyEffect = combinedFrequency / 500.0 // Scale by frequency
+                effect.setAmplitude(index, influence * frequencyEffect)
+            }
+
+            // Apply detune effect
+            effect.setDetune(
+                (if (osc1.volume > 0.0) osc1.detune else 0.0) +
+                    (if (osc2.volume > 0.0) osc2.detune else 0.0) +
+                    (if (osc3.volume > 0.0) osc3.detune else 0.0)
+            )
+        } else if (effect is SacredGeometryOscillation) {
+            effect.setFrequency(
+                (if (osc1.volume > 0.0) osc1.frequency else 0.0) +
+                    (if (osc2.volume > 0.0) osc2.frequency else 0.0) +
+                    (if (osc3.volume > 0.0) osc3.frequency else 0.0)
+            )
+            effect.setDetune(
+                (if (osc1.volume > 0.0) osc1.detune else 0.0) +
+                    (if (osc2.volume > 0.0) osc2.detune else 0.0) +
+                    (if (osc3.volume > 0.0) osc3.detune else 0.0)
+            )
         }
         effect.update()
 
@@ -184,8 +249,8 @@ class Osc3xVfx(
     }
 
     fun draw() {
-        visualizationControls.draw()
         effects[currentEffect.get()].draw()
+        visualizationControls.draw()
     }
 
     fun cleanup() {

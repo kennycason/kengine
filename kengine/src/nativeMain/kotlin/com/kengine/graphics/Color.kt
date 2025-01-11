@@ -1,5 +1,6 @@
 package com.kengine.graphics
 
+import kotlin.math.abs
 import kotlin.math.absoluteValue
 
 data class Color(
@@ -67,6 +68,96 @@ data class Color(
             )
         }
 
+
+        fun toHSV(color: Color): FloatArray {
+            val r = color.r.toFloat() / 255f
+            val g = color.g.toFloat() / 255f
+            val b = color.b.toFloat() / 255f
+
+            val max = maxOf(r, g, b)
+            val min = minOf(r, g, b)
+            val delta = max - min
+
+            val h = when {
+                delta == 0f -> 0f
+                max == r -> (60 * ((g - b) / delta) + 360) % 360
+                max == g -> (60 * ((b - r) / delta) + 120) % 360
+                else -> (60 * ((r - g) / delta) + 240) % 360
+            }
+
+            val s = if (max == 0f) 0f else delta / max
+            val v = max
+
+            return floatArrayOf(h, s, v)
+        }
+
+        fun applyHueShift(color: Color, hueShift: Float): Color {
+            val hsv = toHSV(color)
+            val newHue = (hsv[0] + hueShift) % 360f
+            return fromHSV(if (newHue < 0) newHue + 360f else newHue, hsv[1], hsv[2], color.a.toFloat() / 255f)
+        }
+
+        fun shiftHue(color: Color, hueShift: Float): Color {
+            // Convert RGB to HSV
+            val (h, s, v) = rgbToHsv(color.r.toInt(), color.g.toInt(), color.b.toInt())
+
+            // Shift the hue and keep it in the range [0, 360]
+            val newHue = (h + hueShift) % 360f
+
+            // Convert back to RGB
+            val (newR, newG, newB) = hsvToRgb(newHue, s, v)
+
+            return Color(
+                r = newR.toUByte(),
+                g = newG.toUByte(),
+                b = newB.toUByte(),
+                a = color.a
+            )
+        }
+
+        private fun rgbToHsv(r: Int, g: Int, b: Int): Triple<Float, Float, Float> {
+            val rf = r / 255.0f
+            val gf = g / 255.0f
+            val bf = b / 255.0f
+
+            val max = maxOf(rf, gf, bf)
+            val min = minOf(rf, gf, bf)
+            val delta = max - min
+
+            val h = when {
+                delta == 0f -> 0f
+                max == rf -> ((gf - bf) / delta) % 6 * 60f
+                max == gf -> ((bf - rf) / delta + 2) * 60f
+                else -> ((rf - gf) / delta + 4) * 60f
+            }.let { if (it < 0) it + 360f else it }
+
+            val s = if (max == 0f) 0f else delta / max
+            val v = max
+
+            return Triple(h, s, v)
+        }
+
+        private fun hsvToRgb(h: Float, s: Float, v: Float): Triple<Int, Int, Int> {
+            val c = v * s
+            val x = c * (1 - abs((h / 60) % 2 - 1))
+            val m = v - c
+
+            val (rf, gf, bf) = when {
+                h < 60 -> Triple(c, x, 0f)
+                h < 120 -> Triple(x, c, 0f)
+                h < 180 -> Triple(0f, c, x)
+                h < 240 -> Triple(0f, x, c)
+                h < 300 -> Triple(x, 0f, c)
+                else -> Triple(c, 0f, x)
+            }
+
+            return Triple(
+                ((rf + m) * 255).toInt(),
+                ((gf + m) * 255).toInt(),
+                ((bf + m) * 255).toInt()
+            )
+        }
+
         fun invert(c: Color): Color {
             return Color(
                 (255u - c.r).toUByte(),
@@ -101,6 +192,15 @@ data class Color(
             return Color(gray, gray, gray, c.a)
         }
 
+        fun linearInterpolate(color1: Color, color2: Color, alpha: Double): Color {
+            require(alpha in 0.0..1.0) { "Alpha must be in the range [0.0, 1.0]" }
+            return Color(
+                r = ((color1.r.toDouble() * (1 - alpha)) + (color2.r.toDouble() * alpha)).toInt().toUByte(),
+                g = ((color1.g.toDouble() * (1 - alpha)) + (color2.g.toDouble() * alpha)).toInt().toUByte(),
+                b = ((color1.b.toDouble() * (1 - alpha)) + (color2.b.toDouble() * alpha)).toInt().toUByte(),
+                a = ((color1.a.toDouble() * (1 - alpha)) + (color2.a.toDouble() * alpha)).toInt().toUByte()
+            )
+        }
 
         // Color helpers, thanks ChatGPT :)
 
@@ -175,6 +275,22 @@ data class Color(
         val neonTurquoise = Color(0x40u, 0xE0u, 0xD0u, 0xFFu)   // #40E0D0
         val neonPeach = Color(0xFFu, 0x85u, 0x72u, 0xFFu)       // #FF8572
 
+        fun neon(steps: Int): List<Color> {
+            require(steps > 0) { "Steps must be greater than 0" }
+            val neonPalette = listOf(
+                neonPink, neonGreen, neonBlue, electricLime, hotPink,
+                neonYellow, neonOrange, neonCyan, neonPurple, neonMagenta
+            )
+            val colors = mutableListOf<Color>()
+            for (i in 0 until steps) {
+                val index = (i.toDouble() / steps * (neonPalette.size - 1)).toInt()
+                val nextIndex = (index + 1) % neonPalette.size
+                val t = (i.toDouble() / steps * (neonPalette.size - 1)) % 1
+                colors.add(linearInterpolate(neonPalette[index], neonPalette[nextIndex], t))
+            }
+            return colors
+        }
+
         // 🌈 Rainbow Palette (8 Shades)
         val rainbow1Red = Color(0xFFu, 0x00u, 0x00u, 0xFFu)      // Red
         val rainbow2Orange = Color(0xFFu, 0x7Fu, 0x00u, 0xFFu)   // Orange
@@ -185,12 +301,11 @@ data class Color(
         val rainbow7Violet = Color(0x8Au, 0x2Bu, 0xE2u, 0xFFu)   // Violet
         val rainbow8Pink = Color(0xFFu, 0x14u, 0x93u, 0xFFu)     // Neon Pink 💖
 
-        fun rainbow(steps: Int): List<Color> {
+        fun rainbow(steps: Int, maxHue: Float = 300f): List<Color> {
             require(steps > 0) { "Steps must be greater than 0" }
-            val maxHue = 300f // Maximum hue to prevent wrap-around (stops before red again)
             return List(steps) { i ->
-                val hue = (i.toFloat() / (steps - 1)) * maxHue // Avoid looping to red
-                fromHSV(hue, saturation = 1.0f, value = 1.0f)
+                val hue = (i.toFloat() / steps) * maxHue // Blend past red into the next cycle
+                fromHSV(hue % 360f, saturation = 1.0f, value = 1.0f) // Wrap hue back to [0, 360]
             }
         }
 
