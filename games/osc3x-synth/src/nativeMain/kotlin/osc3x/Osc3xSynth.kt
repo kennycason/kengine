@@ -319,4 +319,17 @@ class Osc3xSynth(
      * Access the raw Osc3x engine.
      */
     fun getOsc3x(): Osc3x = osc3x
+
+    fun randomize() {
+        osc3x.randomize() // Randomize the underlying Osc3x engine
+
+        // Synchronize the UI state with the randomized values
+        for (i in 0..2) {
+            val config = osc3x.getConfig(i)
+            volumes[i].set(config.volume)
+            frequencies[i].set(config.frequency)
+            detunes[i].set(config.detune)
+            waveforms[i].set(config.waveform)
+        }
+    }
 }

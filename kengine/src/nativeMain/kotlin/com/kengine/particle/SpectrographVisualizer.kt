@@ -67,12 +67,13 @@ class SpectrographVisualizer(
     }
 
     override fun update() {
-        time += 0.1
+        time += 0.04
+
         for (i in bands.indices) {
             // Frequency-based oscillation for dynamic behavior
-            val oscillation = 0.5 * sin(i * 0.1 + time * (frequency * 0.002))
+            val oscillation = 0.4 * sin(i * 0.1 + time * (frequency * 0.001)) // Lower frequency multiplier for slower oscillation
             bands[i] = max(0.0, bands[i] - decayRate + oscillation)
-            bands[i] = bands[i].coerceIn(0.0, 1.0) // Ensure values stay normalized
+            bands[i] = bands[i].coerceIn(0.0, 1.0)
         }
     }
 }

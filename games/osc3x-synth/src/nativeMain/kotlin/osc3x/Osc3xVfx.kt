@@ -8,6 +8,7 @@ import com.kengine.particle.NeonLinesEffect
 import com.kengine.particle.RainbowLinesEffect
 import com.kengine.particle.RainbowLinesWithFrequencyEffect
 import com.kengine.particle.SacredGeometryOscillation
+import com.kengine.particle.SacredGeometryOscillation2
 import com.kengine.particle.SpectrographVisualizer
 import com.kengine.particle.WavePatternEffect
 import com.kengine.particle.WavePatternEffect2
@@ -32,6 +33,10 @@ class Osc3xVfx(
     private val height: Int = 480
 
     val effects = listOf(
+        SacredGeometryOscillation2(
+            x = 0, y = osc3xSynth.height.toInt(),
+            width = width, height = height - osc3xSynth.height.toInt(),
+        ),
         SacredGeometryOscillation(
             x = 0, y = osc3xSynth.height.toInt(),
             width = width, height = height - osc3xSynth.height.toInt(),
@@ -107,7 +112,8 @@ class Osc3xVfx(
                 hoverColor = Color.neonMagenta,
                 onClick = {
                     logger.info("Clicked pad 2")
-                    currentEffect.set((currentEffect.get() - 1).mod(effects.size))
+                   // currentEffect.set((currentEffect.get() - 1).mod(effects.size))
+                    osc3xSynth.randomize()
                 }
             )
         }
@@ -209,8 +215,7 @@ class Osc3xVfx(
                     (if (osc2.volume > 0.0) osc2.detune else 0.0) +
                     (if (osc3.volume > 0.0) osc3.detune else 0.0)
             )
-        }
-        else if (effect is WaveformGalaxy) {
+        } else if (effect is WaveformGalaxy) {
             val combinedFrequency = (if (osc1.volume > 0.0) osc1.frequency else 0.0) +
                 (if (osc2.volume > 0.0) osc2.frequency else 0.0) +
                 (if (osc3.volume > 0.0) osc3.frequency else 0.0)
@@ -232,6 +237,17 @@ class Osc3xVfx(
                     (if (osc3.volume > 0.0) osc3.detune else 0.0)
             )
         } else if (effect is SacredGeometryOscillation) {
+            effect.setFrequency(
+                (if (osc1.volume > 0.0) osc1.frequency else 0.0) +
+                    (if (osc2.volume > 0.0) osc2.frequency else 0.0) +
+                    (if (osc3.volume > 0.0) osc3.frequency else 0.0)
+            )
+            effect.setDetune(
+                (if (osc1.volume > 0.0) osc1.detune else 0.0) +
+                    (if (osc2.volume > 0.0) osc2.detune else 0.0) +
+                    (if (osc3.volume > 0.0) osc3.detune else 0.0)
+            )
+        } else if (effect is SacredGeometryOscillation2) {
             effect.setFrequency(
                 (if (osc1.volume > 0.0) osc1.frequency else 0.0) +
                     (if (osc2.volume > 0.0) osc2.frequency else 0.0) +

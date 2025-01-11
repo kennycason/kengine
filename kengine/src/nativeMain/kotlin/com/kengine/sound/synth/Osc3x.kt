@@ -145,6 +145,24 @@ class Osc3x(
         }
     }
 
+    fun randomize() {
+        configs.forEach { config ->
+            config.enabled = (0..1).random() == 1 // Randomly enable or disable the oscillator
+            config.frequency = (20..20000).random().toDouble() // Random frequency in Hz
+            config.waveform = Oscillator.Waveform.values().random() // Random waveform
+            config.detune = (-50..50).random().toDouble() // Random detune in cents
+            config.volume = (0..100).random() / 100.0 // Random volume between 0.0 and 1.0
+
+            // Apply the randomized settings to the corresponding oscillator
+            val detunedFrequency = config.frequency * pow(2.0, config.detune / 1200.0)
+            val oscillatorIndex = configs.indexOf(config)
+            oscillators[oscillatorIndex].apply {
+                setFrequency(detunedFrequency)
+                setWaveform(config.waveform)
+            }
+        }
+    }
+
     fun countEnabled(): Int {
         return configs.filter { it.enabled }.size
     }
