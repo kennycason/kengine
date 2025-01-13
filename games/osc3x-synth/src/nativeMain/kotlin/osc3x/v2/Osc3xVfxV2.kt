@@ -1,4 +1,4 @@
-package osc3x
+package osc3x.v2
 
 import com.kengine.graphics.Color
 import com.kengine.hooks.state.useState
@@ -36,11 +36,10 @@ import kotlin.math.abs
  * )
  */
 @OptIn(ExperimentalForeignApi::class)
-class Osc3xVfx(
+class Osc3xVfxV2(
     private val x: Int = 0,
     private val y: Int = 0,
-  //  private val osc3xSynth: Osc3xSynthV2
-    private val osc3xSynth: Osc3xSynth
+    private val osc3xSynth: Osc3xSynthV2
 ) : Logging {
 
     private val width: Int = 640

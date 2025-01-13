@@ -4,7 +4,9 @@ Kotlin Native Game Engine (`KNGN`?)
 
 Kengine is a lightweight, game framework built in Kotlin Native + SDL3, designed for easy/simple game development.
 
-The project is still in early dev mode, contributors welcome.
+The project is still in early dev mode, contributors welcome. 
+
+This has also been an experiment with ChatGPT + Claude to help with coding + design mixed with some other hobby projects.
 
 # Table of Contents
 

@@ -1,9 +1,11 @@
-package com.kengine.sound.synth
+package osc3x
 
 import com.kengine.graphics.Color
 import com.kengine.hooks.effect.useEffect
 import com.kengine.hooks.state.useState
 import com.kengine.log.Logging
+import com.kengine.sound.synth.Osc3x
+import com.kengine.sound.synth.Oscillator
 import com.kengine.ui.FlexDirection
 import com.kengine.ui.View
 import com.kengine.ui.useView

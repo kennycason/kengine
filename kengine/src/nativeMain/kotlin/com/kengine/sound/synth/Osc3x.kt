@@ -23,12 +23,14 @@ class Osc3x(
     private val bufferSize: Int = 512
 ) {
 
-    // individual oscillator settings
     data class OscillatorConfig(
         var enabled: Boolean = true,
         var frequency: Double = 440.0,
         var waveform: Oscillator.Waveform = Oscillator.Waveform.SINE,
         var detune: Double = 0.0,
+        val adsr: ADSR = ADSR(),
+        val lfo: LFO = LFO(),
+        val filter: Filter = Filter(),
         var volume: Double = 1.0
     )
 
@@ -38,7 +40,7 @@ class Osc3x(
         OscillatorConfig()   // Osc 3
     )
 
-    private val oscillators = configs.map {
+    val oscillators = configs.map {
         Oscillator(it.frequency, sampleRate, it.waveform, it.detune)
     }
 
@@ -121,6 +123,43 @@ class Osc3x(
         osc.setWaveform(config.waveform)
     }
 
+    // Individual setter functions for each parameter
+    fun setEnabled(index: Int, enabled: Boolean) {
+        if (index !in configs.indices) return
+        configs[index].enabled = enabled
+    }
+
+    fun setFrequency(index: Int, frequency: Double) {
+        if (index !in configs.indices) return
+        val config = configs[index]
+        config.frequency = frequency.coerceIn(20.0, 20000.0)
+        updateOscillator(index)
+    }
+
+    fun setWaveform(index: Int, waveform: Oscillator.Waveform) {
+        if (index !in configs.indices) return
+        configs[index].waveform = waveform
+        oscillators[index].setWaveform(waveform)
+    }
+
+    fun setDetune(index: Int, detune: Double) {
+        if (index !in configs.indices) return
+        configs[index].detune = detune
+        updateOscillator(index)
+    }
+
+    fun setVolume(index: Int, volume: Double) {
+        if (index !in configs.indices) return
+        configs[index].volume = volume.coerceIn(0.0, 1.0)
+    }
+
+    // Update oscillator frequency with detune
+    private fun updateOscillator(index: Int) {
+        val config = configs[index]
+        val detunedFrequency = config.frequency * pow(2.0, config.detune / 1200.0)
+        oscillators[index].setFrequency(detunedFrequency)
+    }
+
     fun getConfig(oscillator: Int): OscillatorConfig = configs[oscillator]
 
     // update the audio stream
@@ -132,11 +171,15 @@ class Osc3x(
                 // Mix enabled oscillators
                 for (index in oscillators.indices) {
                     if (configs[index].enabled) {
+                        oscillators[index].trigger()
                         sample += oscillators[index].nextSample() * configs[index].volume
+                    } else {
+                        oscillators[index].release()
                     }
                 }
 
-                buffer[i] = (sample * masterVolume).toFloat() / oscillators.size // Normalize
+                val activeOscillators = configs.count { it.enabled }
+                buffer[i] = if (activeOscillators > 0) (sample * masterVolume).toFloat() / activeOscillators else 0.0f
             }
 
             if (!SDL_PutAudioStreamData(stream, buffer.toCValues(), buffer.size * Float.SIZE_BYTES)) {
@@ -145,21 +188,25 @@ class Osc3x(
         }
     }
 
-    fun randomize() {
-        configs.forEach { config ->
-            config.enabled = (0..1).random() == 1 // Randomly enable or disable the oscillator
-            config.frequency = (20..20000).random().toDouble() // Random frequency in Hz
-            config.waveform = Oscillator.Waveform.values().random() // Random waveform
-            config.detune = (-50..50).random().toDouble() // Random detune in cents
-            config.volume = (0..100).random() / 100.0 // Random volume between 0.0 and 1.0
+    fun getOscillatorControl(index: Int): OscillatorControl? {
+        return if (index in oscillators.indices) oscillators[index] else null
+    }
 
-            // Apply the randomized settings to the corresponding oscillator
-            val detunedFrequency = config.frequency * pow(2.0, config.detune / 1200.0)
-            val oscillatorIndex = configs.indexOf(config)
-            oscillators[oscillatorIndex].apply {
-                setFrequency(detunedFrequency)
-                setWaveform(config.waveform)
-            }
+    fun withOscillator(index: Int, block: Oscillator.() -> Unit) {
+        if (index in oscillators.indices) {
+            oscillators[index].block()
+        }
+    }
+
+    fun randomize() {
+        configs.forEachIndexed { index, config ->
+            config.enabled = (0..1).random() == 1
+            config.frequency = (20..20000).random().toDouble()
+            config.detune = (-50..50).random().toDouble()
+            config.volume = (0..100).random() / 100.0
+            config.waveform = Oscillator.Waveform.entries.toTypedArray().random()
+
+            updateOscillator(index)
         }
     }
 

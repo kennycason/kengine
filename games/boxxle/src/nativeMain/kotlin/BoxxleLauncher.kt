@@ -5,7 +5,7 @@ import com.kengine.log.Logger
 
 fun main() {
     createGameContext(
-        title = "Boxxle",
+        title = "Kengine - Boxxle",
         width = 640,
         height = 480,
         logLevel = Logger.Level.DEBUG

@@ -3,7 +3,7 @@ plugins {
     id("kengine.assets")
 }
 
-group = "kengine.image-shuffle"
+group = "kengine.osc3x.gui"
 version = "1.0.0"
 
 kotlin {
