@@ -1,6 +1,3 @@
-package com.kengine.sound.synth
-
-import com.kengine.graphics.Color
 import com.kengine.hooks.state.useState
 import com.kengine.log.Logging
 import com.kengine.particle.FrequencyCircleEffect
@@ -13,171 +10,85 @@ import com.kengine.particle.SpectrographVisualizer
 import com.kengine.particle.WavePatternEffect
 import com.kengine.particle.WavePatternEffect2
 import com.kengine.particle.WaveformGalaxy
-import com.kengine.ui.FlexDirection
-import com.kengine.ui.useView
-import kotlinx.cinterop.ExperimentalForeignApi
-import sdl3.SDL_Delay
 import kotlin.math.abs
 
 /**
  * A UI wrapper for controlling an Osc3x synth with sliders, knobs, and waveform buttons.
+ *
+ * osc3xSynth.updateConfig(
+ *     oscillator = 0,
+ *     frequency = 110.0,
+ *     detune = 0.0,
+ *     waveform = Oscillator.Waveform.SAW,
+ *     lfoEnabled = true,
+ *     lfoFrequency = 5.0,
+ *     lfoAmplitude = 0.3,
+ *     filterEnabled = true,
+ *     filterCutoff = 2000.0
+ * )
  */
-@OptIn(ExperimentalForeignApi::class)
 class Osc3xVfx(
-    private val x: Int = 0,
-    private val y: Int = 0,
+    x: Int = 0,
+    y: Int = 0,
+    width: Int = 0,
+    height: Int = 0,
     private val osc3xSynth: Osc3xSynth
 ) : Logging {
 
-    private val width: Int = 640
-    private val height: Int = 480
-
-    val effects = listOf(
-        SacredGeometryOscillation2(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
-        ),
-        SacredGeometryOscillation(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
-        ),
-        WaveformGalaxy(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
-        ),
+    private val effects = listOf(
         WavePatternEffect(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y,
+            width = width, height = height,
         ),
         RainbowLinesEffect(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y ,
+            width = width, height = height,
             numLines = width,
         ),
+        NeonLinesEffect(
+            x = x, y = y,
+            width = width, height = height,
+        ),
         RainbowLinesWithFrequencyEffect(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y,
+            width = width, height = height,
             numLines = width, frequency = 444.0
         ),
-        SpectrographVisualizer(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+        SacredGeometryOscillation2(
+            x = x, y = y,
+            width = width, height = height,
         ),
         NeonLinesEffect(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y,
+            width = width, height = height,
+        ),
+        SacredGeometryOscillation(
+            x = x, y = y,
+            width = width, height = height,
+        ),
+        WaveformGalaxy(
+            x = x, y = y,
+            width = width, height = height,
+        ),
+        SpectrographVisualizer(
+            x = x, y = y,
+            width = width, height = height,
         ),
         FrequencyCircleEffect(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y,
+            width = width, height = height,
         ),
     )
+
     private val currentEffect = useState(0)
 
-    private val visualizationControls = useView(
-        id = "visualization-controls",
-        x = 530.0,
-        y = 0.0,
-        w = 110.0,
-        h = 90.0,
-        bgColor = Color.neonBlue,
-        padding = 5.0,
-        spacing = 5.0,
-        direction = FlexDirection.ROW
-    ) {
-        view(
-            direction = FlexDirection.COLUMN,
-            w = 35.0,
-            h = 80.0,
-            spacing = 4.0,
-        ) {
-            button(
-                id = "visualisation-change-button-1",
-                w = 35.0,
-                h = 38.0,
-                padding = 5.0,
-                bgColor = Color.neonMagenta,
-                hoverColor = Color.neonPurple,
-                onClick = {
-                    logger.info("Clicked pad 1")
-                    currentEffect.set((currentEffect.get() + 1).mod(effects.size))
-                }
-            )
-            button(
-                id = "visualisation-change-button-2",
-                w = 35.0,
-                h = 38.0,
-                padding = 5.0,
-                bgColor = Color.neonTurquoise,
-                hoverColor = Color.neonMagenta,
-                onClick = {
-                    logger.info("Clicked pad 2")
-                   // currentEffect.set((currentEffect.get() - 1).mod(effects.size))
-                    osc3xSynth.randomize()
-                }
-            )
-        }
-        view(
-            direction = FlexDirection.COLUMN,
-            w = 35.0,
-            h = 80.0,
-            spacing = 4.0,
-        ) {
-            button(
-                id = "visualisation-change-button-3",
-                w = 35.0,
-                h = 38.0,
-                padding = 5.0,
-                bgColor = Color.neonPink,
-                hoverColor = Color.neonMagenta,
-                onClick = {
-                    logger.info("Clicked pad 3")
-                    osc3xSynth.updateConfig(0, frequency = 110.0, detune = 0.0, waveform = Oscillator.Waveform.SAW)
-                    osc3xSynth.updateConfig(1, frequency = 110.0, detune = 50.0, waveform = Oscillator.Waveform.SAW)
-                    osc3xSynth.updateConfig(2, frequency = 110.0, detune = -50.0, waveform = Oscillator.Waveform.SAW)
-                }
-            )
-            button(
-                id = "visualisation-change-button-4",
-                w = 35.0,
-                h = 38.0,
-                padding = 5.0,
-                bgColor = Color.neonOrange,
-                hoverColor = Color.neonMagenta,
-                onClick = {
-                    logger.info("Clicked pad 4")
-                    osc3xSynth.updateConfig(0, frequency = 98.0, detune = 30.0, waveform = Oscillator.Waveform.SAW)
-                    osc3xSynth.updateConfig(1, frequency = 98.0, detune = -30.0, waveform = Oscillator.Waveform.SAW)
-                    osc3xSynth.updateConfig(2, frequency = 196.0, detune = 0.0, waveform = Oscillator.Waveform.SQUARE)
-                }
-            )
-        }
-        slider(
-            id = "visualization-slider",
-            w = 20.0,
-            h = 80.0,
-            min = 0.0,
-            max = 1.0,
-            state = useState(0.0),
-            bgColor = Color.neonPurple,
-            trackWidth = 3.0,
-            trackColor = Color.neonCyan,
-            handleWidth = 14.0,
-            handleHeight = 7.0,
-            handleColor = Color.neonOrange,
-            onValueChanged = { value ->
-                logger.info("Visualization slider => $value")
-            }
-        )
-    }
-
     fun update() {
-        val config = osc3xSynth.getOsc3x()
+        val config = osc3xSynth.osc3x
         val osc1 = config.getConfig(0)
         val osc2 = config.getConfig(1)
         val osc3 = config.getConfig(2)
 
-        osc3xSynth.update()
+       // osc3xSynth.update()
 
         val effect = effects[currentEffect.get()]
         if (effect is WavePatternEffect) {
@@ -261,14 +172,21 @@ class Osc3xVfx(
         }
         effect.update()
 
-        SDL_Delay(1u) // small delay to prevent CPU overuse
+      //  SDL_Delay(1u) // small delay to prevent CPU overuse
     }
 
     fun draw() {
         effects[currentEffect.get()].draw()
-        visualizationControls.draw()
     }
 
     fun cleanup() {
+    }
+
+    fun nextEffect() {
+        currentEffect.set((currentEffect.get() + 1).mod(effects.size))
+    }
+
+    fun previousEffect() {
+         currentEffect.set((currentEffect.get() - 1).mod(effects.size))
     }
 }

@@ -1,6 +1,6 @@
+
 import com.kengine.GameRunner
 import com.kengine.createGameContext
-import osc3x.Osc3xGUI
 
 fun main() {
     createGameContext(
@@ -9,7 +9,7 @@ fun main() {
         height = 480,
     ) {
         GameRunner(frameRate = 60) {
-            Osc3xGUI()
+            Osc3xSynth()
         }
     }
 }

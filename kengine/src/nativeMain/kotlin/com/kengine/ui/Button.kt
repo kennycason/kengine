@@ -3,6 +3,8 @@ package com.kengine.ui
 import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Color
 import com.kengine.graphics.Sprite
+import com.kengine.hooks.state.State
+import com.kengine.hooks.state.useState
 
 class Button(
     id: String,
@@ -21,6 +23,7 @@ class Button(
     private val isCircle: Boolean = false,
     private val isToggle: Boolean = false,
     private val onToggle: ((Boolean) -> Unit)? = null,
+    private val isPressed: State<Boolean> = useState(false),
     parent: View? = null
 ) : View(
     id = id,
@@ -37,15 +40,13 @@ class Button(
     parent = parent
 ) {
     private var isHovered = false
-    private var isPressed = false
-        private set
 
     override fun draw() {
         if (!visible) return
 
         val currentColor = when {
-            isToggle && isPressed -> pressColor ?: hoverColor ?: bgColor
             isHovered -> hoverColor
+            isToggle && isPressed.get() -> pressColor ?: hoverColor ?: bgColor
             else -> bgColor
         }
 
@@ -70,8 +71,8 @@ class Button(
 
         if (isToggle) {
             // toggle the state and invoke the callback
-            isPressed = !isPressed
-            onToggle?.invoke(isPressed)
+            isPressed.set(!isPressed.get())
+            onToggle?.invoke(isPressed.get())
         } else {
             onClick?.invoke()
         }

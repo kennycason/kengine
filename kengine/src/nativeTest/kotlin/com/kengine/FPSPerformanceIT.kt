@@ -1,32 +1,38 @@
 package com.kengine
 
 import com.kengine.log.Logger
+import com.kengine.sdl.getSDLContext
 import com.kengine.time.getClockContext
 import com.kengine.time.useTimer
 import kotlin.test.Test
 
-class GravitySimulationIT {
-
+class FPSPerformanceIT {
     @Test
     fun `fps test`() {
-        val width = 800
-        val height = 600
+        val width = 640
+        val height = 480
         createGameContext(
             title = "FPS Test",
             width = width,
             height = height,
             logLevel = Logger.Level.INFO
         ) {
-            GameRunner(frameRate = 60) {
+            GameRunner(frameRate = -1) {
+                val sdlContext = getSDLContext()
+
+
+                useTimer(10_000L) {
+                    isRunning = false
+                }
+
                 object : Game {
                     override fun update() {
-                        useTimer(30000L) {
-                            isRunning = false
-                        }
+                        logger.info { "FPS ${getClockContext().fps}ms" }
                     }
 
                     override fun draw() {
-                        logger.info { "FPS ${getClockContext().fps}ms" }
+                        sdlContext.fillScreen(0x0u, 0x0u, 0x0u)
+                        sdlContext.flipScreen()
                     }
 
                     override fun cleanup() {}

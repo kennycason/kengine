@@ -1,5 +1,6 @@
 package com.kengine.font
 
+import com.kengine.graphics.Color
 import com.kengine.graphics.alphaFromRGBA
 import com.kengine.graphics.blueFromRGBA
 import com.kengine.graphics.greenFromRGBA
@@ -60,6 +61,22 @@ class Font(
         }
     }
 
+    fun drawText(
+        text: String,
+        x: Int,
+        y: Int,
+        color: Color,
+        caching: Boolean = false
+    ) {
+        return drawText(
+            text, x, y,
+            r = color.r,
+            g = color.g,
+            b = color.b,
+            a = color.a,
+            caching
+        )
+    }
 
     fun drawText(
         text: String,

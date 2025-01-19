@@ -1,17 +1,15 @@
-import boxxle.BoxxleGame
+
 import com.kengine.GameRunner
 import com.kengine.createGameContext
-import com.kengine.log.Logger
 
 fun main() {
     createGameContext(
-        title = "Kengine - Boxxle",
+        title = "Kengine - Osc3x Synth",
         width = 640,
         height = 480,
-        logLevel = Logger.Level.DEBUG
     ) {
         GameRunner(frameRate = 60) {
-            BoxxleGame()
+            Osc3xSynths()
         }
     }
 }

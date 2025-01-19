@@ -1,6 +1,6 @@
 package com.kengine
 
-import com.kengine.input.mouse.useMouseContext
+import com.kengine.input.mouse.getMouseContext
 import com.kengine.log.Logging
 import com.kengine.sdl.SDLEventContext
 import com.kengine.time.getClockContext
@@ -32,11 +32,15 @@ class GameLoop(
         // Set FPS in ClockContext
         clock.setFrameRate(frameRate)
 
-        logger.info {
-            if (frameRate < 0) "Running at uncapped FPS."
-            else "Target Frame Rate: $frameRate FPS."
+        if (logger.isDebugEnabled()) {
+            logger.debug {
+                if (frameRate < 0) "Running at uncapped FPS."
+                else "Target Frame Rate: $frameRate FPS."
+            }
         }
 
+        val mouse = getMouseContext().mouse
+        val viewContext = getViewContext()
         useGameContext(cleanup = true) {
             while (isRunning) {
                 // poll events
@@ -51,17 +55,12 @@ class GameLoop(
                 // update ClockContext
                 clock.update((deltaTimeNs / 1_000_000u).toLong()) // Convert ns -> ms
 
-                useMouseContext {
-                    val cursor = mouse.cursor()
-
-                    // Release if left was just released.handleMouseEvents(cursor.x, cursor.y, mouse.isLeftPressed())
-                    // Press or hover
-                    getViewContext().handleMouseEvents(cursor.x, cursor.y, mouse.isLeftPressed())
-                }
+                val cursor = mouse.cursor()
+                viewContext.handleMouseEvents(cursor.x, cursor.y, mouse.isLeftPressed())
 
                 update()
 
-                getViewContext().performLayout()
+                viewContext.performLayout()
 
                 draw()
 

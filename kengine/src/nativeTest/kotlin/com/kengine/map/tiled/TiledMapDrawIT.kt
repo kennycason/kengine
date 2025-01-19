@@ -40,7 +40,7 @@ class TiledMapDrawIT {
                     private var avgRenderTimeNs = 0L
 
                     init {
-                        useTimer(10000L) {
+                        useTimer(5000L) {
                             isRunning = false
                         }
                     }
@@ -83,6 +83,7 @@ class TiledMapDrawIT {
                                     "min: ${minRenderTimeNs / 1000000.0}ms " +
                                     "max: ${maxRenderTimeNs / 1000000.0}ms"
                             }
+                            logger.info { "FPS ${getClockContext().fps}ms" }
                             flipScreen()
                         }
                     }

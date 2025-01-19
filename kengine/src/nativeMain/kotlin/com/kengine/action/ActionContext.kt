@@ -6,33 +6,49 @@ import com.kengine.log.Logging
 import com.kengine.math.Vec2
 
 class ActionContext private constructor() : Context(), Logging {
-    private val actions = ArrayDeque<Action>()
+
+    private val actions = mutableListOf<Action>() // Current actions
+    private val pendingActions = mutableListOf<Action>() // Actions added during update
 
     fun moveTo(entity: Entity, destination: Vec2, durationMs: Long, onComplete: (() -> Unit)) {
-        actions.add(MoveAction(entity, destination, durationMs, onComplete))
+        pendingActions.add(MoveAction(entity, destination, durationMs, onComplete))
     }
 
     fun timer(delayMs: Long, onComplete: (() -> Unit)) {
-        actions.add(TimerAction(delayMs, onComplete))
+        pendingActions.add(TimerAction(delayMs, onComplete))
     }
 
     fun interval(delayMs: Long, onComplete: (() -> Unit)) {
-        actions.add(IntervalAction(delayMs, onComplete))
+        pendingActions.add(IntervalAction(delayMs, onComplete))
     }
 
     fun update() {
-        val iterator = actions.iterator()
-        while (iterator.hasNext()) {
-            val action = iterator.next()
+        // early exit if no actions
+        if (actions.isEmpty() && pendingActions.isEmpty()) return
+
+//        logger.info { " wut "}
+        // process current actions
+
+        for (i in 0 until actions.size) {
+            val action = actions[i]
             if (action.update()) {
-                iterator.remove()
+                // remove completed action by swapping with the last element for O(1) removal
+                actions[i] = actions.last()
+                actions.removeAt(actions.lastIndex)
             }
+        }
+
+        // add pending actions to the main list
+        if (pendingActions.isNotEmpty()) {
+            actions.addAll(pendingActions)
+            pendingActions.clear()
         }
     }
 
     override fun cleanup() {
-        logger.info { "Cleaning up ActionContext"}
+        logger.info { "Cleaning up ActionContext" }
         actions.clear()
+        pendingActions.clear()
     }
 
     fun size() = actions.size

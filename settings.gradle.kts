@@ -25,6 +25,7 @@ modules.addAll(
         "games:helloworld",
         "games:image-shuffle",
         "games:osc3x-synth",
+        "games:osc3x-synth-v2",
         "games:physics-demo"
     )
 )

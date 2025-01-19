@@ -3,7 +3,7 @@ plugins {
     id("kengine.assets")
 }
 
-group = "kengine.osc3x.synth"
+group = "kengine.osc3x.synthv2"
 version = "1.0.0"
 
 kotlin {

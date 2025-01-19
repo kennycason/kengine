@@ -5,6 +5,7 @@ import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Color
 import com.kengine.graphics.Sprite
 import com.kengine.hooks.state.State
+import com.kengine.hooks.state.useState
 import com.kengine.log.Logging
 import com.kengine.math.Vec2
 import com.kengine.time.getCurrentNanoseconds
@@ -48,8 +49,6 @@ fun useView(
         desiredH = h,
         bgColor = bgColor,
         bgSprite = bgImage,
-        text = text,
-        textColor = textColor,
         align = align,
         direction = direction,
         padding = padding,
@@ -73,6 +72,9 @@ fun useView(
     return view
 }
 
+/**
+ * TODO in future consider caching rendered views. First draw to an intermediate buffer, dynamically re-render as needed.
+ */
 open class View(
     val id: String = "",
     /**
@@ -86,8 +88,6 @@ open class View(
 
     val bgColor: Color? = null,
     val bgSprite: Sprite? = null,
-    val textColor: Color = Color.white,
-    val text: String? = null,
     val textFont: Font? = null,
     val align: Align = Align.LEFT,
     val direction: FlexDirection = FlexDirection.ROW,
@@ -301,6 +301,37 @@ open class View(
         )
     }
 
+    fun text(
+        id: String,
+        x: Double = 0.0,
+        y: Double = 0.0,
+        w: Double,
+        h: Double,
+        text: String,
+        font: Font,
+        textColor: Color = Color.white,
+        align: Align = Align.LEFT,
+        padding: Double = 0.0,
+        bgColor: Color? = null
+    ): TextView {
+        val textView = TextView(
+            id = id,
+            x = x,
+            y = y,
+            w = w,
+            h = h,
+            text = text,
+            align = align,
+            font = font,
+            textColor = textColor,
+            padding = padding,
+            bgColor = bgColor,
+            parent = this
+        )
+        addChild(textView)
+        return textView
+    }
+
     fun slider(
         id: String,
         x: Double = 0.0,
@@ -363,6 +394,7 @@ open class View(
         isCircle: Boolean = false,
         isToggle: Boolean = false,
         onToggle: ((Boolean) -> Unit)? = null,
+        isPressed: State<Boolean> = useState(false),
     ): Button {
         val button = Button(
             id = id,
@@ -381,6 +413,7 @@ open class View(
             isCircle = isCircle,
             isToggle = isToggle,
             onToggle = onToggle,
+            isPressed = isPressed,
             parent = this
         )
         addChild(button)
@@ -458,5 +491,4 @@ open class View(
     fun cleanup() {
         children.forEach { it.cleanup() }
     }
-
 }
