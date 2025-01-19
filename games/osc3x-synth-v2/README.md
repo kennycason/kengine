@@ -1,13 +1,11 @@
 # Osc3x Synth
 
 
-<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/images/osc3x-7.png" width="48%"/> <img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/images/osc3x-2.png" width="48%"/>
-
-<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/images/osc3x-3.png" width="48%"/> <img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/images/osc3x-4.png" width="48%"/>
+<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/games/osc3x-synth-v2/screenshot.png" width="66%"/>
 
 ## Build and Run
 
-From within IntelliJ, run the `main` function within `Osc3xGUILauncher.kt`.
+From within IntelliJ, run the `main` function within `Osc3xSynthsLauncher.kt`.
 
 From the terminal:
 
