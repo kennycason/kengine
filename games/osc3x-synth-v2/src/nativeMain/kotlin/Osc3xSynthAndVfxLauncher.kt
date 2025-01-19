@@ -9,7 +9,7 @@ fun main() {
         height = 480,
     ) {
         GameRunner(frameRate = 60) {
-            Osc3xSynths()
+            Osc3xSynthAndVfx()
         }
     }
 }

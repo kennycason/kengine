@@ -22,13 +22,13 @@ class ADSR(
     fun trigger() {
         state = State.ATTACK
         time = 0.0
-        logger.info("Triggered -> Phase: $state, Time: $time")
+        //logger.info("Triggered -> Phase: $state, Time: $time")
     }
 
     fun release() {
         state = State.RELEASE
         time = 0.0
-        logger.info("Released -> Phase: $state, Time: $time")
+        //logger.info("Released -> Phase: $state, Time: $time")
     }
 
     fun getValue(): Double {

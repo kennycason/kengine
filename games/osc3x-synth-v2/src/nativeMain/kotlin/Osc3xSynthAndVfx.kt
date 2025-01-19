@@ -7,7 +7,7 @@ import com.kengine.log.Logging
 import com.kengine.sdl.useSDLContext
 import com.kengine.sound.keyboard.VirtualKeyboard
 
-class Osc3xSynths : Game, Logging {
+class Osc3xSynthAndVfx : Game, Logging {
 
     init {
         useFontContext {
