@@ -1,7 +1,6 @@
 
 import com.kengine.GameRunner
 import com.kengine.createGameContext
-import osc3x.v2.Osc3xSynths
 
 fun main() {
     createGameContext(

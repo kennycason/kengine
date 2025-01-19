@@ -1,5 +1,3 @@
-package osc3x.v2
-
 import com.kengine.Game
 import com.kengine.font.getFontContext
 import com.kengine.font.useFontContext
@@ -7,7 +5,7 @@ import com.kengine.graphics.Color
 import com.kengine.hooks.state.useState
 import com.kengine.log.Logging
 import com.kengine.sdl.useSDLContext
-import com.kengine.time.getClockContext
+import com.kengine.sound.keyboard.VirtualKeyboard
 
 class Osc3xSynths : Game, Logging {
 
@@ -25,13 +23,24 @@ class Osc3xSynths : Game, Logging {
         masterVolume = masterVolume
     )
 
+    private val keyboard = VirtualKeyboard(
+        id = "keyboard",
+        x = 0.0, y = 480.0 - 100.0,
+        w = 640.0, h = 100.0,
+        synth = osc3xSynth.osc3x,
+        bgColor = Color.gray10,
+        startOctave = 2,
+        numOctaves = 4
+    )
+
     private val osc3XVfx = Osc3xVfx(
-        x = 0, y = osc3xSynth.height.toInt(),
+        x = osc3xSynth.width.toInt(), y = 90,
+        width = 640 - osc3xSynth.width.toInt(), height = 300,
         osc3xSynth = osc3xSynth,
     )
 
     private val controlPad = ControlPad(
-        x = 530.0, y = 0.0,
+        x = 445.0, y = 0.0,
         osc3xSynth = osc3xSynth,
         osc3xVfx = osc3XVfx,
         masterVolume = masterVolume
@@ -41,7 +50,7 @@ class Osc3xSynths : Game, Logging {
         osc3xSynth.update()
         osc3XVfx.update()
         controlPad.update()
-        logger.info { "FPS: ${getClockContext().fps}" }
+        // logger.info { "FPS: ${getClockContext().fps}" }
     }
 
     override fun draw() {
@@ -50,6 +59,7 @@ class Osc3xSynths : Game, Logging {
             osc3XVfx.draw()
             osc3xSynth.draw()
             controlPad.draw()
+            keyboard.draw()
             flipScreen()
         }
     }

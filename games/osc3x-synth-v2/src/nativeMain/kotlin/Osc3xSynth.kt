@@ -1,5 +1,6 @@
-package osc3x.v2
-
+import Osc3xSynth.Styles.Common.PANEL_PADDING
+import Osc3xSynth.Styles.Common.PANEL_SPACING
+import Osc3xSynth.Styles.Common.PANEL_WIDTH
 import com.kengine.font.Font
 import com.kengine.graphics.Color
 import com.kengine.hooks.effect.useEffect
@@ -12,9 +13,6 @@ import com.kengine.ui.Align
 import com.kengine.ui.FlexDirection
 import com.kengine.ui.View
 import com.kengine.ui.useView
-import osc3x.v2.Osc3xSynth.Styles.Common.PANEL_PADDING
-import osc3x.v2.Osc3xSynth.Styles.Common.PANEL_SPACING
-import osc3x.v2.Osc3xSynth.Styles.Common.PANEL_WIDTH
 
 class Osc3xSynth(
     private val x: Double = 0.0,
@@ -63,10 +61,10 @@ class Osc3xSynth(
         // ADSR envelope section
         object ADSR {
             const val SECTION_WIDTH = Common.PANEL_WIDTH// - PANEL_PADDING * 2
-            const val SECTION_HEIGHT = 100.0
+            const val SECTION_HEIGHT = 105.0
             const val HEADER_HEIGHT = 15.0
             const val SLIDER_WIDTH = 20.0
-            const val SLIDER_HEIGHT = 60.0
+            const val SLIDER_HEIGHT = 55.0
         }
     }
 
@@ -142,7 +140,7 @@ class Osc3xSynth(
                     osc3x.withOscillator(index) { setLFO(amplitude = amp) }
                 }
             },
-            filterEnabled = useState(true).also { state ->
+            filterEnabled = useState(false).also { state ->
                 state.subscribe { enabled ->
                     osc3x.withOscillator(index) { enableFilter(enabled) }
                 }
@@ -157,7 +155,7 @@ class Osc3xSynth(
                     osc3x.withOscillator(index) { setFilterResonance(res) }
                 }
             },
-            adsrEnabled = useState(true).also { state ->
+            adsrEnabled = useState(false).also { state ->
                 state.subscribe { enabled ->
                     osc3x.withOscillator(index) { enableADSR(enabled) }
                 }
@@ -492,6 +490,7 @@ class Osc3xSynth(
                     hoverColor = Colors.hoverButton,
                     pressColor = Colors.enabledButton,
                     isToggle = true,
+                    isPressed = enableState,
                     onToggle = onToggle
                 )
             }
@@ -556,6 +555,7 @@ class Osc3xSynth(
                     pressColor = Colors.enabledButton,
                     isToggle = true,
                     onToggle = { enabled ->
+                        state.adsrEnabled.set(enabled)
                         osc3x.withOscillator(index) {
                             enableADSR(enabled)
                         }
@@ -567,10 +567,11 @@ class Osc3xSynth(
             // ADSR Controls
             view(
                 id = "adsr-controls-$index",
-                w  = panelWidth - Styles.Common.PANEL_SPACING * 4,
-                h = Styles.ADSR.SECTION_HEIGHT - Styles.ADSR.HEADER_HEIGHT -  Styles.Common.PANEL_SPACING * 2,
+                w = Styles.ADSR.SLIDER_WIDTH * 4 + Styles.Common.PANEL_SPACING * 3 + Styles.Common.PANEL_PADDING * 2,
+                h = Styles.ADSR.SECTION_HEIGHT - Styles.ADSR.HEADER_HEIGHT - Styles.Common.PANEL_PADDING * 2 - Styles.Common.PANEL_SPACING,
                 direction = FlexDirection.ROW,
                 bgColor = Colors.moduleBg,
+                padding = Styles.Common.PANEL_PADDING,
                 spacing = Styles.Common.CONTROL_SPACING
             ) {
                 // Attack
@@ -612,7 +613,6 @@ class Osc3xSynth(
             }
         }
     }
-
 
     // would follow similar patterns but I'll keep the code sample focused on the
     // main elements for now. Would you like me to continue with the effects and ADSR sections?
@@ -778,5 +778,4 @@ class Osc3xSynth(
     fun setMaterVolume(volume: Double) {
         masterVolume.set(volume)
     }
-
 }

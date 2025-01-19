@@ -1,5 +1,6 @@
 package com.kengine.sound.synth
 
+import com.kengine.log.Logging
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.cValue
@@ -21,7 +22,7 @@ import sdl3.SDL_ResumeAudioStreamDevice
 class Osc3x(
     private val sampleRate: Int = 44100,
     private val bufferSize: Int = 512
-) {
+) : Logging {
 
     data class OscillatorConfig(
         var enabled: Boolean = true,
@@ -31,7 +32,8 @@ class Osc3x(
         val adsr: ADSR = ADSR(),
         val lfo: LFO = LFO(),
         val filter: Filter = Filter(),
-        var volume: Double = 1.0
+        var volume: Double = 1.0,
+        var isTriggered: Boolean = false
     )
 
     private val configs = listOf(
@@ -168,13 +170,18 @@ class Osc3x(
             for (i in buffer.indices) {
                 var sample = 0.0
 
-                // mix enabled oscillators
+                // Mix enabled oscillators
                 for (index in oscillators.indices) {
                     if (configs[index].enabled) {
-                        oscillators[index].trigger()
-                        sample += oscillators[index].nextSample() * configs[index].volume
+                        if (!configs[index].isTriggered) {
+                            oscillators[index].trigger()
+                            configs[index].isTriggered = true
+                        }
+                        val adsrValue = configs[index].adsr.getValue()
+                        sample += oscillators[index].nextSample() * configs[index].volume * adsrValue
                     } else {
                         oscillators[index].release()
+                        configs[index].isTriggered = false // Reset for next trigger
                     }
                 }
 
@@ -196,6 +203,17 @@ class Osc3x(
         if (index in oscillators.indices) {
             oscillators[index].block()
         }
+    }
+
+    fun triggerNote(index: Int) {
+        if (index !in configs.indices) return
+        configs[index].isTriggered = false  // This will cause the next update to trigger
+    }
+
+    fun releaseNote(index: Int) {
+        if (index !in configs.indices) return
+        oscillators[index].release()
+        configs[index].isTriggered = false
     }
 
     fun randomize() {

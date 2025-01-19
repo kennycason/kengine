@@ -33,20 +33,20 @@ class Oscillator(
 
         // Apply ADSR envelope if enabled
         val adsrValue = if (adsr.enabled) adsr.getValue() else 1.0
+        //logger.info("Oscillator ADSR: enabled=${adsr.enabled}, value=$adsrValue, state=${adsr.toString()}")
 
-        // Apply filter
         // Apply filter if enabled
-        val processedSample = if (filter.enabled) filter.apply(rawSample) else rawSample
+        val filteredSample = if (filter.enabled) filter.apply(rawSample) else rawSample
+        //logger.info("Oscillator Filter: enabled=${filter.enabled}, sample=$filteredSample")
 
+        // Scale the filtered sample by the ADSR value
+        val finalSample = filteredSample * adsrValue
 
-        // Increment phase
-        phase = (phase + phaseIncrement) % (2.0 * Math.PI)
-
-        // Increment phase
+        // Increment phase based on frequency
         phase = (phase + phaseIncrement) % (2.0 * Math.PI)
 
         // Final output
-        return (processedSample * adsrValue).toFloat()
+        return finalSample.toFloat()
     }
 
     private fun calculatePhaseIncrement(): Double {
@@ -80,6 +80,7 @@ class Oscillator(
 
     override fun enableADSR(enabled: Boolean) {
         adsr.enabled = enabled
+        logger.info("ADSR Enabled: $enabled")
     }
 
     override fun enableLFO(enabled: Boolean) {

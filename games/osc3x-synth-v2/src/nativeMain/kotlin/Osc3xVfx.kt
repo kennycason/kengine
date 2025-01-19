@@ -1,5 +1,3 @@
-package osc3x.v2
-
 import com.kengine.hooks.state.useState
 import com.kengine.log.Logging
 import com.kengine.particle.FrequencyCircleEffect
@@ -30,56 +28,55 @@ import kotlin.math.abs
  * )
  */
 class Osc3xVfx(
-    private val x: Int = 0,
-    private val y: Int = 0,
+    x: Int = 0,
+    y: Int = 0,
+    width: Int = 0,
+    height: Int = 0,
     private val osc3xSynth: Osc3xSynth
 ) : Logging {
 
-    private val width: Int = 640
-    private val height: Int = 480
-
     private val effects = listOf(
         WavePatternEffect(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y,
+            width = width, height = height,
         ),
         RainbowLinesEffect(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y ,
+            width = width, height = height,
             numLines = width,
         ),
         NeonLinesEffect(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y,
+            width = width, height = height,
         ),
         RainbowLinesWithFrequencyEffect(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y,
+            width = width, height = height,
             numLines = width, frequency = 444.0
         ),
         SacredGeometryOscillation2(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y,
+            width = width, height = height,
         ),
         NeonLinesEffect(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y,
+            width = width, height = height,
         ),
         SacredGeometryOscillation(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y,
+            width = width, height = height,
         ),
         WaveformGalaxy(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y,
+            width = width, height = height,
         ),
         SpectrographVisualizer(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y,
+            width = width, height = height,
         ),
         FrequencyCircleEffect(
-            x = 0, y = osc3xSynth.height.toInt(),
-            width = width, height = height - osc3xSynth.height.toInt(),
+            x = x, y = y,
+            width = width, height = height,
         ),
     )
 

@@ -1,5 +1,7 @@
 package com.kengine.sound.synth
 
+import com.kengine.log.Logging
+
 /**
  * ADSR (Attack, Decay, Sustain, Release) envelope shapes the amplitude of the sound to make it more dynamic & expressive.
  */
@@ -10,7 +12,7 @@ class ADSR(
     var release: Double = 0.3, // Release time in seconds
     val sampleRate: Int = 44100,
     var enabled: Boolean = false
-) {
+) : Logging {
     private var state: State = State.IDLE
     private var value = 0.0 // Current ADSR value
     private var time = 0.0 // Current time within the current phase
@@ -20,50 +22,68 @@ class ADSR(
     fun trigger() {
         state = State.ATTACK
         time = 0.0
+        logger.info("Triggered -> Phase: $state, Time: $time")
     }
 
     fun release() {
         state = State.RELEASE
         time = 0.0
+        logger.info("Released -> Phase: $state, Time: $time")
     }
 
     fun getValue(): Double {
         if (!enabled) return 1.0
 
+       // logger.info("Before Update -> Phase: $state, Value: $value, Time: $time")
+
         when (state) {
             State.ATTACK -> {
-                value += 1.0 / (attack * sampleRate)
+                time += 1.0 / sampleRate
+                value = time / attack
                 if (value >= 1.0) {
                     value = 1.0
                     state = State.DECAY
+                    time = 0.0 // Reset time for the next phase
+                    //logger.info("Transitioned to DECAY phase")
                 }
             }
 
             State.DECAY -> {
-                value -= (1.0 - sustain) / (decay * sampleRate)
+                time += 1.0 / sampleRate
+                value = 1.0 - (1.0 - sustain) * (time / decay)
                 if (value <= sustain) {
                     value = sustain
                     state = State.SUSTAIN
+                    time = 0.0 // Reset time for the next phase
+                    //logger.info("Transitioned to SUSTAIN phase")
                 }
             }
 
             State.SUSTAIN -> {
-                // Maintain sustain level
-                value = sustain
+                value = sustain // Maintain sustain level
             }
 
             State.RELEASE -> {
-                value -= sustain / (release * sampleRate)
+                time += 1.0 / sampleRate
+                value = sustain * (1.0 - (time / release))
                 if (value <= 0.0) {
                     value = 0.0
                     state = State.IDLE
+                    time = 0.0 // Reset time when idle
+                    //logger.info("Transitioned to IDLE phase")
                 }
             }
 
             State.IDLE -> {
-                // Do nothing
+                // Do nothing, maintain value = 0.0
             }
         }
+
+        //logger.info("After Update -> Phase: $state, Value: $value, Time: $time")
         return value
+    }
+
+    override fun toString(): String {
+        return "ADSR(attack=$attack, decay=$decay, sustain=$sustain, release=$release, sampleRate=$sampleRate, enabled=$enabled, state=$state, value=$value, time=$time)"
     }
 }
