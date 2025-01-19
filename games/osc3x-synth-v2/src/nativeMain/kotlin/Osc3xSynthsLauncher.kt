@@ -4,7 +4,7 @@ import com.kengine.createGameContext
 
 fun main() {
     createGameContext(
-        title = "Kengine - Osc3x Synths",
+        title = "Kengine - Osc3x Synth",
         width = 640,
         height = 480,
     ) {
