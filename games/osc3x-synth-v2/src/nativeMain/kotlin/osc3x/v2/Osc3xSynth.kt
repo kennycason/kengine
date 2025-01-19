@@ -2,6 +2,7 @@ package osc3x.v2
 
 import com.kengine.font.Font
 import com.kengine.graphics.Color
+import com.kengine.hooks.effect.useEffect
 import com.kengine.hooks.state.State
 import com.kengine.hooks.state.useState
 import com.kengine.log.Logging
@@ -11,17 +12,18 @@ import com.kengine.ui.Align
 import com.kengine.ui.FlexDirection
 import com.kengine.ui.View
 import com.kengine.ui.useView
-import osc3x.v2.Osc3xSynthV2.Styles.Common.PANEL_PADDING
-import osc3x.v2.Osc3xSynthV2.Styles.Common.PANEL_WIDTH
+import osc3x.v2.Osc3xSynth.Styles.Common.PANEL_PADDING
+import osc3x.v2.Osc3xSynth.Styles.Common.PANEL_SPACING
+import osc3x.v2.Osc3xSynth.Styles.Common.PANEL_WIDTH
 
-class Osc3xSynthV2(
+class Osc3xSynth(
     private val x: Double = 0.0,
     private val y: Double = 0.0,
     private val font: Font,
-    defaultVolume: Double = 0.5
+    private val masterVolume: State<Double>// = useState(0.5)
 ) : Logging {
-    val width: Double = PANEL_WIDTH * 3
-    val height: Double = 300.0
+    val width: Double = PANEL_WIDTH * 3 + PANEL_PADDING * 2 + PANEL_SPACING * 2
+    val height: Double = 380.0
 
     private object Styles {
         // Common sizes used across sections
@@ -43,6 +45,7 @@ class Osc3xSynthV2(
             const val KNOB_SIZE = 20.0
             const val KNOB_FREQ_DRAG_SCALE = 1000.0
             const val KNOB_DETUNE_DRAG_SCALE = 400.0
+            const val WAVE_BUTTONS_SPACING = 2.0
         }
 
         // Effects section (LFO & Filter)
@@ -59,9 +62,9 @@ class Osc3xSynthV2(
 
         // ADSR envelope section
         object ADSR {
-            const val SECTION_WIDTH = Common.PANEL_WIDTH - PANEL_PADDING * 2
-            const val SECTION_HEIGHT = 90.0   // Reduced from 100.0
-            const val HEADER_HEIGHT = 15.0    // Reduced from 20.0
+            const val SECTION_WIDTH = Common.PANEL_WIDTH// - PANEL_PADDING * 2
+            const val SECTION_HEIGHT = 100.0
+            const val HEADER_HEIGHT = 15.0
             const val SLIDER_WIDTH = 20.0
             const val SLIDER_HEIGHT = 60.0
         }
@@ -76,13 +79,16 @@ class Osc3xSynthV2(
         val effectSlider = Color.neonBlue
         val adsrSlider = Color.neonCyan
         val knobs = Color.neonOrange
+        val disabledButton = Color.neonOrange
+        val hoverButton = Color.neonPurple
         val enabledButton = Color.neonGreen
         val waveformButton = Color.neonPink
         val labelText = Color.neonYellow
         val valueText = Color.white
     }
 
-    private val osc3x = Osc3x()
+    val osc3x = Osc3x()
+
     private val synthView: View
 
     private data class OscillatorState(
@@ -109,7 +115,7 @@ class Osc3xSynthV2(
             enabled = useState(true).also { state ->
                 state.subscribe { enabled -> osc3x.setEnabled(index, enabled) }
             },
-            volume = useState(defaultVolume).also { state ->
+            volume = useState(masterVolume.get()).also { state ->
                 state.subscribe { volume -> osc3x.setVolume(index, volume) }
             },
             frequency = useState(440.0).also { state ->
@@ -179,11 +185,15 @@ class Osc3xSynthV2(
         )
     }
 
-    private val masterVolume = useState(defaultVolume)
-
     init {
         osc3x.setMasterVolume(masterVolume.get())
-        for (i in 0..2) syncOscillatorConfig(i)
+        useEffect({
+            osc3x.setMasterVolume(masterVolume.get())
+        }, masterVolume)
+
+        for (i in 0..2) {
+            syncOscillatorConfig(i)
+        }
 
         synthView = useView(
             id = "osc3xsynth-v2-container",
@@ -196,17 +206,19 @@ class Osc3xSynthV2(
             spacing = Styles.Common.PANEL_SPACING,
             bgColor = Colors.background
         ) {
-            for (i in 0..2) buildOscillatorPanel(i)
+            for (i in 0..2) {
+                buildOscillatorPanel(i)
+            }
         }
     }
 
     private fun View.buildOscillatorPanel(index: Int) {
-        val panelWidth = PANEL_WIDTH - PANEL_PADDING * 2
+//        val panelWidth = PANEL_WIDTH - PANEL_PADDING * 2
         val panelHeight = height - Styles.Common.PANEL_SPACING * 2
 
         view(
             id = "osc-$index-panel",
-            w = panelWidth,
+//            w = panelWidth,
             h = panelHeight,
             bgColor = Colors.panelBg,
             padding = Styles.Common.PANEL_SPACING,
@@ -266,14 +278,16 @@ class Osc3xSynthV2(
         hasKnob: Boolean = false,
         dragScale: Double = 200.0,
         enableState: State<Boolean>? = null,
-        sliderColor: Color = Colors.mainSlider
+        sliderColor: Color = Colors.mainSlider,
+        height: Double = Styles.Main.SECTION_HEIGHT,
+        sliderHeight: Double = Styles.Main.SLIDER_HEIGHT
     ) {
         view(
             id = "${label.lowercase()}-column",
             w = Styles.Main.SLIDER_WIDTH + Styles.Common.CONTROL_SPACING,
-            h = if (hasKnob) Styles.Main.SECTION_HEIGHT else Styles.Main.SLIDER_HEIGHT,
+            h = if (hasKnob) height else sliderHeight,
             direction = FlexDirection.COLUMN,
-            spacing = Styles.Common.CONTROL_SPACING
+            spacing = Styles.Main.WAVE_BUTTONS_SPACING
         ) {
             text(
                 id = "${label.lowercase()}-label",
@@ -288,7 +302,7 @@ class Osc3xSynthV2(
             slider(
                 id = "${label.lowercase()}-slider",
                 w = Styles.Main.SLIDER_WIDTH,
-                h = Styles.Main.SLIDER_HEIGHT,
+                h = sliderHeight,
                 min = min,
                 max = max,
                 state = state,
@@ -313,10 +327,11 @@ class Osc3xSynthV2(
                     id = "${label.lowercase()}-enable",
                     w = Styles.Common.SMALL_BUTTON_SIZE,
                     h = Styles.Common.SMALL_BUTTON_SIZE,
-                    bgColor = Colors.moduleBg,
-                    hoverColor = Colors.enabledButton,
+                    bgColor = Colors.disabledButton,
+                    hoverColor = Colors.hoverButton,
+                    pressColor = Colors.enabledButton,
                     isToggle = true,
-                    onToggle = { enabled -> it.set(enabled) }
+                    isPressed = it
                 )
             }
         }
@@ -345,7 +360,9 @@ class Osc3xSynthV2(
                     id = "waveform-$index-$waveform",
                     w = Styles.Common.SMALL_BUTTON_SIZE,
                     h = Styles.Common.SMALL_BUTTON_SIZE,
-                    bgColor = Colors.waveformButton,
+                    bgColor = Colors.disabledButton,
+                    hoverColor = Colors.hoverButton,
+                    pressColor = Colors.enabledButton,
                     isToggle = true,
                     onToggle = { enabled ->
                         if (enabled) state.waveform.set(waveform)
@@ -357,14 +374,14 @@ class Osc3xSynthV2(
 
     private fun View.buildEffectsSection(index: Int, state: OscillatorState) {
         val panelWidth = PANEL_WIDTH - PANEL_PADDING * 2
-
+        val panelHeight = Styles.Effects.SECTION_HEIGHT - PANEL_PADDING * 2
         view(
             id = "effects-section-$index",
             w = panelWidth,
-            h = Styles.Effects.SECTION_HEIGHT,
+            h = panelHeight,
             bgColor = Color.neonPink, // Colors.moduleBg,
-            padding = Styles.Common.PANEL_SPACING,
-            spacing = Styles.Common.PANEL_SPACING,
+//            padding = Styles.Common.PANEL_PADDING,
+//            spacing = Styles.Common.PANEL_SPACING,
             direction = FlexDirection.ROW
         ) {
             // LFO Panel
@@ -396,20 +413,20 @@ class Osc3xSynthV2(
 
             // Filter Panel
             buildEffectPanel(
-                "FILTER",
+                "FIL",
                 panelWidth / 2,
                 state.filterEnabled,
                 listOf(
                     EffectControl(
 //                        "CUTOFF",
-                        "C",
+                        "CUT",
                         state.filterCutoff,
                         20.0, 20000.0,
                         Styles.Effects.KNOB_FREQ_DRAG_SCALE
                     ),
                     EffectControl(
 //                        "RES",
-                        "R",
+                        "RES",
                         state.filterRes,
                         0.0, 1.0,
                         Styles.Effects.KNOB_RES_DRAG_SCALE
@@ -471,8 +488,9 @@ class Osc3xSynthV2(
                     id = "${label.lowercase()}-enable",
                     w = Styles.Common.SMALL_BUTTON_SIZE,
                     h = Styles.Common.SMALL_BUTTON_SIZE,
-                    bgColor = Colors.moduleBg,
-                    hoverColor = Colors.enabledButton,
+                    bgColor = Colors.disabledButton,
+                    hoverColor = Colors.hoverButton,
+                    pressColor = Colors.enabledButton,
                     isToggle = true,
                     onToggle = onToggle
                 )
@@ -507,7 +525,7 @@ class Osc3xSynthV2(
             id = "adsr-section-$index",
             w = panelWidth,
             h = Styles.ADSR.SECTION_HEIGHT,
-            bgColor = Colors.moduleBg,
+            bgColor = Color.neonBlue,
             padding = Styles.Common.PANEL_SPACING,
             spacing = Styles.Common.PANEL_SPACING,
             direction = FlexDirection.COLUMN
@@ -533,15 +551,16 @@ class Osc3xSynthV2(
                     id = "adsr-enable-$index",
                     w = Styles.Common.SMALL_BUTTON_SIZE,
                     h = Styles.Common.SMALL_BUTTON_SIZE,
-                    bgColor = Colors.moduleBg,
-                    hoverColor = Colors.enabledButton,
+                    bgColor = Colors.disabledButton,
+                    hoverColor = Colors.hoverButton,
+                    pressColor = Colors.enabledButton,
                     isToggle = true,
                     onToggle = { enabled ->
-                        state.adsrEnabled.set(enabled)
                         osc3x.withOscillator(index) {
                             enableADSR(enabled)
                         }
-                    }
+                    },
+                    isPressed = state.adsrEnabled
                 )
             }
 
@@ -549,8 +568,9 @@ class Osc3xSynthV2(
             view(
                 id = "adsr-controls-$index",
                 w  = panelWidth - Styles.Common.PANEL_SPACING * 4,
-                h = Styles.ADSR.SECTION_HEIGHT - Styles.Common.PANEL_SPACING * 2,
+                h = Styles.ADSR.SECTION_HEIGHT - Styles.ADSR.HEADER_HEIGHT -  Styles.Common.PANEL_SPACING * 2,
                 direction = FlexDirection.ROW,
+                bgColor = Colors.moduleBg,
                 spacing = Styles.Common.CONTROL_SPACING
             ) {
                 // Attack
@@ -559,7 +579,8 @@ class Osc3xSynthV2(
                     state.attack,
                     0.01, 2.0,
                     hasKnob = false,
-                    sliderColor = Colors.adsrSlider
+                    sliderColor = Colors.adsrSlider,
+                    sliderHeight = Styles.ADSR.SLIDER_HEIGHT
                 )
                 // Decay
                 buildControlColumn(
@@ -567,7 +588,8 @@ class Osc3xSynthV2(
                     state.decay,
                     0.01, 2.0,
                     hasKnob = false,
-                    sliderColor = Colors.adsrSlider
+                    sliderColor = Colors.adsrSlider,
+                    sliderHeight = Styles.ADSR.SLIDER_HEIGHT
                 )
                 // Sustain
                 buildControlColumn(
@@ -575,7 +597,8 @@ class Osc3xSynthV2(
                     state.sustain,
                     0.0, 1.0,
                     hasKnob = false,
-                    sliderColor = Colors.adsrSlider
+                    sliderColor = Colors.adsrSlider,
+                    sliderHeight = Styles.ADSR.SLIDER_HEIGHT
                 )
                 // Release
                 buildControlColumn(
@@ -583,11 +606,13 @@ class Osc3xSynthV2(
                     state.release,
                     0.01, 2.0,
                     hasKnob = false,
-                    sliderColor = Colors.adsrSlider
+                    sliderColor = Colors.adsrSlider,
+                    sliderHeight = Styles.ADSR.SLIDER_HEIGHT
                 )
             }
         }
     }
+
 
     // would follow similar patterns but I'll keep the code sample focused on the
     // main elements for now. Would you like me to continue with the effects and ADSR sections?
@@ -689,7 +714,7 @@ class Osc3xSynthV2(
      * Update oscillator configuration and sync state.
      * Base parameters go through Osc3x's public API while effect parameters use the withOscillator pattern.
      */
-    fun updateConfig(
+    fun setConfig(
         oscillator: Int,
         // Basic oscillator parameters
         enabled: Boolean? = null,
@@ -742,7 +767,16 @@ class Osc3xSynthV2(
         syncOscillatorConfig(oscillator)
     }
 
-    fun update() = osc3x.update()
-    fun draw() = synthView.draw()
-    fun getOsc3x(): Osc3x = osc3x
+    fun update() {
+        osc3x.update()
+    }
+
+    fun draw() {
+        synthView.draw()
+    }
+
+    fun setMaterVolume(volume: Double) {
+        masterVolume.set(volume)
+    }
+
 }

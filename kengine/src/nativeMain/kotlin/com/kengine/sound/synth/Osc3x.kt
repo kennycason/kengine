@@ -168,7 +168,7 @@ class Osc3x(
             for (i in buffer.indices) {
                 var sample = 0.0
 
-                // Mix enabled oscillators
+                // mix enabled oscillators
                 for (index in oscillators.indices) {
                     if (configs[index].enabled) {
                         oscillators[index].trigger()
@@ -188,8 +188,8 @@ class Osc3x(
         }
     }
 
-    fun getOscillatorControl(index: Int): OscillatorControl? {
-        return if (index in oscillators.indices) oscillators[index] else null
+    fun getOscillatorControl(index: Int): OscillatorControl {
+        return oscillators[index]
     }
 
     fun withOscillator(index: Int, block: Oscillator.() -> Unit) {

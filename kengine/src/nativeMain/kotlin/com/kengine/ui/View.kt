@@ -5,6 +5,7 @@ import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Color
 import com.kengine.graphics.Sprite
 import com.kengine.hooks.state.State
+import com.kengine.hooks.state.useState
 import com.kengine.log.Logging
 import com.kengine.math.Vec2
 import com.kengine.time.getCurrentNanoseconds
@@ -71,6 +72,9 @@ fun useView(
     return view
 }
 
+/**
+ * TODO in future consider caching rendered views. First draw to an intermediate buffer, dynamically re-render as needed.
+ */
 open class View(
     val id: String = "",
     /**
@@ -390,6 +394,7 @@ open class View(
         isCircle: Boolean = false,
         isToggle: Boolean = false,
         onToggle: ((Boolean) -> Unit)? = null,
+        isPressed: State<Boolean> = useState(false),
     ): Button {
         val button = Button(
             id = id,
@@ -408,6 +413,7 @@ open class View(
             isCircle = isCircle,
             isToggle = isToggle,
             onToggle = onToggle,
+            isPressed = isPressed,
             parent = this
         )
         addChild(button)

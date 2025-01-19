@@ -163,7 +163,7 @@ fun main() {
 
 Explore sound synthesis with a3x Oscillator and a variety of visual effects. This also showcases the `UI` library and state handling via `useState`.
 
-<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/images/osc3x-2.png" width="48%"/><img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/images/osc3x-7.png" width="48%"/>
+<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/games/osc3x-synth/osc3x-2.png" width="48%"/><img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/games/osc3x-synth/osc3x-7.png" width="48%"/>
 
 [Video of Synth on IG](https://www.instagram.com/p/DEnebatzN3V/?igsh=MTZ0ZTJ1ZDE4ejVuag==)
 

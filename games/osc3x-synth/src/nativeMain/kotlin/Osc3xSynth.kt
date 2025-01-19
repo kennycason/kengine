@@ -1,11 +1,12 @@
-package osc3x
-
+import com.kengine.Game
 import com.kengine.graphics.Color
 import com.kengine.hooks.effect.useEffect
 import com.kengine.hooks.state.useState
 import com.kengine.log.Logging
+import com.kengine.sdl.useSDLContext
 import com.kengine.sound.synth.Osc3x
 import com.kengine.sound.synth.Oscillator
+import com.kengine.time.getClockContext
 import com.kengine.ui.FlexDirection
 import com.kengine.ui.View
 import com.kengine.ui.useView
@@ -17,12 +18,17 @@ class Osc3xSynth(
     private val x: Double = 0.0,
     private val y: Double = 0.0,
     defaultVolume: Double = 0.5
-) : Logging {
+) : Game, Logging {
 
     val width: Double = 530.0
     val height: Double = 90.0
 
-    private val osc3x = Osc3x()
+    val osc3x = Osc3x()
+
+    private val osc3XVfx = Osc3xVfx(
+        x = 0, y = height.toInt(),
+        osc3xSynth = this
+    )
 
     private val synthView: View
 
@@ -306,21 +312,26 @@ class Osc3xSynth(
     /**
      * Update audio state (called each frame).
      */
-    fun update() {
+    override fun update() {
         osc3x.update()
+        osc3XVfx.update()
+        logger.info { "FPS: ${getClockContext().fps}" }
     }
 
     /**
      * Render the UI.
      */
-    fun draw() {
-        synthView.draw()
+    override fun draw() {
+        useSDLContext {
+            fillScreen(Color.black)
+            synthView.draw()
+            osc3XVfx.draw()
+            flipScreen()
+        }
     }
 
-    /**
-     * Access the raw Osc3x engine.
-     */
-    fun getOsc3x(): Osc3x = osc3x
+    override fun cleanup() {
+    }
 
     fun randomize() {
         osc3x.randomize() // Randomize the underlying Osc3x engine

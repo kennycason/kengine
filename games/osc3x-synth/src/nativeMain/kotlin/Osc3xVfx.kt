@@ -1,5 +1,3 @@
-package osc3x
-
 import com.kengine.graphics.Color
 import com.kengine.hooks.state.useState
 import com.kengine.log.Logging
@@ -46,7 +44,7 @@ class Osc3xVfx(
     private val width: Int = 640
     private val height: Int = 480
 
-    val effects = listOf(
+    private val effects = listOf(
         WavePatternEffect(
             x = 0, y = osc3xSynth.height.toInt(),
             width = width, height = height - osc3xSynth.height.toInt(),
@@ -90,6 +88,7 @@ class Osc3xVfx(
             width = width, height = height - osc3xSynth.height.toInt(),
         ),
     )
+
     private val currentEffect = useState(0)
 
     private val visualizationControls = useView(
@@ -190,7 +189,7 @@ class Osc3xVfx(
     }
 
     fun update() {
-        val config = osc3xSynth.getOsc3x()
+        val config = osc3xSynth.osc3x
         val osc1 = config.getConfig(0)
         val osc2 = config.getConfig(1)
         val osc3 = config.getConfig(2)
