@@ -65,6 +65,9 @@ class TiledMapLoader : Logging {
             }
         }
 
+        // Initialize map after loading external tilesets
+        map.initialize()
+        
         logger.info { "Map successfully loaded: ${map.width}x${map.height}, ${map.layers.size} layers, ${map.tilesets.size} tilesets." }
         return map
     }

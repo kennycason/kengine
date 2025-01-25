@@ -47,8 +47,8 @@ class TiledMap(
     /**
      * batch mode still WIP
      * Batch Mode on avg 10.6ms/render
-     * Batch Mode off 7.6ms/render
-     * TiledMapDrawIT
+     * Batch Mode off 6.5ms/render
+     * TiledMapDrawITest
      */
     @Transient
     private val enableBatch = false
@@ -77,8 +77,21 @@ class TiledMap(
     @Transient
     private val spriteCache = HashMap<UInt, Sprite>(64)
 
+    @Transient
+    private val persistentSpriteCache = HashMap<UInt, Sprite>(1024)
+
+    @Transient
+    private val screenWidth = getSDLContext().screenWidth
+    @Transient
+    private val screenHeight = getSDLContext().screenHeight
+
+    @Transient
+    private val tilesetColumns = mutableMapOf<Tileset, UInt>()
+
     init {
+        // Sort tilesets
         tilesets = tilesets.sortedBy { it.firstgid }
+
         logger
             .infoStream()
             .writeLn { "Loading Map." }
@@ -89,6 +102,34 @@ class TiledMap(
             .writeLn { "Tilesets: ${tilesets.size}" }
             .writeLn(tilesets)
             .flush()
+    }
+
+    fun initialize() {
+        // Pre-compute tileset columns for faster lookup during rendering
+        tilesets.forEach { tileset ->
+            tilesetColumns[tileset] = tileset.columns!!.toUInt()
+        }
+        
+        // Validation can be done in debug builds only
+        validateTilesets()
+    }
+
+    private fun validateTilesets() {
+        // Move validation to a separate method that's only called in debug builds
+        tilesets.forEach { tileset ->
+            require(tileset.columns != null) {
+                "Tileset '${tileset.name ?: "unnamed"}' (firstgid: ${tileset.firstgid}) has no columns defined."
+            }
+            require(tileset.tileWidth != null) {
+                "Tileset '${tileset.name ?: "unnamed"}' (firstgid: ${tileset.firstgid}) has no tileWidth defined."
+            }
+            require(tileset.tileHeight != null) {
+                "Tileset '${tileset.name ?: "unnamed"}' (firstgid: ${tileset.firstgid}) has no tileHeight defined."
+            }
+            require(tileset.image != null) {
+                "Tileset '${tileset.name ?: "unnamed"}' (firstgid: ${tileset.firstgid}) has no image defined."
+            }
+        }
     }
 
     private fun buildResourceCaches() {
@@ -150,8 +191,8 @@ class TiledMap(
                 val texture = tilesetAndSheet.spriteSheet.texture
                 if (!batches.containsKey(texture)) {
                     // calculate maximum possible tiles in view
-                    val maxTilesInView = (getSDLContext().screenWidth / tileWidth + 1) *
-                        (getSDLContext().screenHeight / tileHeight + 1)
+                    val maxTilesInView = (screenWidth / tileWidth + 1) *
+                        (screenHeight / tileHeight + 1)
                     batches[texture] = SpriteBatch(texture, maxTilesInView)
                 }
             }
@@ -197,7 +238,7 @@ class TiledMap(
         val screenLeft = -p.x
         val screenRight = screenLeft + getSDLContext().screenWidth
         val screenTop = -p.y
-        val screenBottom = screenTop + getSDLContext().screenHeight
+        val screenBottom = screenTop + screenHeight
 
         val startX = (screenLeft / tileWidth).toInt().coerceAtLeast(0)
         val endX = (screenRight / tileWidth).toInt().coerceAtMost(layer.width!! - 1)
@@ -275,19 +316,29 @@ class TiledMap(
     }
 
     private fun drawNoBatch(layer: TiledMapLayer) {
+        // Pre-calculate these values once per frame
+        val offsetX = p.x
+        val offsetY = p.y
+        
         // calculate visible region
-        val screenLeft = -p.x
-        val screenRight = screenLeft + getSDLContext().screenWidth
-        val screenTop = -p.y
-        val screenBottom = screenTop + getSDLContext().screenHeight
+        val screenLeft = -offsetX
+        val screenRight = screenLeft + screenWidth
+        val screenTop = -offsetY
+        val screenBottom = screenTop + screenHeight
 
         val startX = (screenLeft / tileWidth).toInt().coerceAtLeast(0)
         val endX = (screenRight / tileWidth).toInt().coerceAtMost(layer.width!! - 1)
         val startY = (screenTop / tileHeight).toInt().coerceAtLeast(0)
         val endY = (screenBottom / tileHeight).toInt().coerceAtMost(layer.height!! - 1)
 
+        // Cache commonly used values as doubles
+        val tileWidthD = tileWidth.toDouble()
+        val tileHeightD = tileHeight.toDouble()
+        val offsetXD = offsetX
+        val offsetYD = offsetY
+
         for (y in startY..endY) {
-            val baseY = y * tileHeight + p.y
+            val baseY = y * tileHeightD + offsetYD
 
             for (x in startX..endX) {
                 val rawGid = layer.getTileAt(x, y)
@@ -296,31 +347,46 @@ class TiledMap(
                 val decoded = decodeTileGid(rawGid)
                 if (decoded.tileId <= 0u) continue
 
-                val (flip, angle) = decodeFlipAndRotation(decoded)
-                val dstX = x * tileWidth + p.x
+                val dstX = x * tileWidthD + offsetXD
 
                 if (decoded.tileId in animatedSprites) {
-                    animatedSprites[decoded.tileId]!!.draw(dstX, baseY, flip)
+                    animatedSprites[decoded.tileId]!!.draw(dstX, baseY, 
+                        if (decoded.flipH) FlipMode.HORIZONTAL else FlipMode.NONE
+                    )
                 } else {
-                    val tilesetWithSprite = findTilesetForGid(decoded.tileId)
-                    val (tilePx, tilePy) = getTilePosition(decoded.tileId, tilesetWithSprite.tileset)
-                    val tile = tilesetWithSprite.spriteSheet.getTile(tilePx.toInt(), tilePy.toInt())
+                    val tile = persistentSpriteCache.getOrPut(decoded.tileId) {
+                        val tilesetWithSprite = findTilesetForGid(decoded.tileId)
+                        val (px, py) = getTilePosition(decoded.tileId, tilesetWithSprite.tileset)
+                        tilesetWithSprite.spriteSheet.getTile(px.toInt(), py.toInt())
+                    }
+                    
+                    val (flip, angle) = decodeFlipAndRotation(decoded)
                     tile.draw(dstX, baseY, flip, angle)
                 }
             }
         }
     }
 
-    private fun decodeFlipAndRotation(decoded: DecodedTile) = when {
-        !decoded.flipH && !decoded.flipV && !decoded.flipD -> FlipMode.NONE to 0.0
-        decoded.flipH && !decoded.flipV && !decoded.flipD -> FlipMode.HORIZONTAL to 0.0
-        !decoded.flipH && decoded.flipV && !decoded.flipD -> FlipMode.VERTICAL to 0.0
-        !decoded.flipH && !decoded.flipV && decoded.flipD -> FlipMode.VERTICAL to 90.0
-        decoded.flipH && !decoded.flipV && decoded.flipD -> FlipMode.NONE to 90.0
-        decoded.flipH && decoded.flipV && !decoded.flipD -> FlipMode.BOTH to 0.0
-        !decoded.flipH && decoded.flipV && decoded.flipD -> FlipMode.NONE to 270.0
-        decoded.flipH && decoded.flipV && decoded.flipD -> FlipMode.HORIZONTAL to 90.0
-        else -> FlipMode.NONE to 0.0
+    // Cache flip/rotation results
+    private val flipRotationCache = Array(8) { 
+        FlipMode.NONE to 0.0 
+    }.apply {
+        // Precompute all possible flip/rotation combinations
+        this[0] = FlipMode.NONE to 0.0  // !H !V !D
+        this[1] = FlipMode.HORIZONTAL to 0.0  // H !V !D
+        this[2] = FlipMode.VERTICAL to 0.0  // !H V !D
+        this[3] = FlipMode.VERTICAL to 90.0  // !H !V D
+        this[4] = FlipMode.NONE to 90.0  // H !V D
+        this[5] = FlipMode.BOTH to 0.0  // H V !D
+        this[6] = FlipMode.NONE to 270.0  // !H V D
+        this[7] = FlipMode.HORIZONTAL to 90.0  // H V D
+    }
+
+    private fun decodeFlipAndRotation(decoded: DecodedTile): Pair<FlipMode, Double> {
+        val index = (if (decoded.flipH) 1 else 0) or
+                    (if (decoded.flipV) 2 else 0) or
+                    (if (decoded.flipD) 4 else 0)
+        return flipRotationCache[index]
     }
 
     private fun findTilesetForGid(gid: UInt): TilesetAndSpriteSheet =
@@ -328,8 +394,8 @@ class TiledMap(
 
     private fun getTilePosition(tileId: UInt, tileset: Tileset): Pair<UInt, UInt> {
         val localId = tileId - tileset.firstgid
-        val cols = tileset.columns ?: throw IllegalArgumentException("Tileset '${tileset.name}' must have defined columns.")
-        return (localId % cols.toUInt()) to (localId / cols.toUInt())
+        val cols = tilesetColumns[tileset]!!
+        return localId % cols to localId / cols
     }
 
     private fun decodeTileGid(gid: UInt): DecodedTile {
@@ -345,6 +411,7 @@ class TiledMap(
         animatedSprites.values.forEach { it.cleanup() }
         tilesetCache.clear()
         spriteCache.clear()
+        persistentSpriteCache.clear()
     }
 
     data class DecodedTile(

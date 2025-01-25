@@ -5,7 +5,7 @@ import com.kengine.log.getLogger
 import com.kengine.math.IntRect
 import com.kengine.math.Math
 import com.kengine.math.Vec2
-import com.kengine.sdl.useSDLContext
+import com.kengine.sdl.getSDLContext
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.free
@@ -54,6 +54,8 @@ class Sprite private constructor(
     private val right = nativeHeap.alloc<SDL_FPoint>()
     private val down = nativeHeap.alloc<SDL_FPoint>()
 
+    private val sdlContext = getSDLContext()
+
     fun draw(
         p: Vec2,
         flip: FlipMode = FlipMode.NONE,
@@ -66,61 +68,102 @@ class Sprite private constructor(
         flip: FlipMode = FlipMode.NONE,
         angle: Double = 0.0
     ) {
-        useSDLContext {
-            // handle no rotation or flipping early
-            if (angle == 0.0 && flip == FlipMode.NONE) {
-                destRect.apply {
-                    this.x = x.toFloat()
-                    this.y = y.toFloat()
-                }
 
-                if (!SDL_RenderTexture(renderer, texture.texture, clipRect?.ptr, destRect.ptr)) {
-                    handleError()
-                }
-                return
-            }
+        // Most common case - no transformations
+        if (angle == 0.0 && flip == FlipMode.NONE) {
+            drawNoRotation(x, y)
+            return
+        }
 
-            // aply flipping
-            val flipX = if (flip == FlipMode.HORIZONTAL || flip == FlipMode.BOTH) -1f else 1f
-            val flipY = if (flip == FlipMode.VERTICAL || flip == FlipMode.BOTH) -1f else 1f
+        // Only flipping needed
+        if (angle == 0.0) {
+            drawFlipped(x, y, flip)
+            return
+        }
 
-            // compute pivot point
-            val pivotX = x + (scaledWidth / 2.0f)
-            val pivotY = y + (scaledHeight / 2.0f)
+        // Full transformation needed
+        drawTransformed(x, y, flip, angle)
+    }
 
-            // calculate rotation with affine transform
-            val rad = Math.toRadians(angle)
-            val cos = kotlin.math.cos(rad).toFloat()
-            val sin = kotlin.math.sin(rad).toFloat()
+    private fun drawNoRotation(x: Double, y: Double) {
+        destRect.apply {
+            this.x = x.toFloat()
+            this.y = y.toFloat()
+        }
 
-            val offsetX = (scaledWidth / 2.0f) * flipX
-            val offsetY = (scaledHeight / 2.0f) * flipY
+        if (!SDL_RenderTexture(sdlContext.renderer, texture.texture, clipRect?.ptr, destRect.ptr)) {
+            handleError()
+        }
+    }
 
-            // update affine points
-            origin.apply {
-                this.x = ((pivotX - offsetX * cos + offsetY * sin).toFloat())
-                this.y = ((pivotY - offsetX * sin - offsetY * cos).toFloat())
-            }
-            right.apply {
-                this.x = ((pivotX + offsetX * cos + offsetY * sin).toFloat())
-                this.y = ((pivotY + offsetX * sin - offsetY * cos).toFloat())
-            }
-            down.apply {
-                this.x = ((pivotX - offsetX * cos - offsetY * sin).toFloat())
-                this.y = ((pivotY - offsetX * sin + offsetY * cos).toFloat())
-            }
+    private fun drawFlipped(x: Double, y: Double, flip: FlipMode) {
+        val flipX = if (flip == FlipMode.HORIZONTAL || flip == FlipMode.BOTH) -1f else 1f
+        val flipY = if (flip == FlipMode.VERTICAL || flip == FlipMode.BOTH) -1f else 1f
 
-            // render with affine transform
-            if (!SDL_RenderTextureAffine(
-                    renderer,
-                    texture.texture,
-                    clipRect?.ptr,
-                    origin.ptr,
-                    right.ptr,
-                    down.ptr
-                )) {
-                handleError()
-            }
+        val offsetX = (scaledWidth / 2.0f) * flipX
+        val offsetY = (scaledHeight / 2.0f) * flipY
+
+        origin.apply {
+            this.x = (x + scaledWidth / 2.0f - offsetX).toFloat()
+            this.y = (y + scaledHeight / 2.0f - offsetY).toFloat()
+        }
+        right.apply {
+            this.x = (x + scaledWidth / 2.0f + offsetX).toFloat()
+            this.y = (y + scaledHeight / 2.0f - offsetY).toFloat()
+        }
+        down.apply {
+            this.x = (x + scaledWidth / 2.0f - offsetX).toFloat()
+            this.y = (y + scaledHeight / 2.0f + offsetY).toFloat()
+        }
+
+        if (!SDL_RenderTextureAffine(
+                sdlContext.renderer,
+                texture.texture,
+                clipRect?.ptr,
+                origin.ptr,
+                right.ptr,
+                down.ptr
+            )) {
+            handleError()
+        }
+    }
+
+    private fun drawTransformed(x: Double, y: Double, flip: FlipMode, angle: Double) {
+        val flipX = if (flip == FlipMode.HORIZONTAL || flip == FlipMode.BOTH) -1f else 1f
+        val flipY = if (flip == FlipMode.VERTICAL || flip == FlipMode.BOTH) -1f else 1f
+
+        val pivotX = x + (scaledWidth / 2.0f)
+        val pivotY = y + (scaledHeight / 2.0f)
+
+        val rad = Math.toRadians(angle)
+        val cos = kotlin.math.cos(rad).toFloat()
+        val sin = kotlin.math.sin(rad).toFloat()
+
+        val offsetX = (scaledWidth / 2.0f) * flipX
+        val offsetY = (scaledHeight / 2.0f) * flipY
+
+        origin.apply {
+            this.x = ((pivotX - offsetX * cos + offsetY * sin).toFloat())
+            this.y = ((pivotY - offsetX * sin - offsetY * cos).toFloat())
+        }
+        right.apply {
+            this.x = ((pivotX + offsetX * cos + offsetY * sin).toFloat())
+            this.y = ((pivotY + offsetX * sin - offsetY * cos).toFloat())
+        }
+        down.apply {
+            this.x = ((pivotX - offsetX * cos - offsetY * sin).toFloat())
+            this.y = ((pivotY - offsetX * sin + offsetY * cos).toFloat())
+        }
+
+        if (!SDL_RenderTextureAffine(
+                sdlContext.renderer,
+                texture.texture,
+                clipRect?.ptr,
+                origin.ptr,
+                right.ptr,
+                down.ptr
+            )) {
+            handleError()
         }
     }
 
@@ -153,6 +196,5 @@ class Sprite private constructor(
         fun fromTexture(texture: Texture, clip: IntRect? = null): Sprite {
             return Sprite(texture, clip)
         }
-
     }
 }

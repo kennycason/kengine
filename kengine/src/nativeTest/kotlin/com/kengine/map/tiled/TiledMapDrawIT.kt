@@ -12,6 +12,16 @@ import com.kengine.time.getCurrentNanoseconds
 import com.kengine.time.useTimer
 import kotlin.test.Test
 
+/**
+ * Performance:
+ * 200ms - v1
+ * 100ms - cull edges 100ms
+ * minimize object creation + shared textures 15ms
+ * optimize tile id lookup 10ms
+ * remove/minimize logging 7.5ms
+ * Sprite optimize render if no transformation 6.57ms
+ * drawNoBatch optimization 6.0ms
+ */
 class TiledMapDrawIT {
 
     @Test
@@ -40,7 +50,7 @@ class TiledMapDrawIT {
                     private var avgRenderTimeNs = 0L
 
                     init {
-                        useTimer(5000L) {
+                        useTimer(15000L) {
                             isRunning = false
                         }
                     }
