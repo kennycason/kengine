@@ -82,6 +82,7 @@ class TiledMap(
 
     @Transient
     private val screenWidth = getSDLContext().screenWidth
+
     @Transient
     private val screenHeight = getSDLContext().screenHeight
 
@@ -109,7 +110,7 @@ class TiledMap(
         tilesets.forEach { tileset ->
             tilesetColumns[tileset] = tileset.columns!!.toUInt()
         }
-        
+
         // Validation can be done in debug builds only
         validateTilesets()
     }
@@ -319,7 +320,7 @@ class TiledMap(
         // Pre-calculate these values once per frame
         val offsetX = p.x
         val offsetY = p.y
-        
+
         // calculate visible region
         val screenLeft = -offsetX
         val screenRight = screenLeft + screenWidth
@@ -350,7 +351,7 @@ class TiledMap(
                 val dstX = x * tileWidthD + offsetXD
 
                 if (decoded.tileId in animatedSprites) {
-                    animatedSprites[decoded.tileId]!!.draw(dstX, baseY, 
+                    animatedSprites[decoded.tileId]!!.draw(dstX, baseY,
                         if (decoded.flipH) FlipMode.HORIZONTAL else FlipMode.NONE
                     )
                 } else {
@@ -359,7 +360,7 @@ class TiledMap(
                         val (px, py) = getTilePosition(decoded.tileId, tilesetWithSprite.tileset)
                         tilesetWithSprite.spriteSheet.getTile(px.toInt(), py.toInt())
                     }
-                    
+
                     val (flip, angle) = decodeFlipAndRotation(decoded)
                     tile.draw(dstX, baseY, flip, angle)
                 }
@@ -368,8 +369,8 @@ class TiledMap(
     }
 
     // Cache flip/rotation results
-    private val flipRotationCache = Array(8) { 
-        FlipMode.NONE to 0.0 
+    private val flipRotationCache = Array(8) {
+        FlipMode.NONE to 0.0
     }.apply {
         // Precompute all possible flip/rotation combinations
         this[0] = FlipMode.NONE to 0.0  // !H !V !D
