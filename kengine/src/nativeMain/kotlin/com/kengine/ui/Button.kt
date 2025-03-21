@@ -18,7 +18,7 @@ class Button(
     onRelease: (() -> Unit)? = null,
     bgColor: Color? = null,
     bgSprite: Sprite? = null,
-    private val hoverColor: Color? = null,
+    buttonHoverColor: Color? = null,
     private val pressColor: Color? = null,
     private val isCircle: Boolean = false,
     private val isToggle: Boolean = false,
@@ -37,7 +37,8 @@ class Button(
     onClick = onClick,
     onHover = onHover,
     onRelease = onRelease,
-    parent = parent
+    parent = parent,
+    hoverColor = buttonHoverColor
 ) {
     private var isHovered = false
 
@@ -81,10 +82,15 @@ class Button(
     override fun hover(mouseX: Double, mouseY: Double) {
         if (!visible) return
 
-        val wasHovered = isHovered
-        isHovered = isWithinBounds(mouseX, mouseY)
-        if (isHovered != wasHovered) {
-            onHover?.invoke()
+        try {
+            val wasHovered = isHovered
+            isHovered = isWithinBounds(mouseX, mouseY)
+            if (isHovered != wasHovered && isHovered) {
+                onHover?.invoke()
+            }
+        } catch (e: Exception) {
+            // Log error but continue
+            logger.error { "Error in Button.hover: ${e.message}" }
         }
     }
 

@@ -26,15 +26,18 @@ class ActionContext private constructor() : Context(), Logging {
         // early exit if no actions
         if (actions.isEmpty() && pendingActions.isEmpty()) return
 
-//        logger.info { " wut "}
-        // process current actions
-
-        for (i in 0 until actions.size) {
-            val action = actions[i]
+        // Using toList() to create a defensive copy of the actions list
+        // This way we can safely iterate and remove actions without modifying the
+        // collection we're iterating over
+        val actionsToProcess = actions.toList()
+        
+        for (action in actionsToProcess) {
             if (action.update()) {
-                // remove completed action by swapping with the last element for O(1) removal
-                actions[i] = actions.last()
-                actions.removeAt(actions.lastIndex)
+                // Only remove if the action is still in the list
+                // (could have been removed by another action)
+                if (actions.contains(action)) {
+                    actions.remove(action)
+                }
             }
         }
 

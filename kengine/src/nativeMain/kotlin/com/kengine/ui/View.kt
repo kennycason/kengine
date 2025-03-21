@@ -38,6 +38,7 @@ fun useView(
     maxHeight: Double = Double.MAX_VALUE,
     onClick: (() -> Unit)? = null,
     onHover: (() -> Unit)? = null,
+    hoverColor: Color? = null,
     parent: View? = null,
     block: View.() -> Unit = {}
 ): View {
@@ -59,7 +60,8 @@ fun useView(
         maxHeight = maxHeight,
         onClick = onClick,
         onHover = onHover,
-        parent = parent
+        parent = parent,
+        hoverColor = hoverColor
     )
 
     if (parent != null) {
@@ -97,11 +99,12 @@ open class View(
     val maxWidth: Double = Double.MAX_VALUE,
     val minHeight: Double = 0.0,
     val maxHeight: Double = Double.MAX_VALUE,
-    val visible: Boolean = true,
+    var visible: Boolean = true,
     val parent: View? = null,
     protected val onClick: (() -> Unit)? = null,
     protected val onHover: (() -> Unit)? = null,
-    protected val onRelease: (() -> Unit)? = null
+    protected val onRelease: (() -> Unit)? = null,
+    open val hoverColor: Color? = null
 ) : Logging {
 
     /**
@@ -118,7 +121,7 @@ open class View(
     /**
      * Add child, then possibly recalc layout if you want immediate results.
      */
-    fun addChild(view: View) {
+    open fun addChild(view: View) {
         logger.debug { "Adding child ${view.id} to parent $id" }
         children.add(view)
         // Optionally call performLayout() here if you want incremental relayout.
@@ -211,9 +214,14 @@ open class View(
         }
 
         // 1) Draw background
-        if (bgColor != null) {
+        val currentBgColor = when {
+            isHovered() && hoverColor != null -> hoverColor
+            else -> bgColor
+        }
+        
+        if (currentBgColor != null) {
             useGeometryContext {
-                fillRectangle(layoutX, layoutY, layoutW, layoutH, bgColor)
+                fillRectangle(layoutX, layoutY, layoutW, layoutH, currentBgColor)
             }
         }
         bgSprite?.draw(layoutX, layoutY)
@@ -239,15 +247,22 @@ open class View(
         children.forEach { it.click(mouseX, mouseY) }
     }
 
+    private var isHovered = false
+    
     fun hover(p: Vec2) = hover(p.x, p.y)
 
     open fun hover(mouseX: Double, mouseY: Double) {
         if (!visible) return
-        if (isWithinBounds(mouseX, mouseY)) {
+        val wasHovered = isHovered
+        isHovered = isWithinBounds(mouseX, mouseY)
+        
+        if (isHovered && !wasHovered) {
             onHover?.invoke()
         }
         children.forEach { it.hover(mouseX, mouseY) }
     }
+    
+    fun isHovered(): Boolean = isHovered
 
     open fun release(mouseX: Double, mouseY: Double) {
         if (!visible) return
@@ -278,6 +293,7 @@ open class View(
         spacing: Double = 0.0,
         onClick: (() -> Unit)? = null,
         onHover: (() -> Unit)? = null,
+        hoverColor: Color? = null,
         block: View.() -> Unit = {}
     ): View {
         return useView(
@@ -297,6 +313,7 @@ open class View(
             parent = this,
             onClick = onClick,
             onHover = onHover,
+            hoverColor = hoverColor,
             block = block
         )
     }
@@ -408,7 +425,7 @@ open class View(
             padding = padding,
             bgColor = bgColor,
             bgSprite = bgSprite,
-            hoverColor = hoverColor,
+            buttonHoverColor = hoverColor,
             pressColor = pressColor,
             isCircle = isCircle,
             isToggle = isToggle,
@@ -488,7 +505,52 @@ open class View(
         return spriteView
     }
 
+    fun drawer(
+        id: String,
+        x: Double = 0.0,
+        y: Double = 0.0,
+        w: Double,
+        h: Double,
+        direction: DrawerDirection = DrawerDirection.DOWN,
+        trigger: DrawerTrigger = DrawerTrigger.CLICK,
+        bgColor: Color? = null,
+        hoverColor: Color? = null,
+        activeColor: Color? = null,
+        padding: Double = 5.0,
+        spacing: Double = 2.0,
+        onClick: (() -> Unit)? = null,
+        onHover: (() -> Unit)? = null,
+        isOpen: State<Boolean> = useState(false),
+        block: Drawer.() -> Unit = {}
+    ): Drawer {
+        val drawer = Drawer(
+            id = id,
+            x = x,
+            y = y,
+            w = w,
+            h = h,
+            drawerDirection = direction,
+            trigger = trigger,
+            bgColor = bgColor,
+            drawerHoverColor = hoverColor,
+            activeColor = activeColor,
+            padding = padding,
+            spacing = spacing,
+            parent = this,
+            onClick = onClick,
+            onHover = onHover,
+            isOpen = isOpen
+        )
+
+        addChild(drawer)
+        drawer.block()
+        return drawer
+    }
+
     fun cleanup() {
-        children.forEach { it.cleanup() }
+        // Create a defensive copy of children to avoid concurrent modification issues
+        val childrenCopy = children.toList()
+        childrenCopy.forEach { it.cleanup() }
+        children.clear()
     }
 }

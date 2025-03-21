@@ -741,6 +741,14 @@ rm -rf ~/.gradle/wrapper
 ./gradlew clean build --refresh-dependencies
 ```
 
+Run specific tests
+```shell
+ ./gradlew nativeTest --tests "com.kengine.ui.DrawerIT.drawer component test"oh 
+```
+```shell
+./gradlew nativeTest --tests "*IT"   
+```
+
 ## Roadmap
 - Binary
   - Embed data files in executable
