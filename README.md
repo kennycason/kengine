@@ -741,17 +741,22 @@ rm -rf ~/.gradle/wrapper
 ./gradlew clean build --refresh-dependencies
 ```
 
+Run specific tests
+```shell
+ ./gradlew nativeTest --tests "com.kengine.ui.DrawerIT.drawer component test"oh 
+```
+```shell
+./gradlew nativeTest --tests "*IT"   
+```
+
 ## Roadmap
 - Binary
   - Embed data files in executable
-- GameLoop
-  - Decouple update/draw calls
 - TiledMapLoader
-  - Performance enhancements
+  - Performance enhancements (5ms/render -> <1ms/render)
   - Support TMX (XML format)
 - Logger file support
 - Menu system
-- GUI
 - fix @OptIn(ExperimentalForeignApi::class) (-opt-in being ignored by compiler in multi-module project in IJ)
 - Add Vec2 versions of functions that take (x,y) parameters, ditto for Rect2 and (x,y,w,h)
 - Redesign font handling + caching/config

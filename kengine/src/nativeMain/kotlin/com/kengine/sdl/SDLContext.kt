@@ -135,7 +135,7 @@ class SDLContext private constructor(
         }
 
         fun get(): SDLContext {
-            return currentContext ?: throw IllegalStateException("SDL3Context has not been created. Call create() first.")
+            return currentContext ?: throw IllegalStateException("SDLContext has not been created. Call create() first.")
         }
     }
 }

@@ -81,12 +81,6 @@ class TiledMap(
     private val persistentSpriteCache = HashMap<UInt, Sprite>(1024)
 
     @Transient
-    private val screenWidth = getSDLContext().screenWidth
-
-    @Transient
-    private val screenHeight = getSDLContext().screenHeight
-
-    @Transient
     private val tilesetColumns = mutableMapOf<Tileset, UInt>()
 
     init {
@@ -137,6 +131,9 @@ class TiledMap(
         if (isCacheBuilt) return
 
         logger.debug { "Starting resource cache build..." }
+
+        val screenWidth = getSDLContext().screenWidth
+        val screenHeight = getSDLContext().screenHeight
 
         // initialize tilesets with spritesheets
         tilesetsWithSprites = tilesets.map { tileset ->
@@ -239,7 +236,7 @@ class TiledMap(
         val screenLeft = -p.x
         val screenRight = screenLeft + getSDLContext().screenWidth
         val screenTop = -p.y
-        val screenBottom = screenTop + screenHeight
+        val screenBottom = screenTop + getSDLContext().screenHeight
 
         val startX = (screenLeft / tileWidth).toInt().coerceAtLeast(0)
         val endX = (screenRight / tileWidth).toInt().coerceAtMost(layer.width!! - 1)
@@ -323,9 +320,9 @@ class TiledMap(
 
         // calculate visible region
         val screenLeft = -offsetX
-        val screenRight = screenLeft + screenWidth
+        val screenRight = screenLeft + getSDLContext().screenWidth
         val screenTop = -offsetY
-        val screenBottom = screenTop + screenHeight
+        val screenBottom = screenTop + getSDLContext().screenHeight
 
         val startX = (screenLeft / tileWidth).toInt().coerceAtLeast(0)
         val endX = (screenRight / tileWidth).toInt().coerceAtMost(layer.width!! - 1)

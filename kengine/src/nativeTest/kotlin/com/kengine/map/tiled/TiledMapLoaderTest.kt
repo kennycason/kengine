@@ -1,7 +1,11 @@
 package com.kengine.map.tiled
 
+import com.kengine.hooks.context.ContextRegistry
 import com.kengine.log.Logging
+import com.kengine.sdl.SDLContext
 import com.kengine.test.expectThat
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 
 class TiledMapLoaderTest : Logging {
@@ -11,6 +15,8 @@ class TiledMapLoaderTest : Logging {
         BOX(2u),
         BOX_SET(3u),
     }
+
+    private var sdlContext: SDLContext? = null
 
     @Test
     fun `load map test`() {
@@ -163,5 +169,22 @@ class TiledMapLoaderTest : Logging {
                 { it[1].tileid == 30 }
             )
         }
+    }
+
+    @BeforeTest
+    fun `before each`() {
+        sdlContext = SDLContext.create(
+            title = "Tile Map Test",
+            width = 800,
+            height = 600
+        )
+            .also {
+                ContextRegistry.register(it)
+            }
+    }
+
+    @AfterTest
+    fun `after each`() {
+        sdlContext?.cleanup()
     }
 }
