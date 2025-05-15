@@ -761,3 +761,20 @@ Run specific tests
 - Add Vec2 versions of functions that take (x,y) parameters, ditto for Rect2 and (x,y,w,h)
 - Redesign font handling + caching/config
 - Playdate integration (WIP struggling to target cortex-m7 arch)
+```shell
+cd SDL_net
+mkdir build
+cd build
+cmake .. \
+  -DCMAKE_INSTALL_PREFIX=/usr/local \
+  -DSDL3_INCLUDE_DIR=/usr/local/include/SDL3 \
+  -DSDL3_LIBRARY=/usr/local/lib/libSDL3.dylib \
+  -DCMAKE_INSTALL_NAME_DIR=@rpath \
+  -DCMAKE_BUILD_WITH_INSTALL_NAME_DIR=ON
+make -j$(sysctl -n hw.ncpu)
+sudo make install
+# Create the versioned symlink in /usr/local/lib
+sudo ln -sf /usr/local/lib/libSDL3_net.dylib /usr/local/lib/libSDL3_net.0.dylib
+pkg-config --libs sdl3-net
+otool -D /usr/local/lib/libSDL3_net.dylib
+cd ../..

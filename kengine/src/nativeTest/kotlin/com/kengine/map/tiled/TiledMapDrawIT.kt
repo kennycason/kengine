@@ -50,7 +50,7 @@ class TiledMapDrawIT {
                     private var avgRenderTimeNs = 0L
 
                     init {
-                        useTimer(15000L) {
+                        useTimer(5000L) {
                             isRunning = false
                         }
                     }
