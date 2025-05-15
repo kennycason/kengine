@@ -461,7 +461,7 @@ object : Game {
 
     override fun draw() {
         tiledMap.draw() // render all layers of the map
-      
+
         // or draw layers by name
         tileMap.draw("bg")
         tileMap.draw("main")
@@ -724,8 +724,12 @@ brew install chipmunk
 ```
 
 
-Install 3DL3. SDL3 is not yet released on brew and must be manually installed.
+Install SDL3 via Homebrew:
+```shell
+brew install sdl3 sdl3_image sdl3_ttf
+```
 
+For SDL3_mixer and SDL3_net (not yet available on Homebrew):
 [SDL3 Installation Guide](/sdl3/README.md)
 
 Build the project
@@ -743,7 +747,7 @@ rm -rf ~/.gradle/wrapper
 
 Run specific tests
 ```shell
- ./gradlew nativeTest --tests "com.kengine.ui.DrawerIT.drawer component test"oh 
+./gradlew nativeTest --tests "com.kengine.ui.DrawerIT.drawer component test"
 ```
 ```shell
 ./gradlew nativeTest --tests "*IT"   

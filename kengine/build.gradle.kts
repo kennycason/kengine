@@ -93,7 +93,7 @@ kotlin {
                 freeCompilerArgs += listOf(
                     "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
                     "-opt-in=kotlin.ExperimentalStdlibApi",
-                    "-g",  // Enable debug symbols
+                    // "-g",  // Enable debug symbols - removed due to conflict with -opt-in
                     "-ea"  // Enable assertions
                 )
             }

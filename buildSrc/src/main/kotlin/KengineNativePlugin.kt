@@ -70,7 +70,7 @@ class KengineNativePlugin : Plugin<Project> {
                         listOf(
                             "-opt-in=kotlinx.c interop.ExperimentalForeignApi",
                             "-opt-in=kotlin.ExperimentalStdlibApi",
-                            "-g",
+                            // "-g",  // Enable debug symbols - removed due to conflict with -opt-in
                             "-ea"
                         )
                     )

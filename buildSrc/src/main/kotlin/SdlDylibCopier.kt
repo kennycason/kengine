@@ -6,12 +6,11 @@ import org.gradle.kotlin.dsl.register
 class SdlDylibCopier(private val project: Project) {
 
     fun registerSDLDylibs() {
+        // Copy libraries that are not available via Homebrew and their dependencies
         val dylibsToCopy = listOf(
-            "/usr/local/lib/libSDL3.0.dylib",
-            "/usr/local/lib/libSDL3_image.0.dylib",
-            "/usr/local/lib/libSDL3_mixer.0.dylib",
-            "/usr/local/lib/libSDL3_net.dylib",  // fails if versioned lib included, symlink exits, not sure error
-            "/usr/local/lib/libSDL3_ttf.0.dylib"
+            "/opt/homebrew/lib/libSDL3.0.dylib",    // Required by SDL3_mixer and SDL3_net
+            "/usr/local/lib/libSDL3_mixer.0.dylib", // Not available in Homebrew yet
+            "/usr/local/lib/libSDL3_net.0.dylib"    // Not available in Homebrew yet
         )
         val dylibTargetDirs = listOf(
             "${project.buildDir}/bin/native/Frameworks",
