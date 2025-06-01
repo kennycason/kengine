@@ -114,6 +114,7 @@ kotlin {
                 api(libs.kotlinxCoroutinesCore)
                 implementation(project(":kengine-test"))
                 implementation(project(":kengine-reactive"))
+                implementation(project(":kengine-network"))
             }
         }
 

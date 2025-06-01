@@ -13,7 +13,8 @@ println("Playdate enabled: $isPlaydateEnabled")
 val modules = mutableListOf(
     "kengine",
     "kengine-test",
-    "kengine-reactive"
+    "kengine-reactive",
+    "kengine-network"
 )
 
 if (isPlaydateEnabled) {
