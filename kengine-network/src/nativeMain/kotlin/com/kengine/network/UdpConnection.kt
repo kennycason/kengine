@@ -34,7 +34,7 @@ import sdl3.net.SDLNet_ReceiveDatagram
 import sdl3.net.SDLNet_SendDatagram
 import sdl3.net.SDLNet_WaitUntilInputAvailable
 import sdl3.net.SDLNet_WaitUntilResolved
-import sdl3.net.SDL_GetError
+import sdl3.SDL_GetError
 
 /**
  * Connectionless protocol

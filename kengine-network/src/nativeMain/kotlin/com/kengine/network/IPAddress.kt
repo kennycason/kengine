@@ -7,7 +7,7 @@ import kotlinx.cinterop.toKString
 import sdl3.net.SDLNet_GetAddressStatus
 import sdl3.net.SDLNet_ResolveHostname
 import sdl3.net.SDLNet_WaitUntilResolved
-import sdl3.net.SDL_GetError
+import sdl3.SDL_GetError
 
 @OptIn(ExperimentalForeignApi::class)
 data class IPAddress(val host: String, val port: UShort) : Logging {

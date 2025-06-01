@@ -5,7 +5,7 @@ import com.kengine.log.Logging
 import kotlinx.cinterop.toKString
 import sdl3.net.SDLNet_Init
 import sdl3.net.SDLNet_Quit
-import sdl3.net.SDL_GetError
+import sdl3.SDL_GetError
 
 class NetworkContext : Context(), Logging {
 

@@ -12,7 +12,7 @@ import kotlinx.coroutines.delay
 import sdl3.net.SDLNet_AcceptClient
 import sdl3.net.SDLNet_CreateServer
 import sdl3.net.SDLNet_DestroyServer
-import sdl3.net.SDL_GetError
+import sdl3.SDL_GetError
 
 @OptIn(ExperimentalForeignApi::class)
 class TcpServer(

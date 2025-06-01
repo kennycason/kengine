@@ -23,7 +23,7 @@ import sdl3.net.SDLNet_DestroyStreamSocket
 import sdl3.net.SDLNet_ReadFromStreamSocket
 import sdl3.net.SDLNet_WaitUntilConnected
 import sdl3.net.SDLNet_WriteToStreamSocket
-import sdl3.net.SDL_GetError
+import sdl3.SDL_GetError
 
 @OptIn(ExperimentalForeignApi::class)
 open class TcpConnection private constructor(
