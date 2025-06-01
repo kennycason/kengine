@@ -64,15 +64,18 @@ kotlin {
         nativeMain {
             dependsOn(commonMain)
             dependencies {
-                implementation(project(":kengine-test"))
+                implementation(project(":kengine"))
                 implementation(project(":kengine-reactive"))
-                api(project(":kengine"))
+                // Expose SDL3_net interop as API
+                api(libs.kotlinxSerializationJson)
+                api(libs.kotlinxCoroutinesCore)
             }
         }
 
         nativeTest {
             dependsOn(commonTest)
             dependencies {
+                implementation(project(":kengine-test"))
                 implementation(kotlin("test"))
             }
         }

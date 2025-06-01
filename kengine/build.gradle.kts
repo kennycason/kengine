@@ -44,7 +44,6 @@ kotlin {
                     "-lSDL3",
                     "-lSDL3_image",
                     "-lSDL3_mixer",
-                    "-lSDL3_net",
                     "-lSDL3_ttf",
                     "-lchipmunk",
                     "-framework", "Cocoa",
@@ -72,10 +71,6 @@ kotlin {
             }
             val sdl3mixer by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3_mixer.def")
-                compilerOpts("-I/usr/local/include")
-            }
-            val sdl3net by creating {
-                defFile = file("src/nativeInterop/cinterop/sdl3_net.def")
                 compilerOpts("-I/usr/local/include")
             }
             val sdl3ttf by creating {
@@ -114,7 +109,6 @@ kotlin {
                 api(libs.kotlinxCoroutinesCore)
                 implementation(project(":kengine-test"))
                 implementation(project(":kengine-reactive"))
-                implementation(project(":kengine-network"))
             }
         }
 

@@ -18,7 +18,6 @@ import com.kengine.input.mouse.getMouseContext
 import com.kengine.log.Logger
 import com.kengine.log.LoggerContext
 import com.kengine.log.Logging
-import com.kengine.network.NetworkContext
 import com.kengine.physics.PhysicsContext
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
@@ -41,7 +40,6 @@ class GameContext private constructor(
     val font: FontContext,
     val view: ViewContext,
     val sound: SoundContext,
-    val network: NetworkContext,
     val action: ActionContext,
     val effect: EffectContext,
     val physics: PhysicsContext,
@@ -84,7 +82,6 @@ class GameContext private constructor(
                 font = FontContext.get(),
                 view = ViewContext.get(),
                 sound = SoundContext.get(),
-                network = NetworkContext.get(),
                 geometry = GeometryContext.get(),
                 action = ActionContext.get(),
                 effect = EffectContext(),
@@ -116,7 +113,6 @@ class GameContext private constructor(
         font.cleanup()
         view.cleanup()
         sound.cleanup()
-        network.cleanup()
         sdl.cleanup()
         clock.cleanup()
         physics.cleanup()
@@ -140,7 +136,6 @@ class GameContext private constructor(
         ContextRegistry.register(font)
         ContextRegistry.register(view)
         ContextRegistry.register(sound)
-        ContextRegistry.register(network)
         ContextRegistry.register(action)
         ContextRegistry.register(effect)
         ContextRegistry.register(physics)
