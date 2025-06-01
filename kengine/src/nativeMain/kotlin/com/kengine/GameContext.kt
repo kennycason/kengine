@@ -119,7 +119,7 @@ class GameContext private constructor(
         network.cleanup()
         sdl.cleanup()
         clock.cleanup()
-       // physics.cleanup() TODO track error with cleanup during ITests (consecutive start/cleanups()
+        physics.cleanup()
 
         ContextRegistry.clearAll()
         currentContext = null

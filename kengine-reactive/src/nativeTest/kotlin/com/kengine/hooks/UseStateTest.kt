@@ -1,11 +1,10 @@
 package com.kengine.hooks
 
 import com.kengine.hooks.state.useState
-import com.kengine.log.Logging
 import com.kengine.test.expectThat
 import kotlin.test.Test
 
-class UseStateTest : Logging {
+class UseStateTest {
     @Test
     fun `useState initializes and updates`() {
         val count = useState(0)

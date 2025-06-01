@@ -15,7 +15,8 @@ inline fun <R> createGameContext(
             width = width,
             height = height,
             logLevel = logLevel
-        )
+        ),
+        cleanup = true
     ) {
         block()
     }

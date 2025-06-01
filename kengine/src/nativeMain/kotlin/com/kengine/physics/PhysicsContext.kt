@@ -16,31 +16,39 @@ import chipmunk.cpv
 import com.kengine.hooks.context.Context
 import com.kengine.log.Logging
 import com.kengine.math.Vec2
+import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 
 @OptIn(ExperimentalForeignApi::class)
 class PhysicsContext private constructor() : Context(), Logging {
-    private val space = cpSpaceNew()
+    private var space = cpSpaceNew()
     private val dynamicObjects = mutableListOf<PhysicsObject>()
     private val staticObjects = mutableListOf<PhysicsObject>()
     private var isClearing = false
+    private var isSpaceDestroyed = false
 
     var gravity: Vec2 = Vec2(0.0, 500.0)
         set(value) {
             field = value
-            cpSpaceSetGravity(space, cpv(value.x, value.y))
+            if (!isSpaceDestroyed && space != null) {
+                cpSpaceSetGravity(space, cpv(value.x, value.y))
+            }
         }
 
     var damping: Double = 0.8
         set(value) {
             field = value
-            cpSpaceSetDamping(space, value)
+            if (!isSpaceDestroyed && space != null) {
+                cpSpaceSetDamping(space, value)
+            }
         }
 
     var iterations: Int = 10
         set(value) {
             field = value
-            cpSpaceSetIterations(space, value)
+            if (!isSpaceDestroyed && space != null) {
+                cpSpaceSetIterations(space, value)
+            }
         }
 
     init {
@@ -52,6 +60,7 @@ class PhysicsContext private constructor() : Context(), Logging {
     fun addObject(obj: PhysicsObject) {
         if (isClearing) throw IllegalStateException("Can not add objects while clearing.")
         if (obj.isDestroyed) throw IllegalStateException("Cannot add destroyed object")
+        if (isSpaceDestroyed || space == null) throw IllegalStateException("Physics space has been destroyed")
 
         val list = if (obj.body.isStatic) staticObjects else dynamicObjects
         if (!list.contains(obj)) {
@@ -67,8 +76,10 @@ class PhysicsContext private constructor() : Context(), Logging {
             logger.debug { "Body destroyed: ${obj.body.isDestroyed}, Shape destroyed: ${obj.shape.isDestroyed}" }
         }
 
-        cpSpaceRemoveBody(space, obj.body.handle)
-        cpSpaceRemoveShape(space, obj.shape.handle)
+        if (!isSpaceDestroyed && space != null) {
+            cpSpaceRemoveBody(space, obj.body.handle)
+            cpSpaceRemoveShape(space, obj.shape.handle)
+        }
 
         // free memory safely
         if (!obj.body.isDestroyed) {
@@ -91,7 +102,7 @@ class PhysicsContext private constructor() : Context(), Logging {
     fun getStaticObjects(): List<PhysicsObject> = staticObjects
 
     fun step(deltaTime: Double) {
-        if (!isClearing) {
+        if (!isClearing && !isSpaceDestroyed && space != null) {
             cpSpaceStep(space, deltaTime)
         }
     }
@@ -120,7 +131,17 @@ class PhysicsContext private constructor() : Context(), Logging {
     override fun cleanup() {
         withClearing {
             clearAll()
-            cpSpaceFree(space)
+            if (!isSpaceDestroyed && space != null) {
+                logger.info { "Freeing physics space" }
+                cpSpaceFree(space)
+                isSpaceDestroyed = true
+                space = null
+            } else {
+                logger.info { "Physics space already destroyed or null" }
+            }
+
+            // Reset the singleton instance to ensure a fresh context for the next test
+            PhysicsContext.reset()
         }
     }
 
@@ -140,6 +161,10 @@ class PhysicsContext private constructor() : Context(), Logging {
             return currentContext ?: PhysicsContext().also {
                 currentContext = it
             }
+        }
+
+        fun reset() {
+            currentContext = null
         }
     }
 }
