@@ -6,13 +6,20 @@ import org.gradle.kotlin.dsl.register
 class SdlDylibCopier(private val project: Project) {
 
     fun registerSDLDylibs() {
-        val dylibsToCopy = listOf(
-            "/usr/local/lib/libSDL3.0.dylib",
-            "/usr/local/lib/libSDL3_image.0.dylib",
-            "/usr/local/lib/libSDL3_mixer.0.dylib",
-            "/usr/local/lib/libSDL3_net.0.dylib",
-            "/usr/local/lib/libSDL3_ttf.0.dylib"
-        )
+        // Determine which libraries to copy based on the module
+        val dylibsToCopy = when (project.name) {
+            "kengine-network" -> listOf(
+                "/usr/local/lib/libSDL3.0.dylib",
+                "/usr/local/lib/libSDL3_net.0.dylib"
+            )
+            else -> listOf(
+                "/usr/local/lib/libSDL3.0.dylib",
+                "/usr/local/lib/libSDL3_image.0.dylib",
+                "/usr/local/lib/libSDL3_mixer.0.dylib",
+                "/usr/local/lib/libSDL3_ttf.0.dylib"
+            )
+        }
+
         val dylibTargetDirs = listOf(
             "${project.buildDir}/bin/native/Frameworks",
             "${project.buildDir}/bin/native/debugExecutable/Frameworks",
