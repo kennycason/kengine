@@ -63,9 +63,12 @@ class Osc3xSynthControllerDemo : Logging {
 
                     override fun update() {
                         useControllerContext {
-                            osc1Selected = controller.isButtonPressed(Buttons.L1) && !controller.isButtonPressed(Buttons.R1)
-                            osc2Selected = controller.isButtonPressed(Buttons.R1) && !controller.isButtonPressed(Buttons.L1)
-                            osc3Selected = controller.isButtonPressed(Buttons.L1) && controller.isButtonPressed(Buttons.R1)
+                            osc1Selected =
+                                controller.isButtonPressed(Buttons.L1) && !controller.isButtonPressed(Buttons.R1)
+                            osc2Selected =
+                                controller.isButtonPressed(Buttons.R1) && !controller.isButtonPressed(Buttons.L1)
+                            osc3Selected =
+                                controller.isButtonPressed(Buttons.L1) && controller.isButtonPressed(Buttons.R1)
 
                             val deltaDetune = when {
                                 controller.isButtonPressed(Buttons.DPAD_UP) -> 1.0
@@ -113,13 +116,13 @@ class Osc3xSynthControllerDemo : Logging {
                                     if (osc3x.countEnabled() > 0) {
                                         wavePattern.setFrequency(
                                             osc3x.getConfig(0).frequency +
-                                                osc3x.getConfig(1).frequency +
-                                                osc3x.getConfig(2).frequency
+                                                    osc3x.getConfig(1).frequency +
+                                                    osc3x.getConfig(2).frequency
                                         )
                                         wavePattern2.setFrequency(
                                             osc3x.getConfig(0).frequency +
-                                                osc3x.getConfig(1).frequency +
-                                                osc3x.getConfig(2).frequency
+                                                    osc3x.getConfig(1).frequency +
+                                                    osc3x.getConfig(2).frequency
                                         )
                                     }
                                 }
@@ -155,7 +158,7 @@ class Osc3xSynthControllerDemo : Logging {
 
                     override fun draw() {
                         useSDLContext {
-                            fillScreen(Color.black)
+                            fillScreen(Color.Companion.black)
                             wavePattern.draw()
 
                             flipScreen()

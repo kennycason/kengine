@@ -21,7 +21,6 @@ import com.kengine.log.Logging
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
 import com.kengine.sdl.registerSDLQuitHandler
-import com.kengine.sound.SoundContext
 import com.kengine.time.ClockContext
 import com.kengine.ui.ViewContext
 
@@ -38,10 +37,10 @@ class GameContext private constructor(
     val geometry: GeometryContext,
     val font: FontContext,
     val view: ViewContext,
-    val sound: SoundContext,
     val action: ActionContext,
     val effect: EffectContext,
     val clock: ClockContext,
+    private val contexts: Array<out Context> = arrayOf()
 ) : Context(), Logging {
     var isRunning = true
 
@@ -60,7 +59,8 @@ class GameContext private constructor(
             title: String,
             width: Int,
             height: Int,
-            logLevel: Logger.Level = Logger.Level.INFO
+            logLevel: Logger.Level = Logger.Level.INFO,
+            vararg contexts: Context
         ): GameContext {
             if (currentContext != null) {
                 throw IllegalStateException("GameContext has already been created. Call cleanup() before creating a new context.")
@@ -79,11 +79,11 @@ class GameContext private constructor(
                 sprite = SpriteContext.get(),
                 font = FontContext.get(),
                 view = ViewContext.get(),
-                sound = SoundContext.get(),
                 geometry = GeometryContext.get(),
                 action = ActionContext.get(),
                 effect = EffectContext(),
-                clock = ClockContext.get()
+                clock = ClockContext.get(),
+                contexts = contexts
             )
                 .also { it.initContexts() }
                 .also { currentContext = it }
@@ -109,9 +109,10 @@ class GameContext private constructor(
         geometry.cleanup()
         font.cleanup()
         view.cleanup()
-        sound.cleanup()
         sdl.cleanup()
         clock.cleanup()
+
+        contexts.forEach { it.cleanup() }
 
         ContextRegistry.clearAll()
         currentContext = null
@@ -131,10 +132,10 @@ class GameContext private constructor(
         ContextRegistry.register(geometry)
         ContextRegistry.register(font)
         ContextRegistry.register(view)
-        ContextRegistry.register(sound)
         ContextRegistry.register(action)
         ContextRegistry.register(effect)
         ContextRegistry.register(clock)
+
         getKeyboardContext().init()
         getMouseContext().init()
         getControllerContext().init()

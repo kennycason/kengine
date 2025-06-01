@@ -15,7 +15,8 @@ val modules = mutableListOf(
     "kengine-test",
     "kengine-reactive",
     "kengine-network",
-    "kengine-physics"
+    "kengine-physics",
+    "kengine-sound"
 )
 
 if (isPlaydateEnabled) {

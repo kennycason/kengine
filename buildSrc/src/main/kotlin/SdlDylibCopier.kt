@@ -16,6 +16,10 @@ class SdlDylibCopier(private val project: Project) {
                 "/usr/local/lib/libSDL3.0.dylib",
                 "/opt/homebrew/lib/libchipmunk.dylib"
             )
+            "kengine-sound" -> listOf(
+                "/usr/local/lib/libSDL3.0.dylib",
+                "/usr/local/lib/libSDL3_mixer.0.dylib"
+            )
             else -> listOf(
                 "/usr/local/lib/libSDL3.0.dylib",
                 "/usr/local/lib/libSDL3_image.0.dylib",
@@ -53,9 +57,20 @@ class SdlDylibCopier(private val project: Project) {
                         from(dylibPath)
                         into(toDir)
 
+                        // Ensure the target directory exists and has write permissions
                         doFirst {
                             println("[${project.name}] Copying $dylibPath to $toDir")
+                            project.mkdir(toDir)
+
+                            // Delete the target file if it already exists to avoid permission issues
+                            val targetFile = project.file("$toDir/$dylibName")
+                            if (targetFile.exists()) {
+                                targetFile.delete()
+                            }
                         }
+
+                        // Set file permissions after copying
+                        fileMode = 0b111101101 // rwxr-xr-x (755)
                     }
                 } else {
                     println("Task $taskName already exists. Skipping registration.")
