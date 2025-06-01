@@ -109,9 +109,9 @@ class PhysicsContext private constructor() : Context(), Logging {
 
     fun clearDynamicObjects() {
         withClearing {
-            val objectsToRemove = dynamicObjects.toList()  // take a snapshot
-            objectsToRemove.forEach(::removeObject)        // remove from physics space first
-            dynamicObjects.clear()                         // THEN clear the list references...
+            val objectsToRemove = dynamicObjects.toList()   // take a snapshot
+            objectsToRemove.forEach(::removeObject) // remove from physics space first
+            dynamicObjects.clear()                          // THEN clear the list references...
         }
     }
 

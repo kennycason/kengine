@@ -12,6 +12,10 @@ class SdlDylibCopier(private val project: Project) {
                 "/usr/local/lib/libSDL3.0.dylib",
                 "/usr/local/lib/libSDL3_net.0.dylib"
             )
+            "kengine-physics" -> listOf(
+                "/usr/local/lib/libSDL3.0.dylib",
+                "/opt/homebrew/lib/libchipmunk.dylib"
+            )
             else -> listOf(
                 "/usr/local/lib/libSDL3.0.dylib",
                 "/usr/local/lib/libSDL3_image.0.dylib",

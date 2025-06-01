@@ -1,4 +1,3 @@
-// getPhysicsContext.kt
 package com.kengine.physics
 
 import com.kengine.hooks.context.ContextRegistry

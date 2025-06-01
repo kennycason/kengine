@@ -45,7 +45,6 @@ kotlin {
                     "-lSDL3_image",
                     "-lSDL3_mixer",
                     "-lSDL3_ttf",
-                    "-lchipmunk",
                     "-framework", "Cocoa",
                     "-framework", "IOKit",
                     "-framework", "CoreVideo",
@@ -75,10 +74,6 @@ kotlin {
             }
             val sdl3ttf by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3_ttf.def")
-                compilerOpts("-I/usr/local/include")
-            }
-            val chipmunk by creating {
-                defFile = file("src/nativeInterop/cinterop/chipmunk.def")
                 compilerOpts("-I/usr/local/include")
             }
         }
