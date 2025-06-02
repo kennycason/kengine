@@ -102,7 +102,6 @@ kotlin {
 
                 api(libs.kotlinxSerializationJson) // Expose API dependencies for reuse
                 api(libs.kotlinxCoroutinesCore)
-                implementation(project(":kengine-test"))
                 implementation(project(":kengine-reactive"))
             }
         }
@@ -111,6 +110,7 @@ kotlin {
             dependsOn(commonTest)
             dependencies {
                 implementation(kotlin("test"))
+                implementation(project(":kengine-test"))
             }
         }
     }
