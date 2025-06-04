@@ -5,6 +5,7 @@ import com.kengine.hooks.context.ContextRegistry
 import com.kengine.test.expectThat
 import platform.posix.sleep
 import kotlin.test.Ignore
+import kotlin.test.Test
 
 class UseTimerTest {
     init {
@@ -12,6 +13,7 @@ class UseTimerTest {
         ContextRegistry.register(ClockContext.get())
     }
 
+    @Test
     @Ignore
     fun `useTimer triggers onComplete after delay`() {
         var timerTriggered = false

@@ -16,10 +16,12 @@ import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.SDL_Delay
 import kotlin.test.Ignore
+import kotlin.test.Test
 
 class Osc3xSynthControllerDemo : Logging {
 
     @OptIn(ExperimentalForeignApi::class)
+    @Test
     @Ignore // @Test to demo
     fun run() {
         createGameContext(

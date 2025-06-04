@@ -43,13 +43,10 @@ kotlin {
                     "-L/opt/homebrew/lib",
                     "-lSDL3",
                     "-lSDL3_image",
-                    "-lSDL3_mixer",
                     "-lSDL3_ttf",
                     "-framework", "Cocoa",
                     "-framework", "IOKit",
                     "-framework", "CoreVideo",
-                    "-framework", "CoreAudio",
-                    "-framework", "AudioToolbox",
                     // Set runtime library paths
                     "-Wl,-rpath,@executable_path/Frameworks",
                     "-Wl,-rpath,/usr/local/lib",
@@ -68,10 +65,6 @@ kotlin {
                 defFile = file("src/nativeInterop/cinterop/sdl3_image.def")
                 compilerOpts("-I/usr/local/include")
             }
-            val sdl3mixer by creating {
-                defFile = file("src/nativeInterop/cinterop/sdl3_mixer.def")
-                compilerOpts("-I/usr/local/include")
-            }
             val sdl3ttf by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3_ttf.def")
                 compilerOpts("-I/usr/local/include")
@@ -83,7 +76,7 @@ kotlin {
                 freeCompilerArgs += listOf(
                     "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
                     "-opt-in=kotlin.ExperimentalStdlibApi",
-                    "-g",  // Enable debug symbols
+                    // "-g",  // Enable debug symbols (removed due to conflict with -opt)
                     "-ea"  // Enable assertions
                 )
             }

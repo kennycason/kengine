@@ -10,7 +10,9 @@ class SdlDylibCopier(private val project: Project) {
         val dylibsToCopy = when (project.name) {
             "kengine-network" -> listOf(
                 "/usr/local/lib/libSDL3.0.dylib",
-                "/usr/local/lib/libSDL3_net.0.dylib"
+                "/usr/local/lib/libSDL3_net.0.dylib",
+                "/usr/local/lib/libSDL3_image.0.dylib",
+                "/usr/local/lib/libSDL3_ttf.0.dylib"
             )
             "kengine-physics" -> listOf(
                 "/usr/local/lib/libSDL3.0.dylib",
@@ -18,7 +20,9 @@ class SdlDylibCopier(private val project: Project) {
             )
             "kengine-sound" -> listOf(
                 "/usr/local/lib/libSDL3.0.dylib",
-                "/usr/local/lib/libSDL3_mixer.0.dylib"
+                "/usr/local/lib/libSDL3_mixer.0.dylib",
+                "/usr/local/lib/libSDL3_image.0.dylib",
+                "/usr/local/lib/libSDL3_ttf.0.dylib"
             )
             else -> listOf(
                 "/usr/local/lib/libSDL3.0.dylib",

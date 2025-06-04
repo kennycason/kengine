@@ -9,12 +9,12 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.toKString
 import platform.posix.exit
+import sdl3.SDL_AudioSpec
 import sdl3.SDL_GetError
 import sdl3.SDL_INIT_AUDIO
 import sdl3.SDL_Init
 import sdl3.mixer.Mix_CloseAudio
 import sdl3.mixer.Mix_OpenAudio
-import sdl3.mixer.SDL_AudioSpec
 
 @OptIn(ExperimentalForeignApi::class)
 class SoundContext private constructor(
