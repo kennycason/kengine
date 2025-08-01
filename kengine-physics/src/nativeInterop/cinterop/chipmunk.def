@@ -1,0 +1,6 @@
+headers = chipmunk/chipmunk.h
+headerFilter = chipmunk/**
+package = chipmunk
+compilerOpts = -I/opt/homebrew/include
+linkerOpts = -L/opt/homebrew/lib -lchipmunk
+# note syntax compilerOpts.osx for cross-platform dev

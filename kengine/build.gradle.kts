@@ -43,15 +43,10 @@ kotlin {
                     "-L/opt/homebrew/lib",
                     "-lSDL3",
                     "-lSDL3_image",
-                    "-lSDL3_mixer",
-                    "-lSDL3_net",
                     "-lSDL3_ttf",
-                    "-lchipmunk",
                     "-framework", "Cocoa",
                     "-framework", "IOKit",
                     "-framework", "CoreVideo",
-                    "-framework", "CoreAudio",
-                    "-framework", "AudioToolbox",
                     // Set runtime library paths
                     "-Wl,-rpath,@executable_path/Frameworks",
                     "-Wl,-rpath,/usr/local/lib",
@@ -70,20 +65,8 @@ kotlin {
                 defFile = file("src/nativeInterop/cinterop/sdl3_image.def")
                 compilerOpts("-I/usr/local/include")
             }
-            val sdl3mixer by creating {
-                defFile = file("src/nativeInterop/cinterop/sdl3_mixer.def")
-                compilerOpts("-I/usr/local/include")
-            }
-            val sdl3net by creating {
-                defFile = file("src/nativeInterop/cinterop/sdl3_net.def")
-                compilerOpts("-I/usr/local/include")
-            }
             val sdl3ttf by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3_ttf.def")
-                compilerOpts("-I/usr/local/include")
-            }
-            val chipmunk by creating {
-                defFile = file("src/nativeInterop/cinterop/chipmunk.def")
                 compilerOpts("-I/usr/local/include")
             }
         }
@@ -93,7 +76,7 @@ kotlin {
                 freeCompilerArgs += listOf(
                     "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
                     "-opt-in=kotlin.ExperimentalStdlibApi",
-                    "-g",  // Enable debug symbols
+                    // "-g",  // Enable debug symbols (removed due to conflict with -opt)
                     "-ea"  // Enable assertions
                 )
             }
@@ -112,7 +95,7 @@ kotlin {
 
                 api(libs.kotlinxSerializationJson) // Expose API dependencies for reuse
                 api(libs.kotlinxCoroutinesCore)
-                implementation(project(":kengine-test"))
+                implementation(project(":kengine-reactive"))
             }
         }
 
@@ -120,6 +103,7 @@ kotlin {
             dependsOn(commonTest)
             dependencies {
                 implementation(kotlin("test"))
+                implementation(project(":kengine-test"))
             }
         }
     }

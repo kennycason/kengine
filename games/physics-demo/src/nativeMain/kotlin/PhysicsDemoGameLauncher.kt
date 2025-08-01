@@ -1,6 +1,7 @@
 import com.kengine.GameRunner
 import com.kengine.createGameContext
 import com.kengine.log.Logger
+import com.kengine.physics.PhysicsContext
 
 fun main() {
     createGameContext(
@@ -9,6 +10,7 @@ fun main() {
         height = 600,
         logLevel = Logger.Level.DEBUG
     ) {
+        registerContext(PhysicsContext.get())
         GameRunner(frameRate = 60) {
             PhysicsDemoGame()
         }

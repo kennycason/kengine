@@ -55,6 +55,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(project(":kengine")) // Depends on core engine
+                implementation(project(":kengine-physics")) // Depends on physics module
                 implementation(libs.kotlinxSerializationJson) // Shared dependencies
                 implementation(libs.kotlinxCoroutinesCore)
             }

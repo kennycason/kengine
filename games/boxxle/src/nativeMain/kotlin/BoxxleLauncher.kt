@@ -2,6 +2,7 @@ import boxxle.BoxxleGame
 import com.kengine.GameRunner
 import com.kengine.createGameContext
 import com.kengine.log.Logger
+import com.kengine.sound.SoundContext
 
 fun main() {
     createGameContext(
@@ -10,6 +11,7 @@ fun main() {
         height = 480,
         logLevel = Logger.Level.DEBUG
     ) {
+        registerContext(SoundContext.get())
         GameRunner(frameRate = 60) {
             BoxxleGame()
         }

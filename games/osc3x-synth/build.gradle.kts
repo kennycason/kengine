@@ -55,7 +55,6 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(project(":kengine")) // Depends on core engine
                 implementation(libs.kotlinxSerializationJson) // Shared dependencies
                 implementation(libs.kotlinxCoroutinesCore)
             }
@@ -63,6 +62,12 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
+            }
+        }
+        val nativeMain by getting {
+            dependencies {
+                implementation(project(":kengine"))
+                implementation(project(":kengine-sound"))
             }
         }
     }
