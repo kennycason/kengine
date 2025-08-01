@@ -2,6 +2,8 @@ package com.kengine.sound.keyboard
 
 import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Color
+import com.kengine.input.keyboard.Keys
+import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.sound.keyboard.NoteGenerator.WHITE_KEYS_PER_OCTAVE
 import com.kengine.sound.synth.Osc3x
 import com.kengine.ui.View
@@ -24,6 +26,36 @@ class VirtualKeyboard(
     init {
         getViewContext().addView(this)
     }
+
+    // Track which keyboard keys are currently pressed to avoid triggering the same note multiple times
+    // and to properly handle key releases when multiple keys are pressed simultaneously
+    private val keyboardKeysPressed = mutableSetOf<UInt>()
+
+    /**
+     * Keyboard layout mapping to piano notes.
+     * The mapping follows the QWERTY keyboard layout in a flattened sequence starting with number row:
+     * "1234567890" (number row)
+     * "QWERTYUIOP" (top letter row)
+     * "ASDFGHJKL:" (middle letter row)
+     * "ZXCVBNM<>?" (bottom letter row)
+     * Plus additional keys: TAB, RETURN, BACKSPACE, etc.
+     */
+    private val keyboardKeys = listOf(
+        // Row 0: 1234567890 (number row)
+        Keys.ONE, Keys.TWO, Keys.THREE, Keys.FOUR, Keys.FIVE, Keys.SIX, Keys.SEVEN, Keys.EIGHT, Keys.NINE, Keys.ZERO,
+        // Row 1: QWERTYUIOP
+        Keys.Q, Keys.W, Keys.E, Keys.R, Keys.T, Keys.Y, Keys.U, Keys.I, Keys.O, Keys.P,
+        // Row 2: ASDFGHJKL:
+        Keys.A, Keys.S, Keys.D, Keys.F, Keys.G, Keys.H, Keys.J, Keys.K, Keys.L, 0x3AU, // 0x3AU is ':'
+        // Row 3: ZXCVBNM<>?
+        Keys.Z, Keys.X, Keys.C, Keys.V, Keys.B, Keys.N, Keys.M, 0x2CU, 0x2EU, 0x2FU,  // 0x2CU is ',', 0x2EU is '.', 0x2FU is '/'
+        // Additional keys for more coverage
+        Keys.TAB, Keys.BACKSPACE, Keys.RETURN, Keys.SPACE,
+        Keys.HOME, Keys.END, Keys.PAGEUP, Keys.PAGEDOWN,
+        Keys.INSERT, Keys.DELETE,
+        Keys.F1, Keys.F2, Keys.F3, Keys.F4, Keys.F5, Keys.F6,
+        Keys.F7, Keys.F8, Keys.F9, Keys.F10, Keys.F11, Keys.F12
+    )
 
     data class PianoKey(
         val note: String,
@@ -187,5 +219,40 @@ class VirtualKeyboard(
     override fun performLayout(offsetX: Double, offsetY: Double) {
         super.performLayout(offsetX, offsetY)
         calculateKeyPositions()  // Calculate positions after layout is set
+    }
+
+    /**
+     * Maps keyboard keys to piano notes.
+     * Each key on the keyboard is mapped directly to the corresponding note in the piano keyboard.
+     * The mapping is sequential, with each key mapping to a single note.
+     * This allows for intuitive playing using the computer keyboard.
+     */
+    fun update() {
+        useKeyboardContext {
+
+            // Check each key in the mapping
+            for (keyIndex in keyboardKeys.indices) {
+                val keyCode = keyboardKeys[keyIndex]
+
+                // Skip if the note index is out of range
+                if (keyIndex >= notes.size) continue
+
+                // Check if key is pressed
+                val isKeyPressed = keyboard.isPressed(keyCode)
+
+                // If key is newly pressed, trigger the note
+                if (isKeyPressed && !keyboardKeysPressed.contains(keyCode)) {
+                    keyboardKeysPressed.add(keyCode)
+                    triggerNote(notes[keyIndex])
+                }
+                // If key is released, release the note if it's the active key
+                else if (!isKeyPressed && keyboardKeysPressed.contains(keyCode)) {
+                    keyboardKeysPressed.remove(keyCode)
+                    if (activeKey == notes[keyIndex]) {
+                        releaseActiveNote()
+                    }
+                }
+            }
+        }
     }
 }
