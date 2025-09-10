@@ -4,6 +4,7 @@ import com.kengine.geometry.useGeometryContext
 import com.kengine.graphics.Color
 import com.kengine.input.keyboard.Keys
 import com.kengine.input.keyboard.useKeyboardContext
+import com.kengine.input.mouse.useMouseContext
 import com.kengine.sound.keyboard.NoteGenerator.WHITE_KEYS_PER_OCTAVE
 import com.kengine.sound.synth.Osc3x
 import com.kengine.ui.View
@@ -30,6 +31,12 @@ class VirtualKeyboard(
     // Track which keyboard keys are currently pressed to avoid triggering the same note multiple times
     // and to properly handle key releases when multiple keys are pressed simultaneously
     private val keyboardKeysPressed = mutableSetOf<UInt>()
+
+    // Track whether the mouse button was previously pressed to detect new presses and releases
+    private var wasMouseButtonPressed = false
+
+    // Track which piano key is currently being played by the mouse
+    private var mouseActiveKey: PianoKey? = null
 
     /**
      * Keyboard layout mapping to piano notes.
@@ -222,14 +229,29 @@ class VirtualKeyboard(
     }
 
     /**
-     * Maps keyboard keys to piano notes.
-     * Each key on the keyboard is mapped directly to the corresponding note in the piano keyboard.
-     * The mapping is sequential, with each key mapping to a single note.
-     * This allows for intuitive playing using the computer keyboard.
+     * Updates the keyboard state based on both keyboard and mouse input.
+     *
+     * For keyboard input:
+     * - Each key on the keyboard is mapped directly to the corresponding note in the piano keyboard.
+     * - The mapping is sequential, with each key mapping to a single note.
+     * - Checks the current state of each key every frame and triggers notes based on that state.
+     *
+     * For mouse input:
+     * - Checks if the mouse is over the keyboard and if the left button is pressed.
+     * - Determines which piano key is under the mouse cursor.
+     * - Triggers notes based on the current state of the mouse button, not just on state transitions.
+     * - Tracks which piano key is currently being played by the mouse to handle cases where the mouse
+     *   moves from one key to another while the button is pressed.
+     *
+     * This approach makes mouse clicks as responsive as keyboard input by:
+     * 1. Checking the current state every frame rather than relying on catching transitions
+     * 2. Triggering notes immediately when the mouse button is pressed, without requiring a hold
+     * 3. Handling cases where the mouse moves between keys while the button is pressed
+     * 4. Using a similar state-based approach as keyboard input for consistency
      */
     fun update() {
+        // Handle keyboard input
         useKeyboardContext {
-
             // Check each key in the mapping
             for (keyIndex in keyboardKeys.indices) {
                 val keyCode = keyboardKeys[keyIndex]
@@ -253,6 +275,84 @@ class VirtualKeyboard(
                     }
                 }
             }
+        }
+
+        // Handle mouse input
+        useMouseContext {
+            val mouseX = mouse.cursor().x
+            val mouseY = mouse.cursor().y
+            val isMouseButtonPressed = mouse.isLeftPressed()
+
+            // Check if mouse is within keyboard bounds
+            if (isWithinBounds(mouseX, mouseY)) {
+                val relativeX = mouseX - layoutX
+                val relativeY = mouseY - layoutY
+
+                // Find which piano key is under the mouse
+                var keyUnderMouse: PianoKey? = null
+
+                // Check black keys first since they're on top
+                val blackKeyUnderMouse = notes.filter { it.isBlack }
+                    .firstOrNull { key ->
+                        relativeX >= key.x &&
+                            relativeX <= key.x + key.width &&
+                            relativeY <= blackKeyHeight
+                    }
+
+                if (blackKeyUnderMouse != null) {
+                    keyUnderMouse = blackKeyUnderMouse
+                } else {
+                    // Then check white keys
+                    val whiteKeyUnderMouse = notes.filter { !it.isBlack }
+                        .firstOrNull { key ->
+                            relativeX >= key.x &&
+                                relativeX <= key.x + key.width
+                        }
+
+                    if (whiteKeyUnderMouse != null) {
+                        keyUnderMouse = whiteKeyUnderMouse
+                    }
+                }
+
+                // Handle mouse input based on current state, similar to keyboard input
+                if (isMouseButtonPressed) {
+                    // Mouse button is currently pressed
+                    if (keyUnderMouse != null) {
+                        // There's a key under the mouse
+                        if (mouseActiveKey == null) {
+                            // No previous active key, trigger the note immediately
+                            mouseActiveKey = keyUnderMouse
+                            triggerNote(keyUnderMouse)
+                        } else if (mouseActiveKey != keyUnderMouse) {
+                            // Different key than before, release previous and trigger new
+                            if (activeKey == mouseActiveKey) {
+                                releaseActiveNote()
+                            }
+                            mouseActiveKey = keyUnderMouse
+                            triggerNote(keyUnderMouse)
+                        }
+                        // If it's the same key as before, do nothing (note is already playing)
+                    }
+                } else {
+                    // Mouse button is not pressed
+                    if (mouseActiveKey != null) {
+                        // If we had an active mouse key, release it
+                        if (activeKey == mouseActiveKey) {
+                            releaseActiveNote()
+                        }
+                        mouseActiveKey = null
+                    }
+                }
+            } else if (mouseActiveKey != null && !isMouseButtonPressed) {
+                // Mouse moved outside bounds and we had an active key
+                if (activeKey == mouseActiveKey) {
+                    releaseActiveNote()
+                }
+                mouseActiveKey = null
+            }
+
+            // Update mouse button state for next frame
+            wasMouseButtonPressed = isMouseButtonPressed
         }
     }
 }
