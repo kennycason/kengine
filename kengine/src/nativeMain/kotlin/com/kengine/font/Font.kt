@@ -102,6 +102,94 @@ class Font(
         r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu,
         caching: Boolean = false
     ) {
+        drawText(text, x = x.toFloat(), y = y.toFloat(), r = r, g = g, b = b, a = a, caching = caching)
+    }
+
+    fun drawText(
+        text: String,
+        x: Float,
+        y: Float,
+        color: Color,
+        caching: Boolean = false
+    ) {
+        return drawText(
+            text, x, y,
+            r = color.r,
+            g = color.g,
+            b = color.b,
+            a = color.a,
+            caching
+        )
+    }
+
+    fun drawText(
+        text: String,
+        x: Float,
+        y: Float,
+        rgba: UInt,
+        caching: Boolean = false
+    ) {
+        return drawText(
+            text, x, y,
+            r = redFromRGBA(rgba),
+            g = greenFromRGBA(rgba),
+            b = blueFromRGBA(rgba),
+            a = alphaFromRGBA(rgba),
+            caching
+        )
+    }
+
+    fun drawText(
+        text: String,
+        x: Double,
+        y: Double,
+        color: Color,
+        caching: Boolean = false
+    ) {
+        return drawText(
+            text, x.toFloat(), y.toFloat(),
+            r = color.r,
+            g = color.g,
+            b = color.b,
+            a = color.a,
+            caching
+        )
+    }
+
+    fun drawText(
+        text: String,
+        x: Double,
+        y: Double,
+        rgba: UInt,
+        caching: Boolean = false
+    ) {
+        return drawText(
+            text, x.toFloat(), y.toFloat(),
+            r = redFromRGBA(rgba),
+            g = greenFromRGBA(rgba),
+            b = blueFromRGBA(rgba),
+            a = alphaFromRGBA(rgba),
+            caching
+        )
+    }
+
+    fun drawText(
+        text: String,
+        x: Double,
+        y: Double,
+        r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu,
+        caching: Boolean = false
+    ) {
+        drawText(text, x = x.toFloat(), y = y.toFloat(), r = r, g = g, b = b, a = a, caching = caching)
+    }
+
+    fun drawText(
+        text: String,
+        x: Float,
+        y: Float,
+        r: UByte, g: UByte, b: UByte, a: UByte = 0xFFu,
+        caching: Boolean = false
+    ) {
         val cacheKey = if (caching) "${text.hashCode()}:$name:$fontSize:$r:$g:$b:$a" else ""
         val surface = if (caching) {
             surfaceCache.getOrPut(cacheKey) {
@@ -115,8 +203,8 @@ class Font(
         useSDLContext {
             memScoped {
                 val dstRect = alloc<SDL_FRect>().apply {
-                    this.x = x.toFloat()
-                    this.y = y.toFloat()
+                    this.x = x
+                    this.y = y
                     this.w = surface.pointed.w.toFloat()
                     this.h = surface.pointed.h.toFloat()
                 }
