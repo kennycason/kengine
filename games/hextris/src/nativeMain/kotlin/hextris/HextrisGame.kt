@@ -54,9 +54,9 @@ class HextrisGame : Game, Logging {
     private lateinit var scoreFont: Font
 
     // Layout - adjusted to avoid overlap between board and left column
-    private val boardPosition = Vec2(380.0, 5.0) // Moved right to avoid overlap with left column
-    private val nextPiecePosition = Vec2(10.0, 5.0) // Top left position
-    private val histogramPosition = Vec2(580.0, 5.0) // Far right position
+    private val boardPosition = Vec2(360.0, 5.0) // Moved right to avoid overlap with left column
+    private val nextPiecePosition = Vec2(16.0, 7.0) // Top left position
+    private val histogramPosition = Vec2(560.0, 0.0) // Far right position
 
     init {
         // Set log level to DEBUG to see debug messages
@@ -136,7 +136,18 @@ class HextrisGame : Game, Logging {
             if (!board.moveDown()) {
                 // If the piece can't move down, lock it in place
                 logger.debug("Piece can't move down, locking in place")
+
+                // Store the current level before locking the piece
+                val currentLevel = board.level
+
+                // Lock the piece and check for completed lines
                 board.lockPiece()
+
+                // If the level has changed, update the drop speed
+                if (board.level != currentLevel) {
+                    logger.info("Level up! ${currentLevel} -> ${board.level}")
+                    updateDropSpeed()
+                }
 
                 // Check if the game is over
                 if (board.gameOver) {
@@ -270,7 +281,18 @@ class HextrisGame : Game, Logging {
                 timeSinceOptionChangeMs = getCurrentMilliseconds()
                 logger.debug("Hard drop. Time since last action: $timeSinceLastAction ms (inputDelayMs: $inputDelayMs ms)")
                 board.drop()
+
+                // Store the current level before locking the piece
+                val currentLevel = board.level
+
+                // Lock the piece and check for completed lines
                 board.lockPiece()
+
+                // If the level has changed, update the drop speed
+                if (board.level != currentLevel) {
+                    logger.info("Level up! ${currentLevel} -> ${board.level}")
+                    updateDropSpeed()
+                }
 
                 // Check if the game is over
                 if (board.gameOver) {
@@ -416,7 +438,18 @@ class HextrisGame : Game, Logging {
                 timeSinceOptionChangeMs = getCurrentMilliseconds()
                 logger.debug("Controller: Hard drop. Time since last action: $timeSinceLastAction ms")
                 board.drop()
+
+                // Store the current level before locking the piece
+                val currentLevel = board.level
+
+                // Lock the piece and check for completed lines
                 board.lockPiece()
+
+                // If the level has changed, update the drop speed
+                if (board.level != currentLevel) {
+                    logger.info("Controller: Level up! ${currentLevel} -> ${board.level}")
+                    updateDropSpeed()
+                }
 
                 // Check if the game is over
                 if (board.gameOver) {
@@ -639,19 +672,16 @@ class HextrisGame : Game, Logging {
             // Update with actual counts
             pieceCounts.putAll(board.getPieceCounts())
 
-            // Calculate total pieces
-            val totalPieces = pieceCounts.values.sum()
-
             // Define a smaller block size for the histogram pieces
             val smallBlockSize = Sprites.BLOCK_SIZE / 2
 
             // Calculate the layout - improved spacing and alignment
             val pieceTypes = PieceType.values()
             val piecesPerColumn = (pieceTypes.size + 1) / 2 // Ceiling division
-            val columnWidth = 6 * smallBlockSize
-            val rowHeight = 5 * smallBlockSize // Increased row height for better spacing
-            val padding = smallBlockSize
-            val horizontalGap = 2 * smallBlockSize // Gap between columns
+            val columnWidth = 7 * smallBlockSize
+            val rowHeight = 40 // Increase row height for better spacing
+            val padding = 5
+            val horizontalGap = 3 * smallBlockSize // Gap between columns
 
             // Draw the pieces and their counts in two columns
             for (i in pieceTypes.indices) {
@@ -669,12 +699,12 @@ class HextrisGame : Game, Logging {
                 drawPieceSmall(x + padding, y + padding, pieceType)
 
                 // Draw the count with "x<count>" format to the RIGHT of the piece
-                scoreFont.drawText("x$count", x + padding * 5, y + padding,
+                scoreFont.drawText("x$count", x + padding * 13, y + padding,
                     r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
             }
 
             // Draw the "HISTOGRAM" label with a more prominent style
-            menuFont.drawText("PIECE STATS", histogramPosition.x.toInt(), histogramPosition.y.toInt() - 40,
+            menuFont.drawText("STATS", histogramPosition.x.toInt(), histogramPosition.y.toInt() - 40,
                 r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
 
             // Total pieces count removed from histogram as per requirements
@@ -747,21 +777,6 @@ class HextrisGame : Game, Logging {
 
     private fun drawStats() {
         useSDLContext {
-            // Draw stats with a more polished layout matching the web version
-
-            // Draw a semi-transparent background for stats
-            useGeometryContext {
-                fillRectangle(
-                    nextPiecePosition.x,
-                    nextPiecePosition.y + 250,
-                    180.0,
-                    120.0,
-                    Color(0u, 0u, 0u, 200u) // Semi-transparent black
-                )
-            }
-
-            // Stats title removed as per requirements
-
             // Draw the score with larger font and highlight
             scoreFont.drawText("SCORE", nextPiecePosition.x, nextPiecePosition.y + 180,
                 r = 0xCCu, g = 0xCCu, b = 0xFFu, a = 0xFFu)
@@ -810,6 +825,22 @@ class HextrisGame : Game, Logging {
         moveRightTime = getCurrentMilliseconds()
         moveDownTime = getCurrentMilliseconds()
         rotateTime = getCurrentMilliseconds()
+        lastMoveDirection = null
+        moveStartTime = getCurrentMilliseconds()
+        timeSinceOptionChangeMs = getCurrentMilliseconds()
+
+        // Adjust drop speed based on level
+        updateDropSpeed()
+    }
+
+    /**
+     * Updates the drop speed based on the current level.
+     * As the level increases, the pieces fall faster.
+     */
+    private fun updateDropSpeed() {
+        // Base drop speed is 300ms, decrease by 10ms per level, with a minimum of 50ms
+        dropSpeed = (300 - (board.level * 10)).coerceAtLeast(50).toLong()
+        logger.debug("Updated drop speed to $dropSpeed ms for level ${board.level}")
     }
 
     override fun cleanup() {
