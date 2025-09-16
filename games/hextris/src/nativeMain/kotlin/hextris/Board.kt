@@ -31,6 +31,11 @@ class Board(val width: Int = 15, val height: Int = 25) {
     var gameOver = false
         private set
 
+    // Piece counter - tracks how many pieces of each type have fallen
+    private val pieceCounter = mutableMapOf<PieceType, Int>().apply {
+        PieceType.values().forEach { this[it] = 0 }
+    }
+
     init {
         // Initialize the next piece
         spawnNextPiece()
@@ -145,12 +150,27 @@ class Board(val width: Int = 15, val height: Int = 25) {
             return true
         }
 
-        // If not, try wall kicks
-        for (offset in listOf(
-            Pair(-1, 0), Pair(1, 0), Pair(0, -1),  // Left, Right, Up
-            Pair(-2, 0), Pair(2, 0),               // Far Left, Far Right
-            Pair(-1, -1), Pair(1, -1)              // Left-Up, Right-Up
-        )) {
+        // If not, try wall kicks with enhanced slide system
+        // This matches the web version's more sophisticated approach
+        val slideAttempts = listOf(
+            Pair(0, 0),    // Try original position first
+            Pair(-1, 0),   // Try left
+            Pair(1, 0),    // Try right
+            Pair(-2, 0),   // Try further left
+            Pair(2, 0),    // Try further right
+            Pair(0, -1),   // Try up
+            Pair(-1, -1),  // Try left-up
+            Pair(1, -1),   // Try right-up
+            Pair(-3, 0),   // Try max left
+            Pair(3, 0),    // Try max right
+            Pair(0, -2),   // Try further up
+            Pair(-2, -1),  // Try far left-up
+            Pair(2, -1),   // Try far right-up
+            Pair(-1, -2),  // Try left-far up
+            Pair(1, -2)    // Try right-far up
+        )
+
+        for (offset in slideAttempts) {
             if (canPlacePiece(piece, pieceX + offset.first, pieceY + offset.second)) {
                 pieceX += offset.first
                 pieceY += offset.second
@@ -178,12 +198,27 @@ class Board(val width: Int = 15, val height: Int = 25) {
             return true
         }
 
-        // If not, try wall kicks
-        for (offset in listOf(
-            Pair(-1, 0), Pair(1, 0), Pair(0, -1),  // Left, Right, Up
-            Pair(-2, 0), Pair(2, 0),               // Far Left, Far Right
-            Pair(-1, -1), Pair(1, -1)              // Left-Up, Right-Up
-        )) {
+        // If not, try wall kicks with enhanced slide system
+        // This matches the web version's more sophisticated approach
+        val slideAttempts = listOf(
+            Pair(0, 0),    // Try original position first
+            Pair(-1, 0),   // Try left
+            Pair(1, 0),    // Try right
+            Pair(-2, 0),   // Try further left
+            Pair(2, 0),    // Try further right
+            Pair(0, -1),   // Try up
+            Pair(-1, -1),  // Try left-up
+            Pair(1, -1),   // Try right-up
+            Pair(-3, 0),   // Try max left
+            Pair(3, 0),    // Try max right
+            Pair(0, -2),   // Try further up
+            Pair(-2, -1),  // Try far left-up
+            Pair(2, -1),   // Try far right-up
+            Pair(-1, -2),  // Try left-far up
+            Pair(1, -2)    // Try right-far up
+        )
+
+        for (offset in slideAttempts) {
             if (canPlacePiece(piece, pieceX + offset.first, pieceY + offset.second)) {
                 pieceX += offset.first
                 pieceY += offset.second
@@ -202,6 +237,9 @@ class Board(val width: Int = 15, val height: Int = 25) {
      */
     fun lockPiece(): Int {
         val piece = currentPiece ?: return 0
+
+        // Increment the counter for this piece type
+        pieceCounter[piece.type] = pieceCounter[piece.type]!! + 1
 
         // Place the piece on the grid
         for (block in piece.getBlocks()) {
@@ -366,8 +404,19 @@ class Board(val width: Int = 15, val height: Int = 25) {
         level = 0
         gameOver = false
 
+        // Reset piece counter
+        PieceType.values().forEach { pieceCounter[it] = 0 }
+
         // Spawn a new piece
         spawnNextPiece()
         spawnPiece()
+    }
+
+    /**
+     * Gets the count of each piece type that has fallen.
+     * @return a map of piece types to their counts
+     */
+    fun getPieceCounts(): Map<PieceType, Int> {
+        return pieceCounter.toMap()
     }
 }

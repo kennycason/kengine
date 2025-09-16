@@ -36,10 +36,15 @@ class HextrisGame : Game, Logging {
     private var moveLeftTime = 0L
     private var moveRightTime = 0L
     private var moveDownTime = 0L
-    private var moveSpeed = 0L // milliseconds (set to 0 to eliminate throttling)
+    private var moveSpeed = 60L // milliseconds - matches web version's repeat rate
+    private var initialMoveDelay = 110L // Short initial delay before repeat starts - matches web version
+
+    // Movement state tracking like the web version
+    private var lastMoveDirection: String? = null
+    private var moveStartTime = 0L
 
     private var rotateTime = 0L
-    private var rotateSpeed = 50L // milliseconds (reduced from 150ms for more responsive rotation)
+    private var rotateSpeed = 150L // milliseconds - matches web version
     private var timeSinceOptionChangeMs = 0L
     private val inputDelayMs = 20L // reduced from 50ms for more responsive input
 
@@ -48,10 +53,10 @@ class HextrisGame : Game, Logging {
     private lateinit var menuFont: Font
     private lateinit var scoreFont: Font
 
-    // Layout
-    private val boardPosition = Vec2(340.0, 0.0)
-    private val nextPiecePosition = Vec2(0.0,  0.0)
-    private val histogramPosition = Vec2(530.0, 0.0)
+    // Layout - adjusted to match web version's spacing and proportions
+    private val boardPosition = Vec2(400.0, 50.0) // Centered and with top margin
+    private val nextPiecePosition = Vec2(100.0, 50.0) // Left side with top margin
+    private val histogramPosition = Vec2(650.0, 50.0) // Right side with top margin
 
     init {
         // Set log level to DEBUG to see debug messages
@@ -162,32 +167,96 @@ class HextrisGame : Game, Logging {
 
     private fun handleKeyboardInput() {
         useKeyboardContext {
-            // Move left (Left Arrow or A) - no throttling
-            if (keyboard.isLeftPressed() || keyboard.isAPressed()) {
-                val timeSinceLastMove = timeSinceMs(moveLeftTime)
-                moveLeftTime = getCurrentMilliseconds()
-                logger.debug("Moving left. Time since last move: $timeSinceLastMove ms")
-                board.moveLeft()
+            // Implement the web version's movement control logic with initial delay and repeat rate
+            val currentTime = getCurrentMilliseconds()
+
+            // Move left (Left Arrow or A) - with throttling
+            val isLeftPressed = keyboard.isLeftPressed() || keyboard.isAPressed()
+            if (isLeftPressed) {
+                val shouldMove = if (lastMoveDirection == "left") {
+                    // If continuing to press left, check if we've passed the initial delay
+                    val timeSinceStart = timeSinceMs(moveStartTime)
+                    if (timeSinceStart < initialMoveDelay) {
+                        // Still in initial delay, don't move again
+                        false
+                    } else {
+                        // Past initial delay, check repeat rate
+                        val timeSinceLastMove = timeSinceMs(moveLeftTime)
+                        timeSinceLastMove >= moveSpeed
+                    }
+                } else {
+                    // First press or direction change, always move
+                    lastMoveDirection = "left"
+                    moveStartTime = currentTime
+                    true
+                }
+
+                if (shouldMove) {
+                    moveLeftTime = currentTime
+                    logger.debug("Moving left. Initial delay: $initialMoveDelay ms, Repeat rate: $moveSpeed ms")
+                    board.moveLeft()
+                }
+            } else if (lastMoveDirection == "left") {
+                // Released left key
+                lastMoveDirection = null
             }
 
-            // Move right (Right Arrow or D) - no throttling
-            if (keyboard.isRightPressed() || keyboard.isDPressed()) {
-                val timeSinceLastMove = timeSinceMs(moveRightTime)
-                moveRightTime = getCurrentMilliseconds()
-                logger.debug("Moving right. Time since last move: $timeSinceLastMove ms")
-                board.moveRight()
+            // Move right (Right Arrow or D) - with throttling
+            val isRightPressed = keyboard.isRightPressed() || keyboard.isDPressed()
+            if (isRightPressed) {
+                val shouldMove = if (lastMoveDirection == "right") {
+                    // If continuing to press right, check if we've passed the initial delay
+                    val timeSinceStart = timeSinceMs(moveStartTime)
+                    if (timeSinceStart < initialMoveDelay) {
+                        // Still in initial delay, don't move again
+                        false
+                    } else {
+                        // Past initial delay, check repeat rate
+                        val timeSinceLastMove = timeSinceMs(moveRightTime)
+                        timeSinceLastMove >= moveSpeed
+                    }
+                } else {
+                    // First press or direction change, always move
+                    lastMoveDirection = "right"
+                    moveStartTime = currentTime
+                    true
+                }
+
+                if (shouldMove) {
+                    moveRightTime = currentTime
+                    logger.debug("Moving right. Initial delay: $initialMoveDelay ms, Repeat rate: $moveSpeed ms")
+                    board.moveRight()
+                }
+            } else if (lastMoveDirection == "right") {
+                // Released right key
+                lastMoveDirection = null
             }
 
             // Move down (soft drop) - track when down key is pressed/released (Down Arrow or S)
             val wasDownPressed = isDownKeyPressed
-            isDownKeyPressed = keyboard.isDownPressed() || keyboard.isSPressed()
+            val isDownPressed = keyboard.isDownPressed() || keyboard.isSPressed()
+            isDownKeyPressed = isDownPressed
 
-            // Only move down manually if the key is pressed - no throttling
-            if (isDownKeyPressed) {
-                val timeSinceLastMove = timeSinceMs(moveDownTime)
-                moveDownTime = getCurrentMilliseconds()
-                logger.debug("Moving down (soft drop). Time since last move: $timeSinceLastMove ms")
-                board.moveDown()
+            // Only move down manually if the key is pressed - with throttling
+            if (isDownPressed) {
+                val shouldMove = if (lastMoveDirection == "down") {
+                    // If continuing to press down, check repeat rate (no initial delay for down)
+                    val timeSinceLastMove = timeSinceMs(moveDownTime)
+                    timeSinceLastMove >= moveSpeed / 2 // Faster repeat for down
+                } else {
+                    // First press, always move
+                    lastMoveDirection = "down"
+                    true
+                }
+
+                if (shouldMove) {
+                    moveDownTime = currentTime
+                    logger.debug("Moving down (soft drop). Repeat rate: ${moveSpeed / 2} ms")
+                    board.moveDown()
+                }
+            } else if (lastMoveDirection == "down") {
+                // Released down key
+                lastMoveDirection = null
             }
 
             // Move up (W key) - not used for gameplay but included for WASD completeness
@@ -246,24 +315,72 @@ class HextrisGame : Game, Logging {
 
     private fun handleControllerInput() {
         useControllerContext {
-            // Move left - Button 7 - no throttling
-            if (controller.isButtonPressed(7)) {
-                val timeSinceLastMove = timeSinceMs(moveLeftTime)
-                moveLeftTime = getCurrentMilliseconds()
-                logger.debug("Controller: Moving left. Time since last move: $timeSinceLastMove ms")
-                board.moveLeft()
+            // Implement the web version's movement control logic with initial delay and repeat rate
+            val currentTime = getCurrentMilliseconds()
+
+            // Move left - Button 7 - with throttling
+            val isLeftPressed = controller.isButtonPressed(7)
+            if (isLeftPressed) {
+                val shouldMove = if (lastMoveDirection == "controller_left") {
+                    // If continuing to press left, check if we've passed the initial delay
+                    val timeSinceStart = timeSinceMs(moveStartTime)
+                    if (timeSinceStart < initialMoveDelay) {
+                        // Still in initial delay, don't move again
+                        false
+                    } else {
+                        // Past initial delay, check repeat rate
+                        val timeSinceLastMove = timeSinceMs(moveLeftTime)
+                        timeSinceLastMove >= moveSpeed
+                    }
+                } else {
+                    // First press or direction change, always move
+                    lastMoveDirection = "controller_left"
+                    moveStartTime = currentTime
+                    true
+                }
+
+                if (shouldMove) {
+                    moveLeftTime = currentTime
+                    logger.debug("Controller: Moving left. Initial delay: $initialMoveDelay ms, Repeat rate: $moveSpeed ms")
+                    board.moveLeft()
+                }
+            } else if (lastMoveDirection == "controller_left") {
+                // Released left button
+                lastMoveDirection = null
             }
 
-            // Move right - Button 8 - no throttling
-            if (controller.isButtonPressed(8)) {
-                val timeSinceLastMove = timeSinceMs(moveRightTime)
-                moveRightTime = getCurrentMilliseconds()
-                logger.debug("Controller: Moving right. Time since last move: $timeSinceLastMove ms")
-                board.moveRight()
+            // Move right - Button 8 - with throttling
+            val isRightPressed = controller.isButtonPressed(8)
+            if (isRightPressed) {
+                val shouldMove = if (lastMoveDirection == "controller_right") {
+                    // If continuing to press right, check if we've passed the initial delay
+                    val timeSinceStart = timeSinceMs(moveStartTime)
+                    if (timeSinceStart < initialMoveDelay) {
+                        // Still in initial delay, don't move again
+                        false
+                    } else {
+                        // Past initial delay, check repeat rate
+                        val timeSinceLastMove = timeSinceMs(moveRightTime)
+                        timeSinceLastMove >= moveSpeed
+                    }
+                } else {
+                    // First press or direction change, always move
+                    lastMoveDirection = "controller_right"
+                    moveStartTime = currentTime
+                    true
+                }
+
+                if (shouldMove) {
+                    moveRightTime = currentTime
+                    logger.debug("Controller: Moving right. Initial delay: $initialMoveDelay ms, Repeat rate: $moveSpeed ms")
+                    board.moveRight()
+                }
+            } else if (lastMoveDirection == "controller_right") {
+                // Released right button
+                lastMoveDirection = null
             }
 
             // Move down (soft drop) - Button 6 (conflicts with START)
-            val wasDownPressed = isDownKeyPressed
             val isControllerDownPressed = controller.isButtonPressed(6)
 
             // Update isDownKeyPressed if controller down is pressed (keyboard OR controller)
@@ -271,12 +388,26 @@ class HextrisGame : Game, Logging {
                 isDownKeyPressed = true
             }
 
-            // Only move down manually if the button is pressed - no throttling
+            // Only move down manually if the button is pressed - with throttling
             if (isControllerDownPressed) {
-                val timeSinceLastMove = timeSinceMs(moveDownTime)
-                moveDownTime = getCurrentMilliseconds()
-                logger.debug("Controller: Moving down (soft drop). Time since last move: $timeSinceLastMove ms")
-                board.moveDown()
+                val shouldMove = if (lastMoveDirection == "controller_down") {
+                    // If continuing to press down, check repeat rate (no initial delay for down)
+                    val timeSinceLastMove = timeSinceMs(moveDownTime)
+                    timeSinceLastMove >= moveSpeed / 2 // Faster repeat for down
+                } else {
+                    // First press, always move
+                    lastMoveDirection = "controller_down"
+                    true
+                }
+
+                if (shouldMove) {
+                    moveDownTime = currentTime
+                    logger.debug("Controller: Moving down (soft drop). Repeat rate: ${moveSpeed / 2} ms")
+                    board.moveDown()
+                }
+            } else if (lastMoveDirection == "controller_down") {
+                // Released down button
+                lastMoveDirection = null
             }
 
             // Hard drop - Button 0 (A button)
@@ -341,19 +472,50 @@ class HextrisGame : Game, Logging {
     private fun drawBoard() {
         val boardX = boardPosition.x
         val boardY = boardPosition.y
+        val boardWidthPx = (board.width * Sprites.BLOCK_SIZE).toDouble()
+        val boardHeightPx = (board.height * Sprites.BLOCK_SIZE).toDouble()
+
         useSDLContext {
-            // Draw the board background
+            // Draw the board background with a semi-transparent effect like the web version
             useGeometryContext {
-                drawRectangle(
-                    boardX - (board.width * Sprites.BLOCK_SIZE) / 2.0 - 1,
+                // Draw outer border with glow effect
+                fillRectangle(
+                    boardX - boardWidthPx / 2.0 - 4,
+                    boardY - 4,
+                    boardWidthPx + 8,
+                    boardHeightPx + 8,
+                    Color(60u, 60u, 100u, 150u) // Bluish glow
+                )
+
+                // Draw inner background
+                fillRectangle(
+                    boardX - boardWidthPx / 2.0 - 1,
                     boardY - 1,
-                    (board.width * Sprites.BLOCK_SIZE).toDouble() + 2,
-                    (board.height * Sprites.BLOCK_SIZE).toDouble() + 2,
-                    Color.white
+                    boardWidthPx + 2,
+                    boardHeightPx + 2,
+                    Color(0u, 0u, 0u, 230u) // Nearly opaque black
                 )
             }
 
-            // Draw the grid
+            // Draw a subtle grid for empty cells
+            useGeometryContext {
+                for (y in 0 until board.height) {
+                    for (x in 0 until board.width) {
+                        if (board.getColorAt(x, y) == null) {
+                            // Draw grid cell
+                            drawRectangle(
+                                boardX - boardWidthPx / 2.0 + x * Sprites.BLOCK_SIZE + 1,
+                                boardY + y * Sprites.BLOCK_SIZE + 1,
+                                (Sprites.BLOCK_SIZE - 2).toDouble(),
+                                (Sprites.BLOCK_SIZE - 2).toDouble(),
+                                Color(30u, 30u, 30u, 100u) // Very dark gray, semi-transparent
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Draw filled cells
             for (y in 0 until board.height) {
                 for (x in 0 until board.width) {
                     val color = board.getColorAt(x, y)
@@ -385,19 +547,23 @@ class HextrisGame : Game, Logging {
                     }
                 }
             }
+
+            // Draw the board title
+            menuFont.drawText("HEXTRIS", boardX.toInt() - 80, boardY.toInt() - 40,
+                r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
         }
     }
 
     private fun drawNextPiece() {
         useSDLContext {
-            // Draw the next piece background
+            // Draw the next piece background with semi-transparent effect like the web version
             useGeometryContext {
-                drawRectangle(
-                    nextPiecePosition.x + 10,
+                fillRectangle(
+                    nextPiecePosition.x,
                     nextPiecePosition.y + 30,
-                    (6 * Sprites.BLOCK_SIZE).toDouble(),
                     (7 * Sprites.BLOCK_SIZE).toDouble(),
-                    Color.white
+                    (8 * Sprites.BLOCK_SIZE).toDouble(),
+                    Color(0u, 0u, 0u, 200u) // Semi-transparent black
                 )
             }
 
@@ -413,70 +579,216 @@ class HextrisGame : Game, Logging {
                 val width = maxX - minX + 1
                 val height = maxY - minY + 1
 
-                val offsetX = (nextPiecePosition.x + (6 * Sprites.BLOCK_SIZE - width * Sprites.BLOCK_SIZE) / 2).toInt()
-                val offsetY = (nextPiecePosition.y + (6 * Sprites.BLOCK_SIZE - height * Sprites.BLOCK_SIZE) / 2).toInt()
+                // Calculate position to center the piece in the display area
+                val offsetX = (nextPiecePosition.x + (7 * Sprites.BLOCK_SIZE - width * Sprites.BLOCK_SIZE) / 2).toInt()
+                val offsetY = (nextPiecePosition.y + 30 + (8 * Sprites.BLOCK_SIZE - height * Sprites.BLOCK_SIZE) / 2).toInt()
 
+                // Draw a subtle grid background for the piece
+                useGeometryContext {
+                    for (x in 0 until 7) {
+                        for (y in 0 until 8) {
+                            drawRectangle(
+                                nextPiecePosition.x + x * Sprites.BLOCK_SIZE + 1,
+                                nextPiecePosition.y + 30 + y * Sprites.BLOCK_SIZE + 1,
+                                (Sprites.BLOCK_SIZE - 2).toDouble(),
+                                (Sprites.BLOCK_SIZE - 2).toDouble(),
+                                Color(30u, 30u, 30u, 100u) // Very dark gray, semi-transparent
+                            )
+                        }
+                    }
+                }
+
+                // Draw each block of the next piece
                 for (block in blocks) {
                     drawBlock(
-                        offsetX + (block.x - minX) * Sprites.BLOCK_SIZE + 10,
-                        offsetY + (block.y - minY) * Sprites.BLOCK_SIZE + 40,
+                        offsetX + (block.x - minX) * Sprites.BLOCK_SIZE,
+                        offsetY + (block.y - minY) * Sprites.BLOCK_SIZE,
                         nextPiece.color
                     )
                 }
             }
 
-            // Draw the "NEXT" label
-            menuFont.drawText("NEXT", nextPiecePosition.x + 10, nextPiecePosition.y, r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
+            // Draw the "NEXT PIECE" label with a more prominent style
+            menuFont.drawText("NEXT PIECE", nextPiecePosition.x, nextPiecePosition.y,
+                r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
         }
     }
 
     private fun drawHistogram() {
         useSDLContext {
-            // Draw the histogram background
+            // Draw the histogram background with a semi-transparent effect like the web version
             useGeometryContext {
-                drawRectangle(
+                fillRectangle(
                     histogramPosition.x,
                     histogramPosition.y,
-                    (8 * Sprites.BLOCK_SIZE).toDouble(),
-                    (board.height * Sprites.BLOCK_SIZE).toDouble(),
-                    Color.white
+                    (14 * Sprites.BLOCK_SIZE).toDouble(),
+                    (16 * Sprites.BLOCK_SIZE).toDouble(),
+                    Color(0u, 0u, 0u, 200u) // Semi-transparent black
                 )
             }
 
-            // Draw the histogram
-            val theHistogram = board.getHistogram()
-            val colorMap = board.getHistogramColors() // Get colors for each column
+            // Get the piece counts
+            val pieceCounts = board.getPieceCounts()
 
-            for (x in 0 until board.width) {
-                val height = theHistogram[x]
-                for (y in 0 until height) {
-                    // Get the color for this column (or use a default if not available)
-                    val color = colorMap[x] ?: 0
+            // Calculate total pieces for percentage display
+            val totalPieces = pieceCounts.values.sum().coerceAtLeast(1) // Avoid division by zero
 
-                    // Draw a colored block for each cell in the histogram
-                    drawBlock(
-                        histogramPosition.x.toInt() + x * Sprites.BLOCK_SIZE,
-                        histogramPosition.y.toInt() + (board.height - y - 1) * Sprites.BLOCK_SIZE,
-                        color
+            // Define a smaller block size for the histogram pieces
+            val smallBlockSize = Sprites.BLOCK_SIZE / 2
+
+            // Calculate the layout - improved spacing and alignment
+            val pieceTypes = PieceType.values()
+            val piecesPerColumn = (pieceTypes.size + 1) / 2 // Ceiling division
+            val columnWidth = 6 * smallBlockSize
+            val rowHeight = 5 * smallBlockSize // Increased row height for better spacing
+            val padding = smallBlockSize
+            val horizontalGap = 2 * smallBlockSize // Gap between columns
+
+            // Draw the pieces and their counts in two columns
+            for (i in pieceTypes.indices) {
+                val pieceType = pieceTypes[i]
+                val count = pieceCounts[pieceType] ?: 0
+                val percentage = if (totalPieces > 0) (count * 100.0 / totalPieces).toInt() else 0
+
+                // Calculate position (left or right column)
+                val column = i / piecesPerColumn
+                val row = i % piecesPerColumn
+
+                val x = histogramPosition.x.toInt() + column * (columnWidth + horizontalGap)
+                val y = histogramPosition.y.toInt() + row * rowHeight + padding * 2
+
+                // Draw a background for this piece with rounded corners like the web version
+                useGeometryContext {
+                    fillRectangle(
+                        x.toDouble(),
+                        y.toDouble(),
+                        columnWidth.toDouble(),
+                        (rowHeight - padding).toDouble(),
+                        Color(50u, 50u, 50u, 220u) // Darker, semi-transparent gray
                     )
                 }
+
+                // Draw the piece
+                drawPieceSmall(x + padding, y + padding, pieceType)
+
+                // Draw the count and percentage with a clearer format
+                scoreFont.drawText("$count", x + columnWidth - padding * 4, y + padding,
+                    r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
+
+                // Draw percentage below the count
+                scoreFont.drawText("$percentage%", x + columnWidth - padding * 5, y + padding * 3,
+                    r = 0xCCu, g = 0xCCu, b = 0xCCu, a = 0xFFu)
+
+                // Draw the piece type name
+                val typeName = pieceType.name
+                scoreFont.drawText(typeName, x + padding, y + rowHeight - padding * 2,
+                    r = 0xAAu, g = 0xAAu, b = 0xAAu, a = 0xFFu)
             }
 
-            // Draw the "HISTOGRAM" label
-            menuFont.drawText("HISTOGRAM", histogramPosition.x.toInt(), histogramPosition.y.toInt() - 40, r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
+            // Draw the "HISTOGRAM" label with a more prominent style
+            menuFont.drawText("PIECE STATS", histogramPosition.x.toInt(), histogramPosition.y.toInt() - 40,
+                r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
+
+            // Draw total pieces count
+            scoreFont.drawText("TOTAL: $totalPieces", histogramPosition.x.toInt(),
+                histogramPosition.y.toInt() + (16 * Sprites.BLOCK_SIZE) + 10,
+                r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
+        }
+    }
+
+    /**
+     * Draws a piece at a specific position with a smaller size.
+     */
+    private fun drawPieceSmall(x: Int, y: Int, pieceType: PieceType) {
+        // Create a temporary piece to get the blocks
+        val tempPiece = Piece(pieceType, pieceType.ordinal % Sprites.BLOCK_COLORS.size)
+        val blocks = tempPiece.getBlocks()
+
+        // Calculate the bounds of the piece
+        val minX = blocks.minOf { it.x }
+        val maxX = blocks.maxOf { it.x }
+        val minY = blocks.minOf { it.y }
+        val maxY = blocks.maxOf { it.y }
+
+        // Calculate the size of the piece
+        val width = maxX - minX + 1
+        val height = maxY - minY + 1
+
+        // Define a smaller block size
+        val smallBlockSize = Sprites.BLOCK_SIZE / 2
+
+        // Calculate the offset to center the piece
+        val offsetX = x + ((3 - width) * smallBlockSize) / 2
+        val offsetY = y + ((3 - height) * smallBlockSize) / 2
+
+        // Get the color for this piece type
+        val color = pieceType.ordinal % Sprites.BLOCK_COLORS.size
+
+        // Draw each block of the piece
+        for (block in blocks) {
+            val blockX = offsetX + (block.x - minX) * smallBlockSize
+            val blockY = offsetY + (block.y - minY) * smallBlockSize
+
+            // Draw a smaller block (using a rectangle for simplicity)
+            useGeometryContext {
+                // Use predefined colors based on the piece type
+                val blockColor = when (color) {
+                    0 -> Color.red      // Red
+                    1 -> Color.orange   // Orange
+                    2 -> Color.yellow   // Yellow
+                    3 -> Color.green    // Green
+                    4 -> Color.blue     // Blue
+                    5 -> Color.purple   // Purple
+                    else -> Color.white // Default
+                }
+
+                fillRectangle(
+                    blockX.toDouble(),
+                    blockY.toDouble(),
+                    smallBlockSize.toDouble(),
+                    smallBlockSize.toDouble(),
+                    blockColor
+                )
+            }
         }
     }
 
     private fun drawStats() {
         useSDLContext {
-            // Draw the score
-            scoreFont.drawText("SCORE ${board.score}", nextPiecePosition.x + 10, nextPiecePosition.y + 200, r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
+            // Draw stats with a more polished layout matching the web version
+
+            // Draw a semi-transparent background for stats
+            useGeometryContext {
+                fillRectangle(
+                    nextPiecePosition.x,
+                    nextPiecePosition.y + 250,
+                    200.0,
+                    120.0,
+                    Color(0u, 0u, 0u, 200u) // Semi-transparent black
+                )
+            }
+
+            // Draw the stats title
+            menuFont.drawText("STATISTICS", nextPiecePosition.x + 10, nextPiecePosition.y + 220,
+                r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
+
+            // Draw the score with larger font and highlight
+            scoreFont.drawText("SCORE", nextPiecePosition.x + 10, nextPiecePosition.y + 270,
+                r = 0xCCu, g = 0xCCu, b = 0xFFu, a = 0xFFu)
+            scoreFont.drawText("${board.score}", nextPiecePosition.x + 120, nextPiecePosition.y + 270,
+                r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
 
             // Draw the level
-            scoreFont.drawText("LEVEL ${board.level}", nextPiecePosition.x + 10, nextPiecePosition.y + 230, r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
+            scoreFont.drawText("LEVEL", nextPiecePosition.x + 10, nextPiecePosition.y + 300,
+                r = 0xCCu, g = 0xFFu, b = 0xCCu, a = 0xFFu)
+            scoreFont.drawText("${board.level}", nextPiecePosition.x + 120, nextPiecePosition.y + 300,
+                r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
 
             // Draw the lines
-            scoreFont.drawText("LINES ${board.lines}", nextPiecePosition.x + 10, nextPiecePosition.y + 260, r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
+            scoreFont.drawText("LINES", nextPiecePosition.x + 10, nextPiecePosition.y + 330,
+                r = 0xFFu, g = 0xCCu, b = 0xCCu, a = 0xFFu)
+            scoreFont.drawText("${board.lines}", nextPiecePosition.x + 120, nextPiecePosition.y + 330,
+                r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
         }
     }
 
