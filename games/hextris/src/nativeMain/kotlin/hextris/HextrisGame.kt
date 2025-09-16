@@ -687,7 +687,7 @@ class HextrisGame : Game, Logging {
      */
     private fun drawPieceSmall(x: Int, y: Int, pieceType: PieceType) {
         // Create a temporary piece to get the blocks
-        val tempPiece = Piece(pieceType, pieceType.ordinal % Sprites.BLOCK_COLORS.size)
+        val tempPiece = Piece(pieceType, 0) // Color doesn't matter for getting blocks
         val blocks = tempPiece.getBlocks()
 
         // Calculate the bounds of the piece
@@ -707,25 +707,31 @@ class HextrisGame : Game, Logging {
         val offsetX = x + ((3 - width) * smallBlockSize) / 2
         val offsetY = y + ((3 - height) * smallBlockSize) / 2
 
-        // Get the color for this piece type
-        val color = pieceType.ordinal % Sprites.BLOCK_COLORS.size
+        // Get the sprite position for this piece type
+        val spritePos = Sprites.PIECE_SPRITES[pieceType] ?: Sprites.PIECE_SPRITES[PieceType.O]!!
 
-        // Draw each block of the piece using colored rectangles that match the sprite colors
+        // Map sprite positions to colors
+        val blockColor = when (spritePos) {
+            0 to 0 -> Color.red       // Square (O)
+            1 to 0 -> Color.orange    // L
+            2 to 0 -> Color.yellow    // J
+            3 to 0 -> Color.green     // I
+            4 to 0 -> Color.blue      // S
+            5 to 0 -> Color.purple    // Z
+            0 to 1 -> Color.cyan      // T
+            else -> Color(
+                (spritePos.first * 40 + 50).toUByte(),
+                (spritePos.second * 40 + 50).toUByte(),
+                ((spritePos.first + spritePos.second) * 30 + 50).toUByte(),
+                255u
+            )
+        }
+
+        // Draw each block of the piece using colored rectangles
         useGeometryContext {
             for (block in blocks) {
                 val blockX = offsetX + (block.x - minX) * smallBlockSize
                 val blockY = offsetY + (block.y - minY) * smallBlockSize
-
-                // Use predefined colors based on the piece type
-                val blockColor = when (color) {
-                    0 -> Color.red      // Red
-                    1 -> Color.orange   // Orange
-                    2 -> Color.yellow   // Yellow
-                    3 -> Color.green    // Green
-                    4 -> Color.blue     // Blue
-                    5 -> Color.purple   // Purple
-                    else -> Color.white // Default
-                }
 
                 // Draw a rectangle with the appropriate color
                 fillRectangle(
@@ -785,7 +791,13 @@ class HextrisGame : Game, Logging {
 
     private fun drawBlock(x: Int, y: Int, color: Int) {
         useSDLContext {
-            val sprite = blockSprites.getTile(Sprites.BLOCK_COLORS[color].first, Sprites.BLOCK_COLORS[color].second)
+            // Calculate the sprite position from the color index
+            // color is now calculated as x + y * 6 in createRandomPiece
+            val spriteX = color % 6
+            val spriteY = color / 6
+
+            // Get the sprite at the calculated position
+            val sprite = blockSprites.getTile(spriteX, spriteY)
             sprite.draw(x.toDouble(), y.toDouble())
         }
     }

@@ -71,12 +71,14 @@ class Board(val width: Int = 15, val height: Int = 25) {
 
     /**
      * Creates a random piece.
-     * Each piece type has a fixed color for consistency.
+     * Each piece type has a fixed sprite based on the PIECE_SPRITES map.
      */
     private fun createRandomPiece(): Piece {
         val type = PieceType.random()
-        // Assign color based on piece type (consistent color per piece type)
-        val color = type.ordinal % Sprites.BLOCK_COLORS.size
+        // Get the sprite position for this piece type
+        val spritePos = Sprites.PIECE_SPRITES[type] ?: Sprites.PIECE_SPRITES[PieceType.O]!!
+        // Use the sprite position as the color index
+        val color = spritePos.first + spritePos.second * 6 // 6 sprites per row
         return Piece(type, color)
     }
 
