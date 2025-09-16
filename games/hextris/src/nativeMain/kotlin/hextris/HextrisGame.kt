@@ -37,14 +37,14 @@ class HextrisGame : Game, Logging {
     private var moveRightTime = 0L
     private var moveDownTime = 0L
     private var moveSpeed = 60L // milliseconds - matches web version's repeat rate
-    private var initialMoveDelay = 110L // Short initial delay before repeat starts - matches web version
+    private var initialMoveDelay = 50L // Short initial delay before repeat starts - matches web version
 
     // Movement state tracking like the web version
     private var lastMoveDirection: String? = null
     private var moveStartTime = 0L
 
     private var rotateTime = 0L
-    private var rotateSpeed = 150L // milliseconds - matches web version
+    private var rotateSpeed = 100L // milliseconds - matches web version
     private var timeSinceOptionChangeMs = 0L
     private val inputDelayMs = 20L // reduced from 50ms for more responsive input
 
@@ -53,10 +53,10 @@ class HextrisGame : Game, Logging {
     private lateinit var menuFont: Font
     private lateinit var scoreFont: Font
 
-    // Layout - adjusted to match web version's spacing and proportions
-    private val boardPosition = Vec2(400.0, 50.0) // Centered and with top margin
-    private val nextPiecePosition = Vec2(100.0, 50.0) // Left side with top margin
-    private val histogramPosition = Vec2(650.0, 50.0) // Right side with top margin
+    // Layout - adjusted to avoid overlap between board and left column
+    private val boardPosition = Vec2(380.0, 5.0) // Moved right to avoid overlap with left column
+    private val nextPiecePosition = Vec2(10.0, 5.0) // Top left position
+    private val histogramPosition = Vec2(580.0, 5.0) // Far right position
 
     init {
         // Set log level to DEBUG to see debug messages
@@ -548,9 +548,7 @@ class HextrisGame : Game, Logging {
                 }
             }
 
-            // Draw the board title
-            menuFont.drawText("HEXTRIS", boardX.toInt() - 80, boardY.toInt() - 40,
-                r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
+            // Board title removed as per requirements
         }
     }
 
@@ -560,9 +558,9 @@ class HextrisGame : Game, Logging {
             useGeometryContext {
                 fillRectangle(
                     nextPiecePosition.x,
-                    nextPiecePosition.y + 30,
-                    (7 * Sprites.BLOCK_SIZE).toDouble(),
-                    (8 * Sprites.BLOCK_SIZE).toDouble(),
+                    nextPiecePosition.y + 35,
+                    (6 * Sprites.BLOCK_SIZE).toDouble(),
+                    (6 * Sprites.BLOCK_SIZE).toDouble(),
                     Color(0u, 0u, 0u, 200u) // Semi-transparent black
                 )
             }
@@ -579,17 +577,22 @@ class HextrisGame : Game, Logging {
                 val width = maxX - minX + 1
                 val height = maxY - minY + 1
 
-                // Calculate position to center the piece in the display area
-                val offsetX = (nextPiecePosition.x + (7 * Sprites.BLOCK_SIZE - width * Sprites.BLOCK_SIZE) / 2).toInt()
-                val offsetY = (nextPiecePosition.y + 30 + (8 * Sprites.BLOCK_SIZE - height * Sprites.BLOCK_SIZE) / 2).toInt()
+                // Calculate position to center the piece in the display area and ensure grid alignment
+                // First, calculate the grid cell position that would center the piece
+                val gridCellX = (6 - width) / 2
+                val gridCellY = (6 - height) / 2
+
+                // Convert grid cell position to pixel coordinates, ensuring alignment with the grid
+                val offsetX = (nextPiecePosition.x + gridCellX * Sprites.BLOCK_SIZE).toInt()
+                val offsetY = (nextPiecePosition.y + 35 + gridCellY * Sprites.BLOCK_SIZE).toInt()
 
                 // Draw a subtle grid background for the piece
                 useGeometryContext {
-                    for (x in 0 until 7) {
-                        for (y in 0 until 8) {
+                    for (x in 0 until 6) {
+                        for (y in 0 until 6) {
                             drawRectangle(
                                 nextPiecePosition.x + x * Sprites.BLOCK_SIZE + 1,
-                                nextPiecePosition.y + 30 + y * Sprites.BLOCK_SIZE + 1,
+                                nextPiecePosition.y + 35 + y * Sprites.BLOCK_SIZE + 1,
                                 (Sprites.BLOCK_SIZE - 2).toDouble(),
                                 (Sprites.BLOCK_SIZE - 2).toDouble(),
                                 Color(30u, 30u, 30u, 100u) // Very dark gray, semi-transparent
@@ -609,7 +612,7 @@ class HextrisGame : Game, Logging {
             }
 
             // Draw the "NEXT PIECE" label with a more prominent style
-            menuFont.drawText("NEXT PIECE", nextPiecePosition.x, nextPiecePosition.y,
+            menuFont.drawText("NEXT", nextPiecePosition.x, nextPiecePosition.y,
                 r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
         }
     }
@@ -627,11 +630,17 @@ class HextrisGame : Game, Logging {
                 )
             }
 
-            // Get the piece counts
-            val pieceCounts = board.getPieceCounts()
+            // Get the piece counts, ensuring all piece types are included
+            val pieceCounts = mutableMapOf<PieceType, Int>()
 
-            // Calculate total pieces for percentage display
-            val totalPieces = pieceCounts.values.sum().coerceAtLeast(1) // Avoid division by zero
+            // Initialize all piece types with 0 count to ensure all are displayed
+            PieceType.values().forEach { pieceCounts[it] = 0 }
+
+            // Update with actual counts
+            pieceCounts.putAll(board.getPieceCounts())
+
+            // Calculate total pieces
+            val totalPieces = pieceCounts.values.sum()
 
             // Define a smaller block size for the histogram pieces
             val smallBlockSize = Sprites.BLOCK_SIZE / 2
@@ -648,7 +657,6 @@ class HextrisGame : Game, Logging {
             for (i in pieceTypes.indices) {
                 val pieceType = pieceTypes[i]
                 val count = pieceCounts[pieceType] ?: 0
-                val percentage = if (totalPieces > 0) (count * 100.0 / totalPieces).toInt() else 0
 
                 // Calculate position (left or right column)
                 val column = i / piecesPerColumn
@@ -657,47 +665,25 @@ class HextrisGame : Game, Logging {
                 val x = histogramPosition.x.toInt() + column * (columnWidth + horizontalGap)
                 val y = histogramPosition.y.toInt() + row * rowHeight + padding * 2
 
-                // Draw a background for this piece with rounded corners like the web version
-                useGeometryContext {
-                    fillRectangle(
-                        x.toDouble(),
-                        y.toDouble(),
-                        columnWidth.toDouble(),
-                        (rowHeight - padding).toDouble(),
-                        Color(50u, 50u, 50u, 220u) // Darker, semi-transparent gray
-                    )
-                }
-
                 // Draw the piece
                 drawPieceSmall(x + padding, y + padding, pieceType)
 
-                // Draw the count and percentage with a clearer format
-                scoreFont.drawText("$count", x + columnWidth - padding * 4, y + padding,
+                // Draw the count with "x<count>" format to the RIGHT of the piece
+                scoreFont.drawText("x$count", x + padding * 5, y + padding,
                     r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
-
-                // Draw percentage below the count
-                scoreFont.drawText("$percentage%", x + columnWidth - padding * 5, y + padding * 3,
-                    r = 0xCCu, g = 0xCCu, b = 0xCCu, a = 0xFFu)
-
-                // Draw the piece type name
-                val typeName = pieceType.name
-                scoreFont.drawText(typeName, x + padding, y + rowHeight - padding * 2,
-                    r = 0xAAu, g = 0xAAu, b = 0xAAu, a = 0xFFu)
             }
 
             // Draw the "HISTOGRAM" label with a more prominent style
             menuFont.drawText("PIECE STATS", histogramPosition.x.toInt(), histogramPosition.y.toInt() - 40,
                 r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
 
-            // Draw total pieces count
-            scoreFont.drawText("TOTAL: $totalPieces", histogramPosition.x.toInt(),
-                histogramPosition.y.toInt() + (16 * Sprites.BLOCK_SIZE) + 10,
-                r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
+            // Total pieces count removed from histogram as per requirements
         }
     }
 
     /**
      * Draws a piece at a specific position with a smaller size.
+     * Uses colored rectangles that match the sprite colors.
      */
     private fun drawPieceSmall(x: Int, y: Int, pieceType: PieceType) {
         // Create a temporary piece to get the blocks
@@ -724,13 +710,12 @@ class HextrisGame : Game, Logging {
         // Get the color for this piece type
         val color = pieceType.ordinal % Sprites.BLOCK_COLORS.size
 
-        // Draw each block of the piece
-        for (block in blocks) {
-            val blockX = offsetX + (block.x - minX) * smallBlockSize
-            val blockY = offsetY + (block.y - minY) * smallBlockSize
+        // Draw each block of the piece using colored rectangles that match the sprite colors
+        useGeometryContext {
+            for (block in blocks) {
+                val blockX = offsetX + (block.x - minX) * smallBlockSize
+                val blockY = offsetY + (block.y - minY) * smallBlockSize
 
-            // Draw a smaller block (using a rectangle for simplicity)
-            useGeometryContext {
                 // Use predefined colors based on the piece type
                 val blockColor = when (color) {
                     0 -> Color.red      // Red
@@ -742,6 +727,7 @@ class HextrisGame : Game, Logging {
                     else -> Color.white // Default
                 }
 
+                // Draw a rectangle with the appropriate color
                 fillRectangle(
                     blockX.toDouble(),
                     blockY.toDouble(),
@@ -762,32 +748,37 @@ class HextrisGame : Game, Logging {
                 fillRectangle(
                     nextPiecePosition.x,
                     nextPiecePosition.y + 250,
-                    200.0,
+                    180.0,
                     120.0,
                     Color(0u, 0u, 0u, 200u) // Semi-transparent black
                 )
             }
 
-            // Draw the stats title
-            menuFont.drawText("STATISTICS", nextPiecePosition.x + 10, nextPiecePosition.y + 220,
-                r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
+            // Stats title removed as per requirements
 
             // Draw the score with larger font and highlight
-            scoreFont.drawText("SCORE", nextPiecePosition.x + 10, nextPiecePosition.y + 270,
+            scoreFont.drawText("SCORE", nextPiecePosition.x, nextPiecePosition.y + 180,
                 r = 0xCCu, g = 0xCCu, b = 0xFFu, a = 0xFFu)
-            scoreFont.drawText("${board.score}", nextPiecePosition.x + 120, nextPiecePosition.y + 270,
+            scoreFont.drawText("${board.score}", nextPiecePosition.x + 120, nextPiecePosition.y + 180,
                 r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
 
             // Draw the level
-            scoreFont.drawText("LEVEL", nextPiecePosition.x + 10, nextPiecePosition.y + 300,
+            scoreFont.drawText("LEVEL", nextPiecePosition.x, nextPiecePosition.y + 205,
                 r = 0xCCu, g = 0xFFu, b = 0xCCu, a = 0xFFu)
-            scoreFont.drawText("${board.level}", nextPiecePosition.x + 120, nextPiecePosition.y + 300,
+            scoreFont.drawText("${board.level}", nextPiecePosition.x + 120, nextPiecePosition.y + 205,
                 r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
 
             // Draw the lines
-            scoreFont.drawText("LINES", nextPiecePosition.x + 10, nextPiecePosition.y + 330,
+            scoreFont.drawText("LINES", nextPiecePosition.x, nextPiecePosition.y + 230,
                 r = 0xFFu, g = 0xCCu, b = 0xCCu, a = 0xFFu)
-            scoreFont.drawText("${board.lines}", nextPiecePosition.x + 120, nextPiecePosition.y + 330,
+            scoreFont.drawText("${board.lines}", nextPiecePosition.x + 120, nextPiecePosition.y + 230,
+                r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
+
+            // Draw the pieces count
+            val totalPieces = board.getPieceCounts().values.sum()
+            scoreFont.drawText("PIECES", nextPiecePosition.x, nextPiecePosition.y + 255,
+                r = 0xFFu, g = 0xCCu, b = 0xFFu, a = 0xFFu)
+            scoreFont.drawText("$totalPieces", nextPiecePosition.x + 120, nextPiecePosition.y + 255,
                 r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
         }
     }

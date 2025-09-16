@@ -8,7 +8,7 @@ fun main() {
     createGameContext(
         title = "Kengine - Hextris",
         width = 800,
-        height = 600,
+        height = 610,
         logLevel = Logger.Level.DEBUG
     ) {
         registerContext(SoundContext.get())
