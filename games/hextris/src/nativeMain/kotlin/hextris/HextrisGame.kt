@@ -37,16 +37,23 @@ class HextrisGame : Game, Logging {
     private var moveRightTime = 0L
     private var moveDownTime = 0L
     private var moveSpeed = 60L // milliseconds - matches web version's repeat rate
-    private var initialMoveDelay = 50L // Short initial delay before repeat starts - matches web version
+    private var initialMoveDelay = 110L // Short initial delay before repeat starts - matches web version
 
     // Movement state tracking like the web version
     private var lastMoveDirection: String? = null
     private var moveStartTime = 0L
 
     private var rotateTime = 0L
-    private var rotateSpeed = 100L // milliseconds - matches web version
+    private var rotateSpeed = 150L // milliseconds - matches web version
     private var timeSinceOptionChangeMs = 0L
     private val inputDelayMs = 20L // reduced from 50ms for more responsive input
+
+    // Input responsiveness tracking
+    private var inputLogCounter = 0
+    private val inputLogInterval = 300 // Log every 300 frames (about 5 seconds at 60 FPS)
+    private var totalInputLatency = 0L
+    private var inputLatencyCount = 0
+    private var maxInputLatency = 0L
 
     // UI
     private lateinit var blockSprites: SpriteSheet
@@ -81,6 +88,31 @@ class HextrisGame : Game, Logging {
     }
 
     override fun update() {
+        // Increment input log counter
+        inputLogCounter++
+
+        // Log input responsiveness metrics periodically
+        if (inputLogCounter >= inputLogInterval) {
+            inputLogCounter = 0
+
+            if (inputLatencyCount > 0) {
+                val avgLatency = totalInputLatency / inputLatencyCount
+                logger.info {
+                    "Input Responsiveness Metrics - " +
+                    "Average Latency: ${avgLatency}ms, " +
+                    "Max Latency: ${maxInputLatency}ms, " +
+                    "Samples: $inputLatencyCount"
+                }
+
+                // Reset metrics for next period
+                totalInputLatency = 0L
+                inputLatencyCount = 0
+                maxInputLatency = 0L
+            } else {
+                logger.info { "Input Responsiveness Metrics - No input events recorded in this period" }
+            }
+        }
+
         when (state) {
             State.INIT -> init()
             State.PLAY -> play()
@@ -203,9 +235,24 @@ class HextrisGame : Game, Logging {
                 }
 
                 if (shouldMove) {
+                    // Record start time for latency measurement
+                    val actionStartTime = getCurrentMilliseconds()
+
                     moveLeftTime = currentTime
                     logger.debug("Moving left. Initial delay: $initialMoveDelay ms, Repeat rate: $moveSpeed ms")
                     board.moveLeft()
+
+                    // Measure and record input latency
+                    val latency = getCurrentMilliseconds() - actionStartTime
+                    totalInputLatency += latency
+                    inputLatencyCount++
+                    if (latency > maxInputLatency) {
+                        maxInputLatency = latency
+                    }
+
+                    if (latency > 5) { // Only log unusually high latencies
+                        logger.debug("Input latency for left movement: ${latency}ms")
+                    }
                 }
             } else if (lastMoveDirection == "left") {
                 // Released left key
@@ -234,9 +281,24 @@ class HextrisGame : Game, Logging {
                 }
 
                 if (shouldMove) {
+                    // Record start time for latency measurement
+                    val actionStartTime = getCurrentMilliseconds()
+
                     moveRightTime = currentTime
                     logger.debug("Moving right. Initial delay: $initialMoveDelay ms, Repeat rate: $moveSpeed ms")
                     board.moveRight()
+
+                    // Measure and record input latency
+                    val latency = getCurrentMilliseconds() - actionStartTime
+                    totalInputLatency += latency
+                    inputLatencyCount++
+                    if (latency > maxInputLatency) {
+                        maxInputLatency = latency
+                    }
+
+                    if (latency > 5) { // Only log unusually high latencies
+                        logger.debug("Input latency for right movement: ${latency}ms")
+                    }
                 }
             } else if (lastMoveDirection == "right") {
                 // Released right key
@@ -248,26 +310,18 @@ class HextrisGame : Game, Logging {
             val isDownPressed = keyboard.isDownPressed() || keyboard.isSPressed()
             isDownKeyPressed = isDownPressed
 
-            // Only move down manually if the key is pressed - with throttling
+            // For down movement, we only set isDownKeyPressed = true
+            // The actual dropping happens in the play() method with a faster drop speed
             if (isDownPressed) {
-                val shouldMove = if (lastMoveDirection == "down") {
-                    // If continuing to press down, check repeat rate (no initial delay for down)
-                    val timeSinceLastMove = timeSinceMs(moveDownTime)
-                    timeSinceLastMove >= moveSpeed / 2 // Faster repeat for down
-                } else {
-                    // First press, always move
+                // Set lastMoveDirection to "down" to track that down is being pressed
+                if (lastMoveDirection != "down") {
                     lastMoveDirection = "down"
-                    true
-                }
-
-                if (shouldMove) {
-                    moveDownTime = currentTime
-                    logger.debug("Moving down (soft drop). Repeat rate: ${moveSpeed / 2} ms")
-                    board.moveDown()
+                    logger.debug("Down key pressed. Using fast drop speed.")
                 }
             } else if (lastMoveDirection == "down") {
                 // Released down key
                 lastMoveDirection = null
+                logger.debug("Down key released. Restoring normal drop speed.")
             }
 
             // Move up (W key) - not used for gameplay but included for WASD completeness
@@ -410,26 +464,18 @@ class HextrisGame : Game, Logging {
                 isDownKeyPressed = true
             }
 
-            // Only move down manually if the button is pressed - with throttling
+            // For down movement, we only set isDownKeyPressed = true
+            // The actual dropping happens in the play() method with a faster drop speed
             if (isControllerDownPressed) {
-                val shouldMove = if (lastMoveDirection == "controller_down") {
-                    // If continuing to press down, check repeat rate (no initial delay for down)
-                    val timeSinceLastMove = timeSinceMs(moveDownTime)
-                    timeSinceLastMove >= moveSpeed / 2 // Faster repeat for down
-                } else {
-                    // First press, always move
+                // Set lastMoveDirection to "controller_down" to track that down is being pressed
+                if (lastMoveDirection != "controller_down") {
                     lastMoveDirection = "controller_down"
-                    true
-                }
-
-                if (shouldMove) {
-                    moveDownTime = currentTime
-                    logger.debug("Controller: Moving down (soft drop). Repeat rate: ${moveSpeed / 2} ms")
-                    board.moveDown()
+                    logger.debug("Controller: Down button pressed. Using fast drop speed.")
                 }
             } else if (lastMoveDirection == "controller_down") {
                 // Released down button
                 lastMoveDirection = null
+                logger.debug("Controller: Down button released. Restoring normal drop speed.")
             }
 
             // Hard drop - Button 0 (A button)
@@ -780,26 +826,26 @@ class HextrisGame : Game, Logging {
             // Draw the score with larger font and highlight
             scoreFont.drawText("SCORE", nextPiecePosition.x, nextPiecePosition.y + 180,
                 r = 0xCCu, g = 0xCCu, b = 0xFFu, a = 0xFFu)
-            scoreFont.drawText("${board.score}", nextPiecePosition.x + 120, nextPiecePosition.y + 180,
+            scoreFont.drawText("${board.score}", nextPiecePosition.x, nextPiecePosition.y + 205,
                 r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
 
             // Draw the level
-            scoreFont.drawText("LEVEL", nextPiecePosition.x, nextPiecePosition.y + 205,
+            scoreFont.drawText("LEVEL", nextPiecePosition.x, nextPiecePosition.y + 230,
                 r = 0xCCu, g = 0xFFu, b = 0xCCu, a = 0xFFu)
-            scoreFont.drawText("${board.level}", nextPiecePosition.x + 120, nextPiecePosition.y + 205,
+            scoreFont.drawText("${board.level}", nextPiecePosition.x, nextPiecePosition.y + 255,
                 r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
 
             // Draw the lines
-            scoreFont.drawText("LINES", nextPiecePosition.x, nextPiecePosition.y + 230,
+            scoreFont.drawText("LINES", nextPiecePosition.x, nextPiecePosition.y + 280,
                 r = 0xFFu, g = 0xCCu, b = 0xCCu, a = 0xFFu)
-            scoreFont.drawText("${board.lines}", nextPiecePosition.x + 120, nextPiecePosition.y + 230,
+            scoreFont.drawText("${board.lines}", nextPiecePosition.x, nextPiecePosition.y + 305,
                 r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
 
             // Draw the pieces count
             val totalPieces = board.getPieceCounts().values.sum()
-            scoreFont.drawText("PIECES", nextPiecePosition.x, nextPiecePosition.y + 255,
+            scoreFont.drawText("PIECES", nextPiecePosition.x, nextPiecePosition.y + 330,
                 r = 0xFFu, g = 0xCCu, b = 0xFFu, a = 0xFFu)
-            scoreFont.drawText("$totalPieces", nextPiecePosition.x + 120, nextPiecePosition.y + 255,
+            scoreFont.drawText("$totalPieces", nextPiecePosition.x, nextPiecePosition.y + 355,
                 r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
         }
     }
@@ -828,6 +874,15 @@ class HextrisGame : Game, Logging {
         lastMoveDirection = null
         moveStartTime = getCurrentMilliseconds()
         timeSinceOptionChangeMs = getCurrentMilliseconds()
+
+        // Reset input tracking variables
+        inputLogCounter = 0
+        totalInputLatency = 0L
+        inputLatencyCount = 0
+        maxInputLatency = 0L
+
+        // Log reset event
+        logger.info("Game reset. Input tracking variables initialized.")
 
         // Adjust drop speed based on level
         updateDropSpeed()

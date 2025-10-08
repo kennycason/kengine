@@ -35,6 +35,8 @@ data class ClockContext private constructor(
 
     private var elapsedTimeSec = 0.0
     private var frameCount = 0
+    private var logCounter = 0
+    private var logInterval = 60 // Log every 60 frames (about once per second at 60 FPS)
 
     // moving average FPS
     private var avgFps = 60.0 // initial approximation
@@ -65,6 +67,7 @@ data class ClockContext private constructor(
         // calculate FPS
         frameCount++
         elapsedTimeSec += deltaTimeSec
+        logCounter++
 
         if (elapsedTimeSec >= 1.0) {
             val currentFps = frameCount / elapsedTimeSec
@@ -80,6 +83,25 @@ data class ClockContext private constructor(
             frameCount = 0
             elapsedTimeSec = 0.0
         }
+
+        // Log detailed metrics periodically
+        if (logCounter >= logInterval) {
+            logCounter = 0
+
+            // Calculate frame time statistics
+            val frameTimeMs = getCurrentMilliseconds() - lastFrameTimeMs
+
+            if (logger.isInfoEnabled()) {
+                logger.info {
+                    "Performance Metrics - " +
+                    "FPS: ${fps.toInt()}, " +
+                    "Frame Time: ${frameTimeMs}ms, " +
+                    "Delta Time: ${deltaTimeMs}ms, " +
+                    "Total Time: ${totalTimeMs}ms, " +
+                    "Target Frame Time: ${targetFrameTime}ms"
+                }
+            }
+        }
     }
 
     /**
@@ -88,8 +110,12 @@ data class ClockContext private constructor(
     fun calculateFrameDelay(): Double {
         if (targetFrameTime <= 0.0) return 0.0 // Uncapped FPS
 
-        val frameTimeMs = getCurrentMilliseconds() - lastFrameTimeMs
+        val currentTimeMs = getCurrentMilliseconds()
+        val frameTimeMs = currentTimeMs - lastFrameTimeMs
         val adjustedDelay = targetFrameTime - frameTimeMs + frameTimeErrorMs
+
+        // Update lastFrameTimeMs for next calculation
+        lastFrameTimeMs = currentTimeMs
 
         // sub-millisecond drift correction
         frameTimeErrorMs = adjustedDelay % 1.0

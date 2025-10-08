@@ -158,18 +158,18 @@ enum class PieceType(val rotations: List<List<Pair<Int, Int>>>) {
 
     // 16. 5 line piece
     LINE_5(listOf(
-        listOf(Pair(-2, 0), Pair(-1, 0), Pair(0, 0), Pair(1, 0), Pair(2, 0)),
-        listOf(Pair(0, -2), Pair(0, -1), Pair(0, 0), Pair(0, 1), Pair(0, 2)),
-        listOf(Pair(-2, 0), Pair(-1, 0), Pair(0, 0), Pair(1, 0), Pair(2, 0)),
-        listOf(Pair(0, -2), Pair(0, -1), Pair(0, 0), Pair(0, 1), Pair(0, 2))
+        listOf(Pair(-2, 0), Pair(-1, 0), Pair(0, 0), Pair(1, 0), Pair(2, 0)),  // Horizontal
+        listOf(Pair(0, -2), Pair(0, -1), Pair(0, 0), Pair(0, 1), Pair(0, 2)),  // Vertical
+        listOf(Pair(-2, 0), Pair(-1, 0), Pair(0, 0), Pair(1, 0), Pair(2, 0)),  // Horizontal
+        listOf(Pair(0, -2), Pair(0, -1), Pair(0, 0), Pair(0, 1), Pair(0, 2))   // Vertical
     )),
 
     // 17. 6 line piece
     LINE_6(listOf(
-        listOf(Pair(-2, 0), Pair(-1, 0), Pair(0, 0), Pair(1, 0), Pair(2, 0), Pair(3, 0)),
-        listOf(Pair(0, -2), Pair(0, -1), Pair(0, 0), Pair(0, 1), Pair(0, 2), Pair(0, 3)),
-        listOf(Pair(-2, 0), Pair(-1, 0), Pair(0, 0), Pair(1, 0), Pair(2, 0), Pair(3, 0)),
-        listOf(Pair(0, -2), Pair(0, -1), Pair(0, 0), Pair(0, 1), Pair(0, 2), Pair(0, 3))
+        listOf(Pair(-2, 0), Pair(-1, 0), Pair(0, 0), Pair(1, 0), Pair(2, 0), Pair(3, 0)),  // Horizontal
+        listOf(Pair(0, -2), Pair(0, -1), Pair(0, 0), Pair(0, 1), Pair(0, 2), Pair(0, 3)),  // Vertical
+        listOf(Pair(-2, 0), Pair(-1, 0), Pair(0, 0), Pair(1, 0), Pair(2, 0), Pair(3, 0)),  // Horizontal
+        listOf(Pair(0, -2), Pair(0, -1), Pair(0, 0), Pair(0, 1), Pair(0, 2), Pair(0, 3))   // Vertical
     )),
 
     // 18. 3x2 block piece
@@ -214,18 +214,18 @@ enum class PieceType(val rotations: List<List<Pair<Int, Int>>>) {
 
     // 23. Big T piece
     BIG_T(listOf(
-        listOf(Pair(-1, -1), Pair(0, -1), Pair(1, -1), Pair(0, 0), Pair(0, 1)),
-        listOf(Pair(-1, 0), Pair(0, 0), Pair(1, 0), Pair(0, -1), Pair(0, 1)),
-        listOf(Pair(0, -1), Pair(0, 0), Pair(-1, 1), Pair(0, 1), Pair(1, 1)),
-        listOf(Pair(-1, 0), Pair(0, 0), Pair(1, 0), Pair(0, -1), Pair(0, 1))
+        listOf(Pair(-1, -1), Pair(0, -1), Pair(1, -1), Pair(0, 0), Pair(0, 1)),  // T pointing up
+        listOf(Pair(-1, 0), Pair(0, 0), Pair(1, 0), Pair(0, -1), Pair(0, 1)),    // + shape (cross)
+        listOf(Pair(0, -1), Pair(0, 0), Pair(-1, 1), Pair(0, 1), Pair(1, 1)),    // T pointing down
+        listOf(Pair(-1, -1), Pair(-1, 0), Pair(-1, 1), Pair(0, 0), Pair(1, 0))   // T pointing left
     )),
 
     // 24. Short parallel piece
     SHORT_PARALLEL(listOf(
-        listOf(Pair(-1, 0), Pair(-1, 1), Pair(1, 0), Pair(1, 1)),
-        listOf(Pair(0, -1), Pair(1, -1), Pair(0, 1), Pair(1, 1)),
-        listOf(Pair(-1, 0), Pair(-1, 1), Pair(1, 0), Pair(1, 1)),
-        listOf(Pair(0, -1), Pair(1, -1), Pair(0, 1), Pair(1, 1))
+        listOf(Pair(-1, 0), Pair(-1, 1), Pair(1, 0), Pair(1, 1)),  // Horizontal orientation
+        listOf(Pair(0, -1), Pair(1, -1), Pair(0, 1), Pair(1, 1)),  // Vertical orientation
+        listOf(Pair(-1, 0), Pair(-1, 1), Pair(1, 0), Pair(1, 1)),  // Horizontal orientation
+        listOf(Pair(0, -1), Pair(1, -1), Pair(0, 1), Pair(1, 1))   // Vertical orientation
     )),
 
     // 25. Big L backwards piece
@@ -246,18 +246,18 @@ enum class PieceType(val rotations: List<List<Pair<Int, Int>>>) {
 
     // 27. Small L piece
     SMALL_L(listOf(
-        listOf(Pair(-1, 0), Pair(0, 0), Pair(0, 1)),
-        listOf(Pair(0, -1), Pair(0, 0), Pair(1, 0)),
-        listOf(Pair(0, -1), Pair(0, 0), Pair(1, 0)),
-        listOf(Pair(-1, 0), Pair(0, 0), Pair(0, 1))
+        listOf(Pair(-1, 0), Pair(0, 0), Pair(0, 1)),       // L shape pointing right
+        listOf(Pair(0, -1), Pair(0, 0), Pair(1, 0)),       // L shape pointing down
+        listOf(Pair(0, -1), Pair(0, 0), Pair(-1, 0)),      // L shape pointing left
+        listOf(Pair(-1, 0), Pair(0, 0), Pair(0, 1))        // L shape pointing right (same as state 0)
     )),
 
     // 28. 3x1 line piece
     LINE_3(listOf(
-        listOf(Pair(-1, 0), Pair(0, 0), Pair(1, 0)),
-        listOf(Pair(0, -1), Pair(0, 0), Pair(0, 1)),
-        listOf(Pair(-1, 0), Pair(0, 0), Pair(1, 0)),
-        listOf(Pair(0, -1), Pair(0, 0), Pair(0, 1))
+        listOf(Pair(-1, 0), Pair(0, 0), Pair(1, 0)),  // Horizontal orientation
+        listOf(Pair(0, -1), Pair(0, 0), Pair(0, 1)),  // Vertical orientation
+        listOf(Pair(-1, 0), Pair(0, 0), Pair(1, 0)),  // Horizontal orientation
+        listOf(Pair(0, -1), Pair(0, 0), Pair(0, 1))   // Vertical orientation
     ));
 
     companion object {

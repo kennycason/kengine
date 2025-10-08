@@ -2,6 +2,9 @@
 
 A Tetris-like game with 6-block pieces.
 
+<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/games/hextris/screenshot.png" width="75%" />
+
+
 ## Description
 
 Hextris is a variant of Tetris that uses 6-block pieces instead of the traditional 4-block pieces. The game follows the standard Tetris rules:
@@ -61,4 +64,4 @@ The game uses the following assets:
 
 ## Credits
 
-This game is based on the "Blocks" game from the blocks_web repository.
+This game is based on my "Blocks" game: https://github.com/kennycason/blocks/
