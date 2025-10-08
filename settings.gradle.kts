@@ -27,6 +27,7 @@ modules.addAll(
     listOf(
         "games:boxxle",
         "games:helloworld",
+        "games:hextris",
         "games:image-shuffle",
         "games:osc3x-synth",
         "games:osc3x-synth-v2",
