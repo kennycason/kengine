@@ -5,6 +5,7 @@ import com.kengine.font.Font
 import com.kengine.font.useFontContext
 import com.kengine.graphics.Color
 import com.kengine.graphics.SpriteSheet
+import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.controls.HatDirection
 import com.kengine.input.controller.useControllerContext
 import com.kengine.input.keyboard.useKeyboardContext
@@ -49,6 +50,9 @@ class HextrisGame : Game, Logging {
     private var rotateStartTime = 0L
     private var timeSinceOptionChangeMs = 0L
     private val inputDelayMs = 50L // doubled from 20ms for better feel
+    
+    // Hard drop state tracking (to prevent repeated triggers)
+    private var hardDropPressed = false
 
     // Input responsiveness tracking
     private var inputLogCounter = 0
@@ -229,8 +233,8 @@ class HextrisGame : Game, Logging {
 
         // Handle controller input for restarting
         useControllerContext {
-            // A button (Button 1) or START (Button 9) to restart
-            if ((controller.isButtonPressed(1) || controller.isButtonPressed(9)) && 
+            // A button or START to restart
+            if ((controller.isButtonPressed(Buttons.A) || controller.isButtonPressed(Buttons.START)) && 
                 timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
                 timeSinceOptionChangeMs = getClockContext().totalTimeMs
                 reset()
@@ -497,8 +501,13 @@ class HextrisGame : Game, Logging {
 
     private fun handleControllerInput() {
         useControllerContext {
-            // SNES Controller Button Mapping:
-            // Buttons: 0=B, 1=A, 2=Y, 3=X, 4=L, 5=R, 8=SELECT, 9=START
+            // Get first controller ID to avoid dual-registration issues
+            val controllerId = controller.getFirstControllerId() ?: return
+            
+            // SNES Controller Button Mapping (JoystickID 3):
+            // Face buttons: B=0, A=1, Y=2, X=3
+            // Shoulders: L=4, R=6 (NOT 5!)
+            // System: SELECT=?, START=?
             // D-Pad: HAT events (not buttons!)
             
             val currentTime = getClockContext().totalTimeMs
@@ -589,7 +598,11 @@ class HextrisGame : Game, Logging {
             }
 
             // Hard drop (instant fall) - DPAD UP (HAT)
-            if (controller.isHatDirectionPressed(0, HatDirection.UP) && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
+            // Requires release and re-press for each piece to prevent repeated triggers
+            val isHardDropPressed = controller.isHatDirectionPressed(0, HatDirection.UP)
+            
+            if (isHardDropPressed && !hardDropPressed && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
+                hardDropPressed = true // Mark as pressed to prevent repeats
                 val timeSinceLastAction = timeSinceMs(timeSinceOptionChangeMs)
                 timeSinceOptionChangeMs = getClockContext().totalTimeMs
                 logger.debug("Controller: Hard drop. Time since last action: $timeSinceLastAction ms")
@@ -612,132 +625,129 @@ class HextrisGame : Game, Logging {
                     logger.info("Controller: Game over after hard drop")
                     state = State.GAME_OVER
                 }
+            } else if (!isHardDropPressed && hardDropPressed) {
+                // Released UP - allow next hard drop
+                hardDropPressed = false
+                logger.debug("Controller: Hard drop button released, ready for next piece")
             }
 
-            // Rotate clockwise - R (Button 5) or A (Button 1) - with continuous rotation
-            // Note: Check R first, then A as fallback
-            val isClockwisePressed = if (controller.isButtonPressed(5)) {
-                true  // R button
-            } else {
-                controller.isButtonPressed(1)  // A button
-            }
-            if (isClockwisePressed) {
-                val shouldRotate = if (lastRotateDirection == "controller_clockwise") {
-                    // If continuing to press clockwise, check if we've passed the initial delay
-                    val timeSinceStart = timeSinceMs(rotateStartTime)
-                    if (timeSinceStart < initialMoveDelay) {
-                        // Still in initial delay, don't rotate again
-                        false
-                    } else {
-                        // Past initial delay, check repeat rate
-                        val timeSinceLastRotate = timeSinceMs(rotateTime)
-                        timeSinceLastRotate >= rotateSpeed
-                    }
-                } else {
-                    // First press or direction change, always rotate
-                    lastRotateDirection = "controller_clockwise"
-                    rotateStartTime = currentTime
-                    true
-                }
-
-                if (shouldRotate) {
-                    val timeSinceLastRotate = timeSinceMs(rotateTime)
-                    rotateTime = currentTime
-                    logger.debug("Controller: Rotating clockwise. Time since last rotate: $timeSinceLastRotate ms (rotateSpeed: $rotateSpeed ms)")
-                    board.rotateClockwise()
-                }
-            } else if (lastRotateDirection == "controller_clockwise") {
-                // Released clockwise button
-                lastRotateDirection = null
-            }
-
-            // Rotate counter-clockwise - L (Button 4) or Y (Button 2) - with continuous rotation
-            // Only check if clockwise is NOT pressed (to avoid conflicts)
-            val isCounterClockwisePressed = if (!isClockwisePressed) {
-                controller.isButtonPressed(4) || controller.isButtonPressed(2)
-            } else {
-                false
-            }
-            if (isCounterClockwisePressed) {
-                val shouldRotate = if (lastRotateDirection == "controller_counterclockwise") {
-                    // If continuing to press counterclockwise, check if we've passed the initial delay
-                    val timeSinceStart = timeSinceMs(rotateStartTime)
-                    if (timeSinceStart < initialMoveDelay) {
-                        // Still in initial delay, don't rotate again
-                        false
-                    } else {
-                        // Past initial delay, check repeat rate
-                        val timeSinceLastRotate = timeSinceMs(rotateTime)
-                        timeSinceLastRotate >= rotateSpeed
-                    }
-                } else {
-                    // First press or direction change, always rotate
-                    lastRotateDirection = "controller_counterclockwise"
-                    rotateStartTime = currentTime
-                    true
-                }
-
-                if (shouldRotate) {
-                    val timeSinceLastRotate = timeSinceMs(rotateTime)
-                    rotateTime = currentTime
-                    logger.debug("Controller: Rotating counter-clockwise. Time since last rotate: $timeSinceLastRotate ms (rotateSpeed: $rotateSpeed ms)")
-                    board.rotateCounterClockwise()
-                }
-            } else if (lastRotateDirection == "controller_counterclockwise") {
-                // Released counterclockwise button
-                lastRotateDirection = null
-            }
-
-            // 180-degree rotation - X (Button 3) or B (Button 0) or L+R (Buttons 4+5) - with continuous rotation
-            // Only check if neither clockwise nor counter-clockwise is pressed (to avoid conflicts)
-            val is180Pressed = if (!isClockwisePressed && !isCounterClockwisePressed) {
-                controller.isButtonPressed(3) || controller.isButtonPressed(0) || 
-                (controller.isButtonPressed(4) && controller.isButtonPressed(5))
-            } else {
-                false
-            }
-            if (is180Pressed) {
+            // ROTATION CONTROLS - Priority order
+            // Use raw button numbers from JoystickID 3 only (first controller)
+            // Priority: (L+R combo) > L > R > X > B > A
+            
+            // From logs (JoystickID 3 only):
+            // L=4, R=6, A=1, B=0, X=3, Y=2
+            val isLPressed = controller.isButtonPressed(controllerId, 4)
+            val isRPressed = controller.isButtonPressed(controllerId, 6)
+            val isAPressed = controller.isButtonPressed(controllerId, 1)
+            val isBPressed = controller.isButtonPressed(controllerId, 0)
+            val isXPressed = controller.isButtonPressed(controllerId, 3)
+            val isYPressed = controller.isButtonPressed(controllerId, 2)
+            
+            // Priority: L+R combo first
+            if (isLPressed && isRPressed) {
+                // L+R combo = 180° rotation
                 val shouldRotate = if (lastRotateDirection == "controller_rotate180") {
-                    // If continuing to press rotate180, check if we've passed the initial delay
-                    val timeSinceStart = timeSinceMs(rotateStartTime)
-                    if (timeSinceStart < initialMoveDelay) {
-                        // Still in initial delay, don't rotate again
-                        false
-                    } else {
-                        // Past initial delay, check repeat rate
-                        val timeSinceLastRotate = timeSinceMs(rotateTime)
-                        timeSinceLastRotate >= rotateSpeed
-                    }
+                    timeSinceMs(rotateTime) >= rotateSpeed
                 } else {
-                    // First press or direction change, always rotate
                     lastRotateDirection = "controller_rotate180"
                     rotateStartTime = currentTime
                     true
                 }
-
+                
                 if (shouldRotate) {
-                    val timeSinceLastRotate = timeSinceMs(rotateTime)
                     rotateTime = currentTime
-                    logger.debug("Controller: Rotating 180 degrees. Time since last rotate: $timeSinceLastRotate ms (rotateSpeed: $rotateSpeed ms)")
-                    // Rotate twice for 180 degrees
+                    logger.debug("Controller: L+R = Rotating 180 degrees")
                     board.rotateClockwise()
                     board.rotateClockwise()
                 }
-            } else if (lastRotateDirection == "controller_rotate180") {
-                // Released 180 button
-                lastRotateDirection = null
+            } else if (isLPressed || isYPressed) {
+                // L shoulder or Y = CCW
+                val shouldRotate = if (lastRotateDirection == "controller_counterclockwise") {
+                    timeSinceMs(rotateTime) >= rotateSpeed
+                } else {
+                    lastRotateDirection = "controller_counterclockwise"
+                    rotateStartTime = currentTime
+                    true
+                }
+                
+                if (shouldRotate) {
+                    rotateTime = currentTime
+                    logger.debug("Controller: L or Y = Rotating counter-clockwise")
+                    board.rotateCounterClockwise()
+                }
+            } else if (isRPressed || isAPressed) {
+                // R shoulder or A = CW
+                val shouldRotate = if (lastRotateDirection == "controller_clockwise") {
+                    timeSinceMs(rotateTime) >= rotateSpeed
+                } else {
+                    lastRotateDirection = "controller_clockwise"
+                    rotateStartTime = currentTime
+                    true
+                }
+                
+                if (shouldRotate) {
+                    rotateTime = currentTime
+                    logger.debug("Controller: R or A = Rotating clockwise")
+                    board.rotateClockwise()
+                }
+            } else if (isXPressed) {
+                // X button = 180°
+                val shouldRotate = if (lastRotateDirection == "controller_rotate180") {
+                    timeSinceMs(rotateTime) >= rotateSpeed
+                } else {
+                    lastRotateDirection = "controller_rotate180"
+                    rotateStartTime = currentTime
+                    true
+                }
+                
+                if (shouldRotate) {
+                    rotateTime = currentTime
+                    logger.debug("Controller: X button = Rotating 180 degrees")
+                    board.rotateClockwise()
+                    board.rotateClockwise()
+                }
+            } else if (isBPressed) {
+                // B button = CCW
+                val shouldRotate = if (lastRotateDirection == "controller_counterclockwise") {
+                    timeSinceMs(rotateTime) >= rotateSpeed
+                } else {
+                    lastRotateDirection = "controller_counterclockwise"
+                    rotateStartTime = currentTime
+                    true
+                }
+                
+                if (shouldRotate) {
+                    rotateTime = currentTime
+                    logger.debug("Controller: B button = Rotating counter-clockwise")
+                    board.rotateCounterClockwise()
+                }
+            } else {
+                // No rotation buttons pressed - reset direction tracking
+                if (lastRotateDirection in listOf("controller_clockwise", "controller_counterclockwise", "controller_rotate180")) {
+                    lastRotateDirection = null
+                }
             }
-
-            // Pause game - START (Button 9)
-            // TODO: Implement pause functionality
             
-            // Reset game - SELECT (Button 8) + START (Button 9) combination
-            if (controller.isButtonPressed(8) && controller.isButtonPressed(9) &&
-                timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
+            // SELECT and START buttons - Priority order
+            // From SNES.kt mapping: SELECT=6, START=7
+            // But logs show different numbers, need to find them
+            // Unknown buttons from logs: 9, 10 (first test), 10, 11 (second test)
+            val isSELECTPressed = controller.isButtonPressed(controllerId, 8) || controller.isButtonPressed(controllerId, 9)
+            val isSTARTPressed = controller.isButtonPressed(controllerId, 7) || controller.isButtonPressed(controllerId, 10)
+            
+            if (isSELECTPressed && isSTARTPressed && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
+                // SELECT + START = Reset game
                 timeSinceOptionChangeMs = getClockContext().totalTimeMs
-                logger.debug("Controller: Resetting game (SELECT+START)")
+                logger.debug("Controller: SELECT+START = Resetting game")
                 reset()
+            } else if (isSTARTPressed && !isSELECTPressed && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
+                // START alone = Pause
+                timeSinceOptionChangeMs = getClockContext().totalTimeMs
+                logger.debug("Controller: START = Pause (not yet implemented)")
+                // TODO: Implement pause functionality
             }
+            // SELECT alone does nothing (as intended)
         }
     }
 
@@ -1067,6 +1077,7 @@ class HextrisGame : Game, Logging {
         lastMoveDirection = null
         moveStartTime = getClockContext().totalTimeMs
         timeSinceOptionChangeMs = getClockContext().totalTimeMs
+        hardDropPressed = false // Reset hard drop flag
 
         // Reset input tracking variables
         inputLogCounter = 0

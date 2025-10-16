@@ -219,24 +219,55 @@ class ControllerInputEventSubscriber(
             val count = countPtr.value
             logger.info { "Controllers found: $count" }
 
+            // Track exact controller names to detect duplicates
+            val seenControllerNames = mutableSetOf<String>()
+
             joysticks?.let { joyArray ->
                 for (i in 0 until count) {
                     val instanceId = joyArray[i]
                     SDL_OpenJoystick(instanceId)?.let { joystick ->
                         val name = SDL_GetJoystickName(joystick)?.toKString() ?: "Unknown Controller"
+                        val numAxes = SDL_GetNumJoystickAxes(joystick)
+                        val numButtons = SDL_GetNumJoystickButtons(joystick)
+                        val numHats = SDL_GetNumJoystickHats(joystick)
+                        
+                        // Log full controller details
+                        logger.info { 
+                            "Controller #$i - Name: '$name', InstanceID: $instanceId, " +
+                            "Axes: $numAxes, Buttons: $numButtons, Hats: $numHats"
+                        }
+                        
+                        // Skip phantom/virtual controllers (no axes AND no hats = not real hardware)
+                        if (numAxes == 0 && numHats == 0) {
+                            logger.warn { "Skipping phantom controller: '$name' (0 axes, 0 hats - likely virtual device)" }
+                            return@let
+                        }
+                        
+                        // Check for exact name duplicate
+                        val isDuplicate = seenControllerNames.any { existingName ->
+                            existingName == name
+                        }
+                        
+                        if (isDuplicate) {
+                            logger.warn { "Skipping duplicate controller: '$name' (exact name match with already registered controller)" }
+                            return@let
+                        }
+                        
                         val mapping = ControllerMapper.getMapping(name)
 
                         logger.info { "Controller '$name' connected with mapping: ${mapping?.name ?: "None"}" }
 
                         controllerStates[instanceId] = ControllerState(
-                            axes = FloatArray(SDL_GetNumJoystickAxes(joystick)),
-                            buttons = BooleanArray(SDL_GetNumJoystickButtons(joystick)),
-                            hatStates = IntArray(SDL_GetNumJoystickHats(joystick))
+                            axes = FloatArray(numAxes),
+                            buttons = BooleanArray(numButtons),
+                            hatStates = IntArray(numHats)
                         )
 
                         if (mapping != null) {
                             controllerMappings[instanceId] = mapping
                         }
+                        
+                        seenControllerNames.add(name)
                     } ?: run {
                         logger.warn { "Failed to open joystick $i: ${SDL_GetError()?.toKString()}" }
                     }
