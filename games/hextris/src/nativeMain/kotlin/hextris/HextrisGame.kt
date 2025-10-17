@@ -6,6 +6,7 @@ import com.kengine.font.useFontContext
 import com.kengine.graphics.Color
 import com.kengine.graphics.SpriteSheet
 import com.kengine.input.controller.controls.Buttons
+import com.kengine.input.controller.controls.HatDirection
 import com.kengine.input.controller.useControllerContext
 import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.log.Logging
@@ -13,7 +14,7 @@ import com.kengine.log.Logger
 import com.kengine.sdl.useSDLContext
 import com.kengine.geometry.useGeometryContext
 import com.kengine.math.Vec2
-import com.kengine.time.getCurrentMilliseconds
+import com.kengine.time.getClockContext
 import com.kengine.time.timeSinceMs
 
 /**
@@ -28,25 +29,30 @@ class HextrisGame : Game, Logging {
     private var state = State.INIT
     private var board = Board()
     private var dropTime = 0L
-    private var dropSpeed = 300L // milliseconds (reduced from 500ms for faster gameplay)
-    private var fastDropSpeed = 50L // milliseconds (reduced from 100ms for faster dropping)
-    private var isDownKeyPressed = false // Track if down key is pressed
+    private var dropSpeed = 800L // Base drop speed - Tetris Level 1 timing (will be updated by updateDropSpeed())
+    private var fastDropSpeed = 30L // Fast drop speed when down key is pressed
 
     // Separate timers for each movement direction for more responsive controls
     private var moveLeftTime = 0L
     private var moveRightTime = 0L
     private var moveDownTime = 0L
-    private var moveSpeed = 60L // milliseconds - matches web version's repeat rate
-    private var initialMoveDelay = 110L // Short initial delay before repeat starts - matches web version
+    private var moveSpeed = 80L // milliseconds - doubled from 20ms for better feel
+    private var initialMoveDelay = 60L // Short initial delay before repeat starts - doubled from 30ms
 
     // Movement state tracking like the web version
     private var lastMoveDirection: String? = null
     private var moveStartTime = 0L
 
-    private var rotateTime = 0L
-    private var rotateSpeed = 150L // milliseconds - matches web version
+    // Rotation timing and state tracking
+    private var rotateTime = 0L // Keep for backward compatibility
+    private var rotateSpeed = 150L // milliseconds - doubled from 50ms for better feel
+    private var lastRotateDirection: String? = null
+    private var rotateStartTime = 0L
     private var timeSinceOptionChangeMs = 0L
-    private val inputDelayMs = 20L // reduced from 50ms for more responsive input
+    private val inputDelayMs = 50L // doubled from 20ms for better feel
+    
+    // Hard drop state tracking (to prevent repeated triggers)
+    private var hardDropPressed = false
 
     // Input responsiveness tracking
     private var inputLogCounter = 0
@@ -152,6 +158,9 @@ class HextrisGame : Game, Logging {
         state = State.PLAY
     }
 
+    // Track the last recorded drop speed for debugging
+    private var lastLoggedDropSpeed = 0L
+
     private fun play() {
         // Handle keyboard input
         handleKeyboardInput()
@@ -159,11 +168,32 @@ class HextrisGame : Game, Logging {
         // Handle controller input
         handleControllerInput()
 
-        // Handle automatic dropping - use fastDropSpeed if down key is pressed
-        val currentDropSpeed = if (isDownKeyPressed) fastDropSpeed else dropSpeed
-        if (timeSinceMs(dropTime) > currentDropSpeed) {
-            dropTime = getCurrentMilliseconds()
-            logger.debug("Auto dropping piece. Current drop speed: $currentDropSpeed ms")
+        // Log drop speed and level periodically to track changes
+        if (inputLogCounter % 60 == 0) { // Log every 60 frames (about once per second)
+            val isDownPressed = lastMoveDirection == "down" || lastMoveDirection == "controller_down"
+
+            // Check if drop speed has changed unexpectedly
+            if (lastLoggedDropSpeed > 0 && dropSpeed != lastLoggedDropSpeed &&
+                !isDownPressed && lastMoveDirection != "down" && lastMoveDirection != "controller_down") {
+                logger.warn("UNEXPECTED DROP SPEED CHANGE: Previous: $lastLoggedDropSpeed ms, Current: $dropSpeed ms")
+            }
+
+            lastLoggedDropSpeed = dropSpeed
+
+            logger.info("Current state - Level: ${board.level}, Drop speed: $dropSpeed ms, Current drop speed: $dropSpeed ms, Down key pressed: $isDownPressed")
+
+            // Log input responsiveness metrics if available
+            if (inputLatencyCount > 0) {
+                val avgLatency = totalInputLatency / inputLatencyCount
+                logger.info("Input Responsiveness Metrics - Average Latency: ${avgLatency}ms, Max Latency: ${maxInputLatency}ms, Samples: $inputLatencyCount")
+            }
+        }
+
+        // Handle automatic dropping - drop speed is directly modified when down key is pressed/released
+        val timeElapsed = timeSinceMs(dropTime)
+        if (timeElapsed > dropSpeed) {
+            logger.debug("Auto dropping piece. Time elapsed: $timeElapsed ms, Current drop speed: $dropSpeed ms")
+            dropTime = getClockContext().totalTimeMs
 
             if (!board.moveDown()) {
                 // If the piece can't move down, lock it in place
@@ -177,8 +207,10 @@ class HextrisGame : Game, Logging {
 
                 // If the level has changed, update the drop speed
                 if (board.level != currentLevel) {
+                    val oldDropSpeed = dropSpeed
                     logger.info("Level up! ${currentLevel} -> ${board.level}")
                     updateDropSpeed()
+                    logger.info("After level up - Drop speed changed from $oldDropSpeed ms to $dropSpeed ms")
                 }
 
                 // Check if the game is over
@@ -194,15 +226,17 @@ class HextrisGame : Game, Logging {
         // Handle keyboard input for restarting
         useKeyboardContext {
             if (keyboard.isSpacePressed() && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
-                timeSinceOptionChangeMs = getCurrentMilliseconds()
+                timeSinceOptionChangeMs = getClockContext().totalTimeMs
                 reset()
             }
         }
 
         // Handle controller input for restarting
         useControllerContext {
-            if (controller.isButtonPressed(Buttons.A) && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
-                timeSinceOptionChangeMs = getCurrentMilliseconds()
+            // A button or START to restart
+            if ((controller.isButtonPressed(Buttons.A) || controller.isButtonPressed(Buttons.START)) && 
+                timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
+                timeSinceOptionChangeMs = getClockContext().totalTimeMs
                 reset()
             }
         }
@@ -211,7 +245,7 @@ class HextrisGame : Game, Logging {
     private fun handleKeyboardInput() {
         useKeyboardContext {
             // Implement the web version's movement control logic with initial delay and repeat rate
-            val currentTime = getCurrentMilliseconds()
+            val currentTime = getClockContext().totalTimeMs
 
             // Move left (Left Arrow or A) - with throttling
             val isLeftPressed = keyboard.isLeftPressed() || keyboard.isAPressed()
@@ -236,14 +270,14 @@ class HextrisGame : Game, Logging {
 
                 if (shouldMove) {
                     // Record start time for latency measurement
-                    val actionStartTime = getCurrentMilliseconds()
+                    val actionStartTime = getClockContext().totalTimeMs
 
                     moveLeftTime = currentTime
                     logger.debug("Moving left. Initial delay: $initialMoveDelay ms, Repeat rate: $moveSpeed ms")
                     board.moveLeft()
 
                     // Measure and record input latency
-                    val latency = getCurrentMilliseconds() - actionStartTime
+                    val latency = getClockContext().totalTimeMs - actionStartTime
                     totalInputLatency += latency
                     inputLatencyCount++
                     if (latency > maxInputLatency) {
@@ -282,14 +316,14 @@ class HextrisGame : Game, Logging {
 
                 if (shouldMove) {
                     // Record start time for latency measurement
-                    val actionStartTime = getCurrentMilliseconds()
+                    val actionStartTime = getClockContext().totalTimeMs
 
                     moveRightTime = currentTime
                     logger.debug("Moving right. Initial delay: $initialMoveDelay ms, Repeat rate: $moveSpeed ms")
                     board.moveRight()
 
                     // Measure and record input latency
-                    val latency = getCurrentMilliseconds() - actionStartTime
+                    val latency = getClockContext().totalTimeMs - actionStartTime
                     totalInputLatency += latency
                     inputLatencyCount++
                     if (latency > maxInputLatency) {
@@ -305,23 +339,27 @@ class HextrisGame : Game, Logging {
                 lastMoveDirection = null
             }
 
-            // Move down (soft drop) - track when down key is pressed/released (Down Arrow or S)
-            val wasDownPressed = isDownKeyPressed
+            // Move down (soft drop) - directly modify drop speed like the web version
             val isDownPressed = keyboard.isDownPressed() || keyboard.isSPressed()
-            isDownKeyPressed = isDownPressed
 
-            // For down movement, we only set isDownKeyPressed = true
-            // The actual dropping happens in the play() method with a faster drop speed
-            if (isDownPressed) {
-                // Set lastMoveDirection to "down" to track that down is being pressed
-                if (lastMoveDirection != "down") {
-                    lastMoveDirection = "down"
-                    logger.debug("Down key pressed. Using fast drop speed.")
-                }
-            } else if (lastMoveDirection == "down") {
-                // Released down key
+            if (isDownPressed && lastMoveDirection != "down") {
+                // First press - set fast drop speed and move down immediately
+                lastMoveDirection = "down"
+                val originalDropSpeed = dropSpeed
+                val timeSinceLastDrop = timeSinceMs(dropTime)
+                dropSpeed = fastDropSpeed
+                dropTime = 0L // Reset drop time to make the piece fall immediately
+                logger.debug("Down key pressed. Changed drop speed from $originalDropSpeed ms to $fastDropSpeed ms. Time since last drop: $timeSinceLastDrop ms")
+
+                // Move down immediately
+                board.moveDown()
+            } else if (!isDownPressed && lastMoveDirection == "down") {
+                // Released down key - restore normal drop speed
+                val downKeyPressedTime = timeSinceMs(moveStartTime)
                 lastMoveDirection = null
-                logger.debug("Down key released. Restoring normal drop speed.")
+                val fastSpeed = dropSpeed
+                updateDropSpeed() // Restore proper speed for current level
+                logger.debug("Down key released after ${downKeyPressedTime}ms. Restored drop speed from $fastSpeed ms to $dropSpeed ms")
             }
 
             // Move up (W key) - not used for gameplay but included for WASD completeness
@@ -332,7 +370,7 @@ class HextrisGame : Game, Logging {
             // Hard drop (Space)
             if (keyboard.isSpacePressed() && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
                 val timeSinceLastAction = timeSinceMs(timeSinceOptionChangeMs)
-                timeSinceOptionChangeMs = getCurrentMilliseconds()
+                timeSinceOptionChangeMs = getClockContext().totalTimeMs
                 logger.debug("Hard drop. Time since last action: $timeSinceLastAction ms (inputDelayMs: $inputDelayMs ms)")
                 board.drop()
 
@@ -355,35 +393,107 @@ class HextrisGame : Game, Logging {
                 }
             }
 
-            // Rotate clockwise (Up Arrow or L)
-            if ((keyboard.isUpPressed() || keyboard.isLPressed()) && timeSinceMs(rotateTime) > rotateSpeed) {
-                val timeSinceLastRotate = timeSinceMs(rotateTime)
-                rotateTime = getCurrentMilliseconds()
-                logger.debug("Rotating clockwise. Time since last rotate: $timeSinceLastRotate ms (rotateSpeed: $rotateSpeed ms)")
-                board.rotateClockwise()
+            // Rotate clockwise (Up Arrow or L) - with continuous rotation
+            val isClockwisePressed = keyboard.isUpPressed() || keyboard.isLPressed()
+            if (isClockwisePressed) {
+                val shouldRotate = if (lastRotateDirection == "clockwise") {
+                    // If continuing to press clockwise, check if we've passed the initial delay
+                    val timeSinceStart = timeSinceMs(rotateStartTime)
+                    if (timeSinceStart < initialMoveDelay) {
+                        // Still in initial delay, don't rotate again
+                        false
+                    } else {
+                        // Past initial delay, check repeat rate
+                        val timeSinceLastRotate = timeSinceMs(rotateTime)
+                        timeSinceLastRotate >= rotateSpeed
+                    }
+                } else {
+                    // First press or direction change, always rotate
+                    lastRotateDirection = "clockwise"
+                    rotateStartTime = currentTime
+                    true
+                }
+
+                if (shouldRotate) {
+                    val timeSinceLastRotate = timeSinceMs(rotateTime)
+                    rotateTime = currentTime
+                    logger.debug("Rotating clockwise. Time since last rotate: $timeSinceLastRotate ms (rotateSpeed: $rotateSpeed ms)")
+                    board.rotateClockwise()
+                }
+            } else if (lastRotateDirection == "clockwise") {
+                // Released clockwise key
+                lastRotateDirection = null
             }
 
-            // Rotate counter-clockwise (Z or J)
-            if ((keyboard.isZPressed() || keyboard.isJPressed()) && timeSinceMs(rotateTime) > rotateSpeed) {
-                val timeSinceLastRotate = timeSinceMs(rotateTime)
-                rotateTime = getCurrentMilliseconds()
-                logger.debug("Rotating counter-clockwise. Time since last rotate: $timeSinceLastRotate ms (rotateSpeed: $rotateSpeed ms)")
-                board.rotateCounterClockwise()
+            // Rotate counter-clockwise (Z or J) - with continuous rotation
+            val isCounterClockwisePressed = keyboard.isZPressed() || keyboard.isJPressed()
+            if (isCounterClockwisePressed) {
+                val shouldRotate = if (lastRotateDirection == "counterclockwise") {
+                    // If continuing to press counterclockwise, check if we've passed the initial delay
+                    val timeSinceStart = timeSinceMs(rotateStartTime)
+                    if (timeSinceStart < initialMoveDelay) {
+                        // Still in initial delay, don't rotate again
+                        false
+                    } else {
+                        // Past initial delay, check repeat rate
+                        val timeSinceLastRotate = timeSinceMs(rotateTime)
+                        timeSinceLastRotate >= rotateSpeed
+                    }
+                } else {
+                    // First press or direction change, always rotate
+                    lastRotateDirection = "counterclockwise"
+                    rotateStartTime = currentTime
+                    true
+                }
+
+                if (shouldRotate) {
+                    val timeSinceLastRotate = timeSinceMs(rotateTime)
+                    rotateTime = currentTime
+                    logger.debug("Rotating counter-clockwise. Time since last rotate: $timeSinceLastRotate ms (rotateSpeed: $rotateSpeed ms)")
+                    board.rotateCounterClockwise()
+                }
+            } else if (lastRotateDirection == "counterclockwise") {
+                // Released counterclockwise key
+                lastRotateDirection = null
             }
 
-            // 180-degree rotation (K)
-            if (keyboard.isKPressed() && timeSinceMs(rotateTime) > rotateSpeed) {
-                val timeSinceLastRotate = timeSinceMs(rotateTime)
-                rotateTime = getCurrentMilliseconds()
-                logger.debug("Rotating 180 degrees. Time since last rotate: $timeSinceLastRotate ms (rotateSpeed: $rotateSpeed ms)")
-                // Rotate twice for 180 degrees
-                board.rotateClockwise()
-                board.rotateClockwise()
+            // 180-degree rotation (K) - with continuous rotation
+            val is180Pressed = keyboard.isKPressed()
+            if (is180Pressed) {
+                val shouldRotate = if (lastRotateDirection == "rotate180") {
+                    // If continuing to press rotate180, check if we've passed the initial delay
+                    val timeSinceStart = timeSinceMs(rotateStartTime)
+                    if (timeSinceStart < initialMoveDelay) {
+                        // Still in initial delay, don't rotate again
+                        false
+                    } else {
+                        // Past initial delay, check repeat rate
+                        val timeSinceLastRotate = timeSinceMs(rotateTime)
+                        timeSinceLastRotate >= rotateSpeed
+                    }
+                } else {
+                    // First press or direction change, always rotate
+                    lastRotateDirection = "rotate180"
+                    rotateStartTime = currentTime
+                    true
+                }
+
+                if (shouldRotate) {
+                    val timeSinceLastRotate = timeSinceMs(rotateTime)
+                    rotateTime = currentTime
+                    logger.debug("Rotating 180 degrees. Time since last rotate: $timeSinceLastRotate ms (rotateSpeed: $rotateSpeed ms)")
+                    // Rotate twice for 180 degrees
+                    board.rotateClockwise()
+                    board.rotateClockwise()
+                }
+            } else if (lastRotateDirection == "rotate180") {
+                // Released 180 key
+                lastRotateDirection = null
             }
 
             // Reset game (R)
             if (keyboard.isRPressed() && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
-                timeSinceOptionChangeMs = getCurrentMilliseconds()
+                timeSinceOptionChangeMs = getClockContext().totalTimeMs
                 reset()
             }
         }
@@ -391,11 +501,19 @@ class HextrisGame : Game, Logging {
 
     private fun handleControllerInput() {
         useControllerContext {
-            // Implement the web version's movement control logic with initial delay and repeat rate
-            val currentTime = getCurrentMilliseconds()
+            // Get first controller ID to avoid dual-registration issues
+            val controllerId = controller.getFirstControllerId() ?: return
+            
+            // SNES Controller Button Mapping (JoystickID 3):
+            // Face buttons: B=0, A=1, Y=2, X=3
+            // Shoulders: L=4, R=6 (NOT 5!)
+            // System: SELECT=?, START=?
+            // D-Pad: HAT events (not buttons!)
+            
+            val currentTime = getClockContext().totalTimeMs
 
-            // Move left - Button 7 - with throttling
-            val isLeftPressed = controller.isButtonPressed(7)
+            // Move left - DPAD LEFT (HAT) - with throttling
+            val isLeftPressed = controller.isHatDirectionPressed(0, HatDirection.LEFT)
             if (isLeftPressed) {
                 val shouldMove = if (lastMoveDirection == "controller_left") {
                     // If continuing to press left, check if we've passed the initial delay
@@ -425,8 +543,8 @@ class HextrisGame : Game, Logging {
                 lastMoveDirection = null
             }
 
-            // Move right - Button 8 - with throttling
-            val isRightPressed = controller.isButtonPressed(8)
+            // Move right - DPAD RIGHT (HAT) - with throttling
+            val isRightPressed = controller.isHatDirectionPressed(0, HatDirection.RIGHT)
             if (isRightPressed) {
                 val shouldMove = if (lastMoveDirection == "controller_right") {
                     // If continuing to press right, check if we've passed the initial delay
@@ -456,32 +574,37 @@ class HextrisGame : Game, Logging {
                 lastMoveDirection = null
             }
 
-            // Move down (soft drop) - Button 6 (conflicts with START)
-            val isControllerDownPressed = controller.isButtonPressed(6)
+            // Soft drop (speed up fall) - DPAD DOWN (HAT) - directly modify drop speed
+            val isControllerDownPressed = controller.isHatDirectionPressed(0, HatDirection.DOWN)
 
-            // Update isDownKeyPressed if controller down is pressed (keyboard OR controller)
-            if (isControllerDownPressed) {
-                isDownKeyPressed = true
-            }
+            if (isControllerDownPressed && lastMoveDirection != "controller_down") {
+                // First press - set fast drop speed and move down immediately
+                lastMoveDirection = "controller_down"
+                val originalDropSpeed = dropSpeed
+                val timeSinceLastDrop = timeSinceMs(dropTime)
+                dropSpeed = fastDropSpeed
+                dropTime = 0L // Reset drop time to make the piece fall immediately
+                logger.debug("Controller: Down button pressed. Changed drop speed from $originalDropSpeed ms to $fastDropSpeed ms. Time since last drop: $timeSinceLastDrop ms")
 
-            // For down movement, we only set isDownKeyPressed = true
-            // The actual dropping happens in the play() method with a faster drop speed
-            if (isControllerDownPressed) {
-                // Set lastMoveDirection to "controller_down" to track that down is being pressed
-                if (lastMoveDirection != "controller_down") {
-                    lastMoveDirection = "controller_down"
-                    logger.debug("Controller: Down button pressed. Using fast drop speed.")
-                }
-            } else if (lastMoveDirection == "controller_down") {
-                // Released down button
+                // Move down immediately
+                board.moveDown()
+            } else if (!isControllerDownPressed && lastMoveDirection == "controller_down") {
+                // Released down button - restore normal drop speed
+                val downButtonPressedTime = timeSinceMs(moveStartTime)
                 lastMoveDirection = null
-                logger.debug("Controller: Down button released. Restoring normal drop speed.")
+                val fastSpeed = dropSpeed
+                updateDropSpeed() // Restore proper speed for current level
+                logger.debug("Controller: Down button released after ${downButtonPressedTime}ms. Restored drop speed from $fastSpeed ms to $dropSpeed ms")
             }
 
-            // Hard drop - Button 0 (A button)
-            if (controller.isButtonPressed(0) && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
+            // Hard drop (instant fall) - DPAD UP (HAT)
+            // Requires release and re-press for each piece to prevent repeated triggers
+            val isHardDropPressed = controller.isHatDirectionPressed(0, HatDirection.UP)
+            
+            if (isHardDropPressed && !hardDropPressed && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
+                hardDropPressed = true // Mark as pressed to prevent repeats
                 val timeSinceLastAction = timeSinceMs(timeSinceOptionChangeMs)
-                timeSinceOptionChangeMs = getCurrentMilliseconds()
+                timeSinceOptionChangeMs = getClockContext().totalTimeMs
                 logger.debug("Controller: Hard drop. Time since last action: $timeSinceLastAction ms")
                 board.drop()
 
@@ -502,49 +625,129 @@ class HextrisGame : Game, Logging {
                     logger.info("Controller: Game over after hard drop")
                     state = State.GAME_OVER
                 }
+            } else if (!isHardDropPressed && hardDropPressed) {
+                // Released UP - allow next hard drop
+                hardDropPressed = false
+                logger.debug("Controller: Hard drop button released, ready for next piece")
             }
 
-            // Rotate clockwise - Button 9 (UP or L button)
-            if (controller.isButtonPressed(9) && timeSinceMs(rotateTime) > rotateSpeed) {
-                val timeSinceLastRotate = timeSinceMs(rotateTime)
-                rotateTime = getCurrentMilliseconds()
-                logger.debug("Controller: Rotating clockwise. Time since last rotate: $timeSinceLastRotate ms")
-                board.rotateClockwise()
+            // ROTATION CONTROLS - Priority order
+            // Use raw button numbers from JoystickID 3 only (first controller)
+            // Priority: (L+R combo) > L > R > X > B > A
+            
+            // From logs (JoystickID 3 only):
+            // L=4, R=6, A=1, B=0, X=3, Y=2
+            val isLPressed = controller.isButtonPressed(controllerId, 4)
+            val isRPressed = controller.isButtonPressed(controllerId, 6)
+            val isAPressed = controller.isButtonPressed(controllerId, 1)
+            val isBPressed = controller.isButtonPressed(controllerId, 0)
+            val isXPressed = controller.isButtonPressed(controllerId, 3)
+            val isYPressed = controller.isButtonPressed(controllerId, 2)
+            
+            // Priority: L+R combo first
+            if (isLPressed && isRPressed) {
+                // L+R combo = 180° rotation
+                val shouldRotate = if (lastRotateDirection == "controller_rotate180") {
+                    timeSinceMs(rotateTime) >= rotateSpeed
+                } else {
+                    lastRotateDirection = "controller_rotate180"
+                    rotateStartTime = currentTime
+                    true
+                }
+                
+                if (shouldRotate) {
+                    rotateTime = currentTime
+                    logger.debug("Controller: L+R = Rotating 180 degrees")
+                    board.rotateClockwise()
+                    board.rotateClockwise()
+                }
+            } else if (isLPressed || isYPressed) {
+                // L shoulder or Y = CCW
+                val shouldRotate = if (lastRotateDirection == "controller_counterclockwise") {
+                    timeSinceMs(rotateTime) >= rotateSpeed
+                } else {
+                    lastRotateDirection = "controller_counterclockwise"
+                    rotateStartTime = currentTime
+                    true
+                }
+                
+                if (shouldRotate) {
+                    rotateTime = currentTime
+                    logger.debug("Controller: L or Y = Rotating counter-clockwise")
+                    board.rotateCounterClockwise()
+                }
+            } else if (isRPressed || isAPressed) {
+                // R shoulder or A = CW
+                val shouldRotate = if (lastRotateDirection == "controller_clockwise") {
+                    timeSinceMs(rotateTime) >= rotateSpeed
+                } else {
+                    lastRotateDirection = "controller_clockwise"
+                    rotateStartTime = currentTime
+                    true
+                }
+                
+                if (shouldRotate) {
+                    rotateTime = currentTime
+                    logger.debug("Controller: R or A = Rotating clockwise")
+                    board.rotateClockwise()
+                }
+            } else if (isXPressed) {
+                // X button = 180°
+                val shouldRotate = if (lastRotateDirection == "controller_rotate180") {
+                    timeSinceMs(rotateTime) >= rotateSpeed
+                } else {
+                    lastRotateDirection = "controller_rotate180"
+                    rotateStartTime = currentTime
+                    true
+                }
+                
+                if (shouldRotate) {
+                    rotateTime = currentTime
+                    logger.debug("Controller: X button = Rotating 180 degrees")
+                    board.rotateClockwise()
+                    board.rotateClockwise()
+                }
+            } else if (isBPressed) {
+                // B button = CCW
+                val shouldRotate = if (lastRotateDirection == "controller_counterclockwise") {
+                    timeSinceMs(rotateTime) >= rotateSpeed
+                } else {
+                    lastRotateDirection = "controller_counterclockwise"
+                    rotateStartTime = currentTime
+                    true
+                }
+                
+                if (shouldRotate) {
+                    rotateTime = currentTime
+                    logger.debug("Controller: B button = Rotating counter-clockwise")
+                    board.rotateCounterClockwise()
+                }
+            } else {
+                // No rotation buttons pressed - reset direction tracking
+                if (lastRotateDirection in listOf("controller_clockwise", "controller_counterclockwise", "controller_rotate180")) {
+                    lastRotateDirection = null
+                }
             }
-
-            // Rotate counter-clockwise - Button 1 (B button)
-            if (controller.isButtonPressed(1) && timeSinceMs(rotateTime) > rotateSpeed) {
-                val timeSinceLastRotate = timeSinceMs(rotateTime)
-                rotateTime = getCurrentMilliseconds()
-                logger.debug("Controller: Rotating counter-clockwise. Time since last rotate: $timeSinceLastRotate ms")
-                board.rotateCounterClockwise()
-            }
-
-            // 180-degree rotation - Button 3 (X button)
-            if (controller.isButtonPressed(3) && timeSinceMs(rotateTime) > rotateSpeed) {
-                val timeSinceLastRotate = timeSinceMs(rotateTime)
-                rotateTime = getCurrentMilliseconds()
-                logger.debug("Controller: Rotating 180 degrees. Time since last rotate: $timeSinceLastRotate ms")
-                // Rotate twice for 180 degrees
-                board.rotateClockwise()
-                board.rotateClockwise()
-            }
-
-            // Reset game - Button 2 (Y button) or Button 10 (R button)
-            if ((controller.isButtonPressed(2) || controller.isButtonPressed(10)) &&
-                timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
-                timeSinceOptionChangeMs = getCurrentMilliseconds()
-                logger.debug("Controller: Resetting game")
+            
+            // SELECT and START buttons - Priority order
+            // From SNES.kt mapping: SELECT=6, START=7
+            // But logs show different numbers, need to find them
+            // Unknown buttons from logs: 9, 10 (first test), 10, 11 (second test)
+            val isSELECTPressed = controller.isButtonPressed(controllerId, 8) || controller.isButtonPressed(controllerId, 9)
+            val isSTARTPressed = controller.isButtonPressed(controllerId, 7) || controller.isButtonPressed(controllerId, 10)
+            
+            if (isSELECTPressed && isSTARTPressed && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
+                // SELECT + START = Reset game
+                timeSinceOptionChangeMs = getClockContext().totalTimeMs
+                logger.debug("Controller: SELECT+START = Resetting game")
                 reset()
+            } else if (isSTARTPressed && !isSELECTPressed && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
+                // START alone = Pause
+                timeSinceOptionChangeMs = getClockContext().totalTimeMs
+                logger.debug("Controller: START = Pause (not yet implemented)")
+                // TODO: Implement pause functionality
             }
-
-            // Alternative reset: SELECT (4) + START (6) combination
-            if (controller.isButtonPressed(4) && controller.isButtonPressed(6) &&
-                timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
-                timeSinceOptionChangeMs = getCurrentMilliseconds()
-                logger.debug("Controller: Resetting game (SELECT+START)")
-                reset()
-            }
+            // SELECT alone does nothing (as intended)
         }
     }
 
@@ -866,14 +1069,15 @@ class HextrisGame : Game, Logging {
     private fun reset() {
         board.reset()
         state = State.INIT
-        dropTime = getCurrentMilliseconds()
-        moveLeftTime = getCurrentMilliseconds()
-        moveRightTime = getCurrentMilliseconds()
-        moveDownTime = getCurrentMilliseconds()
-        rotateTime = getCurrentMilliseconds()
+        dropTime = getClockContext().totalTimeMs
+        moveLeftTime = getClockContext().totalTimeMs
+        moveRightTime = getClockContext().totalTimeMs
+        moveDownTime = getClockContext().totalTimeMs
+        rotateTime = getClockContext().totalTimeMs
         lastMoveDirection = null
-        moveStartTime = getCurrentMilliseconds()
-        timeSinceOptionChangeMs = getCurrentMilliseconds()
+        moveStartTime = getClockContext().totalTimeMs
+        timeSinceOptionChangeMs = getClockContext().totalTimeMs
+        hardDropPressed = false // Reset hard drop flag
 
         // Reset input tracking variables
         inputLogCounter = 0
@@ -891,10 +1095,42 @@ class HextrisGame : Game, Logging {
     /**
      * Updates the drop speed based on the current level.
      * As the level increases, the pieces fall faster.
+     * Classic Tetris-style progression: slower start, faster as you advance.
      */
     private fun updateDropSpeed() {
-        // Base drop speed is 300ms, decrease by 10ms per level, with a minimum of 50ms
-        dropSpeed = (300 - (board.level * 10)).coerceAtLeast(50).toLong()
+        // Calculate drop speed based on level tiers (every 10 levels)
+        dropSpeed = when {
+            // Level 1-10: 800ms (classic Tetris Level 1 speed)
+            board.level <= 10 -> 800L
+            
+            // Level 11-20: 600ms
+            board.level <= 20 -> 600L
+            
+            // Level 21-30: 400ms
+            board.level <= 30 -> 400L
+            
+            // Level 31-40: 300ms
+            board.level <= 40 -> 300L
+            
+            // Level 41-50: 200ms
+            board.level <= 50 -> 200L
+            
+            // Level 51-60: 150ms
+            board.level <= 60 -> 150L
+            
+            // Level 61-70: 100ms
+            board.level <= 70 -> 100L
+            
+            // Level 71-80: 80ms
+            board.level <= 80 -> 80L
+            
+            // Level 81-90: 60ms
+            board.level <= 90 -> 60L
+            
+            // Level 91+: 50ms (maximum speed)
+            else -> 50L
+        }
+
         logger.debug("Updated drop speed to $dropSpeed ms for level ${board.level}")
     }
 
