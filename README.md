@@ -386,6 +386,39 @@ Controller Axes Overview
 | **Left Trigger Axis**     | `controller.getAxisValue(4)`              | L2 Trigger Axis                      | LT Trigger Axis                    |
 | **Right Trigger Axis**    | `controller.getAxisValue(5)`              | R2 Trigger Axis                      | RT Trigger Axis                    |
 
+Controller Modes
+
+Kengine supports two controller input modes that can be configured via environment variable:
+
+**JOYSTICK Mode (Default)**
+- Uses custom per-controller mappings (SNES, PS4/PS5, Xbox, Nintendo Switch, etc.)
+- Maximum compatibility with all controller types
+- D-pad may use HAT events on some controllers
+- Games work with existing controller mappings without changes
+
+**GAMEPAD Mode**
+- Uses SDL3's standardized gamepad layer
+- Automatic button/axis normalization across all controllers
+- Fixes duplicate controller detection on macOS
+- Single unified mapping for all hardware
+- Recommended for new games
+
+Set the mode using the `KENGINE_CONTROLLER_MODE` environment variable:
+
+```bash
+# Default: JOYSTICK mode (custom mappings)
+./myGame.kexe
+
+# GAMEPAD mode (SDL3 standardized)
+export KENGINE_CONTROLLER_MODE=gamepad
+./myGame.kexe
+
+# Or inline:
+KENGINE_CONTROLLER_MODE=gamepad ./gradlew :games:hextris:runDebugExecutableNative
+```
+
+**Note**: GAMEPAD mode is recommended on macOS to avoid duplicate controller detection issues with certain controllers (e.g., Nintendo SNES controllers).
+
 
 ### Entities
 

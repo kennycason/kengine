@@ -8,6 +8,7 @@ import com.kengine.input.controller.controls.HatDirection
 import com.kengine.log.Logging
 import com.kengine.sdl.SDLEventContext
 import com.kengine.sdl.useSDLEventContext
+import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.IntVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.get
@@ -34,6 +35,10 @@ class ControllerInputEventSubscriber(
     
     // Track seen devices to prevent duplicates
     private val seenDeviceKeys = mutableSetOf<String>()
+    
+    // Track opened SDL resources so we can close them properly
+    private val openedJoysticks = mutableMapOf<UInt, CPointer<cnames.structs.SDL_Joystick>>()
+    private val openedGamepads = mutableMapOf<UInt, CPointer<cnames.structs.SDL_Gamepad>>()
 
     /**
      * Gets the ID of the first connected controller, if any exist.
@@ -58,11 +63,11 @@ class ControllerInputEventSubscriber(
     fun init() {
         if (!initialized) {
             initialized = true
-            useSDLEventContext {
+        useSDLEventContext {
                 logger.info { "Controller mode: $mode - Subscribing to events" }
-                subscribe(SDLEventContext.EventType.CONTROLLER, ::handleControllerEvent)
-            }
-            initControllers()
+            subscribe(SDLEventContext.EventType.CONTROLLER, ::handleControllerEvent)
+        }
+        initControllers()
         } else {
             logger.warn { "ControllerInputEventSubscriber already initialized, skipping duplicate init" }
         }
@@ -142,51 +147,64 @@ class ControllerInputEventSubscriber(
         logger.info { "Joystick added (instanceId=$instanceId)" }
         
         // Open only this specific device, don't rescan all
-        SDL_OpenJoystick(instanceId)?.let { joystick ->
-            val name = SDL_GetJoystickName(joystick)?.toKString() ?: "Unknown Controller"
-            val numAxes = SDL_GetNumJoystickAxes(joystick)
-            val numButtons = SDL_GetNumJoystickButtons(joystick)
-            val numHats = SDL_GetNumJoystickHats(joystick)
-            
-            logger.info { "Opened joystick '$name' (Axes:$numAxes Buttons:$numButtons Hats:$numHats)" }
-            
-            // Skip phantom/virtual controllers (no axes AND no hats = likely virtual device)
-            if (numAxes == 0 && numHats == 0) {
-                logger.warn { "Skipping phantom controller '$name' (0 axes, 0 hats)" }
-                return
-            }
-            
-            // Create device key for deduplication
-            val deviceKey = "$name:$numAxes:$numButtons:$numHats"
-            if (seenDeviceKeys.contains(deviceKey)) {
-                logger.warn { "Skipping duplicate controller '$name'" }
-                return
-            }
-            
-            val mapping = ControllerMapper.getMapping(name)
-            logger.info { "Controller '$name' mapped to: ${mapping?.name ?: "None"}" }
-            
-            controllerStates[instanceId] = ControllerState(
-                axes = FloatArray(numAxes),
-                buttons = BooleanArray(numButtons),
-                hatStates = IntArray(numHats)
-            )
-            
-            if (mapping != null) {
-                controllerMappings[instanceId] = mapping
-            }
-            
-            seenDeviceKeys.add(deviceKey)
-        } ?: run {
+        val joystick = SDL_OpenJoystick(instanceId)
+        if (joystick == null) {
             logger.warn { "Failed to open joystick $instanceId: ${SDL_GetError()?.toKString()}" }
+            return
         }
+        
+        val name = SDL_GetJoystickName(joystick)?.toKString() ?: "Unknown Controller"
+        val numAxes = SDL_GetNumJoystickAxes(joystick)
+        val numButtons = SDL_GetNumJoystickButtons(joystick)
+        val numHats = SDL_GetNumJoystickHats(joystick)
+        
+        logger.info { "Opened joystick '$name' (Axes:$numAxes Buttons:$numButtons Hats:$numHats)" }
+        
+        // Skip phantom/virtual controllers (no axes AND no hats = likely virtual device)
+        if (numAxes == 0 && numHats == 0) {
+            logger.warn { "Skipping phantom controller '$name' (0 axes, 0 hats)" }
+            SDL_CloseJoystick(joystick)
+            return
+        }
+        
+        // Create device key for deduplication
+        val deviceKey = "$name:$numAxes:$numButtons:$numHats"
+        if (seenDeviceKeys.contains(deviceKey)) {
+            logger.warn { "Skipping duplicate controller '$name'" }
+            SDL_CloseJoystick(joystick)
+            return
+        }
+        
+        val mapping = ControllerMapper.getMapping(name)
+        logger.info { "Controller '$name' mapped to: ${mapping?.name ?: "None"}" }
+        
+        controllerStates[instanceId] = ControllerState(
+            axes = FloatArray(numAxes),
+            buttons = BooleanArray(numButtons),
+            hatStates = IntArray(numHats)
+        )
+        
+        if (mapping != null) {
+            controllerMappings[instanceId] = mapping
+        }
+        
+        openedJoysticks[instanceId] = joystick
+        seenDeviceKeys.add(deviceKey)
     }
 
     private fun handleJoystickRemoved(event: SDL_Event) {
         val instanceId = event.jdevice.which
         logger.info { "Joystick removed (instanceId=$instanceId)" }
+        
+        // Close the SDL joystick resource
+        openedJoysticks[instanceId]?.let { joystick ->
+            SDL_CloseJoystick(joystick)
+            logger.info { "Closed joystick (instanceId=$instanceId)" }
+        }
+        
         controllerStates.remove(instanceId)
         controllerMappings.remove(instanceId)
+        openedJoysticks.remove(instanceId)
     }
 
     // ========== GAMEPAD MODE HANDLERS ==========
@@ -272,6 +290,7 @@ class ControllerInputEventSubscriber(
         
         if (seenDeviceKeys.contains(deviceKey)) {
             logger.warn { "Skipping duplicate gamepad '$name' (normalized: $normalizedName) - not adding to controller states" }
+            SDL_CloseGamepad(gamepad)  // Close the duplicate
             return  // Exit the function, don't add to controllerStates
         }
         
@@ -292,6 +311,7 @@ class ControllerInputEventSubscriber(
             controllerMappings[instanceId] = mapping
         }
         
+        openedGamepads[instanceId] = gamepad
         seenDeviceKeys.add(deviceKey)
         logger.info { "✅ Gamepad '$name' (ID:$instanceId) successfully added via hotplug" }
     }
@@ -299,8 +319,16 @@ class ControllerInputEventSubscriber(
     private fun handleGamepadRemoved(event: SDL_Event) {
         val instanceId = event.gdevice.which
         logger.info { "Gamepad removed (instanceId=$instanceId)" }
+        
+        // Close the SDL gamepad resource
+        openedGamepads[instanceId]?.let { gamepad ->
+            SDL_CloseGamepad(gamepad)
+            logger.info { "Closed gamepad (instanceId=$instanceId)" }
+        }
+        
         controllerStates.remove(instanceId)
         controllerMappings.remove(instanceId)
+        openedGamepads.remove(instanceId)
     }
 
     // ========== INITIALIZATION ==========
@@ -342,6 +370,7 @@ class ControllerInputEventSubscriber(
                         val deviceKey = "$name:$numAxes:$numButtons:$numHats"
                         if (seenDeviceKeys.contains(deviceKey)) {
                             logger.warn { "Skipping duplicate controller '$name'" }
+                            SDL_CloseJoystick(joystick)
                             return@let
                         }
                         
@@ -358,6 +387,7 @@ class ControllerInputEventSubscriber(
                             controllerMappings[instanceId] = mapping
                         }
                         
+                        openedJoysticks[instanceId] = joystick
                         seenDeviceKeys.add(deviceKey)
                     } ?: run {
                         logger.warn { "Failed to open joystick $i: ${SDL_GetError()?.toKString()}" }
@@ -388,6 +418,7 @@ class ControllerInputEventSubscriber(
                         
                         if (seenDeviceKeys.contains(deviceKey)) {
                             logger.warn { "Skipping duplicate gamepad '$name' (normalized: $normalizedName)" }
+                            SDL_CloseGamepad(gamepad)
                             return@let
                         }
                         
@@ -408,6 +439,7 @@ class ControllerInputEventSubscriber(
                             controllerMappings[instanceId] = mapping
                         }
                         
+                        openedGamepads[instanceId] = gamepad
                         seenDeviceKeys.add(deviceKey)
                     } ?: run {
                         logger.warn { "Failed to open gamepad $i: ${SDL_GetError()?.toKString()}" }
@@ -486,9 +518,24 @@ class ControllerInputEventSubscriber(
 
     fun cleanup() {
         logger.info { "Cleaning up ControllerInputEventSubscriber" }
+        
+        // Close all opened SDL joystick resources
+        openedJoysticks.forEach { (id, joystick) ->
+            SDL_CloseJoystick(joystick)
+            logger.info { "Closed joystick (ID:$id)" }
+        }
+        
+        // Close all opened SDL gamepad resources
+        openedGamepads.forEach { (id, gamepad) ->
+            SDL_CloseGamepad(gamepad)
+            logger.info { "Closed gamepad (ID:$id)" }
+        }
+        
         controllerStates.clear()
         controllerMappings.clear()
         seenDeviceKeys.clear()
+        openedJoysticks.clear()
+        openedGamepads.clear()
         initialized = false
     }
 }

@@ -19,10 +19,49 @@ import com.kengine.time.timeSinceMs
 
 /**
  * Main Hextris game class.
+ * 
+ * TIMING SYSTEM DOCUMENTATION:
+ * ============================
+ * This game uses ABSOLUTE timestamps (from getClockContext().totalTimeMs) and timeSinceMs() helper.
+ * 
+ * CRITICAL: Understanding Absolute vs Relative Time
+ * --------------------------------------------------
+ * ✅ CORRECT PATTERN (what we use):
+ *   1. Store ABSOLUTE timestamp: lastActionTime = getClockContext().totalTimeMs
+ *   2. Check elapsed time: if (timeSinceMs(lastActionTime) > delayMs) { ... }
+ *   3. timeSinceMs() internally does: currentTime - lastActionTime
+ * 
+ * ❌ COMMON PITFALL (DO NOT DO THIS):
+ *   1. Store elapsed time: lastActionTime = timeSinceMs(someOtherTime) // WRONG!
+ *   2. This stores a DURATION, not a TIMESTAMP
+ *   3. Future comparisons will be incorrect and cause timing bugs
+ * 
+ * Why This Matters:
+ * -----------------
+ * - dropTime, timeSinceOptionChangeMs, moveStartTime etc. must ALWAYS store ABSOLUTE timestamps
+ * - Always get fresh timestamp: getClockContext().totalTimeMs
+ * - Always use timeSinceMs(timestamp) to calculate elapsed time
+ * - Never store the result of timeSinceMs() as a "time" variable
+ * 
+ * Example Bug We Fixed:
+ * ---------------------
+ * BAD:  timeSinceOptionChangeMs = timeSinceMs(oldTime)  // Stores ~60ms duration
+ *       Later: timeSinceMs(60) = currentTime - 60ms     // Calculates huge wrong value!
+ * 
+ * GOOD: timeSinceOptionChangeMs = getClockContext().totalTimeMs  // Stores ~123456ms absolute
+ *       Later: timeSinceMs(123456) = currentTime - 123456ms      // Calculates correct elapsed time
+ * 
+ * Variables Using This Pattern:
+ * -----------------------------
+ * - dropTime: Last time piece auto-dropped
+ * - moveLeftTime, moveRightTime, moveDownTime: Movement timing
+ * - moveStartTime: When current movement direction started
+ * - rotateTime, rotateStartTime: Rotation timing
+ * - timeSinceOptionChangeMs: Last pause/reset/option change (uses pauseDelayMs = 1000ms)
  */
 class HextrisGame : Game, Logging {
     enum class State {
-        INIT, PLAY, GAME_OVER
+        INIT, PLAY, PAUSED, GAME_OVER
     }
 
     // Game state
@@ -36,8 +75,8 @@ class HextrisGame : Game, Logging {
     private var moveLeftTime = 0L
     private var moveRightTime = 0L
     private var moveDownTime = 0L
-    private var moveSpeed = 80L // milliseconds - doubled from 20ms for better feel
-    private var initialMoveDelay = 60L // Short initial delay before repeat starts - doubled from 30ms
+    private var moveSpeed = 80L // milliseconds
+    private var initialMoveDelay = 60L // Short initial delay before repeat starts
 
     // Movement state tracking like the web version
     private var lastMoveDirection: String? = null
@@ -45,12 +84,13 @@ class HextrisGame : Game, Logging {
 
     // Rotation timing and state tracking
     private var rotateTime = 0L // Keep for backward compatibility
-    private var rotateSpeed = 150L // milliseconds - doubled from 50ms for better feel
+    private var rotateSpeed = 175L // milliseconds
     private var lastRotateDirection: String? = null
     private var rotateStartTime = 0L
     private var timeSinceOptionChangeMs = 0L
-    private val inputDelayMs = 50L // doubled from 20ms for better feel
-    
+    private val inputDelayMs = 60L
+    private val pauseDelayMs = 1000L
+
     // Hard drop state tracking (to prevent repeated triggers)
     private var hardDropPressed = false
 
@@ -122,6 +162,7 @@ class HextrisGame : Game, Logging {
         when (state) {
             State.INIT -> init()
             State.PLAY -> play()
+            State.PAUSED -> handlePaused()
             State.GAME_OVER -> handleGameOver()
         }
     }
@@ -143,10 +184,14 @@ class HextrisGame : Game, Logging {
             // Draw the score, level, and lines
             drawStats()
 
+            // Draw pause message if needed
+            if (state == State.PAUSED) {
+                menuFont.drawText("PAUSED", 330, 280, r = 0xFFu, g = 0xFFu, b = 0x00u, a = 0xFFu)
+            }
+
             // Draw game over message if needed
             if (state == State.GAME_OVER) {
                 menuFont.drawText("GAME OVER", 300, 300, r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
-                menuFont.drawText("PRESS SPACE TO RESTART", 200, 350, r = 0xFFu, g = 0xFFu, b = 0xFFu, a = 0xFFu)
             }
 
             // Flip the screen
@@ -222,10 +267,47 @@ class HextrisGame : Game, Logging {
         }
     }
 
+    private fun handlePaused() {
+        // Handle keyboard input for resuming
+        useKeyboardContext {
+            val timeSinceLastToggle = timeSinceMs(timeSinceOptionChangeMs)
+            if (keyboard.isReturnPressed() && timeSinceLastToggle > pauseDelayMs) {
+                val currentTimeBeforeToggle = getClockContext().totalTimeMs
+                logger.info("Keyboard: Return pressed while paused. Time since last toggle: ${timeSinceLastToggle}ms (delay: ${pauseDelayMs}ms)")
+                timeSinceOptionChangeMs = currentTimeBeforeToggle
+                togglePause()
+                logger.info("Keyboard: Resumed. New timestamp: ${timeSinceOptionChangeMs}")
+            } else if (keyboard.isReturnPressed()) {
+                if (inputLogCounter % 30 == 0) { // Throttle logging
+                    logger.debug("Keyboard: Return pressed but timing gate active. Time since last: ${timeSinceLastToggle}ms < ${pauseDelayMs}ms")
+                }
+            }
+        }
+
+        // Handle controller input for resuming
+        useControllerContext {
+            val controllerId = controller.getFirstControllerId() ?: return
+            val isSTARTPressed = controller.isButtonPressed(controllerId, 6)
+            val timeSinceLastToggle = timeSinceMs(timeSinceOptionChangeMs)
+            
+            if (isSTARTPressed && timeSinceLastToggle > pauseDelayMs) {
+                val currentTimeBeforeToggle = getClockContext().totalTimeMs
+                logger.info("Controller: START pressed while paused. Time since last toggle: ${timeSinceLastToggle}ms (delay: ${pauseDelayMs}ms)")
+                timeSinceOptionChangeMs = currentTimeBeforeToggle
+                togglePause()
+                logger.info("Controller: Resumed. New timestamp: ${timeSinceOptionChangeMs}")
+            } else if (isSTARTPressed) {
+                if (inputLogCounter % 30 == 0) { // Throttle logging
+                    logger.debug("Controller: START pressed but timing gate active. Time since last: ${timeSinceLastToggle}ms < ${pauseDelayMs}ms")
+                }
+            }
+        }
+    }
+
     private fun handleGameOver() {
         // Handle keyboard input for restarting
         useKeyboardContext {
-            if (keyboard.isSpacePressed() && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
+            if (keyboard.isSpacePressed() && timeSinceMs(timeSinceOptionChangeMs) > pauseDelayMs) {
                 timeSinceOptionChangeMs = getClockContext().totalTimeMs
                 reset()
             }
@@ -234,11 +316,21 @@ class HextrisGame : Game, Logging {
         // Handle controller input for restarting
         useControllerContext {
             // A button or START to restart
-            if ((controller.isButtonPressed(Buttons.A) || controller.isButtonPressed(Buttons.START)) && 
+            if ((controller.isButtonPressed(Buttons.A) || controller.isButtonPressed(Buttons.START)) &&
                 timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
                 timeSinceOptionChangeMs = getClockContext().totalTimeMs
                 reset()
             }
+        }
+    }
+
+    private fun togglePause() {
+        state = if (state == State.PAUSED) {
+            logger.info("Game resumed")
+            State.PLAY
+        } else {
+            logger.info("Game paused")
+            State.PAUSED
         }
     }
 
@@ -496,6 +588,13 @@ class HextrisGame : Game, Logging {
                 timeSinceOptionChangeMs = getClockContext().totalTimeMs
                 reset()
             }
+
+            // Pause/Resume game (Return/Enter)
+            if (keyboard.isReturnPressed() && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
+                timeSinceOptionChangeMs = getClockContext().totalTimeMs
+                togglePause()
+                logger.debug("Keyboard: Return = ${if (state == State.PAUSED) "Paused" else "Resumed"}")
+            }
         }
     }
 
@@ -503,17 +602,20 @@ class HextrisGame : Game, Logging {
         useControllerContext {
             // Get first controller ID to avoid dual-registration issues
             val controllerId = controller.getFirstControllerId() ?: return
-            
-            // SNES Controller Button Mapping (JoystickID 3):
+
+            // GAMEPAD MODE Button Mapping (from controller mapping tool):
+            // D-Pad: DPAD_LEFT=13, DPAD_UP=11, DPAD_RIGHT=14, DPAD_DOWN=12 (BUTTONS, not HAT!)
             // Face buttons: B=0, A=1, Y=2, X=3
-            // Shoulders: L=4, R=6 (NOT 5!)
-            // System: SELECT=?, START=?
-            // D-Pad: HAT events (not buttons!)
-            
+            // Shoulders: L1=9, R1=10
+            // System: SELECT=4, START=6
+            //
+            // IMPORTANT: In GAMEPAD mode, D-pad is mapped to BUTTONS, not HAT directions!
+            // This is different from JOYSTICK mode where D-pad uses HAT events.
+
             val currentTime = getClockContext().totalTimeMs
 
-            // Move left - DPAD LEFT (HAT) - with throttling
-            val isLeftPressed = controller.isHatDirectionPressed(0, HatDirection.LEFT)
+            // Move left - DPAD LEFT (Button 13 in GAMEPAD mode) - with throttling
+            val isLeftPressed = controller.isButtonPressed(controllerId, 13)
             if (isLeftPressed) {
                 val shouldMove = if (lastMoveDirection == "controller_left") {
                     // If continuing to press left, check if we've passed the initial delay
@@ -543,8 +645,8 @@ class HextrisGame : Game, Logging {
                 lastMoveDirection = null
             }
 
-            // Move right - DPAD RIGHT (HAT) - with throttling
-            val isRightPressed = controller.isHatDirectionPressed(0, HatDirection.RIGHT)
+            // Move right - DPAD RIGHT (Button 14 in GAMEPAD mode) - with throttling
+            val isRightPressed = controller.isButtonPressed(controllerId, 14)
             if (isRightPressed) {
                 val shouldMove = if (lastMoveDirection == "controller_right") {
                     // If continuing to press right, check if we've passed the initial delay
@@ -574,8 +676,8 @@ class HextrisGame : Game, Logging {
                 lastMoveDirection = null
             }
 
-            // Soft drop (speed up fall) - DPAD DOWN (HAT) - directly modify drop speed
-            val isControllerDownPressed = controller.isHatDirectionPressed(0, HatDirection.DOWN)
+            // Soft drop (speed up fall) - DPAD DOWN (Button 12 in GAMEPAD mode) - directly modify drop speed
+            val isControllerDownPressed = controller.isButtonPressed(controllerId, 12)
 
             if (isControllerDownPressed && lastMoveDirection != "controller_down") {
                 // First press - set fast drop speed and move down immediately
@@ -597,10 +699,10 @@ class HextrisGame : Game, Logging {
                 logger.debug("Controller: Down button released after ${downButtonPressedTime}ms. Restored drop speed from $fastSpeed ms to $dropSpeed ms")
             }
 
-            // Hard drop (instant fall) - DPAD UP (HAT)
+            // Hard drop (instant fall) - DPAD UP (Button 11 in GAMEPAD mode)
             // Requires release and re-press for each piece to prevent repeated triggers
-            val isHardDropPressed = controller.isHatDirectionPressed(0, HatDirection.UP)
-            
+            val isHardDropPressed = controller.isButtonPressed(controllerId, 11)
+
             if (isHardDropPressed && !hardDropPressed && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
                 hardDropPressed = true // Mark as pressed to prevent repeats
                 val timeSinceLastAction = timeSinceMs(timeSinceOptionChangeMs)
@@ -632,18 +734,18 @@ class HextrisGame : Game, Logging {
             }
 
             // ROTATION CONTROLS - Priority order
-            // Use raw button numbers from JoystickID 3 only (first controller)
+            // Use raw button numbers from gamepad mapping
             // Priority: (L+R combo) > L > R > X > B > A
-            
-            // From logs (JoystickID 3 only):
-            // L=4, R=6, A=1, B=0, X=3, Y=2
-            val isLPressed = controller.isButtonPressed(controllerId, 4)
-            val isRPressed = controller.isButtonPressed(controllerId, 6)
+
+            // From controller mapping tool (GAMEPAD mode):
+            // L1=9, R1=10, A=1, B=0, X=3, Y=2
+            val isLPressed = controller.isButtonPressed(controllerId, 9)
+            val isRPressed = controller.isButtonPressed(controllerId, 10)
             val isAPressed = controller.isButtonPressed(controllerId, 1)
             val isBPressed = controller.isButtonPressed(controllerId, 0)
             val isXPressed = controller.isButtonPressed(controllerId, 3)
             val isYPressed = controller.isButtonPressed(controllerId, 2)
-            
+
             // Priority: L+R combo first
             if (isLPressed && isRPressed) {
                 // L+R combo = 180° rotation
@@ -654,7 +756,7 @@ class HextrisGame : Game, Logging {
                     rotateStartTime = currentTime
                     true
                 }
-                
+
                 if (shouldRotate) {
                     rotateTime = currentTime
                     logger.debug("Controller: L+R = Rotating 180 degrees")
@@ -670,7 +772,7 @@ class HextrisGame : Game, Logging {
                     rotateStartTime = currentTime
                     true
                 }
-                
+
                 if (shouldRotate) {
                     rotateTime = currentTime
                     logger.debug("Controller: L or Y = Rotating counter-clockwise")
@@ -685,7 +787,7 @@ class HextrisGame : Game, Logging {
                     rotateStartTime = currentTime
                     true
                 }
-                
+
                 if (shouldRotate) {
                     rotateTime = currentTime
                     logger.debug("Controller: R or A = Rotating clockwise")
@@ -700,7 +802,7 @@ class HextrisGame : Game, Logging {
                     rotateStartTime = currentTime
                     true
                 }
-                
+
                 if (shouldRotate) {
                     rotateTime = currentTime
                     logger.debug("Controller: X button = Rotating 180 degrees")
@@ -716,7 +818,7 @@ class HextrisGame : Game, Logging {
                     rotateStartTime = currentTime
                     true
                 }
-                
+
                 if (shouldRotate) {
                     rotateTime = currentTime
                     logger.debug("Controller: B button = Rotating counter-clockwise")
@@ -728,24 +830,40 @@ class HextrisGame : Game, Logging {
                     lastRotateDirection = null
                 }
             }
-            
+
             // SELECT and START buttons - Priority order
-            // From SNES.kt mapping: SELECT=6, START=7
-            // But logs show different numbers, need to find them
-            // Unknown buttons from logs: 9, 10 (first test), 10, 11 (second test)
-            val isSELECTPressed = controller.isButtonPressed(controllerId, 8) || controller.isButtonPressed(controllerId, 9)
-            val isSTARTPressed = controller.isButtonPressed(controllerId, 7) || controller.isButtonPressed(controllerId, 10)
+            // From controller mapping tool (GAMEPAD mode):
+            // SELECT=4, START=6
+            // 
+            // TIMING NOTE: We use pauseDelayMs (1000ms) here to prevent rapid pause/unpause toggling.
+            // This is CRITICAL because timeSinceMs() calculates the elapsed time since a SPECIFIC TIMESTAMP.
+            // We must compare against an ABSOLUTE timestamp stored in timeSinceOptionChangeMs, not a relative duration.
+            // See timing documentation below for details on this common pitfall.
+            val isSELECTPressed = controller.isButtonPressed(controllerId, 4)
+            val isSTARTPressed = controller.isButtonPressed(controllerId, 6)
             
-            if (isSELECTPressed && isSTARTPressed && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
+            // Calculate time since last pause toggle for debugging
+            val timeSinceLastToggle = timeSinceMs(timeSinceOptionChangeMs)
+
+            if (isSELECTPressed && isSTARTPressed && timeSinceLastToggle > pauseDelayMs) {
                 // SELECT + START = Reset game
-                timeSinceOptionChangeMs = getClockContext().totalTimeMs
-                logger.debug("Controller: SELECT+START = Resetting game")
+                val currentTimeBeforeReset = getClockContext().totalTimeMs
+                logger.info("Controller: SELECT+START = Resetting game. Time since last toggle: ${timeSinceLastToggle}ms (delay: ${pauseDelayMs}ms)")
+                timeSinceOptionChangeMs = currentTimeBeforeReset
                 reset()
-            } else if (isSTARTPressed && !isSELECTPressed && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
-                // START alone = Pause
-                timeSinceOptionChangeMs = getClockContext().totalTimeMs
-                logger.debug("Controller: START = Pause (not yet implemented)")
-                // TODO: Implement pause functionality
+            } else if (isSTARTPressed && !isSELECTPressed && timeSinceLastToggle > pauseDelayMs) {
+                // START alone = Pause/Resume
+                val currentTimeBeforeToggle = getClockContext().totalTimeMs
+                logger.info("Controller: START pressed. Time since last toggle: ${timeSinceLastToggle}ms (delay: ${pauseDelayMs}ms)")
+                timeSinceOptionChangeMs = currentTimeBeforeToggle
+                togglePause()
+                logger.info("Controller: START = ${if (state == State.PAUSED) "Paused" else "Resumed"}. New timestamp: ${timeSinceOptionChangeMs}")
+            }
+            // Log when buttons are pressed but timing gate prevents action
+            else if (isSTARTPressed && !isSELECTPressed && timeSinceLastToggle <= pauseDelayMs) {
+                if (inputLogCounter % 30 == 0) { // Log throttled to avoid spam
+                    logger.debug("Controller: START pressed but timing gate active. Time since last: ${timeSinceLastToggle}ms < ${pauseDelayMs}ms")
+                }
             }
             // SELECT alone does nothing (as intended)
         }
@@ -1102,31 +1220,31 @@ class HextrisGame : Game, Logging {
         dropSpeed = when {
             // Level 1-10: 800ms (classic Tetris Level 1 speed)
             board.level <= 10 -> 800L
-            
+
             // Level 11-20: 600ms
             board.level <= 20 -> 600L
-            
+
             // Level 21-30: 400ms
             board.level <= 30 -> 400L
-            
+
             // Level 31-40: 300ms
             board.level <= 40 -> 300L
-            
+
             // Level 41-50: 200ms
             board.level <= 50 -> 200L
-            
+
             // Level 51-60: 150ms
             board.level <= 60 -> 150L
-            
+
             // Level 61-70: 100ms
             board.level <= 70 -> 100L
-            
+
             // Level 71-80: 80ms
             board.level <= 80 -> 80L
-            
+
             // Level 81-90: 60ms
             board.level <= 90 -> 60L
-            
+
             // Level 91+: 50ms (maximum speed)
             else -> 50L
         }
