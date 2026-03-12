@@ -25,6 +25,7 @@ if (isPlaydateEnabled) {
 
 modules.addAll(
     listOf(
+        "games:antfarm",
         "games:boxxle",
         "games:helloworld",
         "games:hextris",

@@ -33,24 +33,18 @@ copy_libkengine:
 	@echo "Copying libkengine_playdate.a to ./Source..."
 	cp ../build/bin/playdate/libkengine_playdate.a ./Source
 
-# Ensure main.pdz is created
 device_bin: copy_libkengine $(OBJDIR)/pdex.elf
-	@echo "Creating pdex.bin from pdex.elf..."
-	cp $(OBJDIR)/pdex.elf Source/main.pdz
+	@echo "Converting pdex.elf to pdex.bin..."
+	arm-none-eabi-objcopy -O binary $(OBJDIR)/pdex.elf $(OBJDIR)/pdex.bin
 
 build/KenginePlaydate.pdx: device_bin
 	@echo "Packaging KenginePlaydate.pdx..."
 	mkdir -p build/KenginePlaydate.pdx
-	cp Source/main.pdz build/KenginePlaydate.pdx/pdex.bin
-	$(SDK)/bin/pdc -k build/KenginePlaydate.pdx build/KenginePlaydate.pdx
-
-post_exe_cleanup: build/KenginePlaydate.pdx
-	@echo "Post exe build cleanup"
+	cp $(OBJDIR)/pdex.bin build/KenginePlaydate.pdx/pdex.bin
 	cp pdxinfo build/KenginePlaydate.pdx/
-	rm build/KenginePlaydate.pdx/*.c
 
 # Run in Simulator
 run: build/KenginePlaydate.pdx
 	open -a "Playdate Simulator" $(PRODUCT)
 
-.PHONY: all clean run
+.PHONY: all clean run copy_libkengine
