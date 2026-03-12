@@ -35,11 +35,18 @@ jobs:
             /usr/local/lib/libSDL3_net*
             /usr/local/include/SDL3_mixer
             /usr/local/include/SDL3_net
-          key: sdl3-source-${{ runner.os }}-${{ hashFiles('sdl3/SDL_mixer/**', 'sdl3/SDL_net/**') }}
+          key: sdl3-source-${{ runner.os }}-${{ hashFiles('.gitmodules', 'sdl3/build_sdl.sh') }}
 
       - name: Build SDL3_mixer and SDL3_net from source
         if: steps.sdl-source-cache.outputs.cache-hit != 'true'
         run: bash sdl3/build_sdl.sh
+
+      - name: Verify SDL3 libraries
+        run: |
+          echo "=== Brew libs ==="
+          ls /opt/homebrew/lib/libSDL3*.dylib
+          echo "=== Source-built libs ==="
+          ls /usr/local/lib/libSDL3_mixer* /usr/local/lib/libSDL3_net*
 
       - name: Gradle cache
         uses: actions/cache@v4
@@ -59,15 +66,24 @@ jobs:
 
       - name: Copy SDL dylibs for tests
         run: |
+          # rpath in test binaries is @executable_path/../Frameworks
+          # so from debugTest/test.kexe it resolves to native/Frameworks/
           for dir in kengine kengine-network kengine-sound; do
-            fw_dir="$dir/build/bin/native/debugTest/Frameworks"
+            fw_dir="$dir/build/bin/native/Frameworks"
             mkdir -p "$fw_dir"
+            # Brew-installed libs
             cp /opt/homebrew/lib/libSDL3.0.dylib "$fw_dir/" 2>/dev/null || true
             cp /opt/homebrew/lib/libSDL3_image.0.dylib "$fw_dir/" 2>/dev/null || true
             cp /opt/homebrew/lib/libSDL3_ttf.0.dylib "$fw_dir/" 2>/dev/null || true
+            # Source-built libs
             cp /usr/local/lib/libSDL3_mixer.0.dylib "$fw_dir/" 2>/dev/null || true
             cp /usr/local/lib/libSDL3_net.0.dylib "$fw_dir/" 2>/dev/null || true
           done
+          # Verify critical dylibs are in place
+          echo "=== Dylib check ==="
+          ls -la kengine/build/bin/native/Frameworks/*.dylib
+          ls -la kengine-network/build/bin/native/Frameworks/*.dylib
+          ls -la kengine-sound/build/bin/native/Frameworks/*.dylib
 
       - name: Run kengine unit tests
         run: |
