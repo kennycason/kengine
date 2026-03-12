@@ -6,23 +6,27 @@ import java.io.File
 
 class SdlDylibCopier(private val project: Project) {
 
-    companion object {
-        // Search paths in priority order: Homebrew (Apple Silicon), then /usr/local (source builds)
-        private val LIB_SEARCH_PATHS = listOf(
-            "/opt/homebrew/lib",
-            "/usr/local/lib"
-        )
+    private val isMacOS = PlatformConfig.isMacOS
+    private val isLinux = PlatformConfig.isLinux
+
+    private val searchPaths: List<String> = when {
+        isMacOS -> listOf("/opt/homebrew/lib", "/usr/local/lib")
+        isLinux -> listOf("/usr/local/lib", "/usr/lib/x86_64-linux-gnu", "/usr/lib")
+        else -> listOf("/usr/local/lib")
     }
 
     /**
-     * Resolve a dylib by name, searching brew and source-build locations.
-     * Returns the first path found, or throws with a helpful message.
+     * Resolve a shared library by base name (e.g. "SDL3"), searching platform-specific locations.
+     * On macOS looks for .dylib, on Linux looks for .so.
      */
-    private fun resolveDylib(name: String): String {
-        // Try versioned (.0.dylib) first, then unversioned (.dylib)
-        val candidates = listOf(name, name.replace(".0.dylib", ".dylib"))
+    private fun resolveLib(baseName: String): String {
+        val candidates = if (isMacOS) {
+            listOf("lib${baseName}.0.dylib", "lib${baseName}.dylib")
+        } else {
+            listOf("lib${baseName}.so.0", "lib${baseName}.so")
+        }
         for (candidate in candidates) {
-            for (searchPath in LIB_SEARCH_PATHS) {
+            for (searchPath in searchPaths) {
                 val path = "$searchPath/$candidate"
                 if (File(path).exists()) {
                     return path
@@ -30,73 +34,54 @@ class SdlDylibCopier(private val project: Project) {
             }
         }
         throw IllegalStateException(
-            "Could not find $name in any of: ${LIB_SEARCH_PATHS.joinToString()}. " +
-                "Install via Homebrew (brew install sdl3) or build from source (bash sdl3/build_sdl.sh)."
+            "Could not find lib$baseName in any of: ${searchPaths.joinToString()}. " +
+                if (isMacOS) "Install via Homebrew (brew install sdl3) or build from source (bash sdl3/build_sdl.sh)."
+                else "Build from source (bash sdl3/build_sdl.sh) or install via your package manager."
         )
     }
 
     fun registerSDLDylibs() {
-        // Define which dylib names each module needs (just the filenames)
-        val dylibNames = when (project.name) {
-            "kengine-network" -> listOf(
-                "libSDL3.0.dylib",
-                "libSDL3_net.0.dylib",
-                "libSDL3_image.0.dylib",
-                "libSDL3_ttf.0.dylib"
-            )
-            "kengine-physics" -> listOf(
-                "libSDL3.0.dylib",
-                "libchipmunk.dylib"
-            )
-            "kengine-sound" -> listOf(
-                "libSDL3.0.dylib",
-                "libSDL3_mixer.0.dylib",
-                "libSDL3_image.0.dylib",
-                "libSDL3_ttf.0.dylib"
-            )
-            else -> listOf(
-                "libSDL3.0.dylib",
-                "libSDL3_image.0.dylib",
-                "libSDL3_mixer.0.dylib",
-                "libSDL3_ttf.0.dylib"
-            )
+        val libBaseNames = when (project.name) {
+            "kengine-network" -> listOf("SDL3", "SDL3_net", "SDL3_image", "SDL3_ttf")
+            "kengine-physics" -> listOf("SDL3", "chipmunk")
+            "kengine-sound" -> listOf("SDL3", "SDL3_mixer", "SDL3_image", "SDL3_ttf")
+            else -> listOf("SDL3", "SDL3_image", "SDL3_mixer", "SDL3_ttf")
         }
 
-        // Resolve each dylib name to its actual path
-        val dylibsToCopy = dylibNames.map { resolveDylib(it) }
+        val libsToCopy = libBaseNames.map { resolveLib(it) }
 
-        val dylibTargetDirs = listOf(
+        val libTargetDirs = listOf(
             "${project.buildDir}/bin/native/Frameworks",
             "${project.buildDir}/bin/native/debugExecutable/Frameworks",
             "${project.buildDir}/bin/native/debugTest/Frameworks"
         )
-        registerCopyTasks(project, dylibsToCopy, dylibTargetDirs)
+        registerCopyTasks(project, libsToCopy, libTargetDirs)
     }
 
     private fun registerCopyTasks(
         project: Project,
-        dylibsToCopy: List<String>,
-        dylibTargetDirs: List<String>
+        libsToCopy: List<String>,
+        libTargetDirs: List<String>
     ) {
-        dylibsToCopy.forEach { dylibPath ->
-            val dylibName = dylibPath.substringAfterLast("/")
+        libsToCopy.forEach { libPath ->
+            val libName = libPath.substringAfterLast("/")
 
-            dylibTargetDirs.forEach { toDir ->
+            libTargetDirs.forEach { toDir ->
                 val targetDir = toDir.substringAfter("${project.buildDir}/bin/native/")
 
-                val taskName = generateTaskName(project, dylibName, targetDir)
+                val taskName = generateTaskName(project, libName, targetDir)
 
                 if (project.tasks.findByName(taskName) == null) {
                     project.tasks.register<Copy>(taskName) {
-                        description = "Copy $dylibName to $targetDir for module ${project.name}"
-                        from(dylibPath)
+                        description = "Copy $libName to $targetDir for module ${project.name}"
+                        from(libPath)
                         into(toDir)
 
                         doFirst {
-                            println("[${project.name}] Copying $dylibPath to $toDir")
+                            println("[${project.name}] Copying $libPath to $toDir")
                             project.mkdir(toDir)
 
-                            val targetFile = project.file("$toDir/$dylibName")
+                            val targetFile = project.file("$toDir/$libName")
                             if (targetFile.exists()) {
                                 targetFile.delete()
                             }
@@ -110,23 +95,28 @@ class SdlDylibCopier(private val project: Project) {
             }
         }
 
-        // Attach dependencies to the `nativeTest` task
         project.tasks.named("nativeTest") {
             dependsOn(
-                dylibsToCopy.flatMap { dylibPath ->
-                    val dylibName = dylibPath.substringAfterLast("/")
-                    dylibTargetDirs.map { toDir ->
+                libsToCopy.flatMap { libPath ->
+                    val libName = libPath.substringAfterLast("/")
+                    libTargetDirs.map { toDir ->
                         val targetDir = toDir.substringAfter("${project.buildDir}/bin/native/")
-                        generateTaskName(project, dylibName, targetDir)
+                        generateTaskName(project, libName, targetDir)
                     }
                 }
             )
         }
     }
 
-    private fun generateTaskName(project: Project, dylibName: String, targetDir: String): String {
+    private fun generateTaskName(project: Project, libName: String, targetDir: String): String {
         val moduleName = project.name.capitalize()
-        val prefix = dylibName.removePrefix("lib").removeSuffix(".dylib").capitalize()
+        val prefix = libName
+            .removePrefix("lib")
+            .removeSuffix(".0.dylib")
+            .removeSuffix(".dylib")
+            .removeSuffix(".so.0")
+            .removeSuffix(".so")
+            .capitalize()
         return if (targetDir.contains("debugTest"))
             "copy${moduleName}${prefix}ToDebugTestFrameworks"
         else

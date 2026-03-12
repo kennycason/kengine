@@ -30,11 +30,14 @@ kotlin {
     }
 
     nativeTarget.apply {
-        // C interop configurations
+        binaries.all {
+            linkerOpts(PlatformConfig.sharedLibLinkerOpts("SDL3", "SDL3_net"))
+        }
+
         compilations["main"].cinterops {
             val sdl3net by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3_net.def")
-                compilerOpts("-I/opt/homebrew/include", "-I/usr/local/include")
+                compilerOpts(PlatformConfig.compilerOpts)
             }
         }
 

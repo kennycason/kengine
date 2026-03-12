@@ -30,11 +30,14 @@ kotlin {
     }
 
     nativeTarget.apply {
-        // C interop configurations
+        binaries.all {
+            linkerOpts(PlatformConfig.sharedLibLinkerOpts("SDL3", "chipmunk"))
+        }
+
         compilations["main"].cinterops {
             val chipmunk by creating {
                 defFile = file("src/nativeInterop/cinterop/chipmunk.def")
-                compilerOpts("-I/usr/local/include", "-I/opt/homebrew/include")
+                compilerOpts(PlatformConfig.compilerOpts)
             }
         }
 
