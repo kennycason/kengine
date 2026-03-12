@@ -44,8 +44,13 @@ object PlatformConfig {
             "-framework", "AudioToolbox"
         ) else emptyList()
 
+    val linuxSystemLibs: List<String>
+        get() = if (isLinux) listOf(
+            "-lpthread", "-ldl", "-lm"
+        ) else emptyList()
+
     fun sharedLibLinkerOpts(vararg libs: String): List<String> =
-        libPathOpts + libs.map { "-l$it" } + macFrameworks + rpathOpts
+        libPathOpts + libs.map { "-l$it" } + macFrameworks + linuxSystemLibs + rpathOpts
 
     val sharedLibExt: String = if (isMacOS) "dylib" else "so"
 }
