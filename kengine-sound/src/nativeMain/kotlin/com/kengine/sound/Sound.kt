@@ -35,7 +35,9 @@ class Sound(filePath: String) {
      */
     fun setVolume(volume: Int) {
         this.volume = max(0, min(volume, 100))
-        Mix_Volume(channel, scaleVolume(this.volume))
+        if (channel != -1) {
+            Mix_Volume(channel, scaleVolume(this.volume))
+        }
     }
 
     /**

@@ -32,11 +32,13 @@ class NetworkContext : Context(), Logging {
     }
 
     fun getConnection(ipAddress: IPAddress): NetworkConnection {
-        return connections[ipAddress.toString()]!!
+        return connections[ipAddress.toString()]
+            ?: throw IllegalStateException("No connection found for $ipAddress")
     }
 
     fun getConnection(id: String): NetworkConnection {
-        return connections[id]!!
+        return connections[id]
+            ?: throw IllegalStateException("No connection found for id: $id")
     }
 
     fun isConnection(id: String): Boolean {

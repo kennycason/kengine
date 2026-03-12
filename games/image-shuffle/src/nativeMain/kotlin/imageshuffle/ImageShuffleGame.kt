@@ -94,7 +94,7 @@ class ImageShuffleGame : Game, Logging {
                 if (tiles[i] == 0) continue // skip empty tile
 
                 val tileNum = tiles[i] - 1 // -1 because tile 0 is empty
-                val srcX = (tileNum + puzzleSize + 1) % puzzleSize
+                val srcX = tileNum % puzzleSize
                 val srcY = tileNum / puzzleSize
 
                 val destX = (i % puzzleSize) * tileSize

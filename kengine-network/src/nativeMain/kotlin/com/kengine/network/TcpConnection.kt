@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -84,6 +85,7 @@ open class TcpConnection private constructor(
         runBlocking {
             receiveJob?.cancelAndJoin()
         }
+        scope.cancel()
         streamSocket?.let { socket ->
             SDLNet_DestroyStreamSocket(socket)
             streamSocket = null

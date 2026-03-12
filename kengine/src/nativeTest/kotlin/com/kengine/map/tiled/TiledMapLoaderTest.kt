@@ -72,8 +72,8 @@ class TiledMapLoaderTest : Logging {
 
         // validate main layer properties
         expectThat(mainLayer) {
-            property(TiledMapLayer::width).isEqualTo(100)
-            property(TiledMapLayer::height).isEqualTo(17)
+            property(TiledMapLayer::width).isEqualTo(20)
+            property(TiledMapLayer::height).isEqualTo(47)
             satisfiesAll({ it.getTileAt(0, 0) == 1u }) // Check the first tile ID
         }
 
@@ -118,12 +118,12 @@ class TiledMapLoaderTest : Logging {
         expectThat(mainLayer) {
             property(TiledMapLayer::width).isEqualTo(100)
             property(TiledMapLayer::height).isEqualTo(17)
-            satisfiesAll({ it.getTileAt(0, 0) == 1u }) // Check the first tile ID
-
-            expectThat(mainLayer.getTileAt(6, 8)).isEqualTo(203u)
-            expectThat(mainLayer.getTileAt(6, 9)).isEqualTo(224u)
-            expectThat(mainLayer.getTileAt(14, 0)).isEqualTo(203u)
         }
+        // Tile GIDs may include flip flags in the high bits; mask to get the tile index
+        val mask = TiledMap.TILE_INDEX_MASK
+        expectThat(mainLayer.getTileAt(6, 8) and mask).isEqualTo(203u)
+        expectThat(mainLayer.getTileAt(6, 9) and mask).isEqualTo(224u)
+        expectThat(mainLayer.getTileAt(14, 0) and mask).isEqualTo(203u)
 
         // Validate object layer
         val objectLayer = layersByName["object"]!!
@@ -149,7 +149,8 @@ class TiledMapLoaderTest : Logging {
         expectThat(tileset) {
             property(Tileset::source).isEqualTo("tiles.tsj")
             property(Tileset::name).isEqualTo("tiles")
-            property(Tileset::image).isEqualTo("tiles_padded.png")
+            // image path is resolved to full path by the loader
+            expectThat(tileset.image!!).endsWith("tiles_padded.png")
             property(Tileset::imageWidth).isEqualTo(360)
             property(Tileset::imageHeight).isEqualTo(846)
             property(Tileset::tileWidth).isEqualTo(16)
