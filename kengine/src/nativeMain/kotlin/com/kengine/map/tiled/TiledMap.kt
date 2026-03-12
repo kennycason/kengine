@@ -369,15 +369,17 @@ class TiledMap(
     private val flipRotationCache = Array(8) {
         FlipMode.NONE to 0.0
     }.apply {
-        // Precompute all possible flip/rotation combinations
-        this[0] = FlipMode.NONE to 0.0  // !H !V !D
-        this[1] = FlipMode.HORIZONTAL to 0.0  // H !V !D
-        this[2] = FlipMode.VERTICAL to 0.0  // !H V !D
-        this[3] = FlipMode.VERTICAL to 90.0  // !H !V D
-        this[4] = FlipMode.NONE to 90.0  // H !V D
-        this[5] = FlipMode.BOTH to 0.0  // H V !D
-        this[6] = FlipMode.NONE to 270.0  // !H V D
-        this[7] = FlipMode.HORIZONTAL to 90.0  // H V D
+        // Index = H*1 | V*2 | D*4
+        // Tiled applies: Diagonal (transpose) first, then H flip, then V flip
+        // Rendering applies: Rotate(Flip(source)) via SDL_RenderTextureAffine
+        this[0] = FlipMode.NONE to 0.0            // ---  identity
+        this[1] = FlipMode.HORIZONTAL to 0.0       // H--  flip horizontal
+        this[2] = FlipMode.VERTICAL to 0.0         // -V-  flip vertical
+        this[3] = FlipMode.BOTH to 0.0             // HV-  rotate 180°
+        this[4] = FlipMode.VERTICAL to 90.0        // --D  transpose (diagonal flip)
+        this[5] = FlipMode.NONE to 90.0            // H-D  rotate 90° CW
+        this[6] = FlipMode.NONE to 270.0           // -VD  rotate 270° CW
+        this[7] = FlipMode.HORIZONTAL to 90.0      // HVD  anti-transpose
     }
 
     private fun decodeFlipAndRotation(decoded: DecodedTile): Pair<FlipMode, Double> {

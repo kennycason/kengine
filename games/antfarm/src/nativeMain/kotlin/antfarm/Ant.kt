@@ -414,7 +414,7 @@ class Ant(
     }
     
     private fun findNearbyFood(radius: Int): Pair<Int, Int>? {
-        val surfaceY = 4 // Vegetation row
+        val surfaceY = world.getSurfaceY()
         
         // Scan surface for vegetation within radius
         for (dx in -radius..radius) {

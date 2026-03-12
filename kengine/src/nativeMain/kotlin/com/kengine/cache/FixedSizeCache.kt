@@ -1,19 +1,16 @@
 package com.kengine.cache
 
 class FixedSizeCache<K, V>(private val maxSize: Int) {
-    private val map = mutableMapOf<K, V>()
-    private val keys = ArrayDeque<K>(maxSize)
+    private val map = LinkedHashMap<K, V>(maxSize)
 
     fun getOrPut(key: K, defaultValue: () -> V): V {
-        return map[key] ?: run {
-            if (keys.size >= maxSize) {
-                // Remove oldest entry
-                map.remove(keys.removeFirst())
-            }
-            val value = defaultValue()
-            map[key] = value
-            keys.addLast(key)
-            value
+        map[key]?.let { return it }
+        if (map.size >= maxSize) {
+            val oldest = map.keys.first()
+            map.remove(oldest)
         }
+        val value = defaultValue()
+        map[key] = value
+        return value
     }
 }

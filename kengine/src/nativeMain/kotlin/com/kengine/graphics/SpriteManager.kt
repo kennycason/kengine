@@ -12,7 +12,8 @@ class SpriteManager {
     }
 
     fun getSprite(name: String): Sprite {
-       return sprites[name]!!
+        return sprites[name]
+            ?: throw IllegalStateException("Sprite not found: $name")
     }
 
     fun addSpriteSheet(name: String, spriteSheet: SpriteSheet) {
@@ -20,11 +21,12 @@ class SpriteManager {
     }
 
     fun getSpriteSheet(name: String): SpriteSheet {
-        return spriteSheets[name]!!
+        return spriteSheets[name]
+            ?: throw IllegalStateException("SpriteSheet not found: $name")
     }
 
     fun cleanup() {
-        // sprites.values.forEach { it.cleanup() }
+        sprites.values.forEach { it.cleanup() }
         spriteSheets.values.forEach { it.cleanup() }
     }
 }

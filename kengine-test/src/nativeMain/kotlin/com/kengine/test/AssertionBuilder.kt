@@ -14,7 +14,7 @@ fun <T> expectThat(actual: T): AssertionBuilder<T> = AssertionBuilder(actual)
 fun <T> expectThat(
     actual: T,
     lambda: AssertionBuilder<T>.() -> Unit
-): AssertionBuilder<T> = AssertionBuilder(actual)
+): AssertionBuilder<T> = AssertionBuilder(actual).apply(lambda)
 
 open class AssertionBuilder<T>(private val actual: T) {
 

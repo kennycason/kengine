@@ -120,11 +120,11 @@ class PhysicsContext private constructor() : Context(), Logging {
             val dynamicToRemove = dynamicObjects.toList()
             val staticToRemove = staticObjects.toList()
 
-            dynamicObjects.clear()
-            staticObjects.clear()
-
             dynamicToRemove.forEach(::removeObject)
             staticToRemove.forEach(::removeObject)
+
+            dynamicObjects.clear()
+            staticObjects.clear()
         }
     }
 

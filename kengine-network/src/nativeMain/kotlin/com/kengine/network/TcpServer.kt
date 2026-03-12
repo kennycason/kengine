@@ -60,7 +60,7 @@ class TcpServer(
                                 logger.error(e) { "Error handling accepted connection" }
                                 connection.close()
                             }
-                        } ?: {
+                        } ?: run {
                             if (logger.isTraceEnabled()) {
                                 logger.trace { "Accepted null client stream" }
                             }

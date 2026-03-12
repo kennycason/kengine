@@ -20,12 +20,11 @@ class PheromoneTest {
     @Test
     fun testPheromoneMaxStrength() {
         val pheromoneMap = PheromoneMap()
-        
-        // Add more than max strength
-        pheromoneMap.add(PheromoneType.HOME, 15.0)
-        
-        // Should be capped at 10.0
-        assertEquals(10.0, pheromoneMap.get(PheromoneType.HOME), 0.01)
+
+        // Add more than max strength (capped at 100.0)
+        pheromoneMap.add(PheromoneType.HOME, 150.0)
+
+        assertEquals(100.0, pheromoneMap.get(PheromoneType.HOME), 0.01)
     }
     
     @Test
