@@ -5,7 +5,7 @@ object PlatformConfig {
 
     val includePaths: List<String> = when {
         isMacOS -> listOf("/opt/homebrew/include", "/usr/local/include")
-        isLinux -> listOf("/usr/local/include", "/usr/include")
+        isLinux -> listOf("/usr/local/include", "/usr/include", "/usr/include/x86_64-linux-gnu")
         else -> listOf("/usr/local/include")
     }
 

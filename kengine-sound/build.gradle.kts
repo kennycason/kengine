@@ -31,7 +31,7 @@ kotlin {
 
     nativeTarget.apply {
         binaries.all {
-            linkerOpts(PlatformConfig.sharedLibLinkerOpts("SDL3", "SDL3_mixer"))
+            linkerOpts(PlatformConfig.sharedLibLinkerOpts("SDL3", "SDL3_mixer", "SDL3_image", "SDL3_ttf"))
         }
 
         compilations["main"].cinterops {
