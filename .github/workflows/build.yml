@@ -1,0 +1,99 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-macos:
+    runs-on: macos-14  # Apple Silicon (M1) runner
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Install Homebrew dependencies
+        run: brew install sdl3 sdl3_image sdl3_ttf chipmunk cmake pkg-config
+
+      - name: Cache SDL3 source builds
+        uses: actions/cache@v4
+        id: sdl-source-cache
+        with:
+          path: |
+            /usr/local/lib/libSDL3_mixer*
+            /usr/local/lib/libSDL3_net*
+            /usr/local/include/SDL3_mixer
+            /usr/local/include/SDL3_net
+          key: sdl3-source-${{ runner.os }}-${{ hashFiles('sdl3/SDL_mixer/**', 'sdl3/SDL_net/**') }}
+
+      - name: Build SDL3_mixer and SDL3_net from source
+        if: steps.sdl-source-cache.outputs.cache-hit != 'true'
+        run: bash sdl3/build_sdl.sh
+
+      - name: Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Build all modules and compile test binaries
+        run: |
+          ./gradlew clean build -x allTests -x nativeTest -x jvmTest -x jsTest
+          ./gradlew :kengine:linkDebugTestNative \
+                    :kengine-network:linkDebugTestNative \
+                    :kengine-sound:linkDebugTestNative
+
+      - name: Copy SDL dylibs for tests
+        run: |
+          for dir in kengine kengine-network kengine-sound; do
+            fw_dir="$dir/build/bin/native/debugTest/Frameworks"
+            mkdir -p "$fw_dir"
+            cp /opt/homebrew/lib/libSDL3.0.dylib "$fw_dir/" 2>/dev/null || true
+            cp /opt/homebrew/lib/libSDL3_image.0.dylib "$fw_dir/" 2>/dev/null || true
+            cp /opt/homebrew/lib/libSDL3_ttf.0.dylib "$fw_dir/" 2>/dev/null || true
+            cp /usr/local/lib/libSDL3_mixer.0.dylib "$fw_dir/" 2>/dev/null || true
+            cp /usr/local/lib/libSDL3_net.0.dylib "$fw_dir/" 2>/dev/null || true
+          done
+
+      - name: Run kengine unit tests
+        run: |
+          # Exclude integration tests (*IT) and tests needing a real SDL renderer
+          ./kengine/build/bin/native/debugTest/test.kexe \
+            "--ktest_filter=*-*IT.*:*TiledMapLoaderTest.*"
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+
+      - name: Run kengine-network tests
+        if: always()
+        run: |
+          if [ -f ./kengine-network/build/bin/native/debugTest/test.kexe ]; then
+            ./kengine-network/build/bin/native/debugTest/test.kexe
+          fi
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+
+      - name: Run kengine-sound tests
+        if: always()
+        run: |
+          if [ -f ./kengine-sound/build/bin/native/debugTest/test.kexe ]; then
+            ./kengine-sound/build/bin/native/debugTest/test.kexe
+          fi
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy

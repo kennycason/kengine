@@ -167,7 +167,6 @@ class HelloWorldGame : Game {
     override fun cleanup() {
         bulbasaur.cleanup()
         pidgies.forEach { it.cleanup() }
-        particles.forEach { it.cleanup() }
         particles.clear()
         scytherEntity.cleanup()
         clickableRainbowGrid.cleanup()

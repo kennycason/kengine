@@ -751,35 +751,30 @@ kengine/
 
 Install OpenJDK 17.0+
 
-Install Chipmunk2D via Brew (on Mac)
+Install dependencies via Homebrew (macOS):
 ```shell
-brew install chipmunk
+brew install chipmunk sdl3 sdl3_image sdl3_ttf cmake pkg-config
 ```
 
+Build SDL3_mixer and SDL3_net from source (no Homebrew formula available):
+```shell
+git submodule update --init --recursive
+bash sdl3/build_sdl.sh
+```
 
-Install 3DL3. SDL3 is not yet released on brew and must be manually installed.
+See [SDL3 Installation Guide](sdl3/README.md) for more details.
 
-[SDL3 Installation Guide](/sdl3/README.md)
-
-Build the project
+Build the project:
 ```shell
 ./gradlew clean build
 ```
 
-Misc Gradle cache/refresh dependencies
+Run specific tests:
 ```shell
-rm -rf ~/.gradle/caches
-rm -rf ~/.gradle/wrapper
-./gradlew wrapper --refresh-dependencies
-./gradlew clean build --refresh-dependencies
-```
-
-Run specific tests
-```shell
- ./gradlew nativeTest --tests "com.kengine.ui.DrawerIT.drawer component test"oh 
+./gradlew nativeTest --tests "com.kengine.ui.DrawerIT.drawer component test"
 ```
 ```shell
-./gradlew nativeTest --tests "*IT"   
+./gradlew nativeTest --tests "*IT"
 ```
 
 ## Roadmap
@@ -794,20 +789,3 @@ Run specific tests
 - Add Vec2 versions of functions that take (x,y) parameters, ditto for Rect2 and (x,y,w,h)
 - Redesign font handling + caching/config
 - Playdate integration (WIP struggling to target cortex-m7 arch)
-```shell
-cd SDL_net
-mkdir build
-cd build
-cmake .. \
-  -DCMAKE_INSTALL_PREFIX=/usr/local \
-  -DSDL3_INCLUDE_DIR=/usr/local/include/SDL3 \
-  -DSDL3_LIBRARY=/usr/local/lib/libSDL3.dylib \
-  -DCMAKE_INSTALL_NAME_DIR=@rpath \
-  -DCMAKE_BUILD_WITH_INSTALL_NAME_DIR=ON
-make -j$(sysctl -n hw.ncpu)
-sudo make install
-# Create the versioned symlink in /usr/local/lib
-sudo ln -sf /usr/local/lib/libSDL3_net.dylib /usr/local/lib/libSDL3_net.0.dylib
-pkg-config --libs sdl3-net
-otool -D /usr/local/lib/libSDL3_net.dylib
-cd ../..

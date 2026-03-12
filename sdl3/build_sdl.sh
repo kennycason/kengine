@@ -1,71 +1,52 @@
 #!/bin/sh
+#
+# Build SDL3_mixer and SDL3_net from source.
+# SDL3, SDL3_image, and SDL3_ttf are installed via Homebrew:
+#   brew install sdl3 sdl3_image sdl3_ttf
+#
+# Prerequisites: cmake, pkg-config
+#   brew install cmake pkg-config
+#
+set -e
 
-cd SDL
-mkdir build
-cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-cmake --build . --config Release --parallel
-sudo cmake --install . --config Release
-pkg-config --libs sdl3
-otool -D /usr/local/lib/libSDL3.dylib
-cd ../..
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BREW_PREFIX="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
+SDL3_INCLUDE="${BREW_PREFIX}/include"
+SDL3_LIB="${BREW_PREFIX}/lib/libSDL3.dylib"
+NCPU="$(sysctl -n hw.ncpu)"
 
-
-cd SDL_image
-mkdir build
-cd build
-cmake .. \
-  -DCMAKE_INSTALL_PREFIX=/usr/local \
-  -DSDL3_IMAGE=ON \
-  -DSDL3_INCLUDE_DIR=/usr/local/include/SDL3 \
-  -DSDL3_LIBRARY=/usr/local/lib/libSDL3.dylib \
-  -DINSTALL_PKGCONFIG=ON
-make -j$(sysctl -n hw.ncpu)
-sudo make install
-pkg-config --libs sdl3-image
-otool -D /usr/local/lib/libSDL3_image.dylib
-cd ../..
-
-
-cd SDL_mixer
+echo "=== Building SDL3_mixer ==="
+cd "$SCRIPT_DIR/SDL_mixer"
+rm -rf build
 mkdir build
 cd build
 cmake .. \
+  -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX=/usr/local \
-  -DSDL3_MIXER=ON \
-  -DSDL3_INCLUDE_DIR=/usr/local/include/SDL3 \
-  -DSDL3_LIBRARY=/usr/local/lib/libSDL3.dylib \
-  -DINSTALL_PKGCONFIG=ON
-make -j$(sysctl -n hw.ncpu)
+  -DSDL3_INCLUDE_DIR="$SDL3_INCLUDE/SDL3" \
+  -DSDL3_LIBRARY="$SDL3_LIB"
+make -j"$NCPU"
 sudo make install
-pkg-config --libs sdl3-mixer
+echo "SDL3_mixer installed:"
 otool -D /usr/local/lib/libSDL3_mixer.dylib
-cd ../..
 
-
-cd SDL_ttf
+echo ""
+echo "=== Building SDL3_net ==="
+cd "$SCRIPT_DIR/SDL_net"
+rm -rf build
 mkdir build
 cd build
 cmake .. \
+  -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX=/usr/local \
-  -DSDL3_INCLUDE_DIR=/usr/local/include/SDL3 \
-  -DSDL3_LIBRARY=/usr/local/lib/libSDL3.dylib
-make -j$(sysctl -n hw.ncpu)
+  -DSDL3_INCLUDE_DIR="$SDL3_INCLUDE/SDL3" \
+  -DSDL3_LIBRARY="$SDL3_LIB"
+make -j"$NCPU"
 sudo make install
-pkg-config --libs sdl3-ttf
-otool -D /usr/local/lib/libSDL3_ttf.dylib
-cd ../..
-
-
-cd SDL_net
-mkdir build
-cd build
-cmake .. \
-  -DCMAKE_INSTALL_PREFIX=/usr/local \
-  -DSDL3_INCLUDE_DIR=/usr/local/include/SDL3 \
-  -DSDL3_LIBRARY=/usr/local/lib/libSDL3.dylib
-make -j$(sysctl -n hw.ncpu)
-sudo make install
-pkg-config --libs sdl3-net
+echo "SDL3_net installed:"
 otool -D /usr/local/lib/libSDL3_net.dylib
-cd ../..
+
+echo ""
+echo "=== Done ==="
+echo "Brew-managed: SDL3, SDL3_image, SDL3_ttf (update with: brew upgrade sdl3 sdl3_image sdl3_ttf)"
+echo "Source-built: SDL3_mixer, SDL3_net (installed to /usr/local/lib)"
