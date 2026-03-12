@@ -59,15 +59,15 @@ kotlin {
         compilations["main"].cinterops {
             val sdl3 by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3.def")
-                compilerOpts("-I/usr/local/include")
+                compilerOpts("-I/opt/homebrew/include", "-I/usr/local/include")
             }
             val sdl3image by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3_image.def")
-                compilerOpts("-I/usr/local/include")
+                compilerOpts("-I/opt/homebrew/include", "-I/usr/local/include")
             }
             val sdl3ttf by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3_ttf.def")
-                compilerOpts("-I/usr/local/include")
+                compilerOpts("-I/opt/homebrew/include", "-I/usr/local/include")
             }
         }
 
@@ -108,3 +108,4 @@ kotlin {
         }
     }
 }
+

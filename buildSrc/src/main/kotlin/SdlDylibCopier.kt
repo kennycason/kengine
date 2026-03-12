@@ -2,35 +2,68 @@
 import org.gradle.api.Project
 import org.gradle.api.tasks.Copy
 import org.gradle.kotlin.dsl.register
+import java.io.File
 
 class SdlDylibCopier(private val project: Project) {
 
+    companion object {
+        // Search paths in priority order: Homebrew (Apple Silicon), then /usr/local (source builds)
+        private val LIB_SEARCH_PATHS = listOf(
+            "/opt/homebrew/lib",
+            "/usr/local/lib"
+        )
+    }
+
+    /**
+     * Resolve a dylib by name, searching brew and source-build locations.
+     * Returns the first path found, or throws with a helpful message.
+     */
+    private fun resolveDylib(name: String): String {
+        // Try versioned (.0.dylib) first, then unversioned (.dylib)
+        val candidates = listOf(name, name.replace(".0.dylib", ".dylib"))
+        for (candidate in candidates) {
+            for (searchPath in LIB_SEARCH_PATHS) {
+                val path = "$searchPath/$candidate"
+                if (File(path).exists()) {
+                    return path
+                }
+            }
+        }
+        throw IllegalStateException(
+            "Could not find $name in any of: ${LIB_SEARCH_PATHS.joinToString()}. " +
+                "Install via Homebrew (brew install sdl3) or build from source (bash sdl3/build_sdl.sh)."
+        )
+    }
+
     fun registerSDLDylibs() {
-        // Determine which libraries to copy based on the module
-        val dylibsToCopy = when (project.name) {
+        // Define which dylib names each module needs (just the filenames)
+        val dylibNames = when (project.name) {
             "kengine-network" -> listOf(
-                "/usr/local/lib/libSDL3.0.dylib",
-                "/usr/local/lib/libSDL3_net.0.dylib",
-                "/usr/local/lib/libSDL3_image.0.dylib",
-                "/usr/local/lib/libSDL3_ttf.0.dylib"
+                "libSDL3.0.dylib",
+                "libSDL3_net.0.dylib",
+                "libSDL3_image.0.dylib",
+                "libSDL3_ttf.0.dylib"
             )
             "kengine-physics" -> listOf(
-                "/usr/local/lib/libSDL3.0.dylib",
-                "/opt/homebrew/lib/libchipmunk.dylib"
+                "libSDL3.0.dylib",
+                "libchipmunk.dylib"
             )
             "kengine-sound" -> listOf(
-                "/usr/local/lib/libSDL3.0.dylib",
-                "/usr/local/lib/libSDL3_mixer.0.dylib",
-                "/usr/local/lib/libSDL3_image.0.dylib",
-                "/usr/local/lib/libSDL3_ttf.0.dylib"
+                "libSDL3.0.dylib",
+                "libSDL3_mixer.0.dylib",
+                "libSDL3_image.0.dylib",
+                "libSDL3_ttf.0.dylib"
             )
             else -> listOf(
-                "/usr/local/lib/libSDL3.0.dylib",
-                "/usr/local/lib/libSDL3_image.0.dylib",
-                "/usr/local/lib/libSDL3_mixer.0.dylib",
-                "/usr/local/lib/libSDL3_ttf.0.dylib"
+                "libSDL3.0.dylib",
+                "libSDL3_image.0.dylib",
+                "libSDL3_mixer.0.dylib",
+                "libSDL3_ttf.0.dylib"
             )
         }
+
+        // Resolve each dylib name to its actual path
+        val dylibsToCopy = dylibNames.map { resolveDylib(it) }
 
         val dylibTargetDirs = listOf(
             "${project.buildDir}/bin/native/Frameworks",
@@ -51,29 +84,24 @@ class SdlDylibCopier(private val project: Project) {
             dylibTargetDirs.forEach { toDir ->
                 val targetDir = toDir.substringAfter("${project.buildDir}/bin/native/")
 
-                // Generate a **unique task name** using the module name
                 val taskName = generateTaskName(project, dylibName, targetDir)
 
-                // Check for existing tasks to avoid duplicates
                 if (project.tasks.findByName(taskName) == null) {
                     project.tasks.register<Copy>(taskName) {
                         description = "Copy $dylibName to $targetDir for module ${project.name}"
                         from(dylibPath)
                         into(toDir)
 
-                        // Ensure the target directory exists and has write permissions
                         doFirst {
                             println("[${project.name}] Copying $dylibPath to $toDir")
                             project.mkdir(toDir)
 
-                            // Delete the target file if it already exists to avoid permission issues
                             val targetFile = project.file("$toDir/$dylibName")
                             if (targetFile.exists()) {
                                 targetFile.delete()
                             }
                         }
 
-                        // Set file permissions after copying
                         fileMode = 0b111101101 // rwxr-xr-x (755)
                     }
                 } else {
@@ -97,7 +125,7 @@ class SdlDylibCopier(private val project: Project) {
     }
 
     private fun generateTaskName(project: Project, dylibName: String, targetDir: String): String {
-        val moduleName = project.name.capitalize() // Use the module name
+        val moduleName = project.name.capitalize()
         val prefix = dylibName.removePrefix("lib").removeSuffix(".dylib").capitalize()
         return if (targetDir.contains("debugTest"))
             "copy${moduleName}${prefix}ToDebugTestFrameworks"

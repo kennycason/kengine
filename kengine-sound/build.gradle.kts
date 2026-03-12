@@ -34,11 +34,11 @@ kotlin {
         compilations["main"].cinterops {
             val sdl3 by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3.def")
-                compilerOpts("-I/usr/local/include")
+                compilerOpts("-I/opt/homebrew/include", "-I/usr/local/include")
             }
             val sdl3mixer by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3_mixer.def")
-                compilerOpts("-I/usr/local/include")
+                compilerOpts("-I/opt/homebrew/include", "-I/usr/local/include")
             }
         }
 

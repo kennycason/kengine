@@ -34,7 +34,7 @@ kotlin {
         compilations["main"].cinterops {
             val sdl3net by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3_net.def")
-                compilerOpts("-I/usr/local/include")
+                compilerOpts("-I/opt/homebrew/include", "-I/usr/local/include")
             }
         }
 
