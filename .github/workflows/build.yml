@@ -298,6 +298,8 @@ jobs:
           restore-keys: gradle-${{ runner.os }}-
 
       - name: Patch Konan MinGW sysroot
+        env:
+          MSYS2_ROOT: D:/a/_temp/msys64
         run: |
           # Kotlin/Native bundles an outdated MinGW sysroot whose CRT objects
           # reference symbols missing from its bundled libs.  Copy the system
