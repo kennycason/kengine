@@ -62,18 +62,22 @@ build_cmake_project() {
     mkdir build
     cd build
 
-    cmake_gen=""
     case "$OS" in
         MINGW*|MSYS*)
-            cmake_gen="-G \"MinGW Makefiles\""
+            cmake .. \
+                -G "MinGW Makefiles" \
+                -DCMAKE_MAKE_PROGRAM=mingw32-make \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+                $extra_cmake_args
+            ;;
+        *)
+            cmake .. \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+                $extra_cmake_args
             ;;
     esac
-
-    eval cmake .. \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-        $cmake_gen \
-        $extra_cmake_args
 
     case "$OS" in
         MINGW*|MSYS*)

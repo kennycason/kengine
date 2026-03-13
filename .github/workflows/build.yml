@@ -247,7 +247,7 @@ jobs:
             mingw-w64-x86_64-libwebp
             mingw-w64-x86_64-libtiff
             mingw-w64-x86_64-chipmunk
-            make
+            mingw-w64-x86_64-make
 
       - name: Checkout
         uses: actions/checkout@v4
