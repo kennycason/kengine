@@ -224,7 +224,7 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     defaults:
       run:
@@ -237,12 +237,17 @@ jobs:
           msystem: MINGW64
           update: false
           install: >-
-            mingw-w64-x86_64-SDL3
-            mingw-w64-x86_64-SDL3_image
-            mingw-w64-x86_64-SDL3_ttf
-            mingw-w64-x86_64-SDL3_mixer
-            mingw-w64-x86_64-SDL3_net
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-pkg-config
+            mingw-w64-x86_64-freetype
+            mingw-w64-x86_64-harfbuzz
+            mingw-w64-x86_64-libjpeg-turbo
+            mingw-w64-x86_64-libpng
+            mingw-w64-x86_64-libwebp
+            mingw-w64-x86_64-libtiff
             mingw-w64-x86_64-chipmunk
+            make
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -255,13 +260,33 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Cache SDL3 source builds
+        uses: actions/cache@v4
+        id: sdl-source-cache
+        with:
+          path: |
+            D:\a\_temp\msys64\mingw64\lib\libSDL3*
+            D:\a\_temp\msys64\mingw64\bin\SDL3*
+            D:\a\_temp\msys64\mingw64\bin\libSDL3*
+            D:\a\_temp\msys64\mingw64\include\SDL3
+            D:\a\_temp\msys64\mingw64\include\SDL3_image
+            D:\a\_temp\msys64\mingw64\include\SDL3_ttf
+            D:\a\_temp\msys64\mingw64\include\SDL3_mixer
+            D:\a\_temp\msys64\mingw64\include\SDL3_net
+          key: sdl3-source-${{ runner.os }}-${{ hashFiles('.gitmodules', 'sdl3/build_sdl.sh') }}
+
+      - name: Build all SDL3 libs from source
+        if: steps.sdl-source-cache.outputs.cache-hit != 'true'
+        run: bash sdl3/build_sdl.sh
+
       - name: Verify SDL3 libraries
         run: |
-          echo "=== MSYS2 mingw64 SDL3 libs ==="
+          echo "=== SDL3 DLLs ==="
           ls /mingw64/bin/SDL3*.dll /mingw64/bin/libSDL3*.dll 2>/dev/null || true
+          echo "=== SDL3 import libs ==="
           ls /mingw64/lib/libSDL3* 2>/dev/null || true
           echo "=== Include dirs ==="
-          ls /mingw64/include/SDL3/ | head -5
+          ls /mingw64/include/SDL3/ 2>/dev/null | head -5
 
       - name: Gradle cache
         uses: actions/cache@v4
@@ -288,6 +313,7 @@ jobs:
           if [ -f ./kengine/build/bin/native/debugTest/test.kexe ]; then
             # Copy DLLs next to the test binary
             cp /mingw64/bin/SDL3.dll ./kengine/build/bin/native/debugTest/ 2>/dev/null || true
+            cp /mingw64/bin/libSDL3.dll ./kengine/build/bin/native/debugTest/ 2>/dev/null || true
             cp /mingw64/bin/SDL3_image.dll ./kengine/build/bin/native/debugTest/ 2>/dev/null || true
             cp /mingw64/bin/SDL3_ttf.dll ./kengine/build/bin/native/debugTest/ 2>/dev/null || true
             cp /mingw64/bin/SDL3_mixer.dll ./kengine/build/bin/native/debugTest/ 2>/dev/null || true

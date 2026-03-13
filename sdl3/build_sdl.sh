@@ -11,24 +11,44 @@
 #     libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev libpipewire-0.3-dev \
 #     libfreetype-dev libharfbuzz-dev libjpeg-dev libpng-dev libwebp-dev
 #
+# Windows/MSYS2: builds ALL SDL3 libs from source.
+#   Prerequisites: MSYS2 MINGW64 environment
+#   pacman -S mingw-w64-x86_64-cmake mingw-w64-x86_64-gcc make
+#
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OS="$(uname -s)"
 
-if [ "$OS" = "Darwin" ]; then
-    BREW_PREFIX="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
-    SDL3_INCLUDE="${BREW_PREFIX}/include"
-    SDL3_LIB="${BREW_PREFIX}/lib/libSDL3.dylib"
-    NCPU="$(sysctl -n hw.ncpu)"
-elif [ "$OS" = "Linux" ]; then
-    SDL3_INCLUDE="/usr/local/include"
-    SDL3_LIB="/usr/local/lib/libSDL3.so"
-    NCPU="$(nproc)"
-else
-    echo "Unsupported OS: $OS"
-    exit 1
-fi
+# Detect platform
+case "$OS" in
+    Darwin)
+        BREW_PREFIX="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
+        SDL3_INCLUDE="${BREW_PREFIX}/include"
+        SDL3_LIB="${BREW_PREFIX}/lib/libSDL3.dylib"
+        NCPU="$(sysctl -n hw.ncpu)"
+        INSTALL_PREFIX="/usr/local"
+        USE_SUDO="sudo"
+        ;;
+    Linux)
+        SDL3_INCLUDE="/usr/local/include"
+        SDL3_LIB="/usr/local/lib/libSDL3.so"
+        NCPU="$(nproc)"
+        INSTALL_PREFIX="/usr/local"
+        USE_SUDO="sudo"
+        ;;
+    MINGW*|MSYS*)
+        SDL3_INCLUDE="/mingw64/include"
+        SDL3_LIB="/mingw64/lib/libSDL3.dll.a"
+        NCPU="$(nproc)"
+        INSTALL_PREFIX="/mingw64"
+        USE_SUDO=""
+        ;;
+    *)
+        echo "Unsupported OS: $OS"
+        exit 1
+        ;;
+esac
 
 build_cmake_project() {
     local name="$1"
@@ -41,27 +61,49 @@ build_cmake_project() {
     rm -rf build
     mkdir build
     cd build
-    cmake .. \
+
+    cmake_gen=""
+    case "$OS" in
+        MINGW*|MSYS*)
+            cmake_gen="-G \"MinGW Makefiles\""
+            ;;
+    esac
+
+    eval cmake .. \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+        $cmake_gen \
         $extra_cmake_args
-    make -j"$NCPU"
-    sudo make install
-    echo "$name installed to /usr/local"
+
+    case "$OS" in
+        MINGW*|MSYS*)
+            mingw32-make -j"$NCPU"
+            mingw32-make install
+            ;;
+        *)
+            make -j"$NCPU"
+            $USE_SUDO make install
+            ;;
+    esac
+
+    echo "$name installed to $INSTALL_PREFIX"
 }
 
-# On Linux, build SDL3 core + all satellite libs from source
-if [ "$OS" = "Linux" ]; then
-    build_cmake_project "SDL3" "SDL" ""
+# On Linux and Windows, build SDL3 core + all satellite libs from source
+case "$OS" in
+    Linux|MINGW*|MSYS*)
+        build_cmake_project "SDL3" "SDL" ""
 
-    # Refresh linker cache so subsequent builds find libSDL3
-    sudo ldconfig
+        if [ "$OS" = "Linux" ]; then
+            sudo ldconfig
+        fi
 
-    build_cmake_project "SDL3_image" "SDL_image" ""
-    build_cmake_project "SDL3_ttf" "SDL_ttf" ""
-fi
+        build_cmake_project "SDL3_image" "SDL_image" ""
+        build_cmake_project "SDL3_ttf" "SDL_ttf" ""
+        ;;
+esac
 
-# Both platforms: build mixer and net from source
+# All platforms: build mixer and net from source
 SDL3_CMAKE_ARGS=""
 if [ "$OS" = "Darwin" ]; then
     SDL3_CMAKE_ARGS="-DSDL3_INCLUDE_DIR=${SDL3_INCLUDE}/SDL3 -DSDL3_LIBRARY=${SDL3_LIB}"
@@ -76,9 +118,12 @@ fi
 
 echo ""
 echo "=== Done ==="
-if [ "$OS" = "Darwin" ]; then
-    echo "Brew-managed: SDL3, SDL3_image, SDL3_ttf (update with: brew upgrade sdl3 sdl3_image sdl3_ttf)"
-    echo "Source-built: SDL3_mixer, SDL3_net (installed to /usr/local/lib)"
-else
-    echo "All SDL3 libs built from source and installed to /usr/local/lib"
-fi
+case "$OS" in
+    Darwin)
+        echo "Brew-managed: SDL3, SDL3_image, SDL3_ttf (update with: brew upgrade sdl3 sdl3_image sdl3_ttf)"
+        echo "Source-built: SDL3_mixer, SDL3_net (installed to /usr/local/lib)"
+        ;;
+    *)
+        echo "All SDL3 libs built from source and installed to $INSTALL_PREFIX"
+        ;;
+esac
