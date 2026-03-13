@@ -315,12 +315,24 @@ jobs:
           ls "$KONAN_MINGW"/*.o 2>/dev/null | head -5
           if [ -d "$KONAN_MINGW" ]; then
             echo "Patching Konan sysroot at $KONAN_MINGW"
-            cp -v /mingw64/x86_64-w64-mingw32/lib/libmingwex.a "$KONAN_MINGW/"
-            cp -v /mingw64/x86_64-w64-mingw32/lib/libmingw32.a "$KONAN_MINGW/"
-            echo "Done"
+            # Find libmingwex.a in the system MSYS2 installation
+            MINGWEX=$(find /mingw64 -name "libmingwex.a" 2>/dev/null | head -1)
+            MINGW32=$(find /mingw64 -name "libmingw32.a" 2>/dev/null | head -1)
+            echo "Found libmingwex.a at: $MINGWEX"
+            echo "Found libmingw32.a at: $MINGW32"
+            if [ -n "$MINGWEX" ] && [ -n "$MINGW32" ]; then
+              cp -v "$MINGWEX" "$KONAN_MINGW/"
+              cp -v "$MINGW32" "$KONAN_MINGW/"
+              echo "Patch applied successfully"
+            else
+              echo "ERROR: Could not find CRT libs in system MSYS2"
+              echo "Contents of /mingw64/lib/libmingw*:"
+              ls -la /mingw64/lib/libmingw* 2>/dev/null || echo "  (none)"
+              echo "Searching all of /mingw64:"
+              find /mingw64 -name "libmingw*" 2>/dev/null || echo "  (none found)"
+            fi
           else
             echo "ERROR: Konan MinGW sysroot not found at $KONAN_MINGW"
-            echo "Checking alternative locations..."
             find "$WIN_HOME/.konan" -name "crt2.o" 2>/dev/null || echo "No crt2.o found"
           fi
 
