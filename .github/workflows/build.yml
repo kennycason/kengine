@@ -297,6 +297,31 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
           restore-keys: gradle-${{ runner.os }}-
 
+      - name: Patch Konan MinGW sysroot
+        run: |
+          # Kotlin/Native bundles an outdated MinGW sysroot whose CRT objects
+          # reference symbols missing from its bundled libs.  Copy the system
+          # MSYS2 CRT libs over so the linker can resolve them.
+          # NOTE: $HOME in MSYS2 != Windows home; use USERPROFILE for .konan path
+          WIN_HOME="$(cygpath "$USERPROFILE")"
+          KONAN_MINGW="$WIN_HOME/.konan/dependencies/msys2-mingw-w64-x86_64-2/x86_64-w64-mingw32/lib"
+          if [ ! -d "$KONAN_MINGW" ]; then
+            echo "Konan sysroot not found, triggering download..."
+            ./gradlew :kengine:cinteropSdl3Native || true
+          fi
+          echo "KONAN_MINGW=$KONAN_MINGW"
+          ls "$KONAN_MINGW"/*.o 2>/dev/null | head -5
+          if [ -d "$KONAN_MINGW" ]; then
+            echo "Patching Konan sysroot at $KONAN_MINGW"
+            cp -v /mingw64/x86_64-w64-mingw32/lib/libmingwex.a "$KONAN_MINGW/"
+            cp -v /mingw64/x86_64-w64-mingw32/lib/libmingw32.a "$KONAN_MINGW/"
+            echo "Done"
+          else
+            echo "ERROR: Konan MinGW sysroot not found at $KONAN_MINGW"
+            echo "Checking alternative locations..."
+            find "$WIN_HOME/.konan" -name "crt2.o" 2>/dev/null || echo "No crt2.o found"
+          fi
+
       - name: Build all modules
         env:
           MSYS2_ROOT: D:/a/_temp/msys64
