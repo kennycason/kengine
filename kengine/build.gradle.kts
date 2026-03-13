@@ -36,8 +36,10 @@ kotlin {
     nativeTarget.apply {
         binaries {
             staticLib()
-            sharedLib {
-                baseName = "kengine"
+            if (!PlatformConfig.isWindows) {
+                sharedLib {
+                    baseName = "kengine"
+                }
             }
             all {
                 linkerOpts(PlatformConfig.sharedLibLinkerOpts("SDL3", "SDL3_image", "SDL3_ttf"))
