@@ -1,4 +1,2 @@
 headers = SDL3_image/SDL_image.h
 package = sdl3.image
-compilerOpts = -I/opt/homebrew/include -I/usr/local/include
-linkerOpts = -L/opt/homebrew/lib -L/usr/local/lib -lSDL3_image -framework Cocoa -framework IOKit -framework CoreVideo

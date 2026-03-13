@@ -30,15 +30,18 @@ kotlin {
     }
 
     nativeTarget.apply {
-        // C interop configurations
+        binaries.all {
+            linkerOpts(PlatformConfig.sharedLibLinkerOpts("SDL3", "SDL3_mixer", "SDL3_image", "SDL3_ttf"))
+        }
+
         compilations["main"].cinterops {
             val sdl3 by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3.def")
-                compilerOpts("-I/opt/homebrew/include", "-I/usr/local/include")
+                compilerOpts(PlatformConfig.compilerOpts)
             }
             val sdl3mixer by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3_mixer.def")
-                compilerOpts("-I/opt/homebrew/include", "-I/usr/local/include")
+                compilerOpts(PlatformConfig.compilerOpts)
             }
         }
 

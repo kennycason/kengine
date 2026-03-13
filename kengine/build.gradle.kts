@@ -38,36 +38,24 @@ kotlin {
             staticLib()
             sharedLib {
                 baseName = "kengine"
-                linkerOpts(
-                    "-L/usr/local/lib",
-                    "-L/opt/homebrew/lib",
-                    "-lSDL3",
-                    "-lSDL3_image",
-                    "-lSDL3_ttf",
-                    "-framework", "Cocoa",
-                    "-framework", "IOKit",
-                    "-framework", "CoreVideo",
-                    // Set runtime library paths
-                    "-Wl,-rpath,@executable_path/Frameworks",
-                    "-Wl,-rpath,/usr/local/lib",
-                    "-Wl,-rpath,/opt/homebrew/lib"
-                )
+            }
+            all {
+                linkerOpts(PlatformConfig.sharedLibLinkerOpts("SDL3", "SDL3_image", "SDL3_ttf"))
             }
         }
 
-        // C interop configurations
         compilations["main"].cinterops {
             val sdl3 by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3.def")
-                compilerOpts("-I/opt/homebrew/include", "-I/usr/local/include")
+                compilerOpts(PlatformConfig.compilerOpts)
             }
             val sdl3image by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3_image.def")
-                compilerOpts("-I/opt/homebrew/include", "-I/usr/local/include")
+                compilerOpts(PlatformConfig.compilerOpts)
             }
             val sdl3ttf by creating {
                 defFile = file("src/nativeInterop/cinterop/sdl3_ttf.def")
-                compilerOpts("-I/opt/homebrew/include", "-I/usr/local/include")
+                compilerOpts(PlatformConfig.compilerOpts)
             }
         }
 
