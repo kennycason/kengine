@@ -46,6 +46,7 @@ object PlatformConfig {
 
     val linuxSystemLibs: List<String>
         get() = if (isLinux) listOf(
+            "-Wl,--allow-shlib-undefined",
             "-lpthread", "-ldl", "-lm"
         ) else emptyList()
 
