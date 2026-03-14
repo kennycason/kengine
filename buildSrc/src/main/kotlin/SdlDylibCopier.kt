@@ -8,22 +8,25 @@ class SdlDylibCopier(private val project: Project) {
 
     private val isMacOS = PlatformConfig.isMacOS
     private val isLinux = PlatformConfig.isLinux
+    private val isWindows = PlatformConfig.isWindows
+
+    private val msys2Root: String = System.getenv("MSYS2_ROOT") ?: "C:/msys64"
 
     private val searchPaths: List<String> = when {
         isMacOS -> listOf("/opt/homebrew/lib", "/usr/local/lib")
         isLinux -> listOf("/usr/local/lib", "/usr/lib/x86_64-linux-gnu", "/usr/lib")
+        isWindows -> listOf("$msys2Root/mingw64/bin", "$msys2Root/mingw64/lib")
         else -> listOf("/usr/local/lib")
     }
 
     /**
      * Resolve a shared library by base name (e.g. "SDL3"), searching platform-specific locations.
-     * On macOS looks for .dylib, on Linux looks for .so.
      */
     private fun resolveLib(baseName: String): String {
-        val candidates = if (isMacOS) {
-            listOf("lib${baseName}.0.dylib", "lib${baseName}.dylib")
-        } else {
-            listOf("lib${baseName}.so.0", "lib${baseName}.so")
+        val candidates = when {
+            isMacOS -> listOf("lib${baseName}.0.dylib", "lib${baseName}.dylib")
+            isWindows -> listOf("${baseName}.dll", "lib${baseName}.dll")
+            else -> listOf("lib${baseName}.so.0", "lib${baseName}.so")
         }
         for (candidate in candidates) {
             for (searchPath in searchPaths) {
@@ -33,10 +36,13 @@ class SdlDylibCopier(private val project: Project) {
                 }
             }
         }
+        val installHint = when {
+            isMacOS -> "Install via Homebrew (brew install sdl3) or build from source (bash sdl3/build_sdl.sh)."
+            isWindows -> "Install via MSYS2 (pacman -S mingw-w64-x86_64-SDL3) or build from source."
+            else -> "Build from source (bash sdl3/build_sdl.sh) or install via your package manager."
+        }
         throw IllegalStateException(
-            "Could not find lib$baseName in any of: ${searchPaths.joinToString()}. " +
-                if (isMacOS) "Install via Homebrew (brew install sdl3) or build from source (bash sdl3/build_sdl.sh)."
-                else "Build from source (bash sdl3/build_sdl.sh) or install via your package manager."
+            "Could not find $baseName in any of: ${searchPaths.joinToString()}. $installHint"
         )
     }
 
@@ -64,7 +70,7 @@ class SdlDylibCopier(private val project: Project) {
         libTargetDirs: List<String>
     ) {
         libsToCopy.forEach { libPath ->
-            val libName = libPath.substringAfterLast("/")
+            val libName = libPath.substringAfterLast("/").substringAfterLast("\\")
 
             libTargetDirs.forEach { toDir ->
                 val targetDir = toDir.substringAfter("${project.buildDir}/bin/native/")
@@ -87,7 +93,9 @@ class SdlDylibCopier(private val project: Project) {
                             }
                         }
 
-                        fileMode = 0b111101101 // rwxr-xr-x (755)
+                        if (!isWindows) {
+                            fileMode = 0b111101101 // rwxr-xr-x (755)
+                        }
                     }
                 } else {
                     println("Task $taskName already exists. Skipping registration.")
@@ -98,7 +106,7 @@ class SdlDylibCopier(private val project: Project) {
         project.tasks.named("nativeTest") {
             dependsOn(
                 libsToCopy.flatMap { libPath ->
-                    val libName = libPath.substringAfterLast("/")
+                    val libName = libPath.substringAfterLast("/").substringAfterLast("\\")
                     libTargetDirs.map { toDir ->
                         val targetDir = toDir.substringAfter("${project.buildDir}/bin/native/")
                         generateTaskName(project, libName, targetDir)
@@ -116,6 +124,7 @@ class SdlDylibCopier(private val project: Project) {
             .removeSuffix(".dylib")
             .removeSuffix(".so.0")
             .removeSuffix(".so")
+            .removeSuffix(".dll")
             .capitalize()
         return if (targetDir.contains("debugTest"))
             "copy${moduleName}${prefix}ToDebugTestFrameworks"
