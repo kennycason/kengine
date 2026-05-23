@@ -2,8 +2,8 @@
 #
 # Cross-platform SDL3 builder.
 #
-# macOS (hybrid): builds SDL3_mixer and SDL3_net from source.
-#   SDL3, SDL3_image, SDL3_ttf installed via Homebrew.
+# macOS (hybrid): builds SDL3_net from source.
+#   SDL3, SDL3_image, SDL3_ttf, SDL3_mixer installed via Homebrew.
 #
 # Linux: builds ALL SDL3 libs from source (not in apt repos yet).
 #   Prerequisites: cmake, pkg-config, build-essential
@@ -107,13 +107,22 @@ case "$OS" in
         ;;
 esac
 
-# All platforms: build mixer and net from source
+# Build SDL3_mixer from source on non-macOS (macOS uses Homebrew)
+case "$OS" in
+    Linux|MINGW*|MSYS*)
+        build_cmake_project "SDL3_mixer" "SDL_mixer" ""
+        ;;
+    Darwin)
+        echo "SDL3_mixer: using Homebrew (skipping source build)"
+        ;;
+esac
+
+# All platforms: build SDL3_net from source (not in any package manager yet)
 SDL3_CMAKE_ARGS=""
 if [ "$OS" = "Darwin" ]; then
     SDL3_CMAKE_ARGS="-DSDL3_INCLUDE_DIR=${SDL3_INCLUDE}/SDL3 -DSDL3_LIBRARY=${SDL3_LIB}"
 fi
 
-build_cmake_project "SDL3_mixer" "SDL_mixer" "$SDL3_CMAKE_ARGS"
 build_cmake_project "SDL3_net" "SDL_net" "$SDL3_CMAKE_ARGS"
 
 if [ "$OS" = "Linux" ]; then
@@ -124,8 +133,8 @@ echo ""
 echo "=== Done ==="
 case "$OS" in
     Darwin)
-        echo "Brew-managed: SDL3, SDL3_image, SDL3_ttf (update with: brew upgrade sdl3 sdl3_image sdl3_ttf)"
-        echo "Source-built: SDL3_mixer, SDL3_net (installed to /usr/local/lib)"
+        echo "Brew-managed: SDL3, SDL3_image, SDL3_ttf, SDL3_mixer (update with: brew upgrade sdl3 sdl3_image sdl3_ttf sdl3_mixer)"
+        echo "Source-built: SDL3_net (installed to /usr/local/lib)"
         ;;
     *)
         echo "All SDL3 libs built from source and installed to $INSTALL_PREFIX"
