@@ -3,23 +3,26 @@ package com.kengine.sound
 import com.kengine.hooks.context.Context
 import com.kengine.log.Logger
 import com.kengine.log.Logging
+import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
 import kotlinx.cinterop.toKString
 import platform.posix.exit
-import sdl3.SDL_AudioSpec
+import sdl3.SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK
 import sdl3.SDL_GetError
 import sdl3.SDL_INIT_AUDIO
 import sdl3.SDL_Init
-import sdl3.mixer.Mix_CloseAudio
-import sdl3.mixer.Mix_OpenAudio
+import sdl3.mixer.MIX_CreateMixerDevice
+import sdl3.mixer.MIX_DestroyMixer
+import sdl3.mixer.MIX_Init
+import sdl3.mixer.MIX_Quit
 
 @OptIn(ExperimentalForeignApi::class)
 class SoundContext private constructor(
     private val manager: SoundManager
 ) : Context(), Logging {
+
+    var mixer: CPointer<cnames.structs.MIX_Mixer>? = null
+        private set
 
     init {
         require(SDL_Init(SDL_INIT_AUDIO)) {
@@ -27,19 +30,13 @@ class SoundContext private constructor(
             exit(1)
         }
 
-        memScoped {
-            val audioSpec = alloc<SDL_AudioSpec>().apply {
-                freq = 44100     // Sample rate
-                format = 0x8010u // 16-bit signed little-endian
-                channels = 2     // Stereo
-            }
+        require(MIX_Init()) {
+            "Failed to initialize SDL_mixer: ${SDL_GetError()?.toKString()}"
+        }
 
-            Companion.logger.info { "freq=${audioSpec.freq}, format=${audioSpec.format}, channels=${audioSpec.channels}" }
-
-            val result = Mix_OpenAudio(0u, audioSpec.ptr)
-            require(result) {
-                "Failed to initialize SDL_mixer: ${SDL_GetError()?.toKString()}"
-            }
+        mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, null)
+        requireNotNull(mixer) {
+            "Failed to create SDL_mixer device: ${SDL_GetError()?.toKString()}"
         }
     }
 
@@ -54,7 +51,9 @@ class SoundContext private constructor(
     override fun cleanup() {
         logger.info { "Cleaning up SoundContext" }
         manager.cleanup()
-        Mix_CloseAudio()
+        mixer?.let { MIX_DestroyMixer(it) }
+        mixer = null
+        MIX_Quit()
         currentContext = null
     }
 

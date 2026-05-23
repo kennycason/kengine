@@ -3,30 +3,34 @@ package com.kengine.sound
 import com.kengine.file.File
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
-import sdl3.mixer.MIX_MAX_VOLUME
-import sdl3.mixer.Mix_Chunk
-import sdl3.mixer.Mix_FreeChunk
-import sdl3.mixer.Mix_HaltChannel
-import sdl3.mixer.Mix_LoadWAV
-import sdl3.mixer.Mix_Pause
-import sdl3.mixer.Mix_PlayChannel
-import sdl3.mixer.Mix_Resume
-import sdl3.mixer.Mix_Volume
+import sdl3.mixer.MIX_CreateTrack
+import sdl3.mixer.MIX_DestroyAudio
+import sdl3.mixer.MIX_DestroyTrack
+import sdl3.mixer.MIX_LoadAudio
+import sdl3.mixer.MIX_PauseTrack
+import sdl3.mixer.MIX_PlayTrack
+import sdl3.mixer.MIX_ResumeTrack
+import sdl3.mixer.MIX_SetTrackAudio
+import sdl3.mixer.MIX_SetTrackGain
+import sdl3.mixer.MIX_SetTrackLoops
+import sdl3.mixer.MIX_StopTrack
 import kotlin.math.max
 import kotlin.math.min
 
 @OptIn(ExperimentalForeignApi::class)
 class Sound(filePath: String) {
-    private var sound: CPointer<Mix_Chunk>? = null
-    private var channel: Int = -1
+    private var audio: CPointer<cnames.structs.MIX_Audio>? = null
+    private var track: CPointer<cnames.structs.MIX_Track>? = null
 
     // 0 (silent) to 100 (maximum)
     private var volume: Int = 100
     private val fullFilePath = "${File.pwd()}/$filePath"
 
     init {
-        sound = Mix_LoadWAV(fullFilePath)
-        requireNotNull(sound) { "Failed to load sound: $fullFilePath" }
+        val mixer = getSoundContext().mixer
+            ?: error("SoundContext mixer not initialized")
+        audio = MIX_LoadAudio(mixer, fullFilePath, true)
+        requireNotNull(audio) { "Failed to load sound: $fullFilePath" }
     }
 
     /**
@@ -35,9 +39,7 @@ class Sound(filePath: String) {
      */
     fun setVolume(volume: Int) {
         this.volume = max(0, min(volume, 100))
-        if (channel != -1) {
-            Mix_Volume(channel, scaleVolume(this.volume))
-        }
+        track?.let { MIX_SetTrackGain(it, this.volume / 100.0f) }
     }
 
     /**
@@ -50,65 +52,67 @@ class Sound(filePath: String) {
      * Plays the sound once.
      */
     fun play() {
-        channel = Mix_PlayChannel(-1, sound, 0)
-        require(channel != -1) { "Failed to play sound: $fullFilePath" }
-        Mix_Volume(channel, scaleVolume(volume))
+        prepareTrack(loops = 0)
+        track?.let {
+            MIX_SetTrackGain(it, volume / 100.0f)
+            MIX_PlayTrack(it, 0u)
+        } ?: error("Failed to play sound: $fullFilePath")
     }
 
     /**
      * Loops the sound indefinitely.
      */
     fun loop() {
-        channel = Mix_PlayChannel(-1, sound, -1)
-        require(channel != -1) { "Failed to loop sound: $fullFilePath" }
-        Mix_Volume(channel, scaleVolume(volume))
+        prepareTrack(loops = -1)
+        track?.let {
+            MIX_SetTrackGain(it, volume / 100.0f)
+            MIX_PlayTrack(it, 0u)
+        } ?: error("Failed to loop sound: $fullFilePath")
     }
 
     /**
      * Pauses the sound if it's currently playing.
      */
     fun pause() {
-        if (channel != -1) {
-            Mix_Pause(channel)
-        }
+        track?.let { MIX_PauseTrack(it) }
     }
 
     /**
      * Resumes the sound if it's paused.
      */
     fun resume() {
-        if (channel != -1) {
-            Mix_Resume(channel)
-        }
+        track?.let { MIX_ResumeTrack(it) }
     }
 
     /**
      * Stops the sound if it's currently playing.
      */
     fun stop() {
-        if (channel != -1) {
-            Mix_HaltChannel(channel)
-            channel = -1
+        track?.let {
+            MIX_StopTrack(it, 0)
         }
     }
 
     /**
-     * Cleans up the sound resources when no longer needed
+     * Cleans up the sound resources when no longer needed.
      */
     fun cleanup() {
-        sound?.let {
-            Mix_FreeChunk(it)
+        track?.let { MIX_DestroyTrack(it) }
+        track = null
+        audio?.let { MIX_DestroyAudio(it) }
+        audio = null
+    }
+
+    private fun prepareTrack(loops: Int) {
+        if (track == null) {
+            val mixer = getSoundContext().mixer
+                ?: error("SoundContext mixer not initialized")
+            track = MIX_CreateTrack(mixer)
+            requireNotNull(track) { "Failed to create track for: $fullFilePath" }
         }
-        sound = null
+        track?.let {
+            MIX_SetTrackAudio(it, audio)
+            MIX_SetTrackLoops(it, loops)
+        }
     }
-
-    /**
-     * Linearly map the 0-100 volume range to SDL_mixer's 0-128 range.
-     * @param volume The volume level on a 0-100 scale.
-     * @return The scaled volume on a 0-128 scale.
-     */
-    private fun scaleVolume(volume: Int): Int {
-        return ((volume / 100.0) * MIX_MAX_VOLUME).toInt().coerceIn(0, MIX_MAX_VOLUME)
-    }
-
 }
