@@ -36,8 +36,6 @@ class AntColony(
             spawnAnt()
         }
         
-        lastReproductionTime = getClockContext().totalTimeMs
-        lastFoodProductionTime = getClockContext().totalTimeMs
         logger.info("Colony established at ($queenX, $queenY) with tunnel from surface")
     }
     

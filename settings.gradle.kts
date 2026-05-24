@@ -7,7 +7,9 @@ pluginManagement {
 
 rootProject.name = "kengine"
 
-val isPlaydateEnabled = System.getenv("PLAYDATE_SDK_PATH") != null
+// Playdate requires explicit opt-in via -Pkengine.playdate=true
+// Kotlin/Native's linuxArm32Hfp emits ARMv4 code incompatible with Playdate's Cortex-M7 (ARMv7E-M)
+val isPlaydateEnabled = extra.properties["kengine.playdate"]?.toString()?.toBoolean() == true
 println("Playdate enabled: $isPlaydateEnabled")
 
 val modules = mutableListOf(

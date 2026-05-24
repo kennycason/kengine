@@ -14,7 +14,8 @@ class PheromoneTest {
         assertEquals(1.0, pheromoneMap.get(PheromoneType.FOOD), 0.01)
         
         pheromoneMap.add(PheromoneType.FOOD, 2.0)
-        assertEquals(3.0, pheromoneMap.get(PheromoneType.FOOD), 0.01)
+        // Diminishing returns: 2.0 * (1 - 1.0/100) = 1.98, total = 2.98
+        assertEquals(2.98, pheromoneMap.get(PheromoneType.FOOD), 0.01)
     }
     
     @Test

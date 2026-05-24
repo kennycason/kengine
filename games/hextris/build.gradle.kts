@@ -30,12 +30,14 @@ kotlin {
     }
 
     nativeTarget.apply {
+        binaries.all {
+            linkerOpts(PlatformConfig.sharedLibLinkerOpts(
+                "SDL3", "SDL3_image", "SDL3_mixer", "SDL3_net", "SDL3_ttf", "chipmunk"
+            ))
+        }
         binaries {
             executable {
                 entryPoint = "main"
-                linkerOpts(PlatformConfig.sharedLibLinkerOpts(
-                    "SDL3", "SDL3_image", "SDL3_mixer", "SDL3_net", "SDL3_ttf", "chipmunk"
-                ))
             }
         }
     }
