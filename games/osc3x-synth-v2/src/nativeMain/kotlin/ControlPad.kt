@@ -106,10 +106,10 @@ class ControlPad(
                 bgColor = colors[4],
                 hoverColor = colors[colors.size - 1 - 4],
                 onClick = {
-                    logger.info("Clicked pad 5")
-                    osc3xSynth.setConfig(0, frequency = 110.0, detune = 0.0, waveform = Oscillator.Waveform.SAW)
-                    osc3xSynth.setConfig(1, frequency = 110.0, detune = 50.0, waveform = Oscillator.Waveform.SAW)
-                    osc3xSynth.setConfig(2, frequency = 110.0, detune = -50.0, waveform = Oscillator.Waveform.SAW)
+                    logger.info("Clicked pad 5 - Sub Bass")
+                    osc3xSynth.setConfig(0, frequency = 55.0, detune = 0.0, waveform = Oscillator.Waveform.SINE)
+                    osc3xSynth.setConfig(1, frequency = 55.0, detune = 5.0, waveform = Oscillator.Waveform.SINE)
+                    osc3xSynth.setConfig(2, frequency = 110.0, detune = 0.0, waveform = Oscillator.Waveform.SINE)
                 }
             )
             button(
@@ -120,10 +120,10 @@ class ControlPad(
                 bgColor = colors[5],
                 hoverColor = colors[colors.size - 1 - 5],
                 onClick = {
-                    logger.info("Clicked pad 6")
-                    osc3xSynth.setConfig(0, frequency = 98.0, detune = 30.0, waveform = Oscillator.Waveform.SAW)
-                    osc3xSynth.setConfig(1, frequency = 98.0, detune = -30.0, waveform = Oscillator.Waveform.SAW)
-                    osc3xSynth.setConfig(2, frequency = 196.0, detune = 0.0, waveform = Oscillator.Waveform.SQUARE)
+                    logger.info("Clicked pad 6 - Bright Lead")
+                    osc3xSynth.setConfig(0, frequency = 440.0, detune = 0.0, waveform = Oscillator.Waveform.SQUARE)
+                    osc3xSynth.setConfig(1, frequency = 880.0, detune = 0.0, waveform = Oscillator.Waveform.SQUARE, volume = 0.3)
+                    osc3xSynth.setConfig(2, frequency = 1320.0, detune = 0.0, waveform = Oscillator.Waveform.SINE, volume = 0.15)
                 }
             )
         }
@@ -141,10 +141,10 @@ class ControlPad(
                 bgColor = colors[6],
                 hoverColor = colors[colors.size - 1 - 6],
                 onClick = {
-                    logger.info("Clicked pad 7")
-                    osc3xSynth.setConfig(0, frequency = 110.0, detune = 0.0, waveform = Oscillator.Waveform.SAW)
-                    osc3xSynth.setConfig(1, frequency = 110.0, detune = 50.0, waveform = Oscillator.Waveform.SAW)
-                    osc3xSynth.setConfig(2, frequency = 110.0, detune = -50.0, waveform = Oscillator.Waveform.SAW)
+                    logger.info("Clicked pad 7 - Detuned Pad")
+                    osc3xSynth.setConfig(0, frequency = 261.6, detune = 7.0, waveform = Oscillator.Waveform.TRIANGLE)
+                    osc3xSynth.setConfig(1, frequency = 329.6, detune = -7.0, waveform = Oscillator.Waveform.TRIANGLE)
+                    osc3xSynth.setConfig(2, frequency = 392.0, detune = 5.0, waveform = Oscillator.Waveform.TRIANGLE)
                 }
             )
             button(
@@ -155,10 +155,10 @@ class ControlPad(
                 bgColor = colors[7],
                 hoverColor = colors[colors.size - 1 - 7],
                 onClick = {
-                    logger.info("Clicked pad 8")
-                    osc3xSynth.setConfig(0, frequency = 98.0, detune = 30.0, waveform = Oscillator.Waveform.SAW)
-                    osc3xSynth.setConfig(1, frequency = 98.0, detune = -30.0, waveform = Oscillator.Waveform.SAW)
-                    osc3xSynth.setConfig(2, frequency = 196.0, detune = 0.0, waveform = Oscillator.Waveform.SQUARE)
+                    logger.info("Clicked pad 8 - Fifth Power")
+                    osc3xSynth.setConfig(0, frequency = 110.0, detune = 0.0, waveform = Oscillator.Waveform.SAW)
+                    osc3xSynth.setConfig(1, frequency = 165.0, detune = 10.0, waveform = Oscillator.Waveform.SAW)
+                    osc3xSynth.setConfig(2, frequency = 220.0, detune = -10.0, waveform = Oscillator.Waveform.SQUARE)
                 }
             )
         }

@@ -65,5 +65,7 @@ class Osc3xSynthAndVfx : Game, Logging {
         }
     }
 
-    override fun cleanup() {}
+    override fun cleanup() {
+        osc3xSynth.osc3x.cleanup()
+    }
 }

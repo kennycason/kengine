@@ -36,7 +36,6 @@ class Osc3xSynth(
 
         // Main oscillator controls section
         object Main {
-            const val SECTION_WIDTH = Common.PANEL_WIDTH - PANEL_PADDING * 2
             const val SECTION_HEIGHT = 120.0
             const val SLIDER_WIDTH = 20.0
             const val SLIDER_HEIGHT = 70.0
@@ -48,7 +47,6 @@ class Osc3xSynth(
 
         // Effects section (LFO & Filter)
         object Effects {
-            const val SECTION_WIDTH = Common.PANEL_WIDTH - PANEL_PADDING * 4 - Common.PANEL_SPACING
             const val SECTION_HEIGHT = 140.0
             const val HEADER_HEIGHT = 15.0
             const val SLIDER_WIDTH = 20.0
@@ -60,7 +58,6 @@ class Osc3xSynth(
 
         // ADSR envelope section
         object ADSR {
-            const val SECTION_WIDTH = Common.PANEL_WIDTH// - PANEL_PADDING * 2
             const val SECTION_HEIGHT = 105.0
             const val HEADER_HEIGHT = 15.0
             const val SLIDER_WIDTH = 20.0
@@ -80,9 +77,7 @@ class Osc3xSynth(
         val disabledButton = Color.neonOrange
         val hoverButton = Color.neonPurple
         val enabledButton = Color.neonGreen
-        val waveformButton = Color.neonPink
         val labelText = Color.neonYellow
-        val valueText = Color.white
     }
 
     val osc3x = Osc3x()
@@ -336,6 +331,13 @@ class Osc3xSynth(
     }
 
     private fun View.buildWaveformButtons(index: Int, state: OscillatorState) {
+        val waveformActive = Oscillator.Waveform.entries.associateWith { wf ->
+            useState(state.waveform.get() == wf)
+        }
+        state.waveform.subscribe { activeWaveform ->
+            waveformActive.forEach { (wf, isActive) -> isActive.set(wf == activeWaveform) }
+        }
+
         view(
             id = "waveform-$index-column",
             w = Styles.Common.SMALL_BUTTON_SIZE,
@@ -362,6 +364,7 @@ class Osc3xSynth(
                     hoverColor = Colors.hoverButton,
                     pressColor = Colors.enabledButton,
                     isToggle = true,
+                    isPressed = waveformActive[waveform]!!,
                     onToggle = { enabled ->
                         if (enabled) state.waveform.set(waveform)
                     }
@@ -403,9 +406,6 @@ class Osc3xSynth(
                 ),
                 onToggle = { enabled ->
                     state.lfoEnabled.set(enabled)
-                    osc3x.withOscillator(index) {
-                        enableLFO(enabled)
-                    }
                 }
             )
 
@@ -432,9 +432,6 @@ class Osc3xSynth(
                 ),
                 onToggle = { enabled ->
                     state.filterEnabled.set(enabled)
-                    osc3x.withOscillator(index) {
-                        enableFilter(enabled)
-                    }
                 }
             )
         }
@@ -455,7 +452,6 @@ class Osc3xSynth(
         controls: List<EffectControl>,
         onToggle: (Boolean) -> Unit
     ) {
-        val panelWidth = PANEL_WIDTH - PANEL_PADDING * 2
         view(
             id = "${label.lowercase()}-panel",
             w = width,
@@ -465,10 +461,11 @@ class Osc3xSynth(
             spacing = Styles.Common.CONTROL_SPACING,
             direction = FlexDirection.COLUMN
         ) {
+            val innerWidth = width - Styles.Common.PANEL_SPACING * 2
             // Header with label and enable button
             view(
                 id = "${label.lowercase()}-header",
-                w = panelWidth - Styles.Common.PANEL_SPACING * 2,
+                w = innerWidth,
                 h = Styles.Effects.HEADER_HEIGHT,
                 direction = FlexDirection.ROW,
                 spacing = Styles.Common.CONTROL_SPACING
@@ -498,7 +495,7 @@ class Osc3xSynth(
             // Controls
             view(
                 id = "${label.lowercase()}-controls",
-                w = panelWidth - Styles.Common.PANEL_SPACING * 2,
+                w = innerWidth,
                 h = Styles.Effects.SECTION_HEIGHT - Styles.Effects.HEADER_HEIGHT - Styles.Common.PANEL_SPACING * 2,
                 direction = FlexDirection.ROW,
                 spacing = Styles.Common.CONTROL_SPACING
@@ -556,9 +553,6 @@ class Osc3xSynth(
                     isToggle = true,
                     onToggle = { enabled ->
                         state.adsrEnabled.set(enabled)
-                        osc3x.withOscillator(index) {
-                            enableADSR(enabled)
-                        }
                     },
                     isPressed = state.adsrEnabled
                 )
@@ -614,8 +608,6 @@ class Osc3xSynth(
         }
     }
 
-    // would follow similar patterns but I'll keep the code sample focused on the
-    // main elements for now. Would you like me to continue with the effects and ADSR sections?
     private fun syncOscillatorConfig(index: Int) {
         val state = oscillatorStates[index]
 
@@ -686,27 +678,6 @@ class Osc3xSynth(
             state.decay.set((1..200).random() / 100.0) // 0.01-2.0 seconds
             state.sustain.set((0..100).random() / 100.0) // 0.0-1.0
             state.release.set((1..200).random() / 100.0) // 0.01-2.0 seconds
-
-            // Apply all randomized parameters to the oscillator
-            osc3x.withOscillator(i) {
-                enableLFO(state.lfoEnabled.get())
-                setLFO(
-                    frequency = state.lfoFreq.get(),
-                    amplitude = state.lfoAmp.get()
-                )
-
-                enableFilter(state.filterEnabled.get())
-                setFilterCutoff(state.filterCutoff.get())
-                setFilterResonance(state.filterRes.get())
-
-                enableADSR(state.adsrEnabled.get())
-                setADSR(
-                    attack = state.attack.get(),
-                    decay = state.decay.get(),
-                    sustain = state.sustain.get(),
-                    release = state.release.get()
-                )
-            }
         }
     }
 
@@ -762,9 +733,6 @@ class Osc3xSynth(
         decay?.let { state.decay.set(it) }
         sustain?.let { state.sustain.set(it) }
         release?.let { state.release.set(it) }
-
-        // Sync with Osc3x engine
-        syncOscillatorConfig(oscillator)
     }
 
     fun update() {
@@ -775,7 +743,7 @@ class Osc3xSynth(
         synthView.draw()
     }
 
-    fun setMaterVolume(volume: Double) {
+    fun setMasterVolume(volume: Double) {
         masterVolume.set(volume)
     }
 }

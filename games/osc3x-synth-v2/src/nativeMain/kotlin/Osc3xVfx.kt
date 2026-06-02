@@ -58,7 +58,7 @@ class Osc3xVfx(
             x = x, y = y,
             width = width, height = height,
         ),
-        NeonLinesEffect(
+        WavePatternEffect2(
             x = x, y = y,
             width = width, height = height,
         ),
@@ -93,43 +93,43 @@ class Osc3xVfx(
         val effect = effects[currentEffect.get()]
         if (effect is WavePatternEffect) {
             effect.setFrequency(
-                (if (osc1.volume > 0.0) osc1.frequency else 0.0) +
-                    (if (osc2.volume > 0.0) osc2.frequency else 0.0) +
-                    (if (osc3.volume > 0.0) osc3.frequency else 0.0)
+                (if (osc1.enabled && osc1.volume > 0.0) osc1.frequency else 0.0) +
+                    (if (osc2.enabled && osc2.volume > 0.0) osc2.frequency else 0.0) +
+                    (if (osc3.enabled && osc3.volume > 0.0) osc3.frequency else 0.0)
             )
         } else if (effect is WavePatternEffect2) {
             effect.setFrequency(
-                (if (osc1.volume > 0.0) osc1.frequency else 0.0) +
-                    (if (osc2.volume > 0.0) osc2.frequency else 0.0) +
-                    (if (osc3.volume > 0.0) osc3.frequency else 0.0)
+                (if (osc1.enabled && osc1.volume > 0.0) osc1.frequency else 0.0) +
+                    (if (osc2.enabled && osc2.volume > 0.0) osc2.frequency else 0.0) +
+                    (if (osc3.enabled && osc3.volume > 0.0) osc3.frequency else 0.0)
             )
         } else if (effect is FrequencyCircleEffect) {
             effect.setFrequency(
-                (if (osc1.volume > 0.0) osc1.frequency else 0.0) +
-                    (if (osc2.volume > 0.0) osc2.frequency else 0.0) +
-                    (if (osc3.volume > 0.0) osc3.frequency else 0.0)
+                (if (osc1.enabled && osc1.volume > 0.0) osc1.frequency else 0.0) +
+                    (if (osc2.enabled && osc2.volume > 0.0) osc2.frequency else 0.0) +
+                    (if (osc3.enabled && osc3.volume > 0.0) osc3.frequency else 0.0)
             )
         } else if (effect is RainbowLinesWithFrequencyEffect) {
             effect.setFrequency(
-                (if (osc1.volume > 0.0) osc1.frequency else 0.0) +
-                    (if (osc2.volume > 0.0) osc2.frequency else 0.0) +
-                    (if (osc3.volume > 0.0) osc3.frequency else 0.0)
+                (if (osc1.enabled && osc1.volume > 0.0) osc1.frequency else 0.0) +
+                    (if (osc2.enabled && osc2.volume > 0.0) osc2.frequency else 0.0) +
+                    (if (osc3.enabled && osc3.volume > 0.0) osc3.frequency else 0.0)
             )
         } else if (effect is SpectrographVisualizer) {
             effect.setFrequency(
-                (if (osc1.volume > 0.0) osc1.frequency else 0.0) +
-                    (if (osc2.volume > 0.0) osc2.frequency else 0.0) +
-                    (if (osc3.volume > 0.0) osc3.frequency else 0.0)
+                (if (osc1.enabled && osc1.volume > 0.0) osc1.frequency else 0.0) +
+                    (if (osc2.enabled && osc2.volume > 0.0) osc2.frequency else 0.0) +
+                    (if (osc3.enabled && osc3.volume > 0.0) osc3.frequency else 0.0)
             )
             effect.setDetune(
-                (if (osc1.volume > 0.0) osc1.detune else 0.0) +
-                    (if (osc2.volume > 0.0) osc2.detune else 0.0) +
-                    (if (osc3.volume > 0.0) osc3.detune else 0.0)
+                (if (osc1.enabled && osc1.volume > 0.0) osc1.detune else 0.0) +
+                    (if (osc2.enabled && osc2.volume > 0.0) osc2.detune else 0.0) +
+                    (if (osc3.enabled && osc3.volume > 0.0) osc3.detune else 0.0)
             )
         } else if (effect is WaveformGalaxy) {
-            val combinedFrequency = (if (osc1.volume > 0.0) osc1.frequency else 0.0) +
-                (if (osc2.volume > 0.0) osc2.frequency else 0.0) +
-                (if (osc3.volume > 0.0) osc3.frequency else 0.0)
+            val combinedFrequency = (if (osc1.enabled && osc1.volume > 0.0) osc1.frequency else 0.0) +
+                (if (osc2.enabled && osc2.volume > 0.0) osc2.frequency else 0.0) +
+                (if (osc3.enabled && osc3.volume > 0.0) osc3.frequency else 0.0)
 
             val normalizedIndex = ((combinedFrequency / 2000.0) * effect.numStars).toInt().coerceIn(0, effect.numStars - 1)
 
@@ -143,31 +143,31 @@ class Osc3xVfx(
 
             // Apply detune effect
             effect.setDetune(
-                (if (osc1.volume > 0.0) osc1.detune else 0.0) +
-                    (if (osc2.volume > 0.0) osc2.detune else 0.0) +
-                    (if (osc3.volume > 0.0) osc3.detune else 0.0)
+                (if (osc1.enabled && osc1.volume > 0.0) osc1.detune else 0.0) +
+                    (if (osc2.enabled && osc2.volume > 0.0) osc2.detune else 0.0) +
+                    (if (osc3.enabled && osc3.volume > 0.0) osc3.detune else 0.0)
             )
         } else if (effect is SacredGeometryOscillation) {
             effect.setFrequency(
-                (if (osc1.volume > 0.0) osc1.frequency else 0.0) +
-                    (if (osc2.volume > 0.0) osc2.frequency else 0.0) +
-                    (if (osc3.volume > 0.0) osc3.frequency else 0.0)
+                (if (osc1.enabled && osc1.volume > 0.0) osc1.frequency else 0.0) +
+                    (if (osc2.enabled && osc2.volume > 0.0) osc2.frequency else 0.0) +
+                    (if (osc3.enabled && osc3.volume > 0.0) osc3.frequency else 0.0)
             )
             effect.setDetune(
-                (if (osc1.volume > 0.0) osc1.detune else 0.0) +
-                    (if (osc2.volume > 0.0) osc2.detune else 0.0) +
-                    (if (osc3.volume > 0.0) osc3.detune else 0.0)
+                (if (osc1.enabled && osc1.volume > 0.0) osc1.detune else 0.0) +
+                    (if (osc2.enabled && osc2.volume > 0.0) osc2.detune else 0.0) +
+                    (if (osc3.enabled && osc3.volume > 0.0) osc3.detune else 0.0)
             )
         } else if (effect is SacredGeometryOscillation2) {
             effect.setFrequency(
-                (if (osc1.volume > 0.0) osc1.frequency else 0.0) +
-                    (if (osc2.volume > 0.0) osc2.frequency else 0.0) +
-                    (if (osc3.volume > 0.0) osc3.frequency else 0.0)
+                (if (osc1.enabled && osc1.volume > 0.0) osc1.frequency else 0.0) +
+                    (if (osc2.enabled && osc2.volume > 0.0) osc2.frequency else 0.0) +
+                    (if (osc3.enabled && osc3.volume > 0.0) osc3.frequency else 0.0)
             )
             effect.setDetune(
-                (if (osc1.volume > 0.0) osc1.detune else 0.0) +
-                    (if (osc2.volume > 0.0) osc2.detune else 0.0) +
-                    (if (osc3.volume > 0.0) osc3.detune else 0.0)
+                (if (osc1.enabled && osc1.volume > 0.0) osc1.detune else 0.0) +
+                    (if (osc2.enabled && osc2.volume > 0.0) osc2.detune else 0.0) +
+                    (if (osc3.enabled && osc3.volume > 0.0) osc3.detune else 0.0)
             )
         }
         effect.update()
