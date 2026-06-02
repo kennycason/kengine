@@ -56,15 +56,6 @@ class ViewContext private constructor() : Context(), Logging {
                     view.click(mouseX, mouseY)
                     if (dragFocus != null) break
                 }
-                // Same-frame tap: button was pressed and already released — fire release too
-                if (wasJustPressed && !isCurrentlyPressed) {
-                    if (dragFocus != null) {
-                        dragFocus?.release(mouseX, mouseY)
-                        dragFocus = null
-                    } else {
-                        rootViews.forEach { it.release(mouseX, mouseY) }
-                    }
-                }
             }
 
             // 2) Just released
@@ -94,8 +85,9 @@ class ViewContext private constructor() : Context(), Logging {
             }
         }
 
-        // Update wasPressed at the *end*, so next frame we can see transitions
-        wasPressed = isCurrentlyPressed
+        // For same-frame taps, treat as still pressed so release fires next frame
+        // (gives buttons one frame to show pressed visual state)
+        wasPressed = isCurrentlyPressed || (!wasPressed && wasJustPressed)
     }
 
     /**

@@ -41,11 +41,13 @@ class Button(
     hoverColor = buttonHoverColor
 ) {
     private var isHovered = false
+    private var isActivelyPressed = false
 
     override fun draw() {
         if (!visible) return
 
         val currentColor = when {
+            isActivelyPressed -> pressColor ?: hoverColor ?: bgColor
             isHovered -> hoverColor
             isToggle && isPressed.get() -> pressColor ?: hoverColor ?: bgColor
             else -> bgColor
@@ -70,8 +72,8 @@ class Button(
     override fun click(mouseX: Double, mouseY: Double) {
         if (!visible || !isWithinBounds(mouseX, mouseY)) return
 
+        isActivelyPressed = true
         if (isToggle) {
-            // toggle the state and invoke the callback
             isPressed.set(!isPressed.get())
             onToggle?.invoke(isPressed.get())
         } else {
@@ -95,6 +97,7 @@ class Button(
     }
 
     override fun release(mouseX: Double, mouseY: Double) {
+        isActivelyPressed = false
         if (!isToggle) {
             onRelease?.invoke()
         }
