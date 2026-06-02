@@ -26,6 +26,8 @@ class MouseInputEventSubscriber : Logging {
 
     data class ButtonState(
         var isPressed: Boolean = false,
+        var justPressed: Boolean = false,
+        var justReleased: Boolean = false,
         var lastPressedTime: Long = 0
     )
 
@@ -46,6 +48,7 @@ class MouseInputEventSubscriber : Logging {
                 }
                 buttonStates[button]?.apply {
                     isPressed = true
+                    justPressed = true
                     lastPressedTime = getCurrentMilliseconds()
                 }
             }
@@ -54,7 +57,10 @@ class MouseInputEventSubscriber : Logging {
                 if (logger.isDebugEnabled()) {
                     logger.debug { "Button $button released" }
                 }
-                buttonStates[button]?.isPressed = false
+                buttonStates[button]?.apply {
+                    isPressed = false
+                    justReleased = true
+                }
             }
             SDL_EVENT_MOUSE_MOTION -> {
                 mouseCursor.x = event.motion.x.toDouble()
@@ -91,6 +97,16 @@ class MouseInputEventSubscriber : Logging {
     fun isLeftPressed() = isButtonPressed(SDL_BUTTON_LEFT)
     fun isRightPressed() = isButtonPressed(SDL_BUTTON_RIGHT)
     fun isMiddlePressed() = isButtonPressed(SDL_BUTTON_MIDDLE)
+
+    fun wasLeftJustPressed() = buttonStates[SDL_BUTTON_LEFT]?.justPressed ?: false
+    fun wasLeftJustReleased() = buttonStates[SDL_BUTTON_LEFT]?.justReleased ?: false
+
+    fun clearFrameState() {
+        buttonStates.values.forEach {
+            it.justPressed = false
+            it.justReleased = false
+        }
+    }
 
     fun timeSinceLeftPressed() = timeSinceButtonPressed(SDL_BUTTON_LEFT)
     fun timeSinceRightPressed() = timeSinceButtonPressed(SDL_BUTTON_RIGHT)

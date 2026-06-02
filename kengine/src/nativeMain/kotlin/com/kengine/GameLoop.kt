@@ -56,7 +56,8 @@ class GameLoop(
                 clock.update((deltaTimeNs / 1_000_000u).toLong()) // Convert ns -> ms
 
                 val cursor = mouse.cursor()
-                viewContext.handleMouseEvents(cursor.x, cursor.y, mouse.isLeftPressed())
+                viewContext.handleMouseEvents(cursor.x, cursor.y, mouse.isLeftPressed(), mouse.wasLeftJustPressed())
+                mouse.clearFrameState()
 
                 update()
 

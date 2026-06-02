@@ -34,54 +34,59 @@ class ViewContext private constructor() : Context(), Logging {
      * @param mouseX current mouse X
      * @param mouseY current mouse Y
      * @param isCurrentlyPressed whether the left mouse button is down *this* frame
+     * @param wasJustPressed whether a BUTTON_DOWN event occurred this frame (catches same-frame taps)
      */
     fun handleMouseEvents(
         mouseX: Double,
         mouseY: Double,
-        isCurrentlyPressed: Boolean
+        isCurrentlyPressed: Boolean,
+        wasJustPressed: Boolean = false
     ) {
         if (logger.isTraceEnabled()) {
             logger.trace {
-                "handleMouseEvents: mouse=($mouseX, $mouseY), pressed=$isCurrentlyPressed, wasPressed=$wasPressed"
+                "handleMouseEvents: mouse=($mouseX, $mouseY), pressed=$isCurrentlyPressed, wasPressed=$wasPressed, justPressed=$wasJustPressed"
             }
         }
 
         when {
-            // 1) Just pressed
-            !wasPressed && isCurrentlyPressed -> {
-                // We do a click pass. If a child claims focus, store dragFocus.
+            // 1) Just pressed, or same-frame tap (DOWN+UP arrived in one poll cycle)
+            !wasPressed && (isCurrentlyPressed || wasJustPressed) -> {
                 dragFocus = null
                 for (view in rootViews) {
                     view.click(mouseX, mouseY)
                     if (dragFocus != null) break
                 }
+                // Same-frame tap: button was pressed and already released — fire release too
+                if (wasJustPressed && !isCurrentlyPressed) {
+                    if (dragFocus != null) {
+                        dragFocus?.release(mouseX, mouseY)
+                        dragFocus = null
+                    } else {
+                        rootViews.forEach { it.release(mouseX, mouseY) }
+                    }
+                }
             }
 
             // 2) Just released
             wasPressed && !isCurrentlyPressed -> {
-                // If we had a dragFocus, let it handle release. Then clear focus.
                 if (dragFocus != null) {
                     dragFocus?.release(mouseX, mouseY)
                     dragFocus = null
                 } else {
-                    // No dragFocus => pass release to everyone
                     rootViews.forEach { it.release(mouseX, mouseY) }
                 }
             }
 
             // 3) Still pressed (held)
             wasPressed && isCurrentlyPressed -> {
-                // If we have a dragFocus, it alone sees hover (drag).
                 dragFocus?.hover(mouseX, mouseY)
             }
 
             // 4) Not pressed both frames => normal hover
             else -> {
                 if (dragFocus != null) {
-                    // Either let the dragFocus handle hover, or do nothing
                     dragFocus?.hover(mouseX, mouseY)
                 } else {
-                    // Hover for all
                     for (view in rootViews) {
                         view.hover(mouseX, mouseY)
                     }
