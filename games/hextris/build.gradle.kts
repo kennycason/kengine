@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     id("kengine.assets")
+    id("kengine.packaging")
 }
 
 group = "kengine.hextris"

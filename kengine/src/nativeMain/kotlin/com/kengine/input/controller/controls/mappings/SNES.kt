@@ -16,15 +16,14 @@ object SNES : ControllerMapping {
             controllerName.contains("Super Nintendo Entertainment System", ignoreCase = true)
     }
 
-    // SNES-style button layout
-    const val B = 0      // Bottom button
-    const val A = 1      // Right button
-    const val Y = 2      // Left button
-    const val X = 3      // Top button
-    const val L = 4      // Left shoulder
-    const val R = 5      // Right shoulder
-    const val SELECT = 6
-    const val START = 7
+    const val B = 0
+    const val A = 1
+    const val Y = 2
+    const val X = 3
+    const val SELECT = 4
+    const val START = 6
+    const val L = 9
+    const val R = 10
 
     // D-Pad using standard logical IDs
     const val DPAD_UP = 100
@@ -33,14 +32,14 @@ object SNES : ControllerMapping {
     const val DPAD_RIGHT = 103
 
     override val buttonMappings = mapOf(
-        B to ButtonType.REGULAR,
-        A to ButtonType.REGULAR,
-        Y to ButtonType.REGULAR,
-        X to ButtonType.REGULAR,
-        L to ButtonType.REGULAR,
-        R to ButtonType.REGULAR,
-        SELECT to ButtonType.REGULAR,
-        START to ButtonType.REGULAR,
+        B to ButtonType.REGULAR,       // 0
+        A to ButtonType.REGULAR,       // 1
+        Y to ButtonType.REGULAR,       // 2
+        X to ButtonType.REGULAR,       // 3
+        SELECT to ButtonType.REGULAR,  // 4
+        START to ButtonType.REGULAR,   // 6
+        L to ButtonType.REGULAR,       // 9
+        R to ButtonType.REGULAR,       // 10
         DPAD_UP to ButtonType.HAT_UP,
         DPAD_DOWN to ButtonType.HAT_DOWN,
         DPAD_LEFT to ButtonType.HAT_LEFT,

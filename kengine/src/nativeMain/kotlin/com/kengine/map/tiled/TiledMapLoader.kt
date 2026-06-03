@@ -17,7 +17,7 @@ class TiledMapLoader : Logging {
     }
 
     fun loadMap(filePath: String): TiledMap {
-        val fullFilePath = "${File.pwd()}/$filePath"
+        val fullFilePath = File.resolveAssetPath(filePath)
         logger.info { "Loading map from: $fullFilePath" }
         val jsonContent = readFile(fullFilePath)
         val map = json.decodeFromString<TiledMap>(jsonContent)

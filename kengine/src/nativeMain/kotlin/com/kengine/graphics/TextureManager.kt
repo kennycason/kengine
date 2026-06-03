@@ -1,5 +1,6 @@
 package com.kengine.graphics
 
+import com.kengine.file.File
 import com.kengine.log.Logging
 import com.kengine.sdl.useSDLContext
 import kotlinx.cinterop.CPointer
@@ -40,7 +41,8 @@ class TextureManager : Logging {
             logger.debug { "Loading texture $texturePath to cache" }
 
             // load the surface first
-            val surface: CPointer<SDL_Surface> = IMG_Load(texturePath)
+            val resolvedPath = File.resolveAssetPath(texturePath)
+            val surface: CPointer<SDL_Surface> = IMG_Load(resolvedPath)
                 ?: throw IllegalStateException("Error loading image: ${SDL_GetError()?.toKString()}")
 
             // extract width and height from the surface BEFORE destroying it

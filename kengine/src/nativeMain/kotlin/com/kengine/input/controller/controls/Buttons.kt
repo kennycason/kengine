@@ -69,11 +69,9 @@ package com.kengine.input.controller.controls
  *  \          /                              \           /
  *   \________/                                \_________/
  *
- * These all work for the same button:
- * controller.isButtonPressed(GamepadButton.A)        // Generic mapping
- * controller.isButtonPressed(GamepadButton.CIRCLE)   // PS-specific mapping
- * controller.isButtonPressed(Playstation4.O)         // Raw PS4 button code
- * controller.isButtonPressed(1)                      // Raw PS4 button code as int
+ * Usage:
+ * controller.isButtonPressed(Buttons.A)
+ * controller.isButtonPressed(Buttons.DPAD_LEFT)
  */
 enum class Buttons {
 

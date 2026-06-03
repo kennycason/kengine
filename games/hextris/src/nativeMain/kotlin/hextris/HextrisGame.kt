@@ -287,9 +287,9 @@ class HextrisGame : Game, Logging {
         // Handle controller input for resuming
         useControllerContext {
             val controllerId = controller.getFirstControllerId() ?: return
-            val isSTARTPressed = controller.isButtonPressed(controllerId, 6)
+            val isSTARTPressed = controller.isButtonPressed(Buttons.START)
             val timeSinceLastToggle = timeSinceMs(timeSinceOptionChangeMs)
-            
+
             if (isSTARTPressed && timeSinceLastToggle > pauseDelayMs) {
                 val currentTimeBeforeToggle = getClockContext().totalTimeMs
                 logger.info("Controller: START pressed while paused. Time since last toggle: ${timeSinceLastToggle}ms (delay: ${pauseDelayMs}ms)")
@@ -603,19 +603,10 @@ class HextrisGame : Game, Logging {
             // Get first controller ID to avoid dual-registration issues
             val controllerId = controller.getFirstControllerId() ?: return
 
-            // GAMEPAD MODE Button Mapping (from controller mapping tool):
-            // D-Pad: DPAD_LEFT=13, DPAD_UP=11, DPAD_RIGHT=14, DPAD_DOWN=12 (BUTTONS, not HAT!)
-            // Face buttons: B=0, A=1, Y=2, X=3
-            // Shoulders: L1=9, R1=10
-            // System: SELECT=4, START=6
-            //
-            // IMPORTANT: In GAMEPAD mode, D-pad is mapped to BUTTONS, not HAT directions!
-            // This is different from JOYSTICK mode where D-pad uses HAT events.
-
             val currentTime = getClockContext().totalTimeMs
 
-            // Move left - DPAD LEFT (Button 13 in GAMEPAD mode) - with throttling
-            val isLeftPressed = controller.isButtonPressed(controllerId, 13)
+            // Move left - with throttling
+            val isLeftPressed = controller.isButtonPressed(Buttons.DPAD_LEFT)
             if (isLeftPressed) {
                 val shouldMove = if (lastMoveDirection == "controller_left") {
                     // If continuing to press left, check if we've passed the initial delay
@@ -645,8 +636,8 @@ class HextrisGame : Game, Logging {
                 lastMoveDirection = null
             }
 
-            // Move right - DPAD RIGHT (Button 14 in GAMEPAD mode) - with throttling
-            val isRightPressed = controller.isButtonPressed(controllerId, 14)
+            // Move right - with throttling
+            val isRightPressed = controller.isButtonPressed(Buttons.DPAD_RIGHT)
             if (isRightPressed) {
                 val shouldMove = if (lastMoveDirection == "controller_right") {
                     // If continuing to press right, check if we've passed the initial delay
@@ -676,8 +667,8 @@ class HextrisGame : Game, Logging {
                 lastMoveDirection = null
             }
 
-            // Soft drop (speed up fall) - DPAD DOWN (Button 12 in GAMEPAD mode) - directly modify drop speed
-            val isControllerDownPressed = controller.isButtonPressed(controllerId, 12)
+            // Soft drop (speed up fall) - directly modify drop speed
+            val isControllerDownPressed = controller.isButtonPressed(Buttons.DPAD_DOWN)
 
             if (isControllerDownPressed && lastMoveDirection != "controller_down") {
                 // First press - set fast drop speed and move down immediately
@@ -699,9 +690,8 @@ class HextrisGame : Game, Logging {
                 logger.debug("Controller: Down button released after ${downButtonPressedTime}ms. Restored drop speed from $fastSpeed ms to $dropSpeed ms")
             }
 
-            // Hard drop (instant fall) - DPAD UP (Button 11 in GAMEPAD mode)
-            // Requires release and re-press for each piece to prevent repeated triggers
-            val isHardDropPressed = controller.isButtonPressed(controllerId, 11)
+            // Hard drop (instant fall) - requires release and re-press to prevent repeated triggers
+            val isHardDropPressed = controller.isButtonPressed(Buttons.DPAD_UP)
 
             if (isHardDropPressed && !hardDropPressed && timeSinceMs(timeSinceOptionChangeMs) > inputDelayMs) {
                 hardDropPressed = true // Mark as pressed to prevent repeats
@@ -737,14 +727,12 @@ class HextrisGame : Game, Logging {
             // Use raw button numbers from gamepad mapping
             // Priority: (L+R combo) > L > R > X > B > A
 
-            // From controller mapping tool (GAMEPAD mode):
-            // L1=9, R1=10, A=1, B=0, X=3, Y=2
-            val isLPressed = controller.isButtonPressed(controllerId, 9)
-            val isRPressed = controller.isButtonPressed(controllerId, 10)
-            val isAPressed = controller.isButtonPressed(controllerId, 1)
-            val isBPressed = controller.isButtonPressed(controllerId, 0)
-            val isXPressed = controller.isButtonPressed(controllerId, 3)
-            val isYPressed = controller.isButtonPressed(controllerId, 2)
+            val isLPressed = controller.isButtonPressed(Buttons.L1)
+            val isRPressed = controller.isButtonPressed(Buttons.R1)
+            val isAPressed = controller.isButtonPressed(Buttons.A)
+            val isBPressed = controller.isButtonPressed(Buttons.B)
+            val isXPressed = controller.isButtonPressed(Buttons.X)
+            val isYPressed = controller.isButtonPressed(Buttons.Y)
 
             // Priority: L+R combo first
             if (isLPressed && isRPressed) {
@@ -831,16 +819,8 @@ class HextrisGame : Game, Logging {
                 }
             }
 
-            // SELECT and START buttons - Priority order
-            // From controller mapping tool (GAMEPAD mode):
-            // SELECT=4, START=6
-            // 
-            // TIMING NOTE: We use pauseDelayMs (1000ms) here to prevent rapid pause/unpause toggling.
-            // This is CRITICAL because timeSinceMs() calculates the elapsed time since a SPECIFIC TIMESTAMP.
-            // We must compare against an ABSOLUTE timestamp stored in timeSinceOptionChangeMs, not a relative duration.
-            // See timing documentation below for details on this common pitfall.
-            val isSELECTPressed = controller.isButtonPressed(controllerId, 4)
-            val isSTARTPressed = controller.isButtonPressed(controllerId, 6)
+            val isSELECTPressed = controller.isButtonPressed(Buttons.SELECT)
+            val isSTARTPressed = controller.isButtonPressed(Buttons.START)
             
             // Calculate time since last pause toggle for debugging
             val timeSinceLastToggle = timeSinceMs(timeSinceOptionChangeMs)

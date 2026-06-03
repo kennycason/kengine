@@ -24,7 +24,7 @@ class Sound(filePath: String) {
 
     // 0 (silent) to 100 (maximum)
     private var volume: Int = 100
-    private val fullFilePath = "${File.pwd()}/$filePath"
+    private val fullFilePath = File.resolveAssetPath(filePath)
 
     init {
         val mixer = getSoundContext().mixer

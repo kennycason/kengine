@@ -29,5 +29,9 @@ gradlePlugin {
             id = "kengine.sdl-dylib"
             implementationClass = "SdlDylibPlugin"
         }
+        create("kenginePackaging") {
+            id = "kengine.packaging"
+            implementationClass = "KenginePackagingPlugin"
+        }
     }
 }

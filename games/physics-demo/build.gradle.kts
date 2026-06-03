@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
+    id("kengine.packaging")
 }
 
 group = "kengine.phsyics-demo"

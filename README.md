@@ -722,12 +722,23 @@ logger.info { "New Position: $newPosition" }
 
 ```shell
 kengine/
-├── kengine/                       // kengine core code
-├── kengine-test/                  // kengine test framework
+├── kengine/                       // core engine (graphics, input, entity, UI, maps, particles, math)
+├── kengine-reactive/              // hooks system (useState, useEffect, useContext, useMemo, useReducer)
+├── kengine-test/                  // fluent assertion testing framework
+├── kengine-network/               // networking via SDL3_net (TCP/UDP)
+├── kengine-sound/                 // audio synthesis/playback via SDL3_mixer
+├── kengine-physics/               // 2D physics via Chipmunk bindings
+├── packaging/                     // icons and packaging resources
+├── sdl3/                          // SDL3 submodules and build script
+├── buildSrc/                      // Gradle plugins (PlatformConfig, assets, SDL dylibs, packaging)
 └── games/
+    ├── antfarm/                   // ant colony simulation
     ├── boxxle/                    // boxxle - clone of the Gameboy classic
-    ├── helloworld/                // a simple example, a good starting point.
+    ├── helloworld/                // a simple example, a good starting point
+    ├── hextris/                   // hexagonal tetris variant
     ├── image-shuffle/             // image tile shuffle game
+    ├── osc3x-synth/              // audio synthesizer with visual effects
+    ├── osc3x-synth-v2/           // enhanced synthesizer
     └── physics-demo/              // demonstration of physics engine (chipmunk)
 ```
 
@@ -753,10 +764,10 @@ Install OpenJDK 17.0+
 
 Install dependencies via Homebrew (macOS):
 ```shell
-brew install chipmunk sdl3 sdl3_image sdl3_ttf cmake pkg-config
+brew install chipmunk sdl3 sdl3_image sdl3_ttf sdl3_mixer cmake pkg-config
 ```
 
-Build SDL3_mixer and SDL3_net from source (no Homebrew formula available):
+Build SDL3_net from source (no Homebrew formula available):
 ```shell
 git submodule update --init --recursive
 bash sdl3/build_sdl.sh
@@ -777,15 +788,72 @@ Run specific tests:
 ./gradlew nativeTest --tests "*IT"
 ```
 
+## Packaging & Distribution
+
+Kengine includes a packaging plugin that creates platform-native distributable bundles for any game.
+Each game applies the `kengine.packaging` Gradle plugin and gets platform-specific tasks automatically.
+
+### macOS (.app bundle)
+
+Creates a self-contained `.app` with bundled dylibs, assets, icon, and `Info.plist`.
+The app can be double-clicked from Finder or distributed as-is.
+
+```shell
+./gradlew :games:helloworld:packageMac
+# Output: games/helloworld/build/dist/Helloworld.app
+```
+
+The `.app` bundle structure:
+```
+Helloworld.app/
+  Contents/
+    MacOS/helloworld          # executable
+    Resources/
+      assets/                 # sprites, fonts, sounds, maps
+      kengine.icns            # app icon
+    Frameworks/
+      libSDL3.0.dylib         # bundled SDL3 libraries
+      libSDL3_image.0.dylib
+      libSDL3_mixer.0.dylib
+      libSDL3_ttf.0.dylib
+      libSDL3_net.0.dylib
+    Info.plist                # app metadata
+```
+
+### Linux (tarball)
+
+Creates a self-contained directory with a launch script that sets `LD_LIBRARY_PATH`, plus a `.desktop` entry.
+
+```shell
+./gradlew :games:helloworld:packageLinuxTarball
+# Output: games/helloworld/build/dist/helloworld-linux.tar.gz
+```
+
+### Windows (directory)
+
+Creates a distributable directory with the executable, assets, and DLLs side-by-side.
+
+```shell
+./gradlew :games:helloworld:packageWindows
+# Output: games/helloworld/build/dist/helloworld-windows/
+```
+
+### Custom icon
+
+Replace `packaging/kengine.icns` (macOS) and `packaging/kengine.png` (Linux/Windows) with your own artwork.
+To regenerate the `.icns` from a set of PNGs, use `iconutil`:
+```shell
+iconutil -c icns packaging/icon.iconset -o packaging/kengine.icns
+```
+
 ## Roadmap
-- Binary
-  - Embed data files in executable
+- Tween/animation system (easing curves, property animation)
+- Scene management (scene transitions, scene stack)
+- Physics-based particle system (pooled, with lifespan/velocity/gravity)
 - TiledMapLoader
   - Performance enhancements (5ms/render -> <1ms/render)
   - Support TMX (XML format)
 - Logger file support
 - Menu system
-- fix @OptIn(ExperimentalForeignApi::class) (-opt-in being ignored by compiler in multi-module project in IJ)
 - Add Vec2 versions of functions that take (x,y) parameters, ditto for Rect2 and (x,y,w,h)
 - Redesign font handling + caching/config
-- Playdate integration (WIP struggling to target cortex-m7 arch)

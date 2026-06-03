@@ -35,6 +35,7 @@ class ControllerInputEventSubscriber(
     
     // Track seen devices to prevent duplicates
     private val seenDeviceKeys = mutableSetOf<String>()
+    private val instanceToDeviceKey = mutableMapOf<UInt, String>()
     
     // Track opened SDL resources so we can close them properly
     private val openedJoysticks = mutableMapOf<UInt, CPointer<cnames.structs.SDL_Joystick>>()
@@ -145,8 +146,13 @@ class ControllerInputEventSubscriber(
     private fun handleJoystickAdded(event: SDL_Event) {
         val instanceId = event.jdevice.which
         logger.info { "Joystick added (instanceId=$instanceId)" }
-        
-        // Open only this specific device, don't rescan all
+
+        // Already registered during init — skip
+        if (controllerStates.containsKey(instanceId)) {
+            logger.info { "Joystick $instanceId already registered, ignoring add event" }
+            return
+        }
+
         val joystick = SDL_OpenJoystick(instanceId)
         if (joystick == null) {
             logger.warn { "Failed to open joystick $instanceId: ${SDL_GetError()?.toKString()}" }
@@ -190,6 +196,7 @@ class ControllerInputEventSubscriber(
         
         openedJoysticks[instanceId] = joystick
         seenDeviceKeys.add(deviceKey)
+        instanceToDeviceKey[instanceId] = deviceKey
     }
 
     private fun handleJoystickRemoved(event: SDL_Event) {
@@ -205,6 +212,7 @@ class ControllerInputEventSubscriber(
         controllerStates.remove(instanceId)
         controllerMappings.remove(instanceId)
         openedJoysticks.remove(instanceId)
+        instanceToDeviceKey.remove(instanceId)?.let { seenDeviceKeys.remove(it) }
     }
 
     // ========== GAMEPAD MODE HANDLERS ==========
@@ -329,6 +337,7 @@ class ControllerInputEventSubscriber(
         controllerStates.remove(instanceId)
         controllerMappings.remove(instanceId)
         openedGamepads.remove(instanceId)
+        instanceToDeviceKey.remove(instanceId)?.let { seenDeviceKeys.remove(it) }
     }
 
     // ========== INITIALIZATION ==========
@@ -389,6 +398,7 @@ class ControllerInputEventSubscriber(
                         
                         openedJoysticks[instanceId] = joystick
                         seenDeviceKeys.add(deviceKey)
+                        instanceToDeviceKey[instanceId] = deviceKey
                     } ?: run {
                         logger.warn { "Failed to open joystick $i: ${SDL_GetError()?.toKString()}" }
                     }
@@ -463,34 +473,21 @@ class ControllerInputEventSubscriber(
         return 0.0f
     }
 
-    /**
-     * Checks if a button is pressed on any connected controller
-     */
-    fun isButtonPressed(buttonIndex: Int): Boolean {
-        for ((id, state) in controllerStates) {
-            val mapping = controllerMappings[id]?.buttonMappings?.get(buttonIndex)
-
-            when (mapping) {
-                ButtonType.REGULAR -> if (state.buttons.getOrNull(buttonIndex) == true) return true
-                ButtonType.HAT_UP -> if (state.isHatDirectionPressed(0, HatDirection.UP)) return true
-                ButtonType.HAT_DOWN -> if (state.isHatDirectionPressed(0, HatDirection.DOWN)) return true
-                ButtonType.HAT_LEFT -> if (state.isHatDirectionPressed(0, HatDirection.LEFT)) return true
-                ButtonType.HAT_RIGHT -> if (state.isHatDirectionPressed(0, HatDirection.RIGHT)) return true
-                null -> if (state.buttons.getOrNull(buttonIndex) == true) return true
-            }
-        }
-        return false
-    }
-
-    fun isButtonPressed(controllerId: UInt, buttonIndex: Int): Boolean {
-        return controllerStates[controllerId]?.buttons?.getOrNull(buttonIndex) ?: false
-    }
-
     fun isButtonPressed(button: Buttons): Boolean {
         for ((id, state) in controllerStates) {
             val mapping = controllerMappings[id] ?: continue
             val buttonIndex = mapping.gamepadMappings[button] ?: continue
-            if (isButtonPressed(buttonIndex)) return true
+            val buttonType = mapping.buttonMappings[buttonIndex]
+
+            val pressed = when (buttonType) {
+                ButtonType.REGULAR -> state.buttons.getOrNull(buttonIndex) == true
+                ButtonType.HAT_UP -> state.isHatDirectionPressed(0, HatDirection.UP)
+                ButtonType.HAT_DOWN -> state.isHatDirectionPressed(0, HatDirection.DOWN)
+                ButtonType.HAT_LEFT -> state.isHatDirectionPressed(0, HatDirection.LEFT)
+                ButtonType.HAT_RIGHT -> state.isHatDirectionPressed(0, HatDirection.RIGHT)
+                null -> state.buttons.getOrNull(buttonIndex) == true
+            }
+            if (pressed) return true
         }
         return false
     }

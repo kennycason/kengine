@@ -11,10 +11,11 @@ kengine-test/         Fluent assertion testing framework
 kengine-network/      Networking via SDL3_net
 kengine-sound/        Audio synthesis/playback via SDL3_mixer
 kengine-physics/      2D physics via Chipmunk bindings
-kengine-playdate/     Playdate console port (ARM32, requires PLAYDATE_SDK_PATH)
+kengine-playdate/     Playdate console port (ARM32, blocked: Kotlin/Native can't target Cortex-M7)
 games/                8 example games (antfarm, boxxle, helloworld, hextris, etc.)
 sdl3/                 SDL3 submodules and build script (build_sdl.sh)
-buildSrc/             Custom Gradle plugins (PlatformConfig, KengineAssetPlugin, SdlDylibPlugin)
+packaging/            Icons and packaging resources (kengine.icns, kengine.png)
+buildSrc/             Custom Gradle plugins (PlatformConfig, KengineAssetPlugin, SdlDylibPlugin, KenginePackagingPlugin)
 ```
 
 ## Key Architecture Concepts
@@ -36,6 +37,9 @@ buildSrc/             Custom Gradle plugins (PlatformConfig, KengineAssetPlugin,
 - Run tests excluding ITs: `./kengine/build/bin/native/debugTest/test.kexe "--ktest_filter=*-*IT.*:*TiledMapLoaderTest.*"`
 - Build SDL3 from source: `bash sdl3/build_sdl.sh`
 - Run a specific game: `./gradlew :games:helloworld:runDebugExecutableNative`
+- Package macOS .app: `./gradlew :games:helloworld:packageMac`
+- Package Linux tarball: `./gradlew :games:helloworld:packageLinuxTarball`
+- Package Windows dir: `./gradlew :games:helloworld:packageWindows`
 
 ## Test Environment
 Tests requiring SDL use dummy drivers:
@@ -53,7 +57,7 @@ Tests are under `<module>/src/nativeTest/kotlin/`. Integration tests are suffixe
 - **Chipmunk**: System package (physics)
 
 ## Platform-Specific Notes
-- **macOS**: SDL3 libs from Homebrew + source builds for mixer/net. Frameworks: Cocoa, IOKit, CoreVideo, CoreAudio
+- **macOS**: SDL3 libs from Homebrew (SDL3, SDL3_image, SDL3_ttf, SDL3_mixer) + source build for SDL3_net. Frameworks: Cocoa, IOKit, CoreVideo, CoreAudio
 - **Linux**: All SDL3 libs built from source. Needs X11/Wayland/audio dev packages. Uses LD_LIBRARY_PATH=/usr/local/lib
 - **Windows**: MSYS2/MINGW64. Requires Konan sysroot patching (CRT lib replacement). DLLs must be adjacent to executables
 
@@ -93,6 +97,6 @@ GitHub Actions (`.github/workflows/build.yml`) runs on push/PR to main:
 
 ## Current Status & Known Issues
 - **WASM target**: Branch `wasm-target` exists but contains no work. Would require SDL3 replacement with WebGL/Canvas
-- **Playdate**: Experimental, SDK shows incompatibility issues with simulator
+- **Playdate**: Blocked — Kotlin/Native linuxArm32Hfp emits ARMv4, Playdate requires ARMv7E-M (Cortex-M7). Opt-in via `-Pkengine.playdate=true`
 - **Nintendo Switch**: Blocked on libnx SDL3 support (currently SDL2 only)
 - **Windows CI**: Fragile due to Konan/MINGW CRT compatibility; required 9 iterations to stabilize

@@ -25,7 +25,7 @@ class FontContext : Context(), Logging {
     }
 
     fun addFont(fontName: String, fontFilePath: String, fontSize: Float): Font {
-        val fullFontFilePath = File.pwd() + "/" + fontFilePath
+        val fullFontFilePath = File.resolveAssetPath(fontFilePath)
         if (!File.isExist(fullFontFilePath)) {
             throw IllegalStateException("Font file does not exist at $fullFontFilePath")
         }
