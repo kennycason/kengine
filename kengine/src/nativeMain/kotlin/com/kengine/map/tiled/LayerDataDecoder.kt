@@ -22,32 +22,34 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 @OptIn(ExperimentalEncodingApi::class)
 object LayerDataDecoder : Logging {
 
-    fun decode(layer: TiledMapLayer): List<UInt> {
+    fun decode(layer: TiledMapLayer): UIntArray {
         return when (layer.compression) {
             "zlib" -> decode(decompressZlib(layer.data!!), layer.encoding.orEmpty())
             "", null -> {
-                if (layer.data == null) listOf()
+                if (layer.data == null) UIntArray(0)
                 else decode(layer.data, layer.encoding.orEmpty())
             }
             else -> throw IllegalArgumentException("Unsupported compression: ${layer.compression}")
         }
     }
 
-    fun decode(data: String, encoding: String): List<UInt> {
+    fun decode(data: String, encoding: String): UIntArray {
         if (encoding != "base64") {
             throw IllegalArgumentException("Unsupported encoding: $encoding")
         }
 
         val decoded = Base64.decode(data)
-        return bytesToUInts(decoded)  // Renamed to indicate UInt return type
+        return bytesToUInts(decoded)
     }
 
-    private fun bytesToUInts(bytes: ByteArray): List<UInt> {
-        return List(bytes.size / 4) { index ->
-            (bytes[index * 4].toUInt() and 0xFFu) or
-                    ((bytes[index * 4 + 1].toUInt() and 0xFFu) shl 8) or
-                    ((bytes[index * 4 + 2].toUInt() and 0xFFu) shl 16) or
-                    ((bytes[index * 4 + 3].toUInt() and 0xFFu) shl 24)
+    private fun bytesToUInts(bytes: ByteArray): UIntArray {
+        val size = bytes.size / 4
+        return UIntArray(size) { index ->
+            val i = index * 4
+            (bytes[i].toUInt() and 0xFFu) or
+                    ((bytes[i + 1].toUInt() and 0xFFu) shl 8) or
+                    ((bytes[i + 2].toUInt() and 0xFFu) shl 16) or
+                    ((bytes[i + 3].toUInt() and 0xFFu) shl 24)
         }
     }
 

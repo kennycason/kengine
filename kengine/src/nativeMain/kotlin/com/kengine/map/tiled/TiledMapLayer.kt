@@ -21,7 +21,7 @@ data class TiledMapLayer(
     val draworder: String? = null,
     val objects: List<TiledObject>? = null
 ) {
-    val decodedData = LayerDataDecoder.decode(this)
+    val decodedData: UIntArray = LayerDataDecoder.decode(this)
 
     fun getTileAt(x: Int, y: Int): UInt {
         require(type == "tilelayer") { "Layer [$name] is not a tile layer." }
@@ -34,8 +34,11 @@ data class TiledMapLayer(
         return decodedData[y * width + x]
     }
 
+    fun getTileAtFast(x: Int, y: Int, layerWidth: Int): UInt =
+        decodedData[y * layerWidth + x]
+
     override fun toString(): String {
-        return "Layer(id=$id, name='$name', type='$type', visible=$visible, width=$width, height=$height, data='$data', encoding='$encoding', opacity=$opacity, x=$x, y=$y, decodedData=$decodedData)"
+        return "Layer(id=$id, name='$name', type='$type', visible=$visible, width=$width, height=$height, data='$data', encoding='$encoding', opacity=$opacity, x=$x, y=$y, decodedData=${decodedData.size} tiles)"
     }
 }
 

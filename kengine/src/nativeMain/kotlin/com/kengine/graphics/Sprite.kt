@@ -38,10 +38,10 @@ class Sprite private constructor(
     // pre-allocated SDL objects
     private val clipRect: SDL_FRect? = clip?.let {
         nativeHeap.alloc<SDL_FRect>().apply {
-            this.x = it.x.toFloat() + 0.5f
-            this.y = it.y.toFloat() + 0.5f
-            this.w = it.w.toFloat() - 1f
-            this.h = it.h.toFloat() - 1f
+            this.x = it.x.toFloat()
+            this.y = it.y.toFloat()
+            this.w = it.w.toFloat()
+            this.h = it.h.toFloat()
         }
     }
     private val destRect = nativeHeap.alloc<SDL_FRect>().apply {

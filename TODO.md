@@ -1,6 +1,4 @@
 Area	Status
-App packaging (.app, .deb, AppImage)	Not implemented
-Asset embedding (into binary)	Not implemented
 Physics tests	Zero test files
 Tiled map perf	5-7ms/render, goal <1ms
 Tween/easing system	None (only basic MoveAction/TimerAction)

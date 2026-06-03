@@ -77,6 +77,7 @@ object File {
     }
 
     fun resolveAssetPath(relativePath: String): String {
+        if (relativePath.startsWith("/")) return relativePath
         return "${assetBasePath()}/$relativePath"
     }
 }
