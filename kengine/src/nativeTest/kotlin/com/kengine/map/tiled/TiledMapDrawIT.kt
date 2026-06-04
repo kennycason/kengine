@@ -21,24 +21,29 @@ import kotlin.test.Test
  * remove/minimize logging 7.5ms
  * Sprite optimize render if no transformation 6.57ms
  * drawNoBatch optimization 6.0ms
+ * pre-resolved cells + UIntArray + no clip inset 1.7ms
  */
 class TiledMapDrawIT {
 
     @Test
     fun `draw ninja turdle map`() {
+        runMapDrawTest("src/nativeTest/resources/ninjaturdle/lungs_25.tmj")
+    }
+
+    @Test
+    fun `draw ninja turdle TMX map`() {
+        runMapDrawTest("src/nativeTest/resources/ninjaturdle/lungs_25.tmx")
+    }
+
+    private fun runMapDrawTest(mapPath: String) {
         createGameContext(
             title = "Tile Map Test",
             width = 800,
             height = 600,
             logLevel = Logger.Level.DEBUG
         ) {
-            GameRunner(frameRate = -1) { // unlimited, currently running 130 fps, (map 7ms/render)
-                val tiledMap = TiledMapLoader()
-//            .loadMap("src/nativeTest/resources/ninjaturdle/stomach_0.tmj")
-                    .loadMap("src/nativeTest/resources/ninjaturdle/lungs_25.tmj")
-//            .loadMap("src/nativeTest/resources/ninjatuardle/all_tiles.tmj")
-//            .loadMap("src/nativeTest/resources/ninjaturdle/single_layer.tmj")
-//            .loadMap("src/nativeTest/resources/rotations.tmj")
+            GameRunner(frameRate = -1) {
+                val tiledMap = TiledMapLoader().loadMap(mapPath)
 
                 object : Game {
                     private val scrollSpeed = 100.0
@@ -78,17 +83,16 @@ class TiledMapDrawIT {
                         useSDLContext {
                             fillScreen(Color.black)
                             val startTimeNs = getCurrentNanoseconds()
-//                            tiledMap.draw("bg")
                             tiledMap.draw()
 
-                            val deltaTimeNs = getCurrentNanoseconds() - startTimeNs  // This now measures actual draw time
+                            val deltaTimeNs = getCurrentNanoseconds() - startTimeNs
                             totalRenderTimesNs += deltaTimeNs
                             iterations++
                             minRenderTimeNs = minOf(minRenderTimeNs, deltaTimeNs)
                             maxRenderTimeNs = maxOf(maxRenderTimeNs, deltaTimeNs)
                             avgRenderTimeNs = (totalRenderTimesNs / iterations.toFloat()).toLong()
                             logger.info {
-                                "Map rendered in ${deltaTimeNs / 1000000.0}ms, " +
+                                "[$mapPath] rendered in ${deltaTimeNs / 1000000.0}ms, " +
                                     "avg: ${avgRenderTimeNs / 1000000.0}ms " +
                                     "min: ${minRenderTimeNs / 1000000.0}ms " +
                                     "max: ${maxRenderTimeNs / 1000000.0}ms"

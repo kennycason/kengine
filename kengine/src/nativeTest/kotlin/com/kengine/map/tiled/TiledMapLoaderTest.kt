@@ -97,6 +97,68 @@ class TiledMapLoaderTest : Logging {
     }
 
     @Test
+    fun `load TMX lungs_25 map`() {
+        val tmxMap = TiledMapLoader()
+            .loadMap("src/nativeTest/resources/ninjaturdle/lungs_25.tmx")
+        val tmjMap = TiledMapLoader()
+            .loadMap("src/nativeTest/resources/ninjaturdle/lungs_25.tmj")
+
+        expectThat(tmxMap.width).isEqualTo(tmjMap.width)
+        expectThat(tmxMap.height).isEqualTo(tmjMap.height)
+        expectThat(tmxMap.tileWidth).isEqualTo(tmjMap.tileWidth)
+        expectThat(tmxMap.tileHeight).isEqualTo(tmjMap.tileHeight)
+        expectThat(tmxMap.orientation).isEqualTo(tmjMap.orientation)
+        expectThat(tmxMap.layers.size).isEqualTo(tmjMap.layers.size)
+        expectThat(tmxMap.tilesets.size).isEqualTo(tmjMap.tilesets.size)
+
+        // compare tile layers have same names
+        val tmxLayerNames = tmxMap.layers.map { it.name }.toSet()
+        val tmjLayerNames = tmjMap.layers.map { it.name }.toSet()
+        expectThat(tmxLayerNames).isEqualTo(tmjLayerNames)
+
+        // compare tile data for each tile layer
+        tmjMap.layers.filter { it.type == "tilelayer" }.forEach { tmjLayer ->
+            val tmxLayer = tmxMap.layers.first { it.name == tmjLayer.name }
+            expectThat(tmxLayer.width).isEqualTo(tmjLayer.width)
+            expectThat(tmxLayer.height).isEqualTo(tmjLayer.height)
+
+            val w = tmjLayer.width!!
+            val h = tmjLayer.height!!
+            for (y in 0 until h) {
+                for (x in 0 until w) {
+                    val tmxGid = tmxLayer.getTileAt(x, y)
+                    val tmjGid = tmjLayer.getTileAt(x, y)
+                    if (tmxGid != tmjGid) {
+                        throw AssertionError(
+                            "Tile mismatch at ($x,$y) in layer '${tmjLayer.name}': TMX=$tmxGid, TMJ=$tmjGid"
+                        )
+                    }
+                }
+            }
+        }
+
+        // compare tilesets
+        tmxMap.tilesets.forEachIndexed { i, tmxTs ->
+            val tmjTs = tmjMap.tilesets[i]
+            expectThat(tmxTs.firstgid).isEqualTo(tmjTs.firstgid)
+            expectThat(tmxTs.name).isEqualTo(tmjTs.name)
+            expectThat(tmxTs.columns).isEqualTo(tmjTs.columns)
+            expectThat(tmxTs.tileWidth).isEqualTo(tmjTs.tileWidth)
+            expectThat(tmxTs.tileHeight).isEqualTo(tmjTs.tileHeight)
+            expectThat(tmxTs.tileCount).isEqualTo(tmjTs.tileCount)
+            expectThat(tmxTs.spacing).isEqualTo(tmjTs.spacing)
+            expectThat(tmxTs.margin).isEqualTo(tmjTs.margin)
+        }
+
+        // compare object layer
+        val tmxObjectLayer = tmxMap.layers.first { it.type == "objectgroup" }
+        val tmjObjectLayer = tmjMap.layers.first { it.type == "objectgroup" }
+        expectThat(tmxObjectLayer.objects!!.size).isEqualTo(tmjObjectLayer.objects!!.size)
+
+        logger.info { "TMX and TMJ maps match: ${tmxMap.width}x${tmxMap.height}, ${tmxMap.layers.size} layers" }
+    }
+
+    @Test
     fun `load ninja turdle map`() {
         val tiledMap = TiledMapLoader()
             .loadMap("src/nativeTest/resources/ninjaturdle/stomach_0.tmj")
