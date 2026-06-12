@@ -2,14 +2,13 @@ package com.kengine.network
 
 import com.kengine.log.Logging
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 
 class UdpConnectionTest : Logging {
 
@@ -17,35 +16,30 @@ class UdpConnectionTest : Logging {
     fun `send large data packets`() = runBlocking {
         NetworkContext.get()
 
-        val receiverLocalPort: UShort = 12345u
-        val receiverAddress = IPAddress("127.0.0.1", receiverLocalPort)
+        val receiverAddress = IPAddress("127.0.0.1", UdpTestPorts.next())
         val receiver = UdpConnection(receiverAddress)
         receiver.connect()
 
-        val senderLocalPort: UShort = 12346u
-        val senderAddress = IPAddress("127.0.0.1", senderLocalPort)
+        val senderAddress = IPAddress("127.0.0.1", UdpTestPorts.next())
         val sender = UdpConnection(senderAddress)
         sender.connect()
 
-        val largeData = ByteArray(5000) { it.toByte() }
+        val largeData = ByteArray(5_000) { it.toByte() }
         val received = CompletableDeferred<ByteArray>()
 
-        val receiveJob = launch {
-            receiver.subscribe { it: ByteArray ->
-                received.complete(it)
-            }
+        receiver.subscribe { bytes: ByteArray ->
+            received.complete(bytes)
         }
 
         try {
             sender.send(largeData, receiverAddress)
-            val result = withTimeoutOrNull(2000) { received.await() }
-            assertEquals(largeData.size, result?.size)
+            val result = withTimeout(2_000) { received.await() }
+            assertContentEquals(largeData, result)
         } finally {
             receiver.close()
             sender.close()
-            receiveJob.cancelAndJoin()
             NetworkContext.get().cleanup()
-            delay(100) // Give time for cleanup
+            delay(100)
         }
     }
 
@@ -53,55 +47,105 @@ class UdpConnectionTest : Logging {
     fun `basic udp send and receive test with assertion`() = runBlocking {
         NetworkContext.get()
 
-        // Use different ports for this test
-        val receiverLocalPort: UShort = 12347u
-        val receiverAddress = IPAddress("127.0.0.1", receiverLocalPort)
+        val receiverAddress = IPAddress("127.0.0.1", UdpTestPorts.next())
         val receiver = UdpConnection(receiverAddress)
         receiver.connect()
 
-        delay(500)
-
-        val senderLocalPort: UShort = 12348u
-        val senderAddress = IPAddress("127.0.0.1", senderLocalPort)
+        val senderAddress = IPAddress("127.0.0.1", UdpTestPorts.next())
         val sender = UdpConnection(senderAddress)
         sender.connect()
 
-        delay(500)
-
         val receivedMessage = CompletableDeferred<ByteArray>()
 
-        val receiveJob = launch {
-            logger.info { "Setting up subscriber" }
-            receiver.subscribe { bytes: ByteArray ->
-                logger.info { "Subscriber received ${bytes.size} bytes" }
-                if (!receivedMessage.isCompleted) {
-                    receivedMessage.complete(bytes)
-                }
+        receiver.subscribe { bytes: ByteArray ->
+            if (!receivedMessage.isCompleted) {
+                receivedMessage.complete(bytes)
             }
-            logger.info { "Subscriber setup complete" }
         }
-
-        delay(1000)
 
         try {
             val messageToSend = "Hello from sender!"
             val messageBytes = messageToSend.encodeToByteArray()
-            logger.info { "Sending message of ${messageBytes.size} bytes" }
             sender.send(messageBytes, receiverAddress)
-            logger.info { "Message sent" }
 
-            val receivedBytes = withTimeoutOrNull(5000L) {
-                receivedMessage.await()
-            }
-
-            assertTrue(receivedBytes != null, "Receiver did not get any message")
-            assertEquals(messageToSend, receivedBytes!!.decodeToString())
+            val receivedBytes = withTimeout(5_000) { receivedMessage.await() }
+            assertEquals(messageToSend, receivedBytes.decodeToString())
         } finally {
             receiver.close()
             sender.close()
-            receiveJob.cancelAndJoin()
             NetworkContext.get().cleanup()
-            delay(100) // Give time for cleanup
+            delay(100)
+        }
+    }
+
+    @Test
+    fun `udp callback exception does not stop receive loop or leak packet cleanup`() = runBlocking {
+        NetworkContext.get()
+
+        val receiverAddress = IPAddress("127.0.0.1", UdpTestPorts.next())
+        val receiver = UdpConnection(receiverAddress)
+        receiver.connect()
+
+        val senderAddress = IPAddress("127.0.0.1", UdpTestPorts.next())
+        val sender = UdpConnection(senderAddress)
+        sender.connect()
+
+        val firstAttempted = CompletableDeferred<Unit>()
+        val secondReceived = CompletableDeferred<String>()
+
+        receiver.subscribe { bytes: ByteArray ->
+            val message = bytes.decodeToString()
+            if (message == "first") {
+                firstAttempted.complete(Unit)
+                throw RuntimeException("intentional callback failure")
+            }
+            if (message == "second") {
+                secondReceived.complete(message)
+            }
+        }
+
+        try {
+            sender.send("first", receiverAddress)
+            withTimeout(2_000) { firstAttempted.await() }
+
+            sender.send("second", receiverAddress)
+            assertEquals("second", withTimeout(2_000) { secondReceived.await() })
+        } finally {
+            receiver.close()
+            sender.close()
+            NetworkContext.get().cleanup()
+            delay(100)
+        }
+    }
+
+    @Test
+    fun `closed udp connection cannot be reused`() = runBlocking {
+        NetworkContext.get()
+
+        val receiverAddress = IPAddress("127.0.0.1", UdpTestPorts.next())
+        val receiver = UdpConnection(receiverAddress)
+        receiver.connect()
+
+        try {
+            receiver.close()
+            assertFailsWith<IllegalStateException> {
+                receiver.connect()
+            }
+            Unit
+        } finally {
+            receiver.close()
+            NetworkContext.get().cleanup()
+            delay(100)
+        }
+    }
+
+    private object UdpTestPorts {
+        private var nextPort = 24_000
+
+        fun next(): UShort {
+            val port = nextPort
+            nextPort += 1
+            return port.toUShort()
         }
     }
 }

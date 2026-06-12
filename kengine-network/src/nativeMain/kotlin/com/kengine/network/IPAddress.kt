@@ -6,22 +6,20 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
 import sdl3.net.NET_GetAddressStatus
 import sdl3.net.NET_ResolveHostname
+import sdl3.net.NET_UnrefAddress
 import sdl3.net.NET_WaitUntilResolved
 import sdl3.SDL_GetError
 
 @OptIn(ExperimentalForeignApi::class)
 data class IPAddress(val host: String, val port: UShort) : Logging {
 
-    // cache the resolved address
-    private var resolvedAddress: CPointer<cnames.structs.NET_Address>? = null
-
     /**
      * Converts the host and port into an SDL-compatible IPaddress structure.
+     *
+     * The caller owns the returned SDL_net reference and must release it with
+     * NET_UnrefAddress.
      */
     fun toSDL(): CPointer<cnames.structs.NET_Address>? {
-        // Return cached address if available
-        resolvedAddress?.let { return it }
-
         logger.info { "Resolving host: $host" }
         val address = if (host == "localhost" || host == "127.0.0.1") {
             NET_ResolveHostname("127.0.0.1") // force numeric IP
@@ -44,6 +42,7 @@ data class IPAddress(val host: String, val port: UShort) : Logging {
             logger.error {
                 "Resolution ${if (resolutionStatus == 0) "timeout" else "failure"}: $host, error: ${SDL_GetError()?.toKString()}"
             }
+            NET_UnrefAddress(address)
             return null
         }
 
@@ -53,12 +52,23 @@ data class IPAddress(val host: String, val port: UShort) : Logging {
         // 0 if still resolving
         if (NET_GetAddressStatus(address) != 1) {
             logger.error { "Address status invalid: $host, error: ${SDL_GetError()?.toKString()}" }
+            NET_UnrefAddress(address)
             return null
         }
 
         logger.info { "Host resolved successfully: $host" }
-        resolvedAddress = address
         return address
+    }
+
+    internal inline fun <T> withSDLAddress(block: (CPointer<cnames.structs.NET_Address>) -> T): T {
+        val address = toSDL()
+            ?: throw Exception("Failed to resolve host $host")
+
+        try {
+            return block(address)
+        } finally {
+            NET_UnrefAddress(address)
+        }
     }
 
     override fun toString(): String {

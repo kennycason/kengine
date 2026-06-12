@@ -12,12 +12,6 @@ repositories {
 }
 
 kotlin {
-    jvm()
-    js(IR) {
-        browser()
-        nodejs()
-    }
-
     val hostOs = System.getProperty("os.name")
     val isArm64 = System.getProperty("os.arch") == "aarch64"
     val nativeTarget = when {
@@ -31,7 +25,7 @@ kotlin {
 
     nativeTarget.apply {
         binaries.all {
-            linkerOpts(PlatformConfig.sharedLibLinkerOpts("SDL3", "SDL3_net", "SDL3_image", "SDL3_ttf"))
+            linkerOpts(PlatformConfig.sharedLibLinkerOpts("SDL3", "SDL3_net"))
         }
 
         compilations["main"].cinterops {
@@ -70,7 +64,6 @@ kotlin {
             dependencies {
                 implementation(project(":kengine"))
                 implementation(project(":kengine-reactive"))
-                // Expose SDL3_net interop as API
                 api(libs.kotlinxSerializationJson)
                 api(libs.kotlinxCoroutinesCore)
             }

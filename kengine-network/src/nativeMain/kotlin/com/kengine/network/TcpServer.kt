@@ -7,12 +7,18 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.toKString
 import kotlinx.cinterop.value
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import sdl3.SDL_GetError
 import sdl3.net.NET_AcceptClient
 import sdl3.net.NET_CreateServer
 import sdl3.net.NET_DestroyServer
-import sdl3.SDL_GetError
+import sdl3.net.NET_GetAddressString
+import sdl3.net.NET_GetStreamSocketAddress
+import sdl3.net.NET_UnrefAddress
 
 @OptIn(ExperimentalForeignApi::class)
 class TcpServer(
@@ -20,15 +26,15 @@ class TcpServer(
 ) : Logging {
     private var server: CPointer<cnames.structs.NET_Server>? = null
     private var isRunning = false
+    private var acceptedConnectionCount = 0
 
     fun start() {
         logger.info { "Starting TCP server on ${address.host}:${address.port}" }
 
-        val sdlAddress = address.toSDL()
-            ?: throw Exception("Failed to resolve host ${address.host}")
-
-        server = NET_CreateServer(sdlAddress, address.port, 0u)
-            ?: throw Exception("Failed to create TCP server: ${SDL_GetError()}")
+        server = address.withSDLAddress { sdlAddress ->
+            NET_CreateServer(sdlAddress, address.port, 0u)
+                ?: throw Exception("Failed to create TCP server: ${SDL_GetError()?.toKString()}")
+        }
 
         isRunning = true
         logger.info { "TCP server started on ${address.host}:${address.port}" }
@@ -43,41 +49,70 @@ class TcpServer(
         }
     }
 
-    suspend fun acceptConnection(onAccept: suspend (TcpConnection) -> Unit) {
+    suspend fun acceptConnection(onAccept: suspend (TcpConnection) -> Unit) = coroutineScope {
         while (isRunning) {
+            var acceptedAny = false
             server?.let { srv ->
-                memScoped {
-                    val clientStream = alloc<CPointerVar<cnames.structs.NET_StreamSocket>>()
-                    val acceptResult = NET_AcceptClient(srv, clientStream.ptr)
+                do {
+                    var acceptedConnection: TcpConnection? = null
+                    acceptedConnection = memScoped {
+                        val clientStream = alloc<CPointerVar<cnames.structs.NET_StreamSocket>>()
+                        val acceptResult = NET_AcceptClient(srv, clientStream.ptr)
 
-                    if (acceptResult) {
+                        if (!acceptResult) {
+                            throw Exception("Failed to accept TCP client: ${SDL_GetError()?.toKString()}")
+                        }
+
                         clientStream.value?.let { socket ->
-                            logger.debug { "Accepted new TCP connection" }
-                            val connection = TcpServerConnection(socket)
+                            acceptedConnectionCount += 1
+                            TcpServerConnection(socket, createConnectionId(socket, acceptedConnectionCount))
+                        }
+                    }
+
+                    val connection = acceptedConnection
+                    if (connection != null) {
+                        acceptedAny = true
+                        logger.debug { "Accepted new TCP connection: ${connection.id}" }
+                        launch {
                             try {
                                 onAccept(connection)
                             } catch (e: Exception) {
                                 logger.error(e) { "Error handling accepted connection" }
                                 connection.close()
                             }
-                        } ?: run {
-                            if (logger.isTraceEnabled()) {
-                                logger.trace { "Accepted null client stream" }
-                            }
                         }
                     }
-                }
+                } while (acceptedConnection != null && isRunning)
             }
-            delay(10)  // low delay to be more responsive
+            if (!acceptedAny) {
+                delay(10)
+            }
+        }
+    }
+
+    private fun createConnectionId(
+        socket: CPointer<cnames.structs.NET_StreamSocket>,
+        connectionNumber: Int
+    ): String {
+        val remoteAddress = NET_GetStreamSocketAddress(socket) ?: return "tcp-server-connection-$connectionNumber"
+        return try {
+            val remoteHost = NET_GetAddressString(remoteAddress)?.toKString()
+            if (remoteHost == null) {
+                "tcp-server-connection-$connectionNumber"
+            } else {
+                "$remoteHost#$connectionNumber"
+            }
+        } finally {
+            NET_UnrefAddress(remoteAddress)
         }
     }
 
     private class TcpServerConnection(
-        socket: CPointer<cnames.structs.NET_StreamSocket>
-    ) : TcpConnection(socket) {
+        socket: CPointer<cnames.structs.NET_StreamSocket>,
+        id: String
+    ) : TcpConnection(socket, id) {
         init {
-            isRunning = true
-            logger.info { "Created server-side connection" }
+            logger.info { "Created server-side connection: $id" }
         }
     }
 }

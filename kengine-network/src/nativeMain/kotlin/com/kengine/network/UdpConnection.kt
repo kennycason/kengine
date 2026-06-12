@@ -33,8 +33,8 @@ import sdl3.net.NET_DestroyDatagramSocket
 import sdl3.net.NET_GetAddressString
 import sdl3.net.NET_ReceiveDatagram
 import sdl3.net.NET_SendDatagram
+import sdl3.net.NET_UnrefAddress
 import sdl3.net.NET_WaitUntilInputAvailable
-import sdl3.net.NET_WaitUntilResolved
 import sdl3.SDL_GetError
 
 /**
@@ -56,35 +56,37 @@ class UdpConnection(
     private var receiveJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var isRunning = false
+    private var isClosed = false
 
     override val id: String
         get() = "${address.host}:${address.port}"
 
     override fun connect() {
-        logger.info { "Starting UDP connection on ${address.host}:${address.port}" }
-
-        val sdlAddress = address.toSDL()
-            ?: throw Exception("Failed to resolve host ${address.host}")
-
-        // wait for address resolution to complete
-        // SDL3: returns 1 for success, -1 for failure, 0 for still resolving
-        val resolutionStatus = NET_WaitUntilResolved(sdlAddress, 5000)
-        if (resolutionStatus != 1) {
-            throw Exception("Failed to resolve address: ${
-                if (resolutionStatus == 0) "Timed out"
-                else SDL_GetError()?.toKString() ?: "Unknown error"
-            }")
+        if (isClosed) {
+            throw IllegalStateException("Connection is closed and cannot be reused")
+        }
+        if (datagramSocket != null || isRunning) {
+            throw IllegalStateException("Connection is already open")
         }
 
-        datagramSocket = NET_CreateDatagramSocket(sdlAddress, address.port, 0u)
-            ?: throw Exception("Failed to create UDP socket: ${SDL_GetError()?.toKString()}")
+        logger.info { "Starting UDP connection on ${address.host}:${address.port}" }
+
+        datagramSocket = address.withSDLAddress { sdlAddress ->
+            NET_CreateDatagramSocket(sdlAddress, address.port, 0u)
+                ?: throw Exception("Failed to create UDP socket: ${SDL_GetError()?.toKString()}")
+        }
 
         isRunning = true
         logger.info { "UDP connection established: $id" }
     }
 
     override fun close() {
+        if (isClosed) {
+            return
+        }
+
         logger.info { "Closing UDP connection: $id" }
+        isClosed = true
         isRunning = false
         runBlocking {
             receiveJob?.cancelAndJoin()
@@ -98,26 +100,27 @@ class UdpConnection(
 
     fun send(data: ByteArray, remoteAddress: IPAddress) {
         if (!isRunning) throw IllegalStateException("Connection is not open")
+        if (isClosed) throw IllegalStateException("Connection is closed")
+        if (data.isEmpty()) return
 
         datagramSocket?.let { socket ->
-            val sdlRemoteAddr = remoteAddress.toSDL()
-                ?: throw Exception("Failed to resolve remote host ${remoteAddress.host}")
+            remoteAddress.withSDLAddress { sdlRemoteAddr ->
+                data.usePinned { pinned ->
+                    logger.debug { "Attempting to send ${data.size} bytes" }
+                    val success = NET_SendDatagram(
+                        socket,
+                        sdlRemoteAddr,
+                        remoteAddress.port,
+                        pinned.addressOf(0),
+                        data.size.convert()
+                    )
 
-            data.usePinned { pinned ->
-                logger.debug { "Attempting to send ${data.size} bytes" }
-                val success = NET_SendDatagram(
-                    socket,
-                    sdlRemoteAddr,
-                    remoteAddress.port,
-                    pinned.addressOf(0),
-                    data.size.convert()
-                )
+                    if (!success) {
+                        throw Exception("Failed to send UDP datagram: ${SDL_GetError()?.toKString()}")
+                    }
 
-                if (!success) {
-                    throw Exception("Failed to send UDP datagram: ${SDL_GetError()?.toKString()}")
+                    logger.info { "Successfully sent ${data.size} bytes to ${remoteAddress.host}:${remoteAddress.port}" }
                 }
-
-                logger.info { "Successfully sent ${data.size} bytes to ${remoteAddress.host}:${remoteAddress.port}" }
             }
         } ?: throw IllegalStateException("UDP socket is not open")
     }
@@ -137,6 +140,7 @@ class UdpConnection(
 
     override fun subscribe(onReceive: (ByteArray) -> Unit) {
         if (!isRunning) throw IllegalStateException("Connection is not open")
+        if (isClosed) throw IllegalStateException("Connection is closed")
         if (receiveJob != null) throw IllegalStateException("Already subscribed")
 
         receiveJob = scope.launch {
@@ -169,19 +173,31 @@ class UdpConnection(
                                                 "From: ${NET_GetAddressString(datagram.pointed.addr)}:${datagram.pointed.port}"
                                         }
 
-                                        val data = ByteArray(datagram.pointed.buflen)
-                                        data.usePinned { pinnedData ->
-                                            memcpy(
-                                                pinnedData.addressOf(0),
-                                                datagram.pointed.buf,
-                                                datagram.pointed.buflen.convert()
-                                            )
+                                        val data = try {
+                                            val bytes = ByteArray(datagram.pointed.buflen)
+                                            bytes.usePinned { pinnedData ->
+                                                memcpy(
+                                                    pinnedData.addressOf(0),
+                                                    datagram.pointed.buf,
+                                                    datagram.pointed.buflen.convert()
+                                                )
+                                            }
+                                            bytes
+                                        } finally {
+                                            NET_DestroyDatagram(datagram)
                                         }
 
-                                        onReceive(data)
-                                        NET_DestroyDatagram(datagram)
+                                        dispatchReceive {
+                                            onReceive(data)
+                                        }
                                     }
+                                } else {
+                                    logger.info { "UDP receive error: ${SDL_GetError()?.toKString()}" }
+                                    isRunning = false
                                 }
+                            } else if (waitResult < 0) {
+                                logger.info { "UDP wait error: ${SDL_GetError()?.toKString()}" }
+                                isRunning = false
                             }
                         }
                     } ?: break
@@ -191,6 +207,16 @@ class UdpConnection(
                 logger.error(e) { "Error in receive loop" }
                 isRunning = false
                 throw e
+            }
+        }
+    }
+
+    private fun dispatchReceive(onReceive: () -> Unit) {
+        scope.launch {
+            try {
+                onReceive()
+            } catch (e: Exception) {
+                logger.error(e) { "Error in receive callback" }
             }
         }
     }
@@ -224,9 +250,9 @@ class UdpConnection(
 
     fun resolveAddressOrThrow(host: String): IPAddress {
         val address = IPAddress(host, 0u) // port is irrelevant for resolution.
-        if (NET_WaitUntilResolved(address.toSDL(), 5000) != 1) {
-            throw Exception("Failed to resolve address: $host -> ${SDL_GetError()}")
-        }
+        val sdlAddress = address.toSDL()
+            ?: throw Exception("Failed to resolve address: $host -> ${SDL_GetError()?.toKString()}")
+        NET_UnrefAddress(sdlAddress)
         return address
     }
 }

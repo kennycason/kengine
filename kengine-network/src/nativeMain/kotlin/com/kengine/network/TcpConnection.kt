@@ -19,60 +19,78 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import sdl3.SDL_GetError
 import sdl3.net.NET_CreateClient
 import sdl3.net.NET_DestroyStreamSocket
 import sdl3.net.NET_ReadFromStreamSocket
 import sdl3.net.NET_WaitUntilConnected
 import sdl3.net.NET_WriteToStreamSocket
-import sdl3.SDL_GetError
 
 @OptIn(ExperimentalForeignApi::class)
 open class TcpConnection private constructor(
     private val address: IPAddress,
     initialSocket: CPointer<cnames.structs.NET_StreamSocket>?,
-    private val bufferSize: Int = DEFAULT_BUFFER_SIZE
+    private val bufferSize: Int = DEFAULT_BUFFER_SIZE,
+    private val connectionId: String? = null,
+    private val canConnect: Boolean = initialSocket == null
 ) : NetworkConnection, Logging, AutoCloseable {
 
-    // Primary constructor for normal connections
     constructor(
         address: IPAddress,
         bufferSize: Int = DEFAULT_BUFFER_SIZE
-    ) : this(address, null, bufferSize)
+    ) : this(address, null, bufferSize, null, true)
 
-    // Protected constructor for server connections
     protected constructor(
-        socket: CPointer<cnames.structs.NET_StreamSocket>
-    ) : this(IPAddress("0.0.0.0", 0u), socket)
-
+        socket: CPointer<cnames.structs.NET_StreamSocket>,
+        id: String
+    ) : this(IPAddress("0.0.0.0", 0u), socket, DEFAULT_BUFFER_SIZE, id, false)
 
     companion object {
         const val DEFAULT_BUFFER_SIZE = 1024
+        private const val FRAME_HEADER_SIZE = 4
+        private const val MAX_FRAME_SIZE = 16 * 1024 * 1024
     }
 
     private var streamSocket: CPointer<cnames.structs.NET_StreamSocket>? = initialSocket
     private var receiveJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    var isRunning = false
+    private var isClosed = false
+
+    var isRunning = initialSocket != null
+        protected set
 
     override val id: String
-        get() = "${address.host}:${address.port}"
+        get() = connectionId ?: "${address.host}:${address.port}"
 
     override fun connect() {
+        if (!canConnect) {
+            throw IllegalStateException("Accepted TCP connections are already connected")
+        }
+        if (isClosed) {
+            throw IllegalStateException("Connection is closed and cannot be reused")
+        }
+        if (streamSocket != null || isRunning) {
+            throw IllegalStateException("Connection is already open")
+        }
+
         logger.info { "Starting TCP connection on ${address.host}:${address.port}" }
 
-        val sdlAddress = address.toSDL()
-            ?: throw Exception("Failed to resolve host ${address.host}")
+        val socket = address.withSDLAddress { sdlAddress ->
+            NET_CreateClient(sdlAddress, address.port, 0u)
+                ?: throw Exception("Failed to create TCP client: ${SDL_GetError()?.toKString()}")
+        }
+        streamSocket = socket
 
-        streamSocket = NET_CreateClient(sdlAddress, address.port, 0u)
-            ?: throw Exception("Failed to create TCP client: ${SDL_GetError()}")
-
-        // Wait for connection (SDL3 returns 1 for success)
-        val connectionStatus = NET_WaitUntilConnected(streamSocket, 5000)
+        val connectionStatus = NET_WaitUntilConnected(socket, 5000)
         if (connectionStatus != 1) {
-            throw Exception("Failed to connect: ${
-                if (connectionStatus == 0) "Connection timed out"
-                else SDL_GetError()?.toKString() ?: "Unknown error"
-            }")
+            NET_DestroyStreamSocket(socket)
+            streamSocket = null
+            throw Exception(
+                "Failed to connect: ${
+                    if (connectionStatus == 0) "Connection timed out"
+                    else SDL_GetError()?.toKString() ?: "Unknown error"
+                }"
+            )
         }
 
         isRunning = true
@@ -80,7 +98,12 @@ open class TcpConnection private constructor(
     }
 
     override fun close() {
+        if (isClosed) {
+            return
+        }
+
         logger.info { "Closing TCP connection: $id" }
+        isClosed = true
         isRunning = false
         runBlocking {
             receiveJob?.cancelAndJoin()
@@ -93,13 +116,32 @@ open class TcpConnection private constructor(
     }
 
     fun send(data: ByteArray) {
+        write(data)
+    }
+
+    fun send(data: UByteArray) {
+        send(data.map { it.toByte() }.toByteArray())
+    }
+
+    fun send(data: String) {
+        sendFrame(data.encodeToByteArray())
+    }
+
+    fun <T> send(data: T, serializer: KSerializer<T>) {
+        val json = Json.encodeToString(serializer, data)
+        sendFrame(json.encodeToByteArray())
+    }
+
+    private fun write(data: ByteArray) {
         if (!isRunning) throw IllegalStateException("Connection is not open")
+        if (isClosed) throw IllegalStateException("Connection is closed")
+        if (data.isEmpty()) return
 
         streamSocket?.let { socket ->
             data.usePinned { pinned ->
                 val success = NET_WriteToStreamSocket(socket, pinned.addressOf(0), data.size.convert())
                 if (!success) {
-                    throw Exception("Failed to send TCP data: ${SDL_GetError()}")
+                    throw Exception("Failed to send TCP data: ${SDL_GetError()?.toKString()}")
                 }
                 if (logger.isDebugEnabled()) {
                     logger.debug { "Sent ${data.size} bytes" }
@@ -108,21 +150,69 @@ open class TcpConnection private constructor(
         } ?: throw IllegalStateException("TCP socket is not open")
     }
 
-    fun send(data: UByteArray) {
-        send(data.map { it.toByte() }.toByteArray())
-    }
+    private fun sendFrame(data: ByteArray) {
+        require(data.size <= MAX_FRAME_SIZE) {
+            "TCP frame size ${data.size} exceeds max frame size $MAX_FRAME_SIZE"
+        }
 
-    fun send(data: String) {
-        send(data.encodeToByteArray())
-    }
-
-    fun <T> send(data: T, serializer: KSerializer<T>) {
-        val json = Json.encodeToString(serializer, data)
-        send(json.encodeToByteArray())
+        val frame = ByteArray(FRAME_HEADER_SIZE + data.size)
+        frame[0] = ((data.size ushr 24) and 0xFF).toByte()
+        frame[1] = ((data.size ushr 16) and 0xFF).toByte()
+        frame[2] = ((data.size ushr 8) and 0xFF).toByte()
+        frame[3] = (data.size and 0xFF).toByte()
+        data.copyInto(frame, destinationOffset = FRAME_HEADER_SIZE)
+        write(frame)
     }
 
     override fun subscribe(onReceive: (ByteArray) -> Unit) {
+        startReceiveLoop { data ->
+            dispatchReceive("Error in receive callback") {
+                onReceive(data)
+            }
+        }
+    }
+
+    override fun subscribe(onReceive: (UByteArray) -> Unit) {
+        subscribe { byteArray: ByteArray ->
+            onReceive(byteArray.map { it.toUByte() }.toUByteArray())
+        }
+    }
+
+    override fun subscribe(onReceive: (String) -> Unit) {
+        subscribeFrames { byteArray ->
+            try {
+                onReceive(byteArray.decodeToString())
+            } catch (e: Exception) {
+                logger.error(e) { "Error decoding received data as string" }
+            }
+        }
+    }
+
+    override fun <T> subscribe(onReceive: (T) -> Unit, serializer: KSerializer<T>) {
+        subscribeFrames { byteArray ->
+            try {
+                val json = byteArray.decodeToString()
+                onReceive(Json.decodeFromString(serializer, json))
+            } catch (e: Exception) {
+                logger.error(e) { "Error deserializing received data" }
+            }
+        }
+    }
+
+    private fun subscribeFrames(onReceive: (ByteArray) -> Unit) {
+        val frameDecoder = FrameDecoder(MAX_FRAME_SIZE)
+        startReceiveLoop { data ->
+            frameDecoder.accept(data) { frame ->
+                dispatchReceive("Error in framed receive callback") {
+                    onReceive(frame)
+                }
+            }
+        }
+    }
+
+    private fun startReceiveLoop(onReceive: (ByteArray) -> Unit) {
         if (!isRunning) throw IllegalStateException("Connection is not open")
+        if (isClosed) throw IllegalStateException("Connection is closed")
         if (receiveJob != null) throw IllegalStateException("Already subscribed")
 
         receiveJob = scope.launch {
@@ -130,6 +220,7 @@ open class TcpConnection private constructor(
 
             try {
                 while (isRunning && isActive) {
+                    var shouldDelay = false
                     val shouldContinue = streamSocket?.let { socket ->
                         buffer.usePinned { pinned ->
                             val received = NET_ReadFromStreamSocket(
@@ -144,23 +235,15 @@ open class TcpConnection private constructor(
                                     if (logger.isDebugEnabled()) {
                                         logger.debug { "Received $received bytes" }
                                     }
-
-                                    launch(Dispatchers.Default) {
-                                        try {
-                                            onReceive(data)
-                                        } catch (e: Exception) {
-                                            logger.error(e) { "Error in receive callback" }
-                                        }
-                                    }
-                                    true // continue receiving
+                                    onReceive(data)
+                                    true
                                 }
                                 received == 0 -> {
-                                    logger.info { "Connection closed normally" }
-                                    isRunning = false
-                                    false
+                                    shouldDelay = true
+                                    true
                                 }
                                 else -> {
-                                    logger.info { "Connection error: ${SDL_GetError()}" }
+                                    logger.info { "Connection error: ${SDL_GetError()?.toKString()}" }
                                     isRunning = false
                                     false
                                 }
@@ -171,8 +254,9 @@ open class TcpConnection private constructor(
                     if (!shouldContinue) {
                         break
                     }
-
-                    delay(1) // prevent busy waiting
+                    if (shouldDelay) {
+                        delay(1)
+                    }
                 }
             } catch (e: Exception) {
                 logger.error(e) { "Error in receive loop" }
@@ -182,30 +266,55 @@ open class TcpConnection private constructor(
         }
     }
 
-    override fun subscribe(onReceive: (UByteArray) -> Unit) {
-        subscribe { byteArray: ByteArray ->
-            onReceive(byteArray.map { it.toUByte() }.toUByteArray())
-        }
-    }
-
-    override fun subscribe(onReceive: (String) -> Unit) {
-        subscribe { byteArray: ByteArray ->
+    private fun dispatchReceive(errorMessage: String, onReceive: () -> Unit) {
+        scope.launch {
             try {
-                onReceive(byteArray.decodeToString())
+                onReceive()
             } catch (e: Exception) {
-                logger.error(e) { "Error decoding received data as string" }
+                logger.error(e) { errorMessage }
             }
         }
     }
 
-    override fun <T> subscribe(onReceive: (T) -> Unit, serializer: KSerializer<T>) {
-        subscribe { byteArray: ByteArray ->
-            try {
-                val json = byteArray.decodeToString()
-                onReceive(Json.decodeFromString(serializer, json))
-            } catch (e: Exception) {
-                logger.error(e) { "Error deserializing received data" }
+    private class FrameDecoder(
+        private val maxFrameSize: Int
+    ) {
+        private var pending = ByteArray(0)
+
+        fun accept(chunk: ByteArray, onFrame: (ByteArray) -> Unit) {
+            val buffer = ByteArray(pending.size + chunk.size)
+            pending.copyInto(buffer)
+            chunk.copyInto(buffer, destinationOffset = pending.size)
+
+            var offset = 0
+            while (buffer.size - offset >= FRAME_HEADER_SIZE) {
+                val frameSize = readFrameSize(buffer, offset)
+                if (frameSize < 0 || frameSize > maxFrameSize) {
+                    throw IllegalStateException("TCP frame size $frameSize exceeds max frame size $maxFrameSize")
+                }
+
+                val frameStart = offset + FRAME_HEADER_SIZE
+                val frameEnd = frameStart + frameSize
+                if (buffer.size < frameEnd) {
+                    break
+                }
+
+                onFrame(buffer.copyOfRange(frameStart, frameEnd))
+                offset = frameEnd
             }
+
+            pending = if (offset == buffer.size) {
+                ByteArray(0)
+            } else {
+                buffer.copyOfRange(offset, buffer.size)
+            }
+        }
+
+        private fun readFrameSize(buffer: ByteArray, offset: Int): Int {
+            return ((buffer[offset].toInt() and 0xFF) shl 24) or
+                ((buffer[offset + 1].toInt() and 0xFF) shl 16) or
+                ((buffer[offset + 2].toInt() and 0xFF) shl 8) or
+                (buffer[offset + 3].toInt() and 0xFF)
         }
     }
 }
