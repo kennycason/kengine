@@ -4,29 +4,29 @@ import com.kengine.log.Logging
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
-import sdl3.net.SDLNet_GetAddressStatus
-import sdl3.net.SDLNet_ResolveHostname
-import sdl3.net.SDLNet_WaitUntilResolved
+import sdl3.net.NET_GetAddressStatus
+import sdl3.net.NET_ResolveHostname
+import sdl3.net.NET_WaitUntilResolved
 import sdl3.SDL_GetError
 
 @OptIn(ExperimentalForeignApi::class)
 data class IPAddress(val host: String, val port: UShort) : Logging {
 
     // cache the resolved address
-    private var resolvedAddress: CPointer<cnames.structs.SDLNet_Address>? = null
+    private var resolvedAddress: CPointer<cnames.structs.NET_Address>? = null
 
     /**
      * Converts the host and port into an SDL-compatible IPaddress structure.
      */
-    fun toSDL(): CPointer<cnames.structs.SDLNet_Address>? {
+    fun toSDL(): CPointer<cnames.structs.NET_Address>? {
         // Return cached address if available
         resolvedAddress?.let { return it }
 
         logger.info { "Resolving host: $host" }
         val address = if (host == "localhost" || host == "127.0.0.1") {
-            SDLNet_ResolveHostname("127.0.0.1") // force numeric IP
+            NET_ResolveHostname("127.0.0.1") // force numeric IP
         } else {
-            SDLNet_ResolveHostname(host)
+            NET_ResolveHostname(host)
         }
 
         if (address == null) {
@@ -34,12 +34,12 @@ data class IPAddress(val host: String, val port: UShort) : Logging {
             return null
         }
 
-        // SDLNet_WaitUntilResolved returns:
+        // NET_WaitUntilResolved returns:
         // 1 if successfully resolved
         // -1 if resolution failed
         // 0 if still resolving
         logger.info { "Waiting for resolution: $host" }
-        val resolutionStatus = SDLNet_WaitUntilResolved(address, 5000)
+        val resolutionStatus = NET_WaitUntilResolved(address, 5000)
         if (resolutionStatus != 1) {
             logger.error {
                 "Resolution ${if (resolutionStatus == 0) "timeout" else "failure"}: $host, error: ${SDL_GetError()?.toKString()}"
@@ -51,7 +51,7 @@ data class IPAddress(val host: String, val port: UShort) : Logging {
         // 1 if successfully resolved
         // -1 if resolution failed
         // 0 if still resolving
-        if (SDLNet_GetAddressStatus(address) != 1) {
+        if (NET_GetAddressStatus(address) != 1) {
             logger.error { "Address status invalid: $host, error: ${SDL_GetError()?.toKString()}" }
             return null
         }

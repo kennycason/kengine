@@ -120,7 +120,7 @@ esac
 # All platforms: build SDL3_net from source (not in any package manager yet)
 SDL3_CMAKE_ARGS=""
 if [ "$OS" = "Darwin" ]; then
-    SDL3_CMAKE_ARGS="-DSDL3_INCLUDE_DIR=${SDL3_INCLUDE}/SDL3 -DSDL3_LIBRARY=${SDL3_LIB}"
+    SDL3_CMAKE_ARGS="-DCMAKE_PREFIX_PATH=${BREW_PREFIX} -DSDL3_INCLUDE_DIR=${SDL3_INCLUDE}/SDL3 -DSDL3_LIBRARY=${SDL3_LIB}"
 fi
 
 build_cmake_project "SDL3_net" "SDL_net" "$SDL3_CMAKE_ARGS"

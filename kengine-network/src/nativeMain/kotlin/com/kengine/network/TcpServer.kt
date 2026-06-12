@@ -9,16 +9,16 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
 import kotlinx.coroutines.delay
-import sdl3.net.SDLNet_AcceptClient
-import sdl3.net.SDLNet_CreateServer
-import sdl3.net.SDLNet_DestroyServer
+import sdl3.net.NET_AcceptClient
+import sdl3.net.NET_CreateServer
+import sdl3.net.NET_DestroyServer
 import sdl3.SDL_GetError
 
 @OptIn(ExperimentalForeignApi::class)
 class TcpServer(
     private val address: IPAddress
 ) : Logging {
-    private var server: CPointer<cnames.structs.SDLNet_Server>? = null
+    private var server: CPointer<cnames.structs.NET_Server>? = null
     private var isRunning = false
 
     fun start() {
@@ -27,7 +27,7 @@ class TcpServer(
         val sdlAddress = address.toSDL()
             ?: throw Exception("Failed to resolve host ${address.host}")
 
-        server = SDLNet_CreateServer(sdlAddress, address.port)
+        server = NET_CreateServer(sdlAddress, address.port, 0u)
             ?: throw Exception("Failed to create TCP server: ${SDL_GetError()}")
 
         isRunning = true
@@ -38,7 +38,7 @@ class TcpServer(
         logger.info { "Stopping TCP server" }
         isRunning = false
         server?.let { srv ->
-            SDLNet_DestroyServer(srv)
+            NET_DestroyServer(srv)
             server = null
         }
     }
@@ -47,8 +47,8 @@ class TcpServer(
         while (isRunning) {
             server?.let { srv ->
                 memScoped {
-                    val clientStream = alloc<CPointerVar<cnames.structs.SDLNet_StreamSocket>>()
-                    val acceptResult = SDLNet_AcceptClient(srv, clientStream.ptr)
+                    val clientStream = alloc<CPointerVar<cnames.structs.NET_StreamSocket>>()
+                    val acceptResult = NET_AcceptClient(srv, clientStream.ptr)
 
                     if (acceptResult) {
                         clientStream.value?.let { socket ->
@@ -73,7 +73,7 @@ class TcpServer(
     }
 
     private class TcpServerConnection(
-        socket: CPointer<cnames.structs.SDLNet_StreamSocket>
+        socket: CPointer<cnames.structs.NET_StreamSocket>
     ) : TcpConnection(socket) {
         init {
             isRunning = true

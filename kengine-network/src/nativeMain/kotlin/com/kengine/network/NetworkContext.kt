@@ -3,14 +3,14 @@ package com.kengine.network
 import com.kengine.hooks.context.Context
 import com.kengine.log.Logging
 import kotlinx.cinterop.toKString
-import sdl3.net.SDLNet_Init
-import sdl3.net.SDLNet_Quit
+import sdl3.net.NET_Init
+import sdl3.net.NET_Quit
 import sdl3.SDL_GetError
 
 class NetworkContext : Context(), Logging {
 
     init {
-        if (!SDLNet_Init()) {
+        if (!NET_Init()) {
             throw Exception("Failed to initialize SDL_net: ${SDL_GetError()?.toKString()}")
         }
     }
@@ -63,7 +63,7 @@ class NetworkContext : Context(), Logging {
     override fun cleanup() {
         logger.info { "Cleaning up NetworkContext"}
         closeAllConnections()
-        SDLNet_Quit()
+        NET_Quit()
         currentContext = null
     }
 

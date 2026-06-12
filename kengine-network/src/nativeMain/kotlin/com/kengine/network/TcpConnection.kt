@@ -19,17 +19,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
-import sdl3.net.SDLNet_CreateClient
-import sdl3.net.SDLNet_DestroyStreamSocket
-import sdl3.net.SDLNet_ReadFromStreamSocket
-import sdl3.net.SDLNet_WaitUntilConnected
-import sdl3.net.SDLNet_WriteToStreamSocket
+import sdl3.net.NET_CreateClient
+import sdl3.net.NET_DestroyStreamSocket
+import sdl3.net.NET_ReadFromStreamSocket
+import sdl3.net.NET_WaitUntilConnected
+import sdl3.net.NET_WriteToStreamSocket
 import sdl3.SDL_GetError
 
 @OptIn(ExperimentalForeignApi::class)
 open class TcpConnection private constructor(
     private val address: IPAddress,
-    initialSocket: CPointer<cnames.structs.SDLNet_StreamSocket>?,
+    initialSocket: CPointer<cnames.structs.NET_StreamSocket>?,
     private val bufferSize: Int = DEFAULT_BUFFER_SIZE
 ) : NetworkConnection, Logging, AutoCloseable {
 
@@ -41,7 +41,7 @@ open class TcpConnection private constructor(
 
     // Protected constructor for server connections
     protected constructor(
-        socket: CPointer<cnames.structs.SDLNet_StreamSocket>
+        socket: CPointer<cnames.structs.NET_StreamSocket>
     ) : this(IPAddress("0.0.0.0", 0u), socket)
 
 
@@ -49,7 +49,7 @@ open class TcpConnection private constructor(
         const val DEFAULT_BUFFER_SIZE = 1024
     }
 
-    private var streamSocket: CPointer<cnames.structs.SDLNet_StreamSocket>? = initialSocket
+    private var streamSocket: CPointer<cnames.structs.NET_StreamSocket>? = initialSocket
     private var receiveJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     var isRunning = false
@@ -63,11 +63,11 @@ open class TcpConnection private constructor(
         val sdlAddress = address.toSDL()
             ?: throw Exception("Failed to resolve host ${address.host}")
 
-        streamSocket = SDLNet_CreateClient(sdlAddress, address.port)
+        streamSocket = NET_CreateClient(sdlAddress, address.port, 0u)
             ?: throw Exception("Failed to create TCP client: ${SDL_GetError()}")
 
         // Wait for connection (SDL3 returns 1 for success)
-        val connectionStatus = SDLNet_WaitUntilConnected(streamSocket, 5000)
+        val connectionStatus = NET_WaitUntilConnected(streamSocket, 5000)
         if (connectionStatus != 1) {
             throw Exception("Failed to connect: ${
                 if (connectionStatus == 0) "Connection timed out"
@@ -87,7 +87,7 @@ open class TcpConnection private constructor(
         }
         scope.cancel()
         streamSocket?.let { socket ->
-            SDLNet_DestroyStreamSocket(socket)
+            NET_DestroyStreamSocket(socket)
             streamSocket = null
         }
     }
@@ -97,7 +97,7 @@ open class TcpConnection private constructor(
 
         streamSocket?.let { socket ->
             data.usePinned { pinned ->
-                val success = SDLNet_WriteToStreamSocket(socket, pinned.addressOf(0), data.size.convert())
+                val success = NET_WriteToStreamSocket(socket, pinned.addressOf(0), data.size.convert())
                 if (!success) {
                     throw Exception("Failed to send TCP data: ${SDL_GetError()}")
                 }
@@ -132,7 +132,7 @@ open class TcpConnection private constructor(
                 while (isRunning && isActive) {
                     val shouldContinue = streamSocket?.let { socket ->
                         buffer.usePinned { pinned ->
-                            val received = SDLNet_ReadFromStreamSocket(
+                            val received = NET_ReadFromStreamSocket(
                                 socket,
                                 pinned.addressOf(0),
                                 bufferSize.convert()
