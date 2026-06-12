@@ -6,7 +6,6 @@ import kotlinx.cinterop.toKString
 import platform.posix.F_OK
 import platform.posix.access
 import platform.posix.getcwd
-import platform.posix.readlink
 
 object File {
     private val cachedAssetBasePath: String by lazy { resolveAssetBasePath() }
@@ -22,30 +21,7 @@ object File {
 
     fun assetBasePath(): String = cachedAssetBasePath
 
-    private fun executablePath(): String? {
-        // Linux: /proc/self/exe
-        val buffer = ByteArray(4096)
-        val len = readlink("/proc/self/exe", buffer.refTo(0), buffer.size.convert())
-        if (len > 0) {
-            return buffer.decodeToString(0, len.toInt())
-        }
-        return null
-    }
-
     private fun resolveAssetBasePath(): String {
-        // macOS .app bundle detection:
-        // Check if the executable lives inside a .app/Contents/MacOS/ directory.
-        // We check both the resolved executable path and the CWD.
-        val execPath = executablePath()
-        val execDir = execPath?.substringBeforeLast('/')
-
-        if (execDir != null && execDir.contains(".app/Contents/MacOS")) {
-            val resourcesPath = execDir.replace("/Contents/MacOS", "/Contents/Resources")
-            if (isExist(resourcesPath)) {
-                return resourcesPath
-            }
-        }
-
         val cwd = pwd()
 
         // Check CWD (covers Finder launch)
