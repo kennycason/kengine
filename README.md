@@ -30,6 +30,12 @@ This has also been an experiment with ChatGPT + Claude to help with coding + des
     - [Entities](#entities)
     - [Event Handling](#event-handling)
 - [Tiled Map](#tiled-map)
+- [Actions & Tweens](#actions--tweens)
+  - [Easing Functions](#easing-functions)
+  - [Tweens](#tweens)
+  - [Move with Easing](#move-with-easing)
+  - [Sequences](#sequences)
+- [Scene Management](#scene-management)
 - [Functional Hooks](#functional-hooks)
   - [useState](#usestate)
   - [useContext](#usecontext)
@@ -37,7 +43,6 @@ This has also been an experiment with ChatGPT + Claude to help with coding + des
   - [useMemo](#usememo)
   - [useReducer](#usereducer)
   - [Logging](#logging)
-  - [Actions](#actions)
   - [Math Utilities](#math-utilities)
 - [Unit Testing](kengine-test/)
 - [Dev](#dev)
@@ -464,48 +469,155 @@ useEventContext {
 
 ## Overview
 
-The **TiledMapLoader** is a utility for loading and rendering maps in the **Tiled** map format. Currently, it only supports the `.tmj` (Tiled Map JSON) and `.tsj` (Tiled Tileset JSON) file formats. Maps and tilesets in the `.tmx` and `.tsx` formats are **not supported**.
+The **TiledMapLoader** loads and renders maps created with the [Tiled](https://www.mapeditor.org/) map editor. Both JSON and XML formats are supported — the loader auto-detects the format by file extension.
 
 ## Key Features
 
-- Loads Tiled maps (`.tmj`) and external tilesets (`.tsj`).
-- Supports multiple tiled and object layers.
-- Supports animated tiles and tile flipping/rotations.
-- Scrollable maps with customizable controls for navigation.
-- Render time for a 4-layer map with animations & rotations is ~5-7ms/render. Goal is <1ms.
+- Loads both formats: `.tmj`/`.tsj` (JSON) and `.tmx`/`.tsx` (XML)
+- Multiple tile layers and object layers
+- Animated tiles with per-frame durations
+- Tile flipping/rotations (all 8 combinations)
+- Layer opacity and layer offset support
+- Pre-resolved cells at load time for fast rendering (~1.7ms/render avg for complex multi-layer maps)
+- External tileset references resolved automatically
+
 ---
 
 ## Example Usage
 
 ### Loading and Drawing a Map
 
-Here is an example of loading and rendering a map:
-
 <img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/images/tiled_map.gif" width="65%" />
 
 ```kotlin
+// JSON or XML — just change the extension
 val tiledMap = TiledMapLoader()
-    .loadMap("src/nativeTest/resources/ninjaturdle/lungs_25.tmj")
+    .loadMap("assets/maps/lungs_25.tmx")
 
 object : Game {
     override fun update() {
-        tiledMap.update() // update animated tiles
+        tiledMap.update() // advance animated tiles
     }
 
     override fun draw() {
-        tiledMap.draw() // render all layers of the map
-      
-        // or draw layers by name
-        tileMap.draw("bg")
-        tileMap.draw("main")
-        // draw player/enemies
-        tileMap.draw("fg")
+        tiledMap.draw() // render all visible layers
+
+        // or draw specific layers by name
+        tiledMap.draw("bg")
+        tiledMap.draw("main")
+        // draw player/enemies between layers
+        tiledMap.draw("fg")
     }
 
     override fun cleanup() {
+        tiledMap.cleanup()
     }
 }
 ```
+
+## Actions & Tweens
+
+The action system provides time-based behaviors that run each frame. Tweens interpolate values over time using easing functions for smooth animations.
+
+### Easing Functions
+
+30 built-in easing curves — linear, quad, cubic, quart, sine, expo, circ, back, elastic, bounce (each with in/out/inOut variants).
+
+```kotlin
+Easing.linear           // constant speed
+Easing.easeOutBounce    // bounces at the end
+Easing.easeInOutCubic   // slow start + slow end
+Easing.easeOutElastic   // springy overshoot
+Easing.easeInBack       // pulls back before accelerating
+```
+
+### Tweens
+
+Animate any `Double` value over time with an easing curve.
+
+```kotlin
+useActionContext {
+    tween(
+        from = 0.0, to = 255.0,
+        durationMs = 500,
+        easing = Easing.easeOutQuad,
+        onUpdate = { value -> entity.alpha = value },
+        onComplete = { println("fade complete") }
+    )
+}
+```
+
+### Move with Easing
+
+`moveTo` now accepts an optional easing parameter (defaults to linear for backwards compatibility).
+
+```kotlin
+useActionContext {
+    moveTo(
+        entity, Vec2(400.0, 300.0),
+        durationMs = 1000,
+        easing = Easing.easeOutBounce,
+        onComplete = { entity.state = IDLE }
+    )
+}
+```
+
+### Sequences
+
+Chain actions to run one after another.
+
+```kotlin
+useActionContext {
+    sequence(
+        TweenAction(from = 0.0, to = 1.0, durationMs = 300, easing = Easing.easeOutQuad, onUpdate = { alpha = it }),
+        TimerAction(delayMs = 500),
+        TweenAction(from = 1.0, to = 0.0, durationMs = 300, easing = Easing.easeInQuad, onUpdate = { alpha = it })
+    )
+}
+```
+
+## Scene Management
+
+Manage game states with a scene stack. Scenes have lifecycle hooks and support transitions.
+
+```kotlin
+// Scene interface
+class MenuScene : Scene {
+    override fun enter() { /* called when scene becomes active */ }
+    override fun exit() { /* called when scene is removed */ }
+    override fun pause() { /* called when another scene is pushed on top */ }
+    override fun resume() { /* called when the scene above is popped */ }
+    override fun update() { /* game logic */ }
+    override fun draw() { /* rendering */ }
+    override fun cleanup() { /* free resources */ }
+}
+```
+
+### Scene Stack Operations
+
+```kotlin
+val scenes = SceneContext.get()
+
+scenes.push(GameScene())                          // push with instant cut
+scenes.push(PauseScene(), FadeTransition(500))    // push with fade
+scenes.pop(FadeTransition(300))                   // pop back to previous scene
+scenes.replace(GameOverScene())                   // swap top scene
+```
+
+### Quick Setup with SceneGame
+
+```kotlin
+createGameContext(title = "My Game", width = 800, height = 600) {
+    GameRunner(frameRate = 60) {
+        SceneGame(initialScene = MenuScene())
+    }
+}
+```
+
+### Built-in Transitions
+
+- `FadeTransition(durationMs)` — Fade to black and back
+- `CutTransition()` — Instant switch
 
 ### Functional Hooks
 
@@ -685,20 +797,6 @@ logger.error { "An error occurred." }
 logger.error(e) { "An error occurred." }
 ```
 
-#### Actions
-
-Actions provide a way to script entity behavior over time, such as movements or animations.
-
-Example: Moving an Entity
-
-```kotlin
-useActionContext {
-    moveTo(entity, Vec2(200.0, 300.0), speed = 100.0) {
-        logger.info { "Entity reached its destination!" }
-    }
-}
-```
-
 #### Math Utilities
 
 Kengine includes math utilities such as Vec2 and Rect for vector and rectangle operations.
@@ -847,13 +945,10 @@ iconutil -c icns packaging/icon.iconset -o packaging/kengine.icns
 ```
 
 ## Roadmap
-- Tween/animation system (easing curves, property animation)
-- Scene management (scene transitions, scene stack)
-- Physics-based particle system (pooled, with lifespan/velocity/gravity)
-- TiledMapLoader
-  - Performance enhancements (5ms/render -> <1ms/render)
-  - Support TMX (XML format)
+- Entity system improvements (component-based composition, entity registry)
+- Physics-based particle system (connect particles to kengine-physics)
+- Asset embedding (compile assets into binary for single-file distribution)
+- WASM target (would require SDL3 replacement with WebGL/Canvas)
 - Logger file support
 - Menu system
-- Add Vec2 versions of functions that take (x,y) parameters, ditto for Rect2 and (x,y,w,h)
 - Redesign font handling + caching/config

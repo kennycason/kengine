@@ -10,11 +10,32 @@ class ActionContext private constructor() : Context(), Logging {
     private val actions = mutableListOf<Action>() // Current actions
     private val pendingActions = mutableListOf<Action>() // Actions added during update
 
-    fun moveTo(entity: Entity, destination: Vec2, durationMs: Long, onComplete: (() -> Unit)) {
-        pendingActions.add(MoveAction(entity, destination, durationMs, onComplete))
+    fun moveTo(
+        entity: Entity,
+        destination: Vec2,
+        durationMs: Long,
+        easing: EasingFunction = Easing.linear,
+        onComplete: (() -> Unit)? = null
+    ) {
+        pendingActions.add(MoveAction(entity, destination, durationMs, easing, onComplete))
     }
 
-    fun timer(delayMs: Long, onComplete: (() -> Unit)) {
+    fun tween(
+        from: Double,
+        to: Double,
+        durationMs: Long,
+        easing: EasingFunction = Easing.linear,
+        onUpdate: ((Double) -> Unit)? = null,
+        onComplete: (() -> Unit)? = null
+    ) {
+        pendingActions.add(TweenAction(from, to, durationMs, easing, onUpdate, onComplete))
+    }
+
+    fun sequence(vararg actions: Action, onComplete: (() -> Unit)? = null) {
+        pendingActions.add(SequenceAction(actions.toList(), onComplete))
+    }
+
+    fun timer(delayMs: Long, onComplete: (() -> Unit)? = null) {
         pendingActions.add(TimerAction(delayMs, onComplete))
     }
 
