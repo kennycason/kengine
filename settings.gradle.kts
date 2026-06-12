@@ -29,6 +29,7 @@ modules.addAll(
     listOf(
         "games:antfarm",
         "games:boxxle",
+        "games:chat-demo",
         "games:helloworld",
         "games:hextris",
         "games:image-shuffle",

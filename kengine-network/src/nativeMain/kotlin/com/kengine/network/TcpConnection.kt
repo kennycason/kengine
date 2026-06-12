@@ -7,6 +7,7 @@ import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -258,6 +259,8 @@ open class TcpConnection private constructor(
                         delay(1)
                     }
                 }
+            } catch (e: CancellationException) {
+                isRunning = false
             } catch (e: Exception) {
                 logger.error(e) { "Error in receive loop" }
                 isRunning = false
@@ -267,12 +270,10 @@ open class TcpConnection private constructor(
     }
 
     private fun dispatchReceive(errorMessage: String, onReceive: () -> Unit) {
-        scope.launch {
-            try {
-                onReceive()
-            } catch (e: Exception) {
-                logger.error(e) { errorMessage }
-            }
+        try {
+            onReceive()
+        } catch (e: Exception) {
+            logger.error(e) { errorMessage }
         }
     }
 

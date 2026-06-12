@@ -14,6 +14,7 @@ import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -203,6 +204,8 @@ class UdpConnection(
                     } ?: break
                 }
                 logger.info { "Receive loop ending on ${address.host}:${address.port}" }
+            } catch (e: CancellationException) {
+                isRunning = false
             } catch (e: Exception) {
                 logger.error(e) { "Error in receive loop" }
                 isRunning = false
