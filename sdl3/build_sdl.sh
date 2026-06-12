@@ -1,6 +1,7 @@
 #!/bin/sh
 #
 # Cross-platform SDL3 builder.
+# SDL3 3.4.0, SDL3_image 3.4.0, SDL3_ttf 3.2.0, SDL3_mixer 3.2.2, SDL3_net 3.2.0
 #
 # macOS (hybrid): builds SDL3_net from source.
 #   SDL3, SDL3_image, SDL3_ttf, SDL3_mixer installed via Homebrew.

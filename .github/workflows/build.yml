@@ -33,7 +33,7 @@ jobs:
           path: |
             /usr/local/lib/libSDL3_net*
             /usr/local/include/SDL3_net
-          key: sdl3-source-${{ runner.os }}-${{ hashFiles('.gitmodules', 'sdl3/build_sdl.sh') }}
+          key: sdl3-v2-${{ runner.os }}-${{ hashFiles('.gitmodules', 'sdl3/build_sdl.sh') }}
 
       - name: Build SDL3_net from source
         if: steps.sdl-source-cache.outputs.cache-hit != 'true'
@@ -127,7 +127,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             cmake pkg-config build-essential \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxtst-dev \
             libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl-dev libegl-dev \
             libasound2-dev libpulse-dev libpipewire-0.3-dev \
             libfreetype-dev libharfbuzz-dev \
@@ -145,7 +145,7 @@ jobs:
             /usr/local/include/SDL3_ttf
             /usr/local/include/SDL3_mixer
             /usr/local/include/SDL3_net
-          key: sdl3-source-${{ runner.os }}-${{ hashFiles('.gitmodules', 'sdl3/build_sdl.sh') }}
+          key: sdl3-v2-${{ runner.os }}-${{ hashFiles('.gitmodules', 'sdl3/build_sdl.sh') }}
 
       - name: Build all SDL3 libs from source
         if: steps.sdl-source-cache.outputs.cache-hit != 'true'
@@ -271,7 +271,7 @@ jobs:
             D:\a\_temp\msys64\mingw64\include\SDL3_ttf
             D:\a\_temp\msys64\mingw64\include\SDL3_mixer
             D:\a\_temp\msys64\mingw64\include\SDL3_net
-          key: sdl3-source-${{ runner.os }}-${{ hashFiles('.gitmodules', 'sdl3/build_sdl.sh') }}
+          key: sdl3-v2-${{ runner.os }}-${{ hashFiles('.gitmodules', 'sdl3/build_sdl.sh') }}
 
       - name: Build all SDL3 libs from source
         if: steps.sdl-source-cache.outputs.cache-hit != 'true'
