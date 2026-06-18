@@ -15,6 +15,13 @@ kotlin {
         nodejs()
     }
 
+    compilerOptions {
+        freeCompilerArgs.addAll(
+            "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
+            "-opt-in=kotlin.ExperimentalStdlibApi"
+        )
+    }
+
     val publishAllNativeTargets = providers.gradleProperty("kengine.publish.allNativeTargets")
         .map(String::toBoolean)
         .getOrElse(false)

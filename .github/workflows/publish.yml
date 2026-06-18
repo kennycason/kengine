@@ -90,7 +90,6 @@ jobs:
             :kengine-physics:publishLinuxX64PublicationToGitHubPackagesRepository \
             :kengine-sound:publishLinuxX64PublicationToGitHubPackagesRepository \
             -Pkengine.version="$VERSION" \
-            -Pkengine.publish.allNativeTargets=true \
             --no-daemon --stacktrace
 
   publish-windows-native:
@@ -188,7 +187,6 @@ jobs:
             :kengine-physics:publishMingwX64PublicationToGitHubPackagesRepository \
             :kengine-sound:publishMingwX64PublicationToGitHubPackagesRepository \
             -Pkengine.version="$VERSION" \
-            -Pkengine.publish.allNativeTargets=true \
             --no-daemon --stacktrace
 
   publish-shared-and-macos:

@@ -15,6 +15,13 @@ kotlin {
         nodejs()
     }
 
+    compilerOptions {
+        freeCompilerArgs.addAll(
+            "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
+            "-opt-in=kotlin.ExperimentalStdlibApi"
+        )
+    }
+
     val publishAllNativeTargets = providers.gradleProperty("kengine.publish.allNativeTargets")
         .map(String::toBoolean)
         .getOrElse(false)
@@ -32,11 +39,36 @@ kotlin {
             }
         )
     }
-    sourceSets.maybeCreate("nativeMain").dependsOn(sourceSets.getByName("commonMain"))
-    sourceSets.maybeCreate("nativeTest").dependsOn(sourceSets.getByName("commonTest"))
-    nativeTargets.forEach { nativeTarget ->
-        sourceSets.getByName("${nativeTarget.name}Main").dependsOn(sourceSets.getByName("nativeMain"))
-        sourceSets.getByName("${nativeTarget.name}Test").dependsOn(sourceSets.getByName("nativeTest"))
+    if (publishAllNativeTargets) {
+        val commonMain = sourceSets.getByName("commonMain")
+        val commonTest = sourceSets.getByName("commonTest")
+        nativeTargets.forEach { nativeTarget ->
+            sourceSets.getByName("${nativeTarget.name}Main").apply {
+                dependsOn(commonMain)
+                kotlin.srcDir("src/nativeMain/kotlin")
+                dependencies {
+                    implementation(project(":kengine"))
+                    implementation(project(":kengine-reactive"))
+                    api(libs.kotlinxSerializationJson)
+                    api(libs.kotlinxCoroutinesCore)
+                }
+            }
+            sourceSets.getByName("${nativeTarget.name}Test").apply {
+                dependsOn(commonTest)
+                kotlin.srcDir("src/nativeTest/kotlin")
+                dependencies {
+                    implementation(project(":kengine-test"))
+                    implementation(kotlin("test"))
+                }
+            }
+        }
+    } else {
+        sourceSets.maybeCreate("nativeMain").dependsOn(sourceSets.getByName("commonMain"))
+        sourceSets.maybeCreate("nativeTest").dependsOn(sourceSets.getByName("commonTest"))
+        nativeTargets.forEach { nativeTarget ->
+            sourceSets.getByName("${nativeTarget.name}Main").dependsOn(sourceSets.getByName("nativeMain"))
+            sourceSets.getByName("${nativeTarget.name}Test").dependsOn(sourceSets.getByName("nativeTest"))
+        }
     }
 
     nativeTargets.forEach { nativeTarget ->
@@ -77,22 +109,24 @@ kotlin {
             }
         }
 
-        nativeMain {
-            dependsOn(commonMain)
-            dependencies {
-                implementation(project(":kengine"))
-                implementation(project(":kengine-reactive"))
-                // Expose chipmunk interop as API
-                api(libs.kotlinxSerializationJson)
-                api(libs.kotlinxCoroutinesCore)
+        if (!publishAllNativeTargets) {
+            nativeMain {
+                dependsOn(commonMain)
+                dependencies {
+                    implementation(project(":kengine"))
+                    implementation(project(":kengine-reactive"))
+                    // Expose chipmunk interop as API
+                    api(libs.kotlinxSerializationJson)
+                    api(libs.kotlinxCoroutinesCore)
+                }
             }
-        }
 
-        nativeTest {
-            dependsOn(commonTest)
-            dependencies {
-                implementation(project(":kengine-test"))
-                implementation(kotlin("test"))
+            nativeTest {
+                dependsOn(commonTest)
+                dependencies {
+                    implementation(project(":kengine-test"))
+                    implementation(kotlin("test"))
+                }
             }
         }
     }

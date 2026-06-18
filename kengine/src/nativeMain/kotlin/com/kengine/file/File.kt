@@ -1,18 +1,23 @@
 package com.kengine.file
 
-import kotlinx.cinterop.convert
-import kotlinx.cinterop.refTo
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
+import sdl3.SDL_GetCurrentDirectory
+import sdl3.SDL_free
 import platform.posix.F_OK
 import platform.posix.access
-import platform.posix.getcwd
 
 object File {
     private val cachedAssetBasePath: String by lazy { resolveAssetBasePath() }
 
+    @OptIn(ExperimentalForeignApi::class)
     fun pwd(): String {
-        val buffer = ByteArray(1024)
-        return getcwd(buffer.refTo(0), buffer.size.convert())?.toKString() ?: "Unknown"
+        val currentDirectory = SDL_GetCurrentDirectory() ?: return "Unknown"
+        return try {
+            currentDirectory.toKString().withoutTrailingPathSeparator()
+        } finally {
+            SDL_free(currentDirectory)
+        }
     }
 
     fun isExist(path: String): Boolean {
@@ -55,5 +60,10 @@ object File {
     fun resolveAssetPath(relativePath: String): String {
         if (relativePath.startsWith("/")) return relativePath
         return "${assetBasePath()}/$relativePath"
+    }
+
+    private fun String.withoutTrailingPathSeparator(): String {
+        val isWindowsRoot = length == 3 && this[1] == ':' && (this[2] == '\\' || this[2] == '/')
+        return if (length > 1 && !isWindowsRoot) trimEnd('/', '\\') else this
     }
 }
