@@ -31,10 +31,11 @@ class KengineNativePlugin : Plugin<Project> {
 
         // Detect native target
         val nativeTarget = when {
-            hostOs == "Mac OS X" && isArm64 -> kotlin.macosArm64("native")
-            hostOs == "Mac OS X" && !isArm64 -> kotlin.macosX64("native")
-            hostOs == "Linux" && isArm64 -> kotlin.linuxArm64("native")
-            hostOs == "Linux" && !isArm64 -> kotlin.linuxX64("native")
+            hostOs == "Mac OS X" && isArm64 -> kotlin.macosArm64()
+            hostOs == "Mac OS X" && !isArm64 -> kotlin.macosX64()
+            hostOs == "Linux" && isArm64 -> kotlin.linuxArm64()
+            hostOs == "Linux" && !isArm64 -> kotlin.linuxX64()
+            hostOs.startsWith("Windows") -> kotlin.mingwX64()
             else -> throw GradleException("Host OS [$hostOs] is not supported in Kotlin/Native.")
         }
 

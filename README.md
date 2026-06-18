@@ -49,6 +49,7 @@ This has also been an experiment with ChatGPT + Claude to help with coding + des
   - [Project structure](#project-structure)
   - [Project structure for a Kengine game](#project-structure-for-a-kengine-game)
   - [Installation](#installation)
+  - [Using GitHub Packages](#using-github-packages)
 - [Roadmap](#roadmap)
 
 
@@ -419,7 +420,7 @@ export KENGINE_CONTROLLER_MODE=gamepad
 ./myGame.kexe
 
 # Or inline:
-KENGINE_CONTROLLER_MODE=gamepad ./gradlew :games:hextris:runDebugExecutableNative
+KENGINE_CONTROLLER_MODE=gamepad ./gradlew :games:hextris:runDebugExecutableMacosArm64
 ```
 
 **Note**: GAMEPAD mode is recommended on macOS to avoid duplicate controller detection issues with certain controllers (e.g., Nintendo SNES controllers).
@@ -880,10 +881,77 @@ Build the project:
 
 Run specific tests:
 ```shell
-./gradlew nativeTest --tests "com.kengine.ui.DrawerIT.drawer component test"
+./gradlew macosArm64Test --tests "com.kengine.ui.DrawerIT.drawer component test"
 ```
 ```shell
-./gradlew nativeTest --tests "*IT"
+./gradlew macosArm64Test --tests "*IT"
+```
+
+Replace `MacosArm64` / `macosArm64` with your host target, for example `LinuxX64` / `linuxX64` or `MingwX64` / `mingwX64`.
+
+## Using GitHub Packages
+
+Released Kengine modules are published to GitHub Packages under:
+
+```text
+io.github.kennycason.kengine
+```
+
+GitHub Packages requires authentication for Maven reads. Add a GitHub token with `read:packages` access to `~/.gradle/gradle.properties`:
+
+```properties
+gpr.user=YOUR_GITHUB_USERNAME
+gpr.key=YOUR_GITHUB_TOKEN
+```
+
+Then add the package repository in the consuming project's `build.gradle.kts`:
+
+```kotlin
+repositories {
+    mavenCentral()
+    maven {
+        url = uri("https://maven.pkg.github.com/kennycason/kengine")
+        credentials {
+            username = findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
+            password = findProperty("gpr.key") as String? ?: System.getenv("GITHUB_TOKEN")
+        }
+    }
+}
+```
+
+Use the modules you need from your native source set:
+
+```kotlin
+kotlin {
+    macosArm64()
+
+    sourceSets {
+        val nativeMain by getting {
+            dependencies {
+                implementation("io.github.kennycason.kengine:kengine:0.1.0")
+                implementation("io.github.kennycason.kengine:kengine-sound:0.1.0")
+            }
+        }
+    }
+}
+```
+
+Published modules:
+
+```text
+kengine
+kengine-reactive
+kengine-test
+kengine-network
+kengine-physics
+kengine-sound
+```
+
+The current release workflow publishes `macosArm64`, `linuxX64`, and `mingwX64` native artifacts. To publish a release, push a version tag:
+
+```shell
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
 ## Packaging & Distribution

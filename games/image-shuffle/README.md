@@ -16,7 +16,7 @@ From the terminal:
 ```shell
 ./gradlew :games:image-shuffle:clean :games:image-shuffle:build
 cd games/image-shuffle
-./build/bin/native/releaseExecutable/image-shuffle.kexe
+./build/bin/macosArm64/releaseExecutable/image-shuffle.kexe
 ```
 
 Note: Images are not bundled into the kexe yet and are included with relative paths.

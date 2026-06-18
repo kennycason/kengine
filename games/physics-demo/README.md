@@ -13,7 +13,7 @@ From the terminal:
 
 ```shell
 ./gradlew :games:physics-demo:clean :games:physics-demo:build
-./games/physics-demo/build/bin/native/releaseExecutable/physics-demo.kexe
+./games/physics-demo/build/bin/macosArm64/releaseExecutable/physics-demo.kexe
 ```
 
 Note: Images are not bundled into the kexe yet and are included with relative paths.

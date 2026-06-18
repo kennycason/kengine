@@ -7,8 +7,8 @@ The server binds the first available port in `25000..25020`. Clients discover th
 ## Build
 
 ```bash
-./gradlew :games:chat-demo:linkChatServerDebugExecutableNative
-./gradlew :games:chat-demo:linkChatClientDebugExecutableNative
+./gradlew :games:chat-demo:linkChatServerDebugExecutableMacosArm64
+./gradlew :games:chat-demo:linkChatClientDebugExecutableMacosArm64
 ```
 
 ## Run
@@ -16,14 +16,14 @@ The server binds the first available port in `25000..25020`. Clients discover th
 Start the server:
 
 ```bash
-./games/chat-demo/build/bin/native/chatServerDebugExecutable/chatServer.kexe
+./games/chat-demo/build/bin/macosArm64/chatServerDebugExecutable/chatServer.kexe
 ```
 
 Start clients in separate terminals:
 
 ```bash
-./games/chat-demo/build/bin/native/chatClientDebugExecutable/chatClient.kexe kentroid
-./games/chat-demo/build/bin/native/chatClientDebugExecutable/chatClient.kexe synthwizard
+./games/chat-demo/build/bin/macosArm64/chatClientDebugExecutable/chatClient.kexe kentroid
+./games/chat-demo/build/bin/macosArm64/chatClientDebugExecutable/chatClient.kexe synthwizard
 ```
 
 Send a public message by typing normally.

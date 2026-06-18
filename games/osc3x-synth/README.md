@@ -14,7 +14,7 @@ From the terminal:
 ```shell
 ./gradlew :games:osc3x-synth:clean :games:osc3x-synth:build
 cd games/osc3x-synth
-./build/bin/native/releaseExecutable/osc3x-synth.kexe
+./build/bin/macosArm64/releaseExecutable/osc3x-synth.kexe
 ```
 
 Note: Images are not bundled into the kexe yet and are included with relative paths.

@@ -1,0 +1,264 @@
+name: Publish Packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, without a leading v'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-packages-${{ github.ref_name }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+
+jobs:
+  publish-linux-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake pkg-config build-essential \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxtst-dev \
+            libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl-dev libegl-dev \
+            libasound2-dev libpulse-dev libpipewire-0.3-dev \
+            libfreetype-dev libharfbuzz-dev \
+            libjpeg-dev libpng-dev libwebp-dev libtiff-dev \
+            libchipmunk-dev
+
+      - name: Cache SDL3 source builds
+        uses: actions/cache@v4
+        id: sdl-source-cache
+        with:
+          path: |
+            /usr/local/lib/libSDL3*
+            /usr/local/include/SDL3
+            /usr/local/include/SDL3_image
+            /usr/local/include/SDL3_ttf
+            /usr/local/include/SDL3_mixer
+            /usr/local/include/SDL3_net
+          key: sdl3-v2-${{ runner.os }}-${{ hashFiles('.gitmodules', 'sdl3/build_sdl.sh') }}
+
+      - name: Build all SDL3 libs from source
+        if: steps.sdl-source-cache.outputs.cache-hit != 'true'
+        run: bash sdl3/build_sdl.sh
+
+      - name: Refresh linker cache
+        run: sudo ldconfig
+
+      - name: Publish linuxX64 publications
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LD_LIBRARY_PATH: /usr/local/lib
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+
+          ./gradlew \
+            :kengine:publishLinuxX64PublicationToGitHubPackagesRepository \
+            :kengine-reactive:publishLinuxX64PublicationToGitHubPackagesRepository \
+            :kengine-test:publishLinuxX64PublicationToGitHubPackagesRepository \
+            :kengine-network:publishLinuxX64PublicationToGitHubPackagesRepository \
+            :kengine-physics:publishLinuxX64PublicationToGitHubPackagesRepository \
+            :kengine-sound:publishLinuxX64PublicationToGitHubPackagesRepository \
+            -Pkengine.version="$VERSION" \
+            -Pkengine.publish.allNativeTargets=true \
+            --no-daemon --stacktrace
+
+  publish-windows-native:
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: >-
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-pkg-config
+            mingw-w64-x86_64-freetype
+            mingw-w64-x86_64-harfbuzz
+            mingw-w64-x86_64-libjpeg-turbo
+            mingw-w64-x86_64-libpng
+            mingw-w64-x86_64-libwebp
+            mingw-w64-x86_64-libtiff
+            mingw-w64-x86_64-chipmunk
+            mingw-w64-x86_64-make
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Cache SDL3 source builds
+        uses: actions/cache@v4
+        id: sdl-source-cache
+        with:
+          path: |
+            D:\a\_temp\msys64\mingw64\lib\libSDL3*
+            D:\a\_temp\msys64\mingw64\bin\SDL3*
+            D:\a\_temp\msys64\mingw64\bin\libSDL3*
+            D:\a\_temp\msys64\mingw64\include\SDL3
+            D:\a\_temp\msys64\mingw64\include\SDL3_image
+            D:\a\_temp\msys64\mingw64\include\SDL3_ttf
+            D:\a\_temp\msys64\mingw64\include\SDL3_mixer
+            D:\a\_temp\msys64\mingw64\include\SDL3_net
+          key: sdl3-v2-${{ runner.os }}-${{ hashFiles('.gitmodules', 'sdl3/build_sdl.sh') }}
+
+      - name: Build all SDL3 libs from source
+        if: steps.sdl-source-cache.outputs.cache-hit != 'true'
+        run: bash sdl3/build_sdl.sh
+
+      - name: Patch Konan MinGW sysroot
+        env:
+          MSYS2_ROOT: D:/a/_temp/msys64
+        run: |
+          WIN_HOME="$(cygpath "$USERPROFILE")"
+          KONAN_MINGW="$WIN_HOME/.konan/dependencies/msys2-mingw-w64-x86_64-2/x86_64-w64-mingw32/lib"
+          if [ ! -d "$KONAN_MINGW" ]; then
+            ./gradlew :kengine:cinteropSdl3MingwX64 || true
+          fi
+          if [ -d "$KONAN_MINGW" ]; then
+            SYS_LIB="/mingw64/lib"
+            cp -r "$KONAN_MINGW" "${KONAN_MINGW}.bak"
+            cp -f "$SYS_LIB"/*.a "$KONAN_MINGW/" 2>/dev/null || true
+            cp -f "$SYS_LIB"/*.o "$KONAN_MINGW/" 2>/dev/null || true
+          else
+            echo "ERROR: Konan MinGW sysroot not found at $KONAN_MINGW"
+            exit 1
+          fi
+
+      - name: Publish mingwX64 publications
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MSYS2_ROOT: D:/a/_temp/msys64
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+
+          ./gradlew \
+            :kengine:publishMingwX64PublicationToGitHubPackagesRepository \
+            :kengine-reactive:publishMingwX64PublicationToGitHubPackagesRepository \
+            :kengine-test:publishMingwX64PublicationToGitHubPackagesRepository \
+            :kengine-network:publishMingwX64PublicationToGitHubPackagesRepository \
+            :kengine-physics:publishMingwX64PublicationToGitHubPackagesRepository \
+            :kengine-sound:publishMingwX64PublicationToGitHubPackagesRepository \
+            -Pkengine.version="$VERSION" \
+            -Pkengine.publish.allNativeTargets=true \
+            --no-daemon --stacktrace
+
+  publish-shared-and-macos:
+    runs-on: macos-14
+    timeout-minutes: 45
+    needs:
+      - publish-linux-native
+      - publish-windows-native
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Install Homebrew dependencies
+        run: brew install sdl3 sdl3_image sdl3_ttf sdl3_mixer chipmunk cmake pkg-config
+
+      - name: Cache SDL3 source builds
+        uses: actions/cache@v4
+        id: sdl-source-cache
+        with:
+          path: |
+            /usr/local/lib/libSDL3_net*
+            /usr/local/include/SDL3_net
+          key: sdl3-v2-${{ runner.os }}-${{ hashFiles('.gitmodules', 'sdl3/build_sdl.sh') }}
+
+      - name: Build SDL3_net from source
+        if: steps.sdl-source-cache.outputs.cache-hit != 'true'
+        run: bash sdl3/build_sdl.sh
+
+      - name: Publish shared and macosArm64 publications
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+
+          ./gradlew \
+            :kengine-test:publishKotlinMultiplatformPublicationToGitHubPackagesRepository \
+            :kengine-test:publishJvmPublicationToGitHubPackagesRepository \
+            :kengine-test:publishJsPublicationToGitHubPackagesRepository \
+            :kengine-test:publishMacosArm64PublicationToGitHubPackagesRepository \
+            :kengine-reactive:publishKotlinMultiplatformPublicationToGitHubPackagesRepository \
+            :kengine-reactive:publishJvmPublicationToGitHubPackagesRepository \
+            :kengine-reactive:publishJsPublicationToGitHubPackagesRepository \
+            :kengine-reactive:publishMacosArm64PublicationToGitHubPackagesRepository \
+            :kengine:publishKotlinMultiplatformPublicationToGitHubPackagesRepository \
+            :kengine:publishJvmPublicationToGitHubPackagesRepository \
+            :kengine:publishJsPublicationToGitHubPackagesRepository \
+            :kengine:publishMacosArm64PublicationToGitHubPackagesRepository \
+            :kengine-network:publishKotlinMultiplatformPublicationToGitHubPackagesRepository \
+            :kengine-network:publishMacosArm64PublicationToGitHubPackagesRepository \
+            :kengine-physics:publishKotlinMultiplatformPublicationToGitHubPackagesRepository \
+            :kengine-physics:publishJvmPublicationToGitHubPackagesRepository \
+            :kengine-physics:publishJsPublicationToGitHubPackagesRepository \
+            :kengine-physics:publishMacosArm64PublicationToGitHubPackagesRepository \
+            :kengine-sound:publishKotlinMultiplatformPublicationToGitHubPackagesRepository \
+            :kengine-sound:publishJvmPublicationToGitHubPackagesRepository \
+            :kengine-sound:publishJsPublicationToGitHubPackagesRepository \
+            :kengine-sound:publishMacosArm64PublicationToGitHubPackagesRepository \
+            -Pkengine.version="$VERSION" \
+            -Pkengine.publish.allNativeTargets=true \
+            --no-daemon --stacktrace

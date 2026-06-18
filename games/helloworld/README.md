@@ -18,7 +18,7 @@ From the terminal:
 ```shell
 ./gradlew :games:helloworld:clean :games:helloworld:build
 cd games/helloworld
-./build/bin/native/releaseExecutable/helloworld.kexe
+./build/bin/macosArm64/releaseExecutable/helloworld.kexe
 ```
 
 Note: Images are not bundled into the kexe yet and are included with relative paths.

@@ -19,7 +19,7 @@ From the terminal:
 
 ```shell
 ./gradlew :games:boxxle:clean :games:boxxle:build
-./games/boxxle/build/bin/native/releaseExecutable/boxxle.kexe
+./games/boxxle/build/bin/macosArm64/releaseExecutable/boxxle.kexe
 ```
 
 

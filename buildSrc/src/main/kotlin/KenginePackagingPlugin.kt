@@ -32,7 +32,7 @@ class KenginePackagingPlugin : Plugin<Project> {
         project.tasks.register("packageMacApp") {
             group = "distribution"
             description = "Create a macOS .app bundle for $gameName"
-            dependsOn("linkReleaseExecutableNative")
+            dependsOn("linkReleaseExecutable${KengineHostTarget.taskSuffix}")
 
             doLast {
                 val macosDir = File(appDir, "MacOS")
@@ -43,7 +43,7 @@ class KenginePackagingPlugin : Plugin<Project> {
                 resourcesDir.mkdirs()
                 frameworksDir.mkdirs()
 
-                val executableSrc = File(project.buildDir, "bin/native/releaseExecutable/$gameName.kexe")
+                val executableSrc = File(project.buildDir, KengineHostTarget.binPath("releaseExecutable", "$gameName.kexe"))
                 val executableDst = File(macosDir, gameName)
                 executableSrc.copyTo(executableDst, overwrite = true)
                 executableDst.setExecutable(true)
@@ -197,7 +197,7 @@ class KenginePackagingPlugin : Plugin<Project> {
         project.tasks.register("packageLinux") {
             group = "distribution"
             description = "Create a Linux distributable tarball for $gameName"
-            dependsOn("linkReleaseExecutableNative")
+            dependsOn("linkReleaseExecutable${KengineHostTarget.taskSuffix}")
 
             doLast {
                 val stageDir = File(distDir, "$gameName-linux")
@@ -207,7 +207,7 @@ class KenginePackagingPlugin : Plugin<Project> {
                 binDir.mkdirs()
                 libDir.mkdirs()
 
-                val executableSrc = File(project.buildDir, "bin/native/releaseExecutable/$gameName.kexe")
+                val executableSrc = File(project.buildDir, KengineHostTarget.binPath("releaseExecutable", "$gameName.kexe"))
                 val executableDst = File(binDir, gameName)
                 executableSrc.copyTo(executableDst, overwrite = true)
                 executableDst.setExecutable(true)
@@ -283,13 +283,13 @@ Categories=Game;
         project.tasks.register("packageWindows") {
             group = "distribution"
             description = "Create a Windows distributable directory for $gameName"
-            dependsOn("linkReleaseExecutableNative")
+            dependsOn("linkReleaseExecutable${KengineHostTarget.taskSuffix}")
 
             doLast {
                 val stageDir = File(distDir, "$gameName-windows")
                 stageDir.mkdirs()
 
-                val executableSrc = File(project.buildDir, "bin/native/releaseExecutable/$gameName.exe")
+                val executableSrc = File(project.buildDir, KengineHostTarget.binPath("releaseExecutable", "$gameName.exe"))
                 val executableDst = File(stageDir, "$gameName.exe")
                 executableSrc.copyTo(executableDst, overwrite = true)
 

@@ -124,11 +124,11 @@ sdl3/
 ### Platform Detection
 
 The build auto-detects the host platform and selects the appropriate Kotlin/Native target:
-- macOS arm64 → `macosArm64("native")`
-- macOS x64 → `macosX64("native")`
-- Linux arm64 → `linuxArm64("native")`
-- Linux x64 → `linuxX64("native")`
-- Windows → `mingwX64("native")`
+- macOS arm64 → `macosArm64()`
+- macOS x64 → `macosX64()`
+- Linux arm64 → `linuxArm64()`
+- Linux x64 → `linuxX64()`
+- Windows → `mingwX64()`
 
 ## Module Dependency Graph
 

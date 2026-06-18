@@ -32,13 +32,18 @@ kotlin {
     val isArm64 = System.getProperty("os.arch") == "aarch64"
 
     val nativeTarget = when {
-        hostOs == "Mac OS X" && isArm64 -> macosArm64("native")
-        hostOs == "Mac OS X" && !isArm64 -> macosX64("native")
-        hostOs == "Linux" && isArm64 -> linuxArm64("native")
-        hostOs == "Linux" && !isArm64 -> linuxX64("native")
-        hostOs.startsWith("Windows") -> mingwX64("native")
+        hostOs == "Mac OS X" && isArm64 -> macosArm64()
+        hostOs == "Mac OS X" && !isArm64 -> macosX64()
+        hostOs == "Linux" && isArm64 -> linuxArm64()
+        hostOs == "Linux" && !isArm64 -> linuxX64()
+        hostOs.startsWith("Windows") -> mingwX64()
         else -> throw GradleException("Host OS [$hostOs] is not supported in Kotlin/Native.")
     }
+
+    sourceSets.maybeCreate("nativeMain").dependsOn(sourceSets.getByName("commonMain"))
+    sourceSets.getByName("${nativeTarget.name}Main").dependsOn(sourceSets.getByName("nativeMain"))
+    sourceSets.maybeCreate("nativeTest").dependsOn(sourceSets.getByName("commonTest"))
+    sourceSets.getByName("${nativeTarget.name}Test").dependsOn(sourceSets.getByName("nativeTest"))
 
     nativeTarget.apply {
         binaries.all {

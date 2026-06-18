@@ -56,10 +56,11 @@ class SdlDylibCopier(private val project: Project) {
 
         val libsToCopy = libBaseNames.map { resolveLib(it) }
 
+        val nativeBinDir = "${project.buildDir}/${KengineHostTarget.binPath()}"
         val libTargetDirs = listOf(
-            "${project.buildDir}/bin/native/Frameworks",
-            "${project.buildDir}/bin/native/debugExecutable/Frameworks",
-            "${project.buildDir}/bin/native/debugTest/Frameworks"
+            "$nativeBinDir/Frameworks",
+            "$nativeBinDir/debugExecutable/Frameworks",
+            "$nativeBinDir/debugTest/Frameworks"
         )
         registerCopyTasks(project, libsToCopy, libTargetDirs)
     }
@@ -73,7 +74,7 @@ class SdlDylibCopier(private val project: Project) {
             val libName = libPath.substringAfterLast("/").substringAfterLast("\\")
 
             libTargetDirs.forEach { toDir ->
-                val targetDir = toDir.substringAfter("${project.buildDir}/bin/native/")
+                val targetDir = toDir.substringAfter("${project.buildDir}/${KengineHostTarget.binPath()}/")
 
                 val taskName = generateTaskName(project, libName, targetDir)
 
@@ -103,12 +104,12 @@ class SdlDylibCopier(private val project: Project) {
             }
         }
 
-        project.tasks.named("nativeTest") {
+        project.tasks.named("${KengineHostTarget.name}Test") {
             dependsOn(
                 libsToCopy.flatMap { libPath ->
                     val libName = libPath.substringAfterLast("/").substringAfterLast("\\")
                     libTargetDirs.map { toDir ->
-                        val targetDir = toDir.substringAfter("${project.buildDir}/bin/native/")
+                        val targetDir = toDir.substringAfter("${project.buildDir}/${KengineHostTarget.binPath()}/")
                         generateTaskName(project, libName, targetDir)
                     }
                 }

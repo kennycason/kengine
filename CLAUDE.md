@@ -28,15 +28,15 @@ buildSrc/             Custom Gradle plugins (PlatformConfig, KengineAssetPlugin,
 
 ## Build Commands
 - Build project: `./gradlew clean build`
-- Build (skip tests): `./gradlew clean build -x allTests -x nativeTest -x jvmTest -x jsTest`
+- Build (skip tests): `./gradlew clean build -x allTests -x macosArm64Test -x jvmTest -x jsTest`
 - Run all tests: `./gradlew allTests`
-- Run native tests: `./gradlew nativeTest`
-- Run single test: `./gradlew nativeTest --tests "com.kengine.test.YourTestClass.yourTestMethod"`
-- Compile test binary: `./gradlew :kengine:linkDebugTestNative`
-- Run test binary directly: `./kengine/build/bin/native/debugTest/test.kexe`
-- Run tests excluding ITs: `./kengine/build/bin/native/debugTest/test.kexe "--ktest_filter=*-*IT.*:*TiledMapLoaderTest.*"`
+- Run native tests: `./gradlew macosArm64Test`
+- Run single test: `./gradlew macosArm64Test --tests "com.kengine.test.YourTestClass.yourTestMethod"`
+- Compile test binary: `./gradlew :kengine:linkDebugTestMacosArm64`
+- Run test binary directly: `./kengine/build/bin/macosArm64/debugTest/test.kexe`
+- Run tests excluding ITs: `./kengine/build/bin/macosArm64/debugTest/test.kexe "--ktest_filter=*-*IT.*:*TiledMapLoaderTest.*"`
 - Build SDL3 from source: `bash sdl3/build_sdl.sh`
-- Run a specific game: `./gradlew :games:helloworld:runDebugExecutableNative`
+- Run a specific game: `./gradlew :games:helloworld:runDebugExecutableMacosArm64`
 - Package macOS .app: `./gradlew :games:helloworld:packageMac`
 - Package Linux tarball: `./gradlew :games:helloworld:packageLinuxTarball`
 - Package Windows dir: `./gradlew :games:helloworld:packageWindows`
@@ -44,7 +44,7 @@ buildSrc/             Custom Gradle plugins (PlatformConfig, KengineAssetPlugin,
 ## Test Environment
 Tests requiring SDL use dummy drivers:
 ```
-SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./kengine/build/bin/native/debugTest/test.kexe
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./kengine/build/bin/macosArm64/debugTest/test.kexe
 ```
 Tests are under `<module>/src/nativeTest/kotlin/`. Integration tests are suffixed `IT` and excluded from CI by default.
 

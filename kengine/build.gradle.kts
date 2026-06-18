@@ -6,9 +6,6 @@ plugins {
     id("kengine.sdl-dylib")
 }
 
-group = "kengine"
-version = "1.0.0"
-
 repositories {
     mavenCentral()
 }
@@ -21,54 +18,68 @@ kotlin {
         nodejs()
     }
 
-    // native target detection
-    val hostOs = System.getProperty("os.name").also { println("OS: $it") }
-    val isArm64 = System.getProperty("os.arch").also { println("Arch: $it") } == "aarch64"
-    val nativeTarget = when {
-        hostOs == "Mac OS X" && isArm64 -> macosArm64("native")
-        hostOs == "Mac OS X" && !isArm64 -> macosX64("native")
-        hostOs == "Linux" && isArm64 -> linuxArm64("native")
-        hostOs == "Linux" && !isArm64 -> linuxX64("native")
-        hostOs.startsWith("Windows") -> mingwX64("native")
-        else -> throw GradleException("Host OS [$hostOs] is not supported in Kotlin/Native.")
+    val publishAllNativeTargets = providers.gradleProperty("kengine.publish.allNativeTargets")
+        .map(String::toBoolean)
+        .getOrElse(false)
+    val nativeTargets = if (publishAllNativeTargets) {
+        listOf(macosArm64(), linuxX64(), mingwX64())
+    } else {
+        listOf(
+            when (KengineHostTarget.name) {
+                "macosArm64" -> macosArm64()
+                "macosX64" -> macosX64()
+                "linuxX64" -> linuxX64()
+                "linuxArm64" -> linuxArm64()
+                "mingwX64" -> mingwX64()
+                else -> throw GradleException("Host target [${KengineHostTarget.name}] is not supported.")
+            }
+        )
+    }
+    sourceSets.maybeCreate("nativeMain").dependsOn(sourceSets.getByName("commonMain"))
+    sourceSets.maybeCreate("nativeTest").dependsOn(sourceSets.getByName("commonTest"))
+    nativeTargets.forEach { nativeTarget ->
+        sourceSets.getByName("${nativeTarget.name}Main").dependsOn(sourceSets.getByName("nativeMain"))
+        sourceSets.getByName("${nativeTarget.name}Test").dependsOn(sourceSets.getByName("nativeTest"))
     }
 
-    nativeTarget.apply {
-        binaries {
-            staticLib()
-            if (!PlatformConfig.isWindows) {
-                sharedLib {
-                    baseName = "kengine"
+    nativeTargets.forEach { nativeTarget ->
+        nativeTarget.apply {
+            binaries {
+                staticLib()
+                if (!PlatformConfig.isWindows) {
+                    sharedLib {
+                        baseName = "kengine"
+                    }
+                }
+                all {
+                    linkerOpts(PlatformConfig.sharedLibLinkerOpts("SDL3", "SDL3_image", "SDL3_ttf"))
                 }
             }
-            all {
-                linkerOpts(PlatformConfig.sharedLibLinkerOpts("SDL3", "SDL3_image", "SDL3_ttf"))
-            }
-        }
 
-        compilations["main"].cinterops {
-            val sdl3 by creating {
-                defFile = file("src/nativeInterop/cinterop/sdl3.def")
-                compilerOpts(PlatformConfig.compilerOpts)
+            compilations["main"].cinterops {
+                val sdl3 by creating {
+                    defFile = file("src/nativeInterop/cinterop/sdl3.def")
+                    compilerOpts(PlatformConfig.compilerOpts)
+                }
+                val sdl3image by creating {
+                    defFile = file("src/nativeInterop/cinterop/sdl3_image.def")
+                    compilerOpts(PlatformConfig.compilerOpts)
+                }
+                val sdl3ttf by creating {
+                    defFile = file("src/nativeInterop/cinterop/sdl3_ttf.def")
+                    compilerOpts(PlatformConfig.compilerOpts)
+                }
             }
-            val sdl3image by creating {
-                defFile = file("src/nativeInterop/cinterop/sdl3_image.def")
-                compilerOpts(PlatformConfig.compilerOpts)
-            }
-            val sdl3ttf by creating {
-                defFile = file("src/nativeInterop/cinterop/sdl3_ttf.def")
-                compilerOpts(PlatformConfig.compilerOpts)
-            }
-        }
 
-        compilations["main"].compileTaskProvider.configure {
-            kotlinOptions {
-                freeCompilerArgs += listOf(
-                    "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
-                    "-opt-in=kotlin.ExperimentalStdlibApi",
-                    // "-g",  // Enable debug symbols (removed due to conflict with -opt)
-                    "-ea"  // Enable assertions
-                )
+            compilations["main"].compileTaskProvider.configure {
+                kotlinOptions {
+                    freeCompilerArgs += listOf(
+                        "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
+                        "-opt-in=kotlin.ExperimentalStdlibApi",
+                        // "-g",  // Enable debug symbols (removed due to conflict with -opt)
+                        "-ea"  // Enable assertions
+                    )
+                }
             }
         }
     }
@@ -98,4 +109,3 @@ kotlin {
         }
     }
 }
-

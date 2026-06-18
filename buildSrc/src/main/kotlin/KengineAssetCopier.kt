@@ -32,7 +32,7 @@ class KengineAssetCopier(private val project: Project) {
     private fun registerCopyTask(taskName: String, buildType: String) {
         project.tasks.register<Copy>(taskName) {
             from("assets")
-            into("${project.buildDir}/bin/native/${buildType}/assets")
+            into("${project.buildDir}/${KengineHostTarget.binPath(buildType, "assets")}")
         }
     }
 }

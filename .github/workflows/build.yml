@@ -57,15 +57,15 @@ jobs:
 
       - name: Build all modules and compile test binaries
         run: |
-          ./gradlew clean build -x allTests -x nativeTest -x jvmTest -x jsTest
-          ./gradlew :kengine:linkDebugTestNative \
-                    :kengine-network:linkDebugTestNative \
-                    :kengine-sound:linkDebugTestNative
+          ./gradlew clean build -x allTests -x macosArm64Test -x jvmTest -x jsTest
+          ./gradlew :kengine:linkDebugTestMacosArm64 \
+                    :kengine-network:linkDebugTestMacosArm64 \
+                    :kengine-sound:linkDebugTestMacosArm64
 
       - name: Copy SDL dylibs for tests
         run: |
           for dir in kengine kengine-network kengine-sound; do
-            fw_dir="$dir/build/bin/native/Frameworks"
+            fw_dir="$dir/build/bin/macosArm64/Frameworks"
             mkdir -p "$fw_dir"
             cp /opt/homebrew/lib/libSDL3.0.dylib "$fw_dir/" 2>/dev/null || true
             cp /opt/homebrew/lib/libSDL3_image.0.dylib "$fw_dir/" 2>/dev/null || true
@@ -74,13 +74,13 @@ jobs:
             cp /usr/local/lib/libSDL3_net.0.dylib "$fw_dir/" 2>/dev/null || true
           done
           echo "=== Dylib check ==="
-          ls -la kengine/build/bin/native/Frameworks/*.dylib
-          ls -la kengine-network/build/bin/native/Frameworks/*.dylib
-          ls -la kengine-sound/build/bin/native/Frameworks/*.dylib
+          ls -la kengine/build/bin/macosArm64/Frameworks/*.dylib
+          ls -la kengine-network/build/bin/macosArm64/Frameworks/*.dylib
+          ls -la kengine-sound/build/bin/macosArm64/Frameworks/*.dylib
 
       - name: Run kengine unit tests
         run: |
-          ./kengine/build/bin/native/debugTest/test.kexe \
+          ./kengine/build/bin/macosArm64/debugTest/test.kexe \
             "--ktest_filter=*-*IT.*:*TiledMapLoaderTest.*"
         env:
           SDL_VIDEODRIVER: dummy
@@ -89,8 +89,8 @@ jobs:
       - name: Run kengine-network tests
         if: always()
         run: |
-          if [ -f ./kengine-network/build/bin/native/debugTest/test.kexe ]; then
-            ./kengine-network/build/bin/native/debugTest/test.kexe
+          if [ -f ./kengine-network/build/bin/macosArm64/debugTest/test.kexe ]; then
+            ./kengine-network/build/bin/macosArm64/debugTest/test.kexe
           fi
         env:
           SDL_VIDEODRIVER: dummy
@@ -99,8 +99,8 @@ jobs:
       - name: Run kengine-sound tests
         if: always()
         run: |
-          if [ -f ./kengine-sound/build/bin/native/debugTest/test.kexe ]; then
-            ./kengine-sound/build/bin/native/debugTest/test.kexe
+          if [ -f ./kengine-sound/build/bin/macosArm64/debugTest/test.kexe ]; then
+            ./kengine-sound/build/bin/macosArm64/debugTest/test.kexe
           fi
         env:
           SDL_VIDEODRIVER: dummy
@@ -170,15 +170,15 @@ jobs:
 
       - name: Build all modules and compile test binaries
         run: |
-          ./gradlew clean build -x allTests -x nativeTest -x jvmTest -x jsTest
-          ./gradlew :kengine:linkDebugTestNative \
-                    :kengine-network:linkDebugTestNative \
-                    :kengine-sound:linkDebugTestNative
+          ./gradlew clean build -x allTests -x linuxX64Test -x jvmTest -x jsTest
+          ./gradlew :kengine:linkDebugTestLinuxX64 \
+                    :kengine-network:linkDebugTestLinuxX64 \
+                    :kengine-sound:linkDebugTestLinuxX64
 
       - name: Copy SDL shared libs for tests
         run: |
           for dir in kengine kengine-network kengine-sound; do
-            fw_dir="$dir/build/bin/native/Frameworks"
+            fw_dir="$dir/build/bin/linuxX64/Frameworks"
             mkdir -p "$fw_dir"
             cp /usr/local/lib/libSDL3.so.0 "$fw_dir/" 2>/dev/null || true
             cp /usr/local/lib/libSDL3_image.so.0 "$fw_dir/" 2>/dev/null || true
@@ -187,11 +187,11 @@ jobs:
             cp /usr/local/lib/libSDL3_net.so.0 "$fw_dir/" 2>/dev/null || true
           done
           echo "=== Shared lib check ==="
-          ls -la kengine/build/bin/native/Frameworks/
+          ls -la kengine/build/bin/linuxX64/Frameworks/
 
       - name: Run kengine unit tests
         run: |
-          ./kengine/build/bin/native/debugTest/test.kexe \
+          ./kengine/build/bin/linuxX64/debugTest/test.kexe \
             "--ktest_filter=*-*IT.*:*TiledMapLoaderTest.*"
         env:
           SDL_VIDEODRIVER: dummy
@@ -201,8 +201,8 @@ jobs:
       - name: Run kengine-network tests
         if: always()
         run: |
-          if [ -f ./kengine-network/build/bin/native/debugTest/test.kexe ]; then
-            ./kengine-network/build/bin/native/debugTest/test.kexe
+          if [ -f ./kengine-network/build/bin/linuxX64/debugTest/test.kexe ]; then
+            ./kengine-network/build/bin/linuxX64/debugTest/test.kexe
           fi
         env:
           SDL_VIDEODRIVER: dummy
@@ -212,8 +212,8 @@ jobs:
       - name: Run kengine-sound tests
         if: always()
         run: |
-          if [ -f ./kengine-sound/build/bin/native/debugTest/test.kexe ]; then
-            ./kengine-sound/build/bin/native/debugTest/test.kexe
+          if [ -f ./kengine-sound/build/bin/linuxX64/debugTest/test.kexe ]; then
+            ./kengine-sound/build/bin/linuxX64/debugTest/test.kexe
           fi
         env:
           SDL_VIDEODRIVER: dummy
@@ -307,7 +307,7 @@ jobs:
           KONAN_MINGW="$WIN_HOME/.konan/dependencies/msys2-mingw-w64-x86_64-2/x86_64-w64-mingw32/lib"
           if [ ! -d "$KONAN_MINGW" ]; then
             echo "Konan sysroot not found, triggering download..."
-            ./gradlew :kengine:cinteropSdl3Native || true
+            ./gradlew :kengine:cinteropSdl3MingwX64 || true
           fi
           echo "KONAN_MINGW=$KONAN_MINGW"
           ls "$KONAN_MINGW"/*.o 2>/dev/null | head -5
@@ -334,7 +334,7 @@ jobs:
         env:
           MSYS2_ROOT: D:/a/_temp/msys64
         run: |
-          ./gradlew clean build -x allTests -x nativeTest -x jvmTest -x jsTest
+          ./gradlew clean build -x allTests -x mingwX64Test -x jvmTest -x jsTest
 
       - name: Compile and run kengine tests
         env:
@@ -342,15 +342,20 @@ jobs:
           SDL_VIDEODRIVER: dummy
           SDL_AUDIODRIVER: dummy
         run: |
-          ./gradlew :kengine:linkDebugTestNative || true
-          if [ -f ./kengine/build/bin/native/debugTest/test.kexe ]; then
+          ./gradlew :kengine:linkDebugTestMingwX64 || true
+          test_bin="./kengine/build/bin/mingwX64/debugTest/test.exe"
+          if [ ! -f "$test_bin" ]; then
+            test_bin="./kengine/build/bin/mingwX64/debugTest/test.kexe"
+          fi
+          if [ -f "$test_bin" ]; then
+            test_dir="$(dirname "$test_bin")"
             # Copy DLLs next to the test binary
-            cp /mingw64/bin/SDL3.dll ./kengine/build/bin/native/debugTest/ 2>/dev/null || true
-            cp /mingw64/bin/libSDL3.dll ./kengine/build/bin/native/debugTest/ 2>/dev/null || true
-            cp /mingw64/bin/SDL3_image.dll ./kengine/build/bin/native/debugTest/ 2>/dev/null || true
-            cp /mingw64/bin/SDL3_ttf.dll ./kengine/build/bin/native/debugTest/ 2>/dev/null || true
-            cp /mingw64/bin/SDL3_mixer.dll ./kengine/build/bin/native/debugTest/ 2>/dev/null || true
-            cp /mingw64/bin/SDL3_net.dll ./kengine/build/bin/native/debugTest/ 2>/dev/null || true
-            ./kengine/build/bin/native/debugTest/test.kexe \
+            cp /mingw64/bin/SDL3.dll "$test_dir/" 2>/dev/null || true
+            cp /mingw64/bin/libSDL3.dll "$test_dir/" 2>/dev/null || true
+            cp /mingw64/bin/SDL3_image.dll "$test_dir/" 2>/dev/null || true
+            cp /mingw64/bin/SDL3_ttf.dll "$test_dir/" 2>/dev/null || true
+            cp /mingw64/bin/SDL3_mixer.dll "$test_dir/" 2>/dev/null || true
+            cp /mingw64/bin/SDL3_net.dll "$test_dir/" 2>/dev/null || true
+            "$test_bin" \
               "--ktest_filter=*-*IT.*:*TiledMapLoaderTest.*"
           fi
