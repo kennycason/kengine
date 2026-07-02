@@ -863,10 +863,10 @@ Install OpenJDK 17.0+
 
 Install dependencies via Homebrew (macOS):
 ```shell
-brew install chipmunk sdl3 sdl3_image sdl3_ttf sdl3_mixer cmake pkg-config
+brew install chipmunk sdl3 sdl3_image sdl3_ttf sdl3_mixer sdl3_net cmake pkg-config
 ```
 
-Build SDL3_net from source (no Homebrew formula available):
+Build source-managed SDL3 dependencies for Linux/Windows, or as a macOS fallback:
 ```shell
 git submodule update --init --recursive
 bash sdl3/build_sdl.sh

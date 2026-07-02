@@ -210,20 +210,7 @@ jobs:
           cache: gradle
 
       - name: Install Homebrew dependencies
-        run: brew install sdl3 sdl3_image sdl3_ttf sdl3_mixer chipmunk cmake pkg-config
-
-      - name: Cache SDL3 source builds
-        uses: actions/cache@v4
-        id: sdl-source-cache
-        with:
-          path: |
-            /usr/local/lib/libSDL3_net*
-            /usr/local/include/SDL3_net
-          key: sdl3-v2-${{ runner.os }}-${{ hashFiles('.gitmodules', 'sdl3/build_sdl.sh') }}
-
-      - name: Build SDL3_net from source
-        if: steps.sdl-source-cache.outputs.cache-hit != 'true'
-        run: bash sdl3/build_sdl.sh
+        run: brew install sdl3 sdl3_image sdl3_ttf sdl3_mixer sdl3_net chipmunk cmake pkg-config
 
       - name: Publish shared and macosArm64 publications
         env:

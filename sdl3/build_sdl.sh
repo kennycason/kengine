@@ -3,8 +3,8 @@
 # Cross-platform SDL3 builder.
 # SDL3 3.4.0, SDL3_image 3.4.0, SDL3_ttf 3.2.0, SDL3_mixer 3.2.2, SDL3_net 3.2.0
 #
-# macOS (hybrid): builds SDL3_net from source.
-#   SDL3, SDL3_image, SDL3_ttf, SDL3_mixer installed via Homebrew.
+# macOS: CI uses Homebrew for all SDL3 libraries. This script still keeps a
+#   source-build fallback for SDL3_net when invoked directly.
 #
 # Linux: builds ALL SDL3 libs from source (not in apt repos yet).
 #   Prerequisites: cmake, pkg-config, build-essential
@@ -118,7 +118,7 @@ case "$OS" in
         ;;
 esac
 
-# All platforms: build SDL3_net from source (not in any package manager yet)
+# All platforms: keep SDL3_net source-build support available when invoked.
 SDL3_CMAKE_ARGS=""
 if [ "$OS" = "Darwin" ]; then
     SDL3_CMAKE_ARGS="-DCMAKE_PREFIX_PATH=${BREW_PREFIX} -DSDL3_INCLUDE_DIR=${SDL3_INCLUDE}/SDL3 -DSDL3_LIBRARY=${SDL3_LIB}"
