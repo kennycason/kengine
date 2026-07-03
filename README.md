@@ -44,6 +44,7 @@ This has also been an experiment with ChatGPT + Claude to help with coding + des
   - [useReducer](#usereducer)
   - [Logging](#logging)
   - [Math Utilities](#math-utilities)
+- [3D / SDL GPU](#3d--sdl-gpu)
 - [Unit Testing](kengine-test/)
 - [Dev](#dev)
   - [Project structure](#project-structure)
@@ -811,9 +812,34 @@ val newPosition = position + direction * 5.0
 logger.info { "New Position: $newPosition" }
 ```
 
+## 3D / SDL GPU
 
+Kengine is starting to grow an experimental native 3D layer in `kengine-3d`, built on SDL3's `SDL_GPU` API. The goal is to keep SDL3 as the windowing, input, audio, timing, and platform layer while adding Kengine-owned 3D concepts on top: GPU contexts, meshes, transforms, cameras, depth buffers, and eventually textures/model loading.
 
+The current proof-of-concept includes:
 
+- `RenderBackend.SDL_GPU_3D` for GPU-backed windows.
+- `GpuContext` for SDL GPU device/window ownership.
+- `GpuMesh`, `MeshRenderer3D`, `Mat4`, `Transform3D`, and `PerspectiveCamera`.
+- `games:kengine-3d-demos` for primitive/cube rendering.
+- `games:rubiks-cube-3d` for a 27-cubie Rubik's cube demo with mouse orbit, face picking, animated slice turns, scramble, and reset.
+
+<img src="images/rubiks-cube.png" width="65%" />
+
+Run the Rubik's cube demo:
+
+```shell
+./gradlew :games:rubiks-cube-3d:runDebugExecutableMacosArm64
+```
+
+Controls:
+
+- Left-drag outside the cube: orbit camera.
+- Left-drag on a visible face: turn that face.
+- `S`: scramble.
+- `C`: reset.
+- `U/D/L/R/F/B`: turn faces.
+- Hold `Shift`: reverse a keyboard face turn.
 
 ## Dev
 
@@ -827,6 +853,7 @@ kengine/
 ├── kengine-network/               // networking via SDL3_net (TCP/UDP)
 ├── kengine-sound/                 // audio synthesis/playback via SDL3_mixer
 ├── kengine-physics/               // 2D physics via Chipmunk bindings
+├── kengine-3d/                    // experimental 3D via SDL3 GPU
 ├── packaging/                     // icons and packaging resources
 ├── sdl3/                          // SDL3 submodules and build script
 ├── buildSrc/                      // Gradle plugins (PlatformConfig, assets, SDL dylibs, packaging)
@@ -838,7 +865,8 @@ kengine/
     ├── image-shuffle/             // image tile shuffle game
     ├── osc3x-synth/              // audio synthesizer with visual effects
     ├── osc3x-synth-v2/           // enhanced synthesizer
-    └── physics-demo/              // demonstration of physics engine (chipmunk)
+    ├── physics-demo/              // demonstration of physics engine (chipmunk)
+    └── rubiks-cube-3d/            // experimental 3D Rubik's cube demo
 ```
 
 ## Project structure for a Kengine game

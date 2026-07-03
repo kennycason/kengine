@@ -20,6 +20,7 @@ import com.kengine.log.LoggerContext
 import com.kengine.log.Logging
 import com.kengine.sdl.SDLContext
 import com.kengine.sdl.SDLEventContext
+import com.kengine.sdl.RenderBackend
 import com.kengine.sdl.registerSDLQuitHandler
 import com.kengine.time.ClockContext
 import com.kengine.ui.ViewContext
@@ -60,6 +61,7 @@ class GameContext private constructor(
             width: Int,
             height: Int,
             logLevel: Logger.Level = Logger.Level.INFO,
+            renderBackend: RenderBackend = RenderBackend.SDL_RENDERER_2D,
             vararg contexts: Context
         ): GameContext {
             if (currentContext != null) {
@@ -69,7 +71,7 @@ class GameContext private constructor(
             // TODO order matters, i.e. there are dependencies
             return GameContext(
                 log = LoggerContext.create(logLevel),
-                sdl = SDLContext.create(title, width, height),
+                sdl = SDLContext.create(title, width, height, renderBackend),
                 events = EventContext.get(),
                 sdlEvent = SDLEventContext.get(),
                 keyboard = KeyboardContext.get(),

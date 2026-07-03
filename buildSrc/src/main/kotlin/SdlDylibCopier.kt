@@ -48,6 +48,7 @@ class SdlDylibCopier(private val project: Project) {
 
     fun registerSDLDylibs() {
         val libBaseNames = when (project.name) {
+            "kengine-3d" -> listOf("SDL3")
             "kengine-network" -> listOf("SDL3", "SDL3_net")
             "kengine-physics" -> listOf("SDL3", "chipmunk")
             "kengine-sound" -> listOf("SDL3", "SDL3_mixer", "SDL3_image", "SDL3_ttf")
