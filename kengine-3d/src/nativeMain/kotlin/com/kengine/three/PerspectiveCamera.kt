@@ -7,8 +7,8 @@ data class PerspectiveCamera(
     val fovDegrees: Float = 60f,
     val near: Float = 0.1f,
     val far: Float = 100f
-) {
-    fun viewProjection(aspect: Float): Mat4 {
+) : Camera3D {
+    override fun viewProjection(aspect: Float): Mat4 {
         val projection = Mat4.perspective(fovDegrees, aspect, near, far)
         val view = Mat4.translation(
             Vec3(

@@ -3,13 +3,18 @@ package com.kengine.three
 import cnames.structs.SDL_GPUSampler
 import cnames.structs.SDL_GPUTexture
 import cnames.structs.SDL_GPUTransferBuffer
+import com.kengine.file.File
+import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.convert
+import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
 import platform.posix.memcpy
@@ -41,6 +46,10 @@ import sdl3.SDL_ReleaseGPUTransferBuffer
 import sdl3.SDL_SubmitGPUCommandBuffer
 import sdl3.SDL_UnmapGPUTransferBuffer
 import sdl3.SDL_UploadToGPUTexture
+import sdl3.image.IMG_Load
+import sdl3.image.SDL_ConvertSurface
+import sdl3.image.SDL_DestroySurface
+import sdl3.image.SDL_PIXELFORMAT_RGBA32
 
 @OptIn(ExperimentalForeignApi::class)
 class GpuTexture private constructor(
@@ -63,6 +72,44 @@ class GpuTexture private constructor(
     }
 
     companion object {
+        fun fromFile(
+            gpu: GpuContext,
+            assetPath: String
+        ): GpuTexture {
+            val resolvedPath = File.resolveAssetPath(assetPath)
+            val surface = IMG_Load(resolvedPath)
+                ?: throw IllegalStateException("Error loading image for GPU texture: ${SDL_GetError()?.toKString()}")
+
+            val converted = try {
+                SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32)
+                    ?: throw IllegalStateException("Error converting image to RGBA32: ${SDL_GetError()?.toKString()}")
+            } finally {
+                SDL_DestroySurface(surface)
+            }
+
+            try {
+                val width = converted.pointed.w.toUInt()
+                val height = converted.pointed.h.toUInt()
+                val pitch = converted.pointed.pitch
+                val pixels = converted.pointed.pixels
+                    ?: throw IllegalStateException("Converted image has no pixel data: $assetPath")
+                val source = pixels.reinterpret<ByteVar>()
+                val bytes = ByteArray((width * height * 4u).toInt())
+
+                for (y in 0 until height.toInt()) {
+                    val sourceRow = y * pitch
+                    val destinationRow = y * width.toInt() * 4
+                    for (x in 0 until width.toInt() * 4) {
+                        bytes[destinationRow + x] = source[sourceRow + x]
+                    }
+                }
+
+                return createRgba8(gpu, width, height, bytes)
+            } finally {
+                SDL_DestroySurface(converted)
+            }
+        }
+
         fun createRgba8(
             gpu: GpuContext,
             width: UInt,

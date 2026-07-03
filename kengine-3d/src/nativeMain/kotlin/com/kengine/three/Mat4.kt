@@ -4,6 +4,7 @@ import com.kengine.math.Vec3
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.math.tan
 
 class Mat4(
@@ -117,6 +118,51 @@ class Mat4(
                     0f, 0f, 0f, 1f
                 )
             )
+        }
+
+        fun lookAt(
+            eye: Vec3,
+            target: Vec3,
+            up: Vec3 = Vec3(0.0, 1.0, 0.0)
+        ): Mat4 {
+            val forward = normalize(
+                Vec3(
+                    eye.x - target.x,
+                    eye.y - target.y,
+                    eye.z - target.z
+                )
+            )
+            val right = normalize(cross(up, forward))
+            val cameraUp = cross(forward, right)
+
+            return Mat4(
+                floatArrayOf(
+                    right.x.toFloat(), cameraUp.x.toFloat(), forward.x.toFloat(), 0f,
+                    right.y.toFloat(), cameraUp.y.toFloat(), forward.y.toFloat(), 0f,
+                    right.z.toFloat(), cameraUp.z.toFloat(), forward.z.toFloat(), 0f,
+                    -dot(right, eye).toFloat(), -dot(cameraUp, eye).toFloat(), -dot(forward, eye).toFloat(), 1f
+                )
+            )
+        }
+
+        private fun cross(a: Vec3, b: Vec3): Vec3 {
+            return Vec3(
+                a.y * b.z - a.z * b.y,
+                a.z * b.x - a.x * b.z,
+                a.x * b.y - a.y * b.x
+            )
+        }
+
+        private fun dot(a: Vec3, b: Vec3): Double {
+            return a.x * b.x + a.y * b.y + a.z * b.z
+        }
+
+        private fun normalize(value: Vec3): Vec3 {
+            val length = sqrt(value.x * value.x + value.y * value.y + value.z * value.z)
+            if (length == 0.0) {
+                return Vec3(0.0, 0.0, 0.0)
+            }
+            return Vec3(value.x / length, value.y / length, value.z / length)
         }
     }
 }

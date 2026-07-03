@@ -64,7 +64,7 @@ class TexturedMeshRenderer3D(
         mesh: TexturedGpuMesh,
         texture: GpuTexture,
         transform: Transform3D,
-        camera: PerspectiveCamera
+        camera: Camera3D
     ) {
         draw(frame, mesh, texture, transform.matrix(), camera)
     }
@@ -74,7 +74,7 @@ class TexturedMeshRenderer3D(
         mesh: TexturedGpuMesh,
         texture: GpuTexture,
         modelMatrix: Mat4,
-        camera: PerspectiveCamera
+        camera: Camera3D
     ) {
         check(!cleanedUp) {
             "TexturedMeshRenderer3D has already been cleaned up."

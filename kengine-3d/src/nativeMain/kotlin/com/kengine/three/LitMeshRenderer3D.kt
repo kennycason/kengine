@@ -34,20 +34,21 @@ import sdl3.SDL_GPUVertexElementFormat
 import sdl3.SDL_GPUVertexInputRate
 import sdl3.SDL_GPU_SHADERFORMAT_MSL
 import sdl3.SDL_GetError
+import sdl3.SDL_PushGPUFragmentUniformData
 import sdl3.SDL_PushGPUVertexUniformData
 import sdl3.SDL_ReleaseGPUGraphicsPipeline
 import sdl3.SDL_ReleaseGPUShader
 
 @OptIn(ExperimentalForeignApi::class)
-class MeshRenderer3D(
+class LitMeshRenderer3D(
     private val gpu: GpuContext
 ) {
     private val pipeline: CPointer<SDL_GPUGraphicsPipeline>
     private var cleanedUp = false
 
     init {
-        val vertexShader = createShader(MESH_VERTEX_MSL, SDL_GPUShaderStage.SDL_GPU_SHADERSTAGE_VERTEX)
-        val fragmentShader = createShader(MESH_FRAGMENT_MSL, SDL_GPUShaderStage.SDL_GPU_SHADERSTAGE_FRAGMENT)
+        val vertexShader = createShader(LIT_VERTEX_MSL, SDL_GPUShaderStage.SDL_GPU_SHADERSTAGE_VERTEX)
+        val fragmentShader = createShader(LIT_FRAGMENT_MSL, SDL_GPUShaderStage.SDL_GPU_SHADERSTAGE_FRAGMENT)
 
         pipeline = try {
             createPipeline(vertexShader, fragmentShader)
@@ -59,32 +60,57 @@ class MeshRenderer3D(
 
     fun draw(
         frame: GpuFrame,
-        mesh: GpuMesh,
+        mesh: LitGpuMesh,
         transform: Transform3D,
-        camera: Camera3D
+        camera: Camera3D,
+        light: DirectionalLight3D = DirectionalLight3D()
     ) {
-        draw(frame, mesh, transform.matrix(), camera)
+        draw(frame, mesh, transform.matrix(), camera, light)
     }
 
     fun draw(
         frame: GpuFrame,
-        mesh: GpuMesh,
+        mesh: LitGpuMesh,
         modelMatrix: Mat4,
-        camera: Camera3D
+        camera: Camera3D,
+        light: DirectionalLight3D = DirectionalLight3D()
     ) {
         check(!cleanedUp) {
-            "MeshRenderer3D has already been cleaned up."
+            "LitMeshRenderer3D has already been cleaned up."
         }
 
         val aspect = frame.width.toFloat() / frame.height.toFloat()
         val modelViewProjection = camera.viewProjection(aspect) * modelMatrix
+        val uniforms = FloatArray(32)
 
-        modelViewProjection.values.usePinned { pinned ->
+        modelViewProjection.values.copyInto(uniforms, destinationOffset = 0)
+        modelMatrix.values.copyInto(uniforms, destinationOffset = 16)
+
+        uniforms.usePinned { pinned ->
             SDL_PushGPUVertexUniformData(
                 frame.commandBuffer,
                 0u,
                 pinned.addressOf(0).reinterpret<UByteVar>(),
-                64u
+                (uniforms.size * 4).toUInt()
+            )
+        }
+
+        val lightUniforms = floatArrayOf(
+            light.direction.x.toFloat(),
+            light.direction.y.toFloat(),
+            light.direction.z.toFloat(),
+            light.ambientStrength,
+            light.color.r.toFloat() / 255f,
+            light.color.g.toFloat() / 255f,
+            light.color.b.toFloat() / 255f,
+            light.diffuseStrength
+        )
+        lightUniforms.usePinned { pinned ->
+            SDL_PushGPUFragmentUniformData(
+                frame.commandBuffer,
+                0u,
+                pinned.addressOf(0).reinterpret<UByteVar>(),
+                (lightUniforms.size * 4).toUInt()
             )
         }
 
@@ -125,12 +151,11 @@ class MeshRenderer3D(
                 createInfo.num_samplers = 0u
                 createInfo.num_storage_textures = 0u
                 createInfo.num_storage_buffers = 0u
-                createInfo.num_uniform_buffers =
-                    if (stage == SDL_GPUShaderStage.SDL_GPU_SHADERSTAGE_VERTEX) 1u else 0u
+                createInfo.num_uniform_buffers = 1u
                 createInfo.props = 0u
 
                 SDL_CreateGPUShader(gpu.device, createInfo.ptr)
-                    ?: throw IllegalStateException("Error creating mesh shader: ${SDL_GetError()?.toKString()}")
+                    ?: throw IllegalStateException("Error creating lit mesh shader: ${SDL_GetError()?.toKString()}")
             }
         }
     }
@@ -147,9 +172,9 @@ class MeshRenderer3D(
             vertexBuffer.slot = 0u
             vertexBuffer.input_rate = SDL_GPUVertexInputRate.SDL_GPU_VERTEXINPUTRATE_VERTEX
             vertexBuffer.instance_step_rate = 0u
-            vertexBuffer.pitch = Vertex3D.BYTES_PER_VERTEX.toUInt()
+            vertexBuffer.pitch = LitVertex3D.BYTES_PER_VERTEX.toUInt()
 
-            val attributes = allocArray<SDL_GPUVertexAttribute>(2)
+            val attributes = allocArray<SDL_GPUVertexAttribute>(3)
             attributes[0].apply {
                 buffer_slot = 0u
                 format = SDL_GPUVertexElementFormat.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3
@@ -162,6 +187,12 @@ class MeshRenderer3D(
                 location = 1u
                 offset = 12u
             }
+            attributes[2].apply {
+                buffer_slot = 0u
+                format = SDL_GPUVertexElementFormat.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3
+                location = 2u
+                offset = 24u
+            }
 
             val createInfo = alloc<SDL_GPUGraphicsPipelineCreateInfo>()
             createInfo.vertex_shader = vertexShader
@@ -173,7 +204,7 @@ class MeshRenderer3D(
             createInfo.depth_stencil_state.compare_op = SDL_GPUCompareOp.SDL_GPU_COMPAREOP_LESS_OR_EQUAL
             createInfo.vertex_input_state.num_vertex_buffers = 1u
             createInfo.vertex_input_state.vertex_buffer_descriptions = vertexBuffer.ptr
-            createInfo.vertex_input_state.num_vertex_attributes = 2u
+            createInfo.vertex_input_state.num_vertex_attributes = 3u
             createInfo.vertex_input_state.vertex_attributes = attributes
             createInfo.target_info.num_color_targets = 1u
             createInfo.target_info.color_target_descriptions = colorTarget.ptr
@@ -182,12 +213,12 @@ class MeshRenderer3D(
             createInfo.props = 0u
 
             SDL_CreateGPUGraphicsPipeline(gpu.device, createInfo.ptr)
-                ?: throw IllegalStateException("Error creating mesh pipeline: ${SDL_GetError()?.toKString()}")
+                ?: throw IllegalStateException("Error creating lit mesh pipeline: ${SDL_GetError()?.toKString()}")
         }
     }
 
     companion object {
-        private const val MESH_VERTEX_MSL = """
+        private const val LIT_VERTEX_MSL = """
 #include <metal_stdlib>
 #include <simd/simd.h>
 using namespace metal;
@@ -195,36 +226,47 @@ using namespace metal;
 struct Uniforms
 {
     float4x4 modelViewProjection;
+    float4x4 model;
 };
 
 struct VertexIn
 {
     float3 position [[attribute(0)]];
-    float3 color [[attribute(1)]];
+    float3 normal [[attribute(1)]];
+    float3 color [[attribute(2)]];
 };
 
 struct VertexOut
 {
-    float4 color [[user(locn0)]];
+    float3 normal [[user(locn0)]];
+    float3 color [[user(locn1)]];
     float4 position [[position]];
 };
 
 vertex VertexOut main0(VertexIn in [[stage_in]], constant Uniforms& uniforms [[buffer(0)]])
 {
     VertexOut out;
-    out.color = float4(in.color, 1.0);
+    out.normal = normalize((uniforms.model * float4(in.normal, 0.0)).xyz);
+    out.color = in.color;
     out.position = uniforms.modelViewProjection * float4(in.position, 1.0);
     return out;
 }
 """
 
-        private const val MESH_FRAGMENT_MSL = """
+        private const val LIT_FRAGMENT_MSL = """
 #include <metal_stdlib>
 using namespace metal;
 
+struct LightUniforms
+{
+    float4 directionAndAmbient;
+    float4 colorAndDiffuseStrength;
+};
+
 struct FragmentIn
 {
-    float4 color [[user(locn0)]];
+    float3 normal [[user(locn0)]];
+    float3 color [[user(locn1)]];
 };
 
 struct FragmentOut
@@ -232,10 +274,19 @@ struct FragmentOut
     float4 color [[color(0)]];
 };
 
-fragment FragmentOut main0(FragmentIn in [[stage_in]])
+fragment FragmentOut main0(
+    FragmentIn in [[stage_in]],
+    constant LightUniforms& lightUniforms [[buffer(0)]])
 {
     FragmentOut out;
-    out.color = in.color;
+    float3 normal = normalize(in.normal);
+    float3 lightDirection = normalize(lightUniforms.directionAndAmbient.xyz);
+    float diffuse = max(dot(normal, -lightDirection), 0.0);
+    float ambient = lightUniforms.directionAndAmbient.w;
+    float3 lightColor = lightUniforms.colorAndDiffuseStrength.xyz;
+    float diffuseStrength = lightUniforms.colorAndDiffuseStrength.w;
+    float3 color = in.color * lightColor * (ambient + diffuse * diffuseStrength);
+    out.color = float4(min(color, float3(1.0)), 1.0);
     return out;
 }
 """
