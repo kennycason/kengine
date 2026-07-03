@@ -16,6 +16,7 @@ val modules = mutableListOf(
     "kengine",
     "kengine-test",
     "kengine-reactive",
+    "kengine-3d",
     "kengine-network",
     "kengine-physics",
     "kengine-sound"
@@ -30,12 +31,14 @@ modules.addAll(
         "games:antfarm",
         "games:boxxle",
         "games:chat-demo",
+        "games:kengine-3d-demos",
         "games:helloworld",
         "games:hextris",
         "games:image-shuffle",
         "games:osc3x-synth",
         "games:osc3x-synth-v2",
-        "games:physics-demo"
+        "games:physics-demo",
+        "games:rubiks-cube-3d"
     )
 )
 

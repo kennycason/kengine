@@ -33,18 +33,29 @@ class SDLContext private constructor(
     val title: String,
     val screenWidth: Int,
     val screenHeight: Int,
+    val renderBackend: RenderBackend = RenderBackend.SDL_RENDERER_2D,
     flags: ULong = SDL_WINDOW_RESIZABLE
 ) : Context(), Logging {
 
-    private val window: CValuesRef<cnames.structs.SDL_Window> by lazy {
+    private val windowRef = lazy {
         SDL_CreateWindow(title, screenWidth, screenHeight, flags)
             ?: throw IllegalStateException("Error creating window: ${SDL_GetError()?.toKString()}")
     }
 
-    val renderer: CValuesRef<cnames.structs.SDL_Renderer>? by lazy {
-        SDL_CreateRenderer(window, null)
-            ?: throw IllegalStateException("Error creating renderer: ${SDL_GetError()?.toKString()}")
-    }
+    val window: CValuesRef<cnames.structs.SDL_Window>
+        get() = windowRef.value
+
+    private var rendererRef: CValuesRef<cnames.structs.SDL_Renderer>? = null
+
+    val renderer: CValuesRef<cnames.structs.SDL_Renderer>
+        get() {
+            check(renderBackend == RenderBackend.SDL_RENDERER_2D) {
+                "SDL renderer is unavailable when renderBackend=$renderBackend."
+            }
+            return rendererRef ?: SDL_CreateRenderer(window, null)
+                ?.also { rendererRef = it }
+                ?: throw IllegalStateException("Error creating renderer: ${SDL_GetError()?.toKString()}")
+        }
 
     private var currentBlendMode = SDL_BLENDMODE_NONE // SDL3 defaults to NONE
 
@@ -110,8 +121,10 @@ class SDLContext private constructor(
 
     override fun cleanup() {
         logger.info { "Cleaning up SDLContext"}
-        SDL_DestroyRenderer(renderer)
-        SDL_DestroyWindow(window)
+        rendererRef?.let { SDL_DestroyRenderer(it) }
+        if (windowRef.isInitialized()) {
+            SDL_DestroyWindow(windowRef.value)
+        }
         SDL_Quit()
         currentContext = null
     }
@@ -124,13 +137,14 @@ class SDLContext private constructor(
             title: String,
             width: Int,
             height: Int,
+            renderBackend: RenderBackend = RenderBackend.SDL_RENDERER_2D,
             flags: ULong = SDL_WINDOW_RESIZABLE
         ): SDLContext {
             if (currentContext != null) {
                throw IllegalStateException("SDLContext has already been created. Call cleanup() before creating a new context.")
             }
 
-            currentContext = SDLContext(title, width, height, flags)
+            currentContext = SDLContext(title, width, height, renderBackend, flags)
             return currentContext!!
         }
 
