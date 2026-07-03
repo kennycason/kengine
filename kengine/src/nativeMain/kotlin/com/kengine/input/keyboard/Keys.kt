@@ -15,6 +15,7 @@ import sdl3.SDLK_A
 import sdl3.SDLK_B
 import sdl3.SDLK_BACKSPACE
 import sdl3.SDLK_C
+import sdl3.SDLK_CAPSLOCK
 import sdl3.SDLK_D
 import sdl3.SDLK_DELETE
 import sdl3.SDLK_DOWN
@@ -62,6 +63,7 @@ import sdl3.SDLK_RGUI
 import sdl3.SDLK_RIGHT
 import sdl3.SDLK_RSHIFT
 import sdl3.SDLK_S
+import sdl3.SDLK_SEMICOLON
 import sdl3.SDLK_SPACE
 import sdl3.SDLK_T
 import sdl3.SDLK_TAB
@@ -133,6 +135,7 @@ object Keys {
 
     // other important keys
     const val SPACE: UInt = SDLK_SPACE
+    const val SEMICOLON: UInt = SDLK_SEMICOLON
     const val RETURN: UInt = SDLK_RETURN
     const val ESCAPE: UInt = SDLK_ESCAPE
     const val TAB: UInt = SDLK_TAB
@@ -143,6 +146,7 @@ object Keys {
     const val END: UInt = SDLK_END
     const val PAGEUP: UInt = SDLK_PAGEUP
     const val PAGEDOWN: UInt = SDLK_PAGEDOWN
+    const val CAPSLOCK: UInt = SDLK_CAPSLOCK
 
     // function keys
     const val F1: UInt = SDLK_F1

@@ -13,11 +13,11 @@ import com.kengine.three.MeshRenderer3D
 import com.kengine.three.ObjMeshLoadOptions
 import com.kengine.three.ObjMeshLoader
 import com.kengine.three.OrbitCameraController3D
-import com.kengine.three.PrimitiveRenderer3D
 import com.kengine.three.TexturedGpuMesh
 import com.kengine.three.TexturedLitMeshRenderer3D
 import com.kengine.three.TexturedMeshRenderer3D
 import com.kengine.three.Transform3D
+import com.kengine.three.Vertex3D
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.SDL_Delay
 import sdl3.SDL_GetTicks
@@ -40,6 +40,25 @@ fun main() {
                 pitchRadians = 0.06f
             )
             val cube = GpuMesh.cube(this)
+            val floorPanel = GpuMesh.create(
+                this,
+                listOf(
+                    Vertex3D(Vec3(-0.5, 0.0, -0.5), Color.fromHex("24405f")),
+                    Vertex3D(Vec3(-0.5, 0.0, 0.5), Color.fromHex("24405f")),
+                    Vertex3D(Vec3(0.5, 0.0, 0.5), Color.fromHex("24405f")),
+                    Vertex3D(Vec3(-0.5, 0.0, -0.5), Color.fromHex("24405f")),
+                    Vertex3D(Vec3(0.5, 0.0, 0.5), Color.fromHex("24405f")),
+                    Vertex3D(Vec3(0.5, 0.0, -0.5), Color.fromHex("24405f"))
+                )
+            )
+            val floorMarker = GpuMesh.create(
+                this,
+                listOf(
+                    Vertex3D(Vec3(0.0, 0.0, 0.5), Color.fromHex("f0c84b")),
+                    Vertex3D(Vec3(-0.5, 0.0, -0.42), Color.fromHex("f0c84b")),
+                    Vertex3D(Vec3(0.5, 0.0, -0.42), Color.fromHex("f0c84b"))
+                )
+            )
             val texturedCube = TexturedGpuMesh.cube(this)
             val importedShip = ObjMeshLoader.loadLit(
                 gpu = this,
@@ -71,7 +90,6 @@ fun main() {
             val litMeshes = LitMeshRenderer3D(this)
             val texturedLitMeshes = TexturedLitMeshRenderer3D(this)
             val texturedMeshes = TexturedMeshRenderer3D(this)
-            val primitives = PrimitiveRenderer3D(this)
             var previousTicks = SDL_GetTicks()
 
             try {
@@ -97,13 +115,25 @@ fun main() {
                         val time = elapsedSeconds.toFloat()
                         val camera = cameraController.camera()
 
-                        primitives.quad(
+                        meshes.draw(
                             frame = frame,
-                            center = Vec3(0.0, -2.05, -5.25),
-                            width = 5.2f,
-                            height = 0.52f,
-                            color = Color.fromHex("24405f"),
-                            rotationRadians = -time * 0.1f
+                            mesh = floorPanel,
+                            transform = Transform3D(
+                                position = Vec3(0.0, -2.05, -4.8),
+                                rotation = Vec3(0.0, (time * -0.1f).toDouble(), 0.0),
+                                scale = Vec3(5.2, 1.0, 0.52)
+                            ),
+                            camera = camera
+                        )
+                        meshes.draw(
+                            frame = frame,
+                            mesh = floorMarker,
+                            transform = Transform3D(
+                                position = Vec3(0.0, -1.76, -3.42),
+                                rotation = Vec3(0.0, (time * 0.4f).toDouble(), 0.0),
+                                scale = Vec3(0.46, 1.0, 0.46)
+                            ),
+                            camera = camera
                         )
                         meshes.draw(
                             frame = frame,
@@ -177,19 +207,11 @@ fun main() {
                             ),
                             camera = camera
                         )
-                        primitives.triangle(
-                            frame = frame,
-                            center = Vec3(0.0, -1.78, -3.9),
-                            size = 0.46f,
-                            color = Color.fromHex("f0c84b"),
-                            rotationRadians = time * 0.4f
-                        )
                     }
                     mouse.mouse.clearFrameState()
                     SDL_Delay(16u)
                 }
             } finally {
-                primitives.cleanup()
                 texturedMeshes.cleanup()
                 texturedLitMeshes.cleanup()
                 litMeshes.cleanup()
@@ -200,6 +222,8 @@ fun main() {
                 importedTurret.cleanup()
                 importedShip.cleanup()
                 texturedCube.cleanup()
+                floorMarker.cleanup()
+                floorPanel.cleanup()
                 cube.cleanup()
             }
         }

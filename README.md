@@ -822,7 +822,21 @@ The current proof-of-concept includes:
 - `GpuContext` for SDL GPU device/window ownership.
 - `GpuMesh`, `MeshRenderer3D`, `Mat4`, `Transform3D`, and `PerspectiveCamera`.
 - `games:kengine-3d-demos` for primitive/cube rendering.
+- `games:kengine-3d-space-shooter` for an evolving 3D space shooter test bed with terrain, weapons, pickups, turrets, and bosses.
 - `games:rubiks-cube-3d` for a 27-cubie Rubik's cube demo with mouse orbit, face picking, animated slice turns, scramble, and reset.
+
+<img src="images/space-shooter-3d.png" width="65%" />
+
+Run the space shooter demo:
+
+```shell
+./gradlew :games:kengine-3d-space-shooter:runDebugExecutableMacosArm64
+```
+
+Space shooter controls:
+
+- Keyboard: `WASD` move, `IJKL` aim, `Space` shoot, `C` cycle weapons, `Caps Lock` brake, `;` boost.
+- PlayStation 5 controller: left stick moves, right stick aims, `R2` shoots, `L2` cycles weapons, `L1` brakes, `R1` boosts.
 
 <img src="images/rubiks-cube.png" width="65%" />
 

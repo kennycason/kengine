@@ -32,6 +32,7 @@ modules.addAll(
         "games:boxxle",
         "games:chat-demo",
         "games:kengine-3d-demos",
+        "games:kengine-3d-space-shooter",
         "games:helloworld",
         "games:hextris",
         "games:image-shuffle",

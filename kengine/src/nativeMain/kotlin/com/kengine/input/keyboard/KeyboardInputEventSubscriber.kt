@@ -172,6 +172,8 @@ class KeyboardInputEventSubscriber {
     // other important keys
     fun isSpacePressed() = isPressed(Keys.SPACE)
     fun timeSinceSpacePressed() = timeSincePressed(Keys.SPACE)
+    fun isSemicolonPressed() = isPressed(Keys.SEMICOLON)
+    fun timeSinceSemicolonPressed() = timeSincePressed(Keys.SEMICOLON)
     fun isReturnPressed() = isPressed(Keys.RETURN)
     fun timeSinceReturnPressed() = timeSincePressed(Keys.RETURN)
     fun isEscapePressed() = isPressed(Keys.ESCAPE)
@@ -192,6 +194,8 @@ class KeyboardInputEventSubscriber {
     fun timeSincePageUpPressed() = timeSincePressed(Keys.PAGEUP)
     fun isPageDownPressed() = isPressed(Keys.PAGEDOWN)
     fun timeSincePageDownPressed() = timeSincePressed(Keys.PAGEDOWN)
+    fun isCapsLockPressed() = isPressed(Keys.CAPSLOCK)
+    fun timeSinceCapsLockPressed() = timeSincePressed(Keys.CAPSLOCK)
 
     // function keys
     fun isF1Pressed() = isPressed(Keys.F1)

@@ -391,12 +391,29 @@ Success criteria:
 - Done: Add `TextureVertex3D` and `TexturedGpuMesh`.
 - Done: Add simple unlit textured renderer/material path.
 - Done: Render a textured cube in `games:kengine-3d-demos`.
-- Next: Load image pixels from Kengine assets.
+- Done: Load image pixels from Kengine assets.
+- Done: Load textured OBJ models with UVs for the demo scene.
 - Next: Add reusable `Material3D` wrapper instead of passing texture directly.
 
 Success criteria:
 
 - Done: Textured cube or plane.
+- Done: Textured OBJ model.
+
+### Milestone 4.5: 3D Gameplay Test Bed
+
+- Done: Add `games:kengine-3d-space-shooter`.
+- Done: Add generated sphere meshes for shots and powerups.
+- Done: Add a generated terrain mesh that scrolls through the scene.
+- Done: Add keyboard flight controls with a terrain floor clamp.
+- Done: Add turrets that fire sphere projectiles toward the player.
+- Done: Add player beams, turret hit detection, health pickups, beam upgrades, and rectangle HUD meters.
+- Done: Use the imported Kenney craft model as the foreground player ship.
+- Next: Add imported turret models, a follow camera, richer terrain collision, and controller support.
+
+Success criteria:
+
+- Done: Playable first slice that exercises meshes, textured meshes, spheres, generated terrain, depth, and HUD primitives.
 
 ### Milestone 5: glTF Loader
 
