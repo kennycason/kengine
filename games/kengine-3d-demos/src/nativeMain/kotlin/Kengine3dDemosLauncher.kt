@@ -6,9 +6,12 @@ import com.kengine.math.Vec3
 import com.kengine.sdl.RenderBackend
 import com.kengine.three.GpuContext
 import com.kengine.three.GpuMesh
+import com.kengine.three.GpuTexture
 import com.kengine.three.MeshRenderer3D
 import com.kengine.three.PerspectiveCamera
 import com.kengine.three.PrimitiveRenderer3D
+import com.kengine.three.TexturedGpuMesh
+import com.kengine.three.TexturedMeshRenderer3D
 import com.kengine.three.Transform3D
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.SDL_Delay
@@ -32,7 +35,10 @@ fun main() {
                 far = 100f
             )
             val cube = GpuMesh.cube(this)
+            val texturedCube = TexturedGpuMesh.cube(this)
+            val checkerboard = GpuTexture.checkerboard(this)
             val meshes = MeshRenderer3D(this)
+            val texturedMeshes = TexturedMeshRenderer3D(this)
             val primitives = PrimitiveRenderer3D(this)
 
             try {
@@ -60,11 +66,25 @@ fun main() {
                             frame = frame,
                             mesh = cube,
                             transform = Transform3D(
-                                position = Vec3(0.0, 0.0, -3.2),
+                                position = Vec3(-1.25, 0.0, -3.45),
                                 rotation = Vec3(
                                     (time * 0.72f).toDouble(),
                                     (time * 1.05f).toDouble(),
                                     (time * 0.28f).toDouble()
+                                )
+                            ),
+                            camera = camera
+                        )
+                        texturedMeshes.draw(
+                            frame = frame,
+                            mesh = texturedCube,
+                            texture = checkerboard,
+                            transform = Transform3D(
+                                position = Vec3(1.25, 0.02, -3.45),
+                                rotation = Vec3(
+                                    (time * 0.48f).toDouble(),
+                                    (-time * 0.86f).toDouble(),
+                                    (time * 0.18f).toDouble()
                                 )
                             ),
                             camera = camera
@@ -81,7 +101,10 @@ fun main() {
                 }
             } finally {
                 primitives.cleanup()
+                texturedMeshes.cleanup()
                 meshes.cleanup()
+                checkerboard.cleanup()
+                texturedCube.cleanup()
                 cube.cleanup()
             }
         }
