@@ -27,7 +27,7 @@ import kotlin.math.abs
  */
 class ControllerInputEventSubscriber(
     private val mode: ControllerMode,
-    val deadzone: Float = 0.5f
+    val deadzone: Float = 0.05f
 ) : Logging {
     private val controllerStates = mutableMapOf<UInt, ControllerState>()
     private val controllerMappings = mutableMapOf<UInt, ControllerMapping>()

@@ -36,6 +36,7 @@ modules.addAll(
         "games:helloworld",
         "games:hextris",
         "games:image-shuffle",
+        "games:metroid-3d",
         "games:osc3x-synth",
         "games:osc3x-synth-v2",
         "games:physics-demo",
