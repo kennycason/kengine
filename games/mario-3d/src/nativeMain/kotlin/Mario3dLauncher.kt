@@ -9,6 +9,7 @@ import com.kengine.math.Vec3
 import com.kengine.sdl.RenderBackend
 import com.kengine.three.Camera3D
 import com.kengine.three.DirectionalLight3D
+import com.kengine.three.GlbAnimationClipInfo
 import com.kengine.three.GlbMeshLoadOptions
 import com.kengine.three.GlbMeshLoader
 import com.kengine.three.GpuContext
@@ -39,7 +40,8 @@ private const val CONTROLLER_RAW_RELEASE_DEADZONE = 0.08f
 private const val CONTROLLER_CALIBRATION_SECONDS = 0.2
 private const val WORLD_TARGET_SIZE = 105.0
 private const val PLAYER_HALF_HEIGHT = 0.82
-private const val PLAYER_MOVE_SPEED = 6.2
+private const val PLAYER_WALK_SPEED = 5.4
+private const val PLAYER_RUN_SPEED = 8.2
 private const val PLAYER_JUMP_VELOCITY = 9.6
 private const val PLAYER_GRAVITY = 17.5
 private const val MARIO_MODEL_YAW_OFFSET = 3.141592653589793
@@ -84,14 +86,15 @@ fun main() {
                 )
             )
             val terrain = TerrainCollision.fromVertices(worldVertices)
-            val mario = GlbMeshLoader.loadTexturedLit(
+            val mario = GlbMeshLoader.loadSkinnedTexturedLit(
                 gpu = this,
-                assetPath = resolveMarioAsset("models/Mario 64 Model.glb"),
+                assetPath = resolveMarioAsset("models/Mario64Animated.glb"),
                 options = GlbMeshLoadOptions(
                     targetSize = 1.58,
                     defaultColor = Color.fromHex("ffffff")
                 )
             )
+            val marioClips = MarioAnimationClips.from(mario.clips)
             val goomba = GlbMeshLoader.loadAnimatedLit(
                 gpu = this,
                 assetPath = resolveMarioAsset("models/Animated Goomba Super Mario Bros.glb"),
@@ -125,12 +128,16 @@ fun main() {
             var cameraPitch = 0.38
             var cameraLookX = 0.0
             var cameraLookY = 0.0
+            var marioAnimationState = MarioAnimationState.IDLE
+            var marioAnimationTime = 0.0
             val goombas = createGoombas(terrain)
             val bowserAnchor = findHighestGroundRegionCenter(terrain)
             var controllerNeutral: FloatArray? = null
             var calibratedControllerId: UInt? = null
             var controllerCalibrationUntil = 0.0
             var wasJumpPressed = false
+            var wasGrounded = true
+            var landingAnimationUntil = 0.0
             var wasCameraDistancePressed = false
             var cameraDistanceIndex = 0
             var previousTicks = SDL_GetTicks()
@@ -234,10 +241,16 @@ fun main() {
                     }
                     wasCameraDistancePressed = cameraDistancePressed
 
+                    val runPressed = keyboardState.isLShiftPressed() ||
+                        keyboardState.isRShiftPressed() ||
+                        keyboardState.isBPressed() ||
+                        controllerState.isButtonPressed(Buttons.SQUARE) ||
+                        controllerState.isButtonPressed(Buttons.Y)
                     val moveDirection = movementDirection(moveRightInput, moveForwardInput, cameraYaw)
                     val moveLength = horizontalLength(moveDirection)
-                    val moveSpeed = PLAYER_MOVE_SPEED * deltaSeconds
-                    if (moveLength > MOVEMENT_INPUT_EPSILON) {
+                    val isMoving = moveLength > MOVEMENT_INPUT_EPSILON
+                    val moveSpeed = (if (runPressed) PLAYER_RUN_SPEED else PLAYER_WALK_SPEED) * deltaSeconds
+                    if (isMoving) {
                         val moveScale = moveSpeed / moveLength.coerceAtLeast(1.0)
                         val currentGroundY = terrain.playerYAt(
                             x = player.x,
@@ -281,6 +294,31 @@ fun main() {
                         player = Vec3(player.x, groundYAfterGravity, player.z)
                         playerVelocityY = 0.0
                     }
+                    val isGroundedAfterGravity = player.y <= groundYAfterGravity + GROUND_CONTACT_EPSILON &&
+                        playerVelocityY <= 0.1
+                    if (!wasGrounded && isGroundedAfterGravity) {
+                        landingAnimationUntil = elapsedSeconds + 0.22
+                    }
+                    wasGrounded = isGroundedAfterGravity
+
+                    val nextMarioAnimationState = when {
+                        !isGroundedAfterGravity && playerVelocityY > 0.0 -> MarioAnimationState.JUMP
+                        !isGroundedAfterGravity -> MarioAnimationState.FALL
+                        elapsedSeconds < landingAnimationUntil -> MarioAnimationState.LAND
+                        isMoving && runPressed -> MarioAnimationState.RUN
+                        isMoving -> MarioAnimationState.WALK
+                        else -> MarioAnimationState.IDLE
+                    }
+                    if (nextMarioAnimationState != marioAnimationState) {
+                        marioAnimationState = nextMarioAnimationState
+                        marioAnimationTime = 0.0
+                    } else {
+                        marioAnimationTime += deltaSeconds * marioAnimationState.playbackSpeed
+                    }
+                    mario.updatePose(
+                        clipIndex = marioClips.indexFor(marioAnimationState),
+                        timeSeconds = marioAnimationTime
+                    )
 
                     updateGoombas(goombas, terrain, deltaSeconds)
                     cameraFocus = lerp(cameraFocus, player, smoothingFactor(CAMERA_FOLLOW_SMOOTHING, deltaSeconds))
@@ -361,6 +399,58 @@ private data class RoamingEnemy(
     var position: Vec3,
     var yaw: Double
 )
+
+private enum class MarioAnimationState(
+    val playbackSpeed: Double
+) {
+    IDLE(1.0),
+    WALK(1.05),
+    RUN(1.18),
+    JUMP(1.0),
+    FALL(1.0),
+    LAND(1.0)
+}
+
+private data class MarioAnimationClips(
+    val idle: Int,
+    val walk: Int,
+    val run: Int,
+    val jump: Int,
+    val fall: Int,
+    val land: Int
+) {
+    fun indexFor(state: MarioAnimationState): Int {
+        return when (state) {
+            MarioAnimationState.IDLE -> idle
+            MarioAnimationState.WALK -> walk
+            MarioAnimationState.RUN -> run
+            MarioAnimationState.JUMP -> jump
+            MarioAnimationState.FALL -> fall
+            MarioAnimationState.LAND -> land
+        }
+    }
+
+    companion object {
+        fun from(clips: List<GlbAnimationClipInfo>): MarioAnimationClips {
+            fun clip(name: String): Int {
+                val index = clips.indexOfFirst { it.name == name }
+                require(index >= 0) {
+                    "Mario animated GLB is missing required clip '$name'. Available: ${clips.joinToString { it.name }}"
+                }
+                return index
+            }
+
+            return MarioAnimationClips(
+                idle = clip("Armature|AreaWait64"),
+                walk = clip("Armature|Walk"),
+                run = clip("Armature|Run"),
+                jump = clip("Armature|Jump"),
+                fall = clip("Armature|Fall"),
+                land = clip("Armature|Land")
+            )
+        }
+    }
+}
 
 private data class FollowCamera(
     val eye: Vec3,
