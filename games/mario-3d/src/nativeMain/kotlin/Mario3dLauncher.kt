@@ -12,10 +12,10 @@ import com.kengine.three.DirectionalLight3D
 import com.kengine.three.GlbMeshLoadOptions
 import com.kengine.three.GlbMeshLoader
 import com.kengine.three.GpuContext
-import com.kengine.three.LitGpuMesh
 import com.kengine.three.LitMeshRenderer3D
 import com.kengine.three.LitVertex3D
 import com.kengine.three.Mat4
+import com.kengine.three.TexturedLitMeshRenderer3D
 import com.kengine.three.Transform3D
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.SDL_Delay
@@ -45,6 +45,7 @@ private const val PLAYER_GRAVITY = 17.5
 private const val MARIO_MODEL_YAW_OFFSET = 3.141592653589793
 private const val GOOMBA_MODEL_YAW_OFFSET = 0.0
 private const val RIDLEY_MODEL_YAW_OFFSET = 3.141592653589793
+private const val BOWSER_MODEL_YAW_OFFSET = 3.141592653589793
 private const val GROUND_CONTACT_EPSILON = 0.05
 private const val MAX_STEP_UP = 0.72
 private const val MOVEMENT_INPUT_EPSILON = 0.08
@@ -75,14 +76,21 @@ fun main() {
                     defaultColor = Color.fromHex("7fbf72")
                 )
             )
-            val world = LitGpuMesh.create(this, worldVertices)
-            val terrain = TerrainCollision.fromVertices(worldVertices)
-            val mario = GlbMeshLoader.loadLit(
+            val world = GlbMeshLoader.loadTexturedLit(
                 gpu = this,
-                assetPath = resolveMarioAsset("models/Mario 64 Odyssey Static.glb"),
+                assetPath = resolveMarioAsset("models/Super Mario 64 Bob-Omb Battlefield.glb"),
+                options = GlbMeshLoadOptions(
+                    targetSize = WORLD_TARGET_SIZE,
+                    defaultColor = Color.fromHex("ffffff")
+                )
+            )
+            val terrain = TerrainCollision.fromVertices(worldVertices)
+            val mario = GlbMeshLoader.loadTexturedLit(
+                gpu = this,
+                assetPath = resolveMarioAsset("models/Mario 64 Model.glb"),
                 options = GlbMeshLoadOptions(
                     targetSize = 1.58,
-                    defaultColor = Color.fromHex("e8513d")
+                    defaultColor = Color.fromHex("ffffff")
                 )
             )
             val goomba = GlbMeshLoader.loadLit(
@@ -101,7 +109,16 @@ fun main() {
                     defaultColor = Color.fromHex("9b72d6")
                 )
             )
+            val bowser = GlbMeshLoader.loadTexturedLit(
+                gpu = this,
+                assetPath = resolveMarioAsset("models/Super Mario 64 Bowser.glb"),
+                options = GlbMeshLoadOptions(
+                    targetSize = 4.4,
+                    defaultColor = Color.fromHex("ffffff")
+                )
+            )
             val litRenderer = LitMeshRenderer3D(this)
+            val texturedRenderer = TexturedLitMeshRenderer3D(this)
             val light = DirectionalLight3D(
                 direction = Vec3(-0.45, -0.85, -0.32),
                 color = Color.fromHex("fff8e6"),
@@ -119,6 +136,12 @@ fun main() {
             var cameraLookY = 0.0
             val goombas = createGoombas(terrain)
             val ridleyAnchor = findHighestGroundPoint(terrain)
+            val bowserAnchor = surfacePosition(
+                terrain = terrain,
+                x = ridleyAnchor.x + 5.5,
+                z = ridleyAnchor.z + 3.0,
+                fallbackY = ridleyAnchor.y
+            )
             var controllerNeutral: FloatArray? = null
             var calibratedControllerId: UInt? = null
             var controllerCalibrationUntil = 0.0
@@ -284,9 +307,9 @@ fun main() {
                     )
 
                     render(0.47f, 0.67f, 0.94f, 1f, enableDepth = true) { frame ->
-                        litRenderer.draw(
+                        world.draw(
+                            renderer = texturedRenderer,
                             frame = frame,
-                            mesh = world,
                             transform = Transform3D(),
                             camera = camera,
                             light = light
@@ -303,6 +326,20 @@ fun main() {
                                 light = light
                             )
                         }
+                        bowser.draw(
+                            renderer = texturedRenderer,
+                            frame = frame,
+                            transform = Transform3D(
+                                position = Vec3(
+                                    bowserAnchor.x,
+                                    bowserAnchor.y + 0.18 + sin(elapsedSeconds * 1.1) * 0.1,
+                                    bowserAnchor.z
+                                ),
+                                rotation = Vec3(0.0, elapsedSeconds * -0.22 + BOWSER_MODEL_YAW_OFFSET, 0.0)
+                            ),
+                            camera = camera,
+                            light = light
+                        )
                         litRenderer.draw(
                             frame = frame,
                             mesh = ridley,
@@ -317,9 +354,9 @@ fun main() {
                             camera = camera,
                             light = light
                         )
-                        litRenderer.draw(
+                        mario.draw(
+                            renderer = texturedRenderer,
                             frame = frame,
-                            mesh = mario,
                             transform = Transform3D(
                                 position = Vec3(player.x, player.y - PLAYER_HALF_HEIGHT, player.z),
                                 rotation = Vec3(0.0, playerYaw + MARIO_MODEL_YAW_OFFSET, 0.0)
@@ -333,7 +370,9 @@ fun main() {
                     SDL_Delay(16u)
                 }
             } finally {
+                texturedRenderer.cleanup()
                 litRenderer.cleanup()
+                bowser.cleanup()
                 ridley.cleanup()
                 goomba.cleanup()
                 mario.cleanup()
@@ -508,9 +547,10 @@ private fun updateGoombas(
 private fun surfacePosition(
     terrain: TerrainCollision,
     x: Double,
-    z: Double
+    z: Double,
+    fallbackY: Double = 0.0
 ): Vec3 {
-    return Vec3(x, terrain.groundYAt(x, z) ?: 0.0, z)
+    return Vec3(x, terrain.groundYAt(x, z) ?: fallbackY, z)
 }
 
 private fun findHighestGroundPoint(terrain: TerrainCollision): Vec3 {

@@ -39,6 +39,7 @@ import sdl3.SDL_GPUTransferBufferCreateInfo
 import sdl3.SDL_GPUTransferBufferUsage
 import sdl3.SDL_GPU_TEXTUREUSAGE_SAMPLER
 import sdl3.SDL_GetError
+import sdl3.SDL_IOFromConstMem
 import sdl3.SDL_MapGPUTransferBuffer
 import sdl3.SDL_ReleaseGPUSampler
 import sdl3.SDL_ReleaseGPUTexture
@@ -47,6 +48,8 @@ import sdl3.SDL_SubmitGPUCommandBuffer
 import sdl3.SDL_UnmapGPUTransferBuffer
 import sdl3.SDL_UploadToGPUTexture
 import sdl3.image.IMG_Load
+import sdl3.image.IMG_Load_IO
+import sdl3.image.SDL_Surface
 import sdl3.image.SDL_ConvertSurface
 import sdl3.image.SDL_DestroySurface
 import sdl3.image.SDL_PIXELFORMAT_RGBA32
@@ -80,6 +83,33 @@ class GpuTexture private constructor(
             val surface = IMG_Load(resolvedPath)
                 ?: throw IllegalStateException("Error loading image for GPU texture: ${SDL_GetError()?.toKString()}")
 
+            return fromSurface(gpu, surface, assetPath)
+        }
+
+        fun fromEncodedBytes(
+            gpu: GpuContext,
+            bytes: ByteArray,
+            label: String = "embedded texture"
+        ): GpuTexture {
+            require(bytes.isNotEmpty()) {
+                "Encoded GPU texture bytes must not be empty."
+            }
+
+            return bytes.usePinned { pinned ->
+                val io = SDL_IOFromConstMem(pinned.addressOf(0), bytes.size.convert())
+                    ?: throw IllegalStateException("Error opening image bytes for GPU texture: ${SDL_GetError()?.toKString()}")
+                val surface = IMG_Load_IO(io, true)
+                    ?: throw IllegalStateException("Error loading image bytes for GPU texture: ${SDL_GetError()?.toKString()}")
+
+                fromSurface(gpu, surface, label)
+            }
+        }
+
+        private fun fromSurface(
+            gpu: GpuContext,
+            surface: CPointer<SDL_Surface>,
+            label: String
+        ): GpuTexture {
             val converted = try {
                 SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32)
                     ?: throw IllegalStateException("Error converting image to RGBA32: ${SDL_GetError()?.toKString()}")
@@ -92,7 +122,7 @@ class GpuTexture private constructor(
                 val height = converted.pointed.h.toUInt()
                 val pitch = converted.pointed.pitch
                 val pixels = converted.pointed.pixels
-                    ?: throw IllegalStateException("Converted image has no pixel data: $assetPath")
+                    ?: throw IllegalStateException("Converted image has no pixel data: $label")
                 val source = pixels.reinterpret<ByteVar>()
                 val bytes = ByteArray((width * height * 4u).toInt())
 
