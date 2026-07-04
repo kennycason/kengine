@@ -54,6 +54,12 @@ import sdl3.image.SDL_ConvertSurface
 import sdl3.image.SDL_DestroySurface
 import sdl3.image.SDL_PIXELFORMAT_RGBA32
 
+enum class GpuTextureAddressMode {
+    REPEAT,
+    MIRRORED_REPEAT,
+    CLAMP_TO_EDGE
+}
+
 @OptIn(ExperimentalForeignApi::class)
 class GpuTexture private constructor(
     private val gpu: GpuContext,
@@ -77,19 +83,23 @@ class GpuTexture private constructor(
     companion object {
         fun fromFile(
             gpu: GpuContext,
-            assetPath: String
+            assetPath: String,
+            addressModeU: GpuTextureAddressMode = GpuTextureAddressMode.REPEAT,
+            addressModeV: GpuTextureAddressMode = GpuTextureAddressMode.REPEAT
         ): GpuTexture {
             val resolvedPath = File.resolveAssetPath(assetPath)
             val surface = IMG_Load(resolvedPath)
                 ?: throw IllegalStateException("Error loading image for GPU texture: ${SDL_GetError()?.toKString()}")
 
-            return fromSurface(gpu, surface, assetPath)
+            return fromSurface(gpu, surface, assetPath, addressModeU, addressModeV)
         }
 
         fun fromEncodedBytes(
             gpu: GpuContext,
             bytes: ByteArray,
-            label: String = "embedded texture"
+            label: String = "embedded texture",
+            addressModeU: GpuTextureAddressMode = GpuTextureAddressMode.REPEAT,
+            addressModeV: GpuTextureAddressMode = GpuTextureAddressMode.REPEAT
         ): GpuTexture {
             require(bytes.isNotEmpty()) {
                 "Encoded GPU texture bytes must not be empty."
@@ -101,14 +111,16 @@ class GpuTexture private constructor(
                 val surface = IMG_Load_IO(io, true)
                     ?: throw IllegalStateException("Error loading image bytes for GPU texture: ${SDL_GetError()?.toKString()}")
 
-                fromSurface(gpu, surface, label)
+                fromSurface(gpu, surface, label, addressModeU, addressModeV)
             }
         }
 
         private fun fromSurface(
             gpu: GpuContext,
             surface: CPointer<SDL_Surface>,
-            label: String
+            label: String,
+            addressModeU: GpuTextureAddressMode,
+            addressModeV: GpuTextureAddressMode
         ): GpuTexture {
             val converted = try {
                 SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32)
@@ -134,7 +146,7 @@ class GpuTexture private constructor(
                     }
                 }
 
-                return createRgba8(gpu, width, height, bytes)
+                return createRgba8(gpu, width, height, bytes, addressModeU, addressModeV)
             } finally {
                 SDL_DestroySurface(converted)
             }
@@ -144,7 +156,9 @@ class GpuTexture private constructor(
             gpu: GpuContext,
             width: UInt,
             height: UInt,
-            pixels: ByteArray
+            pixels: ByteArray,
+            addressModeU: GpuTextureAddressMode = GpuTextureAddressMode.REPEAT,
+            addressModeV: GpuTextureAddressMode = GpuTextureAddressMode.REPEAT
         ): GpuTexture {
             require(width > 0u && height > 0u) {
                 "GpuTexture dimensions must be greater than zero."
@@ -155,7 +169,7 @@ class GpuTexture private constructor(
 
             val texture = createTexture(gpu, width, height)
             val sampler = try {
-                createSampler(gpu)
+                createSampler(gpu, addressModeU, addressModeV)
             } catch (e: Throwable) {
                 SDL_ReleaseGPUTexture(gpu.device, texture)
                 throw e
@@ -224,14 +238,18 @@ class GpuTexture private constructor(
             }
         }
 
-        private fun createSampler(gpu: GpuContext): CPointer<SDL_GPUSampler> {
+        private fun createSampler(
+            gpu: GpuContext,
+            addressModeU: GpuTextureAddressMode,
+            addressModeV: GpuTextureAddressMode
+        ): CPointer<SDL_GPUSampler> {
             return memScoped {
                 val createInfo = alloc<SDL_GPUSamplerCreateInfo>()
                 createInfo.min_filter = SDL_GPUFilter.SDL_GPU_FILTER_NEAREST
                 createInfo.mag_filter = SDL_GPUFilter.SDL_GPU_FILTER_NEAREST
                 createInfo.mipmap_mode = SDL_GPUSamplerMipmapMode.SDL_GPU_SAMPLERMIPMAPMODE_NEAREST
-                createInfo.address_mode_u = SDL_GPUSamplerAddressMode.SDL_GPU_SAMPLERADDRESSMODE_REPEAT
-                createInfo.address_mode_v = SDL_GPUSamplerAddressMode.SDL_GPU_SAMPLERADDRESSMODE_REPEAT
+                createInfo.address_mode_u = addressModeU.toSdl()
+                createInfo.address_mode_v = addressModeV.toSdl()
                 createInfo.address_mode_w = SDL_GPUSamplerAddressMode.SDL_GPU_SAMPLERADDRESSMODE_REPEAT
                 createInfo.mip_lod_bias = 0f
                 createInfo.max_anisotropy = 1f
@@ -244,6 +262,14 @@ class GpuTexture private constructor(
 
                 SDL_CreateGPUSampler(gpu.device, createInfo.ptr)
                     ?: throw IllegalStateException("Error creating GPU sampler: ${SDL_GetError()?.toKString()}")
+            }
+        }
+
+        private fun GpuTextureAddressMode.toSdl(): SDL_GPUSamplerAddressMode {
+            return when (this) {
+                GpuTextureAddressMode.REPEAT -> SDL_GPUSamplerAddressMode.SDL_GPU_SAMPLERADDRESSMODE_REPEAT
+                GpuTextureAddressMode.MIRRORED_REPEAT -> SDL_GPUSamplerAddressMode.SDL_GPU_SAMPLERADDRESSMODE_MIRRORED_REPEAT
+                GpuTextureAddressMode.CLAMP_TO_EDGE -> SDL_GPUSamplerAddressMode.SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE
             }
         }
 

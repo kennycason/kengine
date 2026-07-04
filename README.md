@@ -824,6 +824,15 @@ The current proof-of-concept includes:
 - `games:kengine-3d-demos` for primitive/cube rendering.
 - `games:kengine-3d-space-shooter` for an evolving 3D space shooter test bed with terrain, weapons, pickups, turrets, and bosses.
 - `games:rubiks-cube-3d` for a 27-cubie Rubik's cube demo with mouse orbit, face picking, animated slice turns, scramble, and reset.
+- [`games:mario-3d`](games/mario-3d/) for a Mario 64-style textured GLB platformer demo with third-person camera controls and imported world/character models.
+
+<a href="games/mario-3d/"><img src="images/mario3d-bowser-demo.png" width="65%" /></a>
+
+Run the Mario 3D demo:
+
+```shell
+./gradlew :games:mario-3d:runDebugExecutableMacosArm64
+```
 
 <img src="images/space-shooter-3d.png" width="65%" />
 

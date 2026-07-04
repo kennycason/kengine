@@ -43,8 +43,7 @@ private const val PLAYER_MOVE_SPEED = 6.2
 private const val PLAYER_JUMP_VELOCITY = 9.6
 private const val PLAYER_GRAVITY = 17.5
 private const val MARIO_MODEL_YAW_OFFSET = 3.141592653589793
-private const val GOOMBA_MODEL_YAW_OFFSET = 0.0
-private const val RIDLEY_MODEL_YAW_OFFSET = 3.141592653589793
+private const val GOOMBA_MODEL_YAW_OFFSET = 3.141592653589793
 private const val BOWSER_MODEL_YAW_OFFSET = 3.141592653589793
 private const val GROUND_CONTACT_EPSILON = 0.05
 private const val MAX_STEP_UP = 0.72
@@ -93,20 +92,12 @@ fun main() {
                     defaultColor = Color.fromHex("ffffff")
                 )
             )
-            val goomba = GlbMeshLoader.loadLit(
+            val goomba = GlbMeshLoader.loadAnimatedLit(
                 gpu = this,
                 assetPath = resolveMarioAsset("models/Animated Goomba Super Mario Bros.glb"),
                 options = GlbMeshLoadOptions(
                     targetSize = 0.92,
                     defaultColor = Color.fromHex("a86432")
-                )
-            )
-            val ridley = GlbMeshLoader.loadLit(
-                gpu = this,
-                assetPath = resolveMarioAsset("models/Ridley64.glb"),
-                options = GlbMeshLoadOptions(
-                    targetSize = 5.4,
-                    defaultColor = Color.fromHex("9b72d6")
                 )
             )
             val bowser = GlbMeshLoader.loadTexturedLit(
@@ -135,13 +126,7 @@ fun main() {
             var cameraLookX = 0.0
             var cameraLookY = 0.0
             val goombas = createGoombas(terrain)
-            val ridleyAnchor = findHighestGroundPoint(terrain)
-            val bowserAnchor = surfacePosition(
-                terrain = terrain,
-                x = ridleyAnchor.x + 5.5,
-                z = ridleyAnchor.z + 3.0,
-                fallbackY = ridleyAnchor.y
-            )
+            val bowserAnchor = findHighestGroundRegionCenter(terrain)
             var controllerNeutral: FloatArray? = null
             var calibratedControllerId: UInt? = null
             var controllerCalibrationUntil = 0.0
@@ -315,15 +300,16 @@ fun main() {
                             light = light
                         )
                         goombas.forEach { enemy ->
-                            litRenderer.draw(
+                            goomba.draw(
+                                renderer = litRenderer,
                                 frame = frame,
-                                mesh = goomba,
                                 transform = Transform3D(
                                     position = enemy.position,
                                     rotation = Vec3(0.0, enemy.yaw + GOOMBA_MODEL_YAW_OFFSET, 0.0)
                                 ),
                                 camera = camera,
-                                light = light
+                                light = light,
+                                timeSeconds = elapsedSeconds * 1.4 + enemy.angle
                             )
                         }
                         bowser.draw(
@@ -336,20 +322,6 @@ fun main() {
                                     bowserAnchor.z
                                 ),
                                 rotation = Vec3(0.0, elapsedSeconds * -0.22 + BOWSER_MODEL_YAW_OFFSET, 0.0)
-                            ),
-                            camera = camera,
-                            light = light
-                        )
-                        litRenderer.draw(
-                            frame = frame,
-                            mesh = ridley,
-                            transform = Transform3D(
-                                position = Vec3(
-                                    ridleyAnchor.x,
-                                    ridleyAnchor.y + 0.35 + sin(elapsedSeconds * 1.4) * 0.18,
-                                    ridleyAnchor.z
-                                ),
-                                rotation = Vec3(0.0, elapsedSeconds * 0.35 + RIDLEY_MODEL_YAW_OFFSET, 0.0)
                             ),
                             camera = camera,
                             light = light
@@ -373,7 +345,6 @@ fun main() {
                 texturedRenderer.cleanup()
                 litRenderer.cleanup()
                 bowser.cleanup()
-                ridley.cleanup()
                 goomba.cleanup()
                 mario.cleanup()
                 world.cleanup()
@@ -553,21 +524,40 @@ private fun surfacePosition(
     return Vec3(x, terrain.groundYAt(x, z) ?: fallbackY, z)
 }
 
-private fun findHighestGroundPoint(terrain: TerrainCollision): Vec3 {
-    var best = Vec3(0.0, terrain.groundYAt(0.0, 0.0) ?: 0.0, 0.0)
+private fun findHighestGroundRegionCenter(terrain: TerrainCollision): Vec3 {
+    val samples = mutableListOf<Vec3>()
+    var highestY = Double.NEGATIVE_INFINITY
     var x = -42.0
     while (x <= 42.0) {
         var z = -42.0
         while (z <= 42.0) {
-            val y = terrain.groundYAt(x, z)
-            if (y != null && y > best.y) {
-                best = Vec3(x, y, z)
+            terrain.groundYAt(x, z)?.let { y ->
+                val sample = Vec3(x, y, z)
+                samples += sample
+                if (y > highestY) {
+                    highestY = y
+                }
             }
-            z += 2.5
+            z += 1.25
         }
-        x += 2.5
+        x += 1.25
     }
-    return best
+
+    if (samples.isEmpty()) {
+        return Vec3(0.0, 0.0, 0.0)
+    }
+
+    val summitSamples = samples.filter { it.y >= highestY - 1.2 }.ifEmpty {
+        samples.sortedByDescending { it.y }.take(6)
+    }
+    val centerX = summitSamples.map { it.x }.average()
+    val centerZ = summitSamples.map { it.z }.average()
+    return surfacePosition(
+        terrain = terrain,
+        x = centerX,
+        z = centerZ,
+        fallbackY = highestY
+    )
 }
 
 private fun movePlayerOnTerrain(

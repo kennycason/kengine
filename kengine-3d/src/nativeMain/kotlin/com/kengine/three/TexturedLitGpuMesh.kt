@@ -39,6 +39,28 @@ class TexturedLitGpuMesh private constructor(
 ) {
     private var cleanedUp = false
 
+    fun update(vertices: List<TexturedLitVertex3D>) {
+        check(!cleanedUp) {
+            "TexturedLitGpuMesh has already been cleaned up."
+        }
+        require(vertices.size.toUInt() == vertexCount) {
+            "TexturedLitGpuMesh updates must keep the original vertex count."
+        }
+
+        val values = FloatArray(vertices.size * TexturedLitVertex3D.FLOATS_PER_VERTEX)
+        vertices.forEachIndexed { index, vertex ->
+            vertex.writeTo(values, index * TexturedLitVertex3D.FLOATS_PER_VERTEX)
+        }
+
+        val byteSize = (values.size * 4).toUInt()
+        val transferBuffer = createTransferBuffer(gpu, byteSize)
+        try {
+            uploadVertexData(gpu, values, byteSize, transferBuffer, vertexBuffer)
+        } finally {
+            SDL_ReleaseGPUTransferBuffer(gpu.device, transferBuffer)
+        }
+    }
+
     fun cleanup() {
         if (cleanedUp) {
             return
