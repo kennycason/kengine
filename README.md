@@ -814,13 +814,16 @@ logger.info { "New Position: $newPosition" }
 
 ## 3D / SDL GPU
 
-Kengine is starting to grow an experimental native 3D layer in `kengine-3d`, built on SDL3's `SDL_GPU` API. The goal is to keep SDL3 as the windowing, input, audio, timing, and platform layer while adding Kengine-owned 3D concepts on top: GPU contexts, meshes, transforms, cameras, depth buffers, and eventually textures/model loading.
+Kengine is starting to grow an experimental native 3D layer in `kengine-3d`, built on SDL3's `SDL_GPU` API. The goal is to keep SDL3 as the windowing, input, audio, timing, and platform layer while adding Kengine-owned 3D concepts on top: GPU contexts, meshes, transforms, cameras, depth buffers, textures, model loading, animated model playback, and lightweight scene submission.
 
 The current proof-of-concept includes:
 
 - `RenderBackend.SDL_GPU_3D` for GPU-backed windows.
 - `GpuContext` for SDL GPU device/window ownership.
-- `GpuMesh`, `MeshRenderer3D`, `Mat4`, `Transform3D`, and `PerspectiveCamera`.
+- `GpuMesh`, `MeshRenderer3D`, `Mat4`, `Transform3D`, `PerspectiveCamera`, `ThirdPersonCameraController3D`, `AnimationPlayer3D`, `AnimationPose3D`, and `Scene3D`.
+- `ModelLoader3D`, `ParsedModel3D`, `Model3D`, `Material3D`, and `ModelRenderer3D` for reusable static model loading/rendering across OBJ and GLB-backed assets.
+- `AnimatedModel3D`, `AnimatedModelLoader3D`, and `AnimatedModelInstance3D` for reusable animated model loading/playback and per-instance pose state over current GLB-backed assets.
+- `SceneRenderer3D` for ordered per-frame static model, animated model, and mesh submission through a reusable renderer bundle.
 - `games:kengine-3d-demos` for primitive/cube rendering.
 - `games:kengine-3d-space-shooter` for an evolving 3D space shooter test bed with terrain, weapons, pickups, turrets, and bosses.
 - `games:rubiks-cube-3d` for a 27-cubie Rubik's cube demo with mouse orbit, face picking, animated slice turns, scramble, and reset.

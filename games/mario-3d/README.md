@@ -26,14 +26,13 @@ python3 tools/extract_glb_animations.py "$HOME/code/mario64-assets/assets/models
 
 ## Controls
 
-- Keyboard: `WASD` moves Mario relative to the camera, Shift or `B` runs, arrow keys orbit the camera, `T` cycles camera distance, and `X`/space jumps.
-- Controller: left stick moves Mario relative to the camera, Square runs, right stick smoothly orbits the camera, Triangle cycles camera distance, and Cross jumps.
+- Keyboard: `WASD` moves Mario relative to the camera, Shift or `B` runs, arrow keys orbit the camera with non-inverted Y look, `T` cycles camera distance, and `X`/space jumps.
+- Controller: left stick moves Mario relative to the camera, Square runs, right stick smoothly orbits the camera with non-inverted Y look, Triangle cycles camera distance, and Cross jumps.
 
 ## Build Plan
 
 1. Keep the platformer baseline stable: third-person follow camera, camera-relative movement, jump physics, and height-aware terrain collision.
-2. Move terrain collision and third-person follow camera helpers into `kengine-3d` once the Mario demo validates their shape.
-3. Continue improving CPU skeletal playback, then move skinning to shader/GPU buffers once the API shape is stable.
+2. Continue moving validated helpers into `kengine-3d`; static world/Bowser model loading, collision-source parsing, third-person camera controls, animation clip playback, ordered scene submission, animated model facades, and per-instance animated model state now use reusable engine APIs.
+3. Continue improving CPU skeletal playback, then shift skinning to shader/GPU buffers or per-instance skin buffers once the API shape is stable.
 4. Add action-state controls for the already extracted hip-drop, punch, damage, crouch, and brake clips.
-5. Add enemy collision and stomp/bump interactions.
-6. Add richer collision volumes, slope limits, ledges, world bounds, and debug overlays.
+5. Add richer collision volumes, slope limits, ledges, world bounds, and debug overlays.
