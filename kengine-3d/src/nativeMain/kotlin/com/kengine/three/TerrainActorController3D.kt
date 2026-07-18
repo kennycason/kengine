@@ -189,9 +189,11 @@ class TerrainActorController3D(
         position: Vec3,
         velocityY: Double,
         deltaSeconds: Double,
-        gravity: Double
+        gravity: Double,
+        terminalVelocityY: Double? = null
     ): TerrainActorVerticalResult3D {
-        val nextVelocityY = velocityY - gravity * deltaSeconds
+        val rawNextVelocityY = velocityY - gravity * deltaSeconds
+        val nextVelocityY = terminalVelocityY?.let { maxOf(rawNextVelocityY, it) } ?: rawNextVelocityY
         val nextY = position.y + nextVelocityY * deltaSeconds
         val nextPosition = Vec3(position.x, nextY, position.z)
 

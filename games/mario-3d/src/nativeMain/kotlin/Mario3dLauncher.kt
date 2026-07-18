@@ -46,11 +46,13 @@ private const val WORLD_TARGET_SIZE = 105.0
 private const val PLAYER_HALF_HEIGHT = 0.82
 private const val PLAYER_WALK_SPEED = 5.4
 private const val PLAYER_RUN_SPEED = 8.2
-private const val PLAYER_JUMP_VELOCITY = 9.6
-private const val PLAYER_GRAVITY = 17.5
+private const val PLAYER_JUMP_VELOCITY = 15.4
+private const val PLAYER_JUMP_GRAVITY = 42.0
+private const val PLAYER_FALL_GRAVITY = 48.0
+private const val PLAYER_TERMINAL_FALL_SPEED = -28.0
 private const val PLAYER_MAX_STEP_DOWN = 1.4
 private const val PLAYER_COLLISION_RADIUS = 0.38
-private const val PLAYER_STOMP_BOUNCE_VELOCITY = 7.0
+private const val PLAYER_STOMP_BOUNCE_VELOCITY = 10.8
 private const val PLAYER_BUMP_BACK_DISTANCE = 0.58
 private const val PLAYER_HURT_COOLDOWN_SECONDS = 0.75
 private const val ENEMY_MAX_STEP_UP = 0.48
@@ -320,7 +322,8 @@ fun main() {
                         position = player,
                         velocityY = playerVelocityY,
                         deltaSeconds = deltaSeconds,
-                        gravity = PLAYER_GRAVITY
+                        gravity = if (playerVelocityY > 0.0) PLAYER_JUMP_GRAVITY else PLAYER_FALL_GRAVITY,
+                        terminalVelocityY = PLAYER_TERMINAL_FALL_SPEED
                     )
                     player = verticalMove.position
                     playerVelocityY = verticalMove.velocityY
