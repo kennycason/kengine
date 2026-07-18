@@ -10,12 +10,16 @@ import com.kengine.sdl.RenderBackend
 import com.kengine.three.Camera3D
 import com.kengine.three.CapsuleCollider3D
 import com.kengine.three.Collision3D
+import com.kengine.three.DebugRenderer3D
 import com.kengine.three.DirectionalLight3D
 import com.kengine.three.GlbAnimationClipInfo
 import com.kengine.three.GlbMeshLoadOptions
 import com.kengine.three.GlbMeshLoader
 import com.kengine.three.GpuContext
 import com.kengine.three.GpuMesh
+import com.kengine.three.KinematicCharacterController3D
+import com.kengine.three.KinematicCharacterControllerSettings3D
+import com.kengine.three.KinematicCharacterState3D
 import com.kengine.three.LitMeshRenderer3D
 import com.kengine.three.Mat4
 import com.kengine.three.MeshRenderer3D
@@ -127,15 +131,20 @@ fun main() {
                 )
             )
             val terrain = TerrainMeshCollider3D.fromLitVertices(worldVertices)
-            val playerController = TerrainActorController3D(
+            val playerController = KinematicCharacterController3D(
                 terrain = terrain,
-                settings = TerrainActorControllerSettings3D(
+                settings = KinematicCharacterControllerSettings3D(
                     halfHeight = PLAYER_HALF_HEIGHT,
                     maxStepUp = MAX_STEP_UP,
                     maxStepDown = PLAYER_MAX_STEP_DOWN,
-                    groundContactEpsilon = GROUND_CONTACT_EPSILON
+                    groundContactEpsilon = GROUND_CONTACT_EPSILON,
+                    jumpVelocity = PLAYER_JUMP_VELOCITY,
+                    gravity = PLAYER_JUMP_GRAVITY,
+                    fallingGravity = PLAYER_FALL_GRAVITY,
+                    terminalVelocityY = PLAYER_TERMINAL_FALL_SPEED
                 )
             )
+            val playerTerrainController = playerController.terrainController
             val enemyController = TerrainActorController3D(
                 terrain = terrain,
                 settings = TerrainActorControllerSettings3D(
@@ -180,6 +189,7 @@ fun main() {
             val meshRenderer = MeshRenderer3D(this)
             val litRenderer = LitMeshRenderer3D(this)
             val texturedRenderer = TexturedLitMeshRenderer3D(this)
+            val debugRenderer = DebugRenderer3D(this)
             val light = DirectionalLight3D(
                 direction = Vec3(-0.45, -0.85, -0.32),
                 color = Color.fromHex("fff8e6"),
@@ -187,9 +197,11 @@ fun main() {
                 diffuseStrength = 0.8f
             )
 
-            var player = Vec3(0.0, playerController.actorYAt(0.0, 0.0) ?: PLAYER_HALF_HEIGHT, 0.0)
-            var cameraFocus = player
-            var playerVelocityY = 0.0
+            val playerState = KinematicCharacterState3D(
+                position = Vec3(0.0, playerController.actorYAt(0.0, 0.0) ?: PLAYER_HALF_HEIGHT, 0.0),
+                isGrounded = true
+            )
+            var cameraFocus = playerState.position
             var playerYaw = 0.0
             var cameraYaw = 0.0
             var cameraPitch = 0.38
@@ -208,6 +220,8 @@ fun main() {
             var landingAnimationUntil = 0.0
             var lastPlayerHitAt = -PLAYER_HURT_COOLDOWN_SECONDS
             var wasCameraDistancePressed = false
+            var wasDebugPressed = false
+            var debugEnabled = false
             var cameraDistanceIndex = 0
             var cameraDistance = CAMERA_DISTANCES[cameraDistanceIndex]
             var previousTicks = SDL_GetTicks()
@@ -311,6 +325,12 @@ fun main() {
                         cameraDistance = CAMERA_DISTANCES[cameraDistanceIndex]
                     }
                     wasCameraDistancePressed = cameraDistancePressed
+                    val debugPressed = keyboardState.isF1Pressed() ||
+                        controllerState.isButtonPressed(Buttons.START)
+                    if (debugPressed && !wasDebugPressed) {
+                        debugEnabled = !debugEnabled
+                    }
+                    wasDebugPressed = debugPressed
                     val zoomInput = axis(
                         controllerState.isButtonPressed(Buttons.DPAD_DOWN),
                         controllerState.isButtonPressed(Buttons.DPAD_UP)
@@ -328,50 +348,31 @@ fun main() {
                     val moveDirection = movementDirection(moveRightInput, moveForwardInput, cameraYaw)
                     val moveLength = horizontalLength(moveDirection)
                     val isMoving = moveLength > MOVEMENT_INPUT_EPSILON
-                    val moveSpeed = (if (runPressed) PLAYER_RUN_SPEED else PLAYER_WALK_SPEED) * deltaSeconds
+                    val moveSpeed = if (runPressed) PLAYER_RUN_SPEED else PLAYER_WALK_SPEED
+                    val horizontalVelocity = if (isMoving) {
+                        horizontalVelocityForMovement(moveDirection, moveLength, moveSpeed)
+                    } else {
+                        Vec3(0.0, 0.0, 0.0)
+                    }
                     if (isMoving) {
-                        val moveScale = moveSpeed / moveLength.coerceAtLeast(1.0)
-                        val currentGroundY = playerController.actorYAt(
-                            x = player.x,
-                            z = player.z,
-                            maxActorY = player.y + GROUND_CONTACT_EPSILON
-                        ) ?: PLAYER_HALF_HEIGHT
-                        val isGroundedForMove = player.y <= currentGroundY + GROUND_CONTACT_EPSILON &&
-                            playerVelocityY <= 0.1
-                        player = playerController.moveHorizontal(
-                            position = player,
-                            deltaX = moveDirection.x * moveScale,
-                            deltaZ = moveDirection.z * moveScale,
-                            isGrounded = isGroundedForMove,
-                            allowLeaveGround = true
-                        ).position
                         playerYaw = atan2(-moveDirection.x, -moveDirection.z)
                     }
 
                     val jumpPressed = keyboardState.isSpacePressed() ||
                         keyboardState.isXPressed() ||
                         controllerState.isButtonPressed(Buttons.B)
-                    val groundYBeforeJump = playerController.actorYAt(
-                        x = player.x,
-                        z = player.z,
-                        maxActorY = player.y + GROUND_CONTACT_EPSILON
-                    ) ?: PLAYER_HALF_HEIGHT
-                    val isGrounded = player.y <= groundYBeforeJump + GROUND_CONTACT_EPSILON && playerVelocityY <= 0.1
-                    if (jumpPressed && !wasJumpPressed && isGrounded) {
-                        playerVelocityY = PLAYER_JUMP_VELOCITY
-                    }
-                    wasJumpPressed = jumpPressed
-                    val playerYBeforeGravity = player.y
-                    val verticalMove = playerController.applyGravity(
-                        position = player,
-                        velocityY = playerVelocityY,
+                    val playerStep = playerController.step(
+                        state = playerState,
+                        horizontalVelocity = horizontalVelocity,
                         deltaSeconds = deltaSeconds,
-                        gravity = if (playerVelocityY > 0.0) PLAYER_JUMP_GRAVITY else PLAYER_FALL_GRAVITY,
-                        terminalVelocityY = PLAYER_TERMINAL_FALL_SPEED
+                        jumpRequested = jumpPressed && !wasJumpPressed,
+                        allowLeaveGround = true
                     )
-                    player = verticalMove.position
-                    playerVelocityY = verticalMove.velocityY
-                    var isGroundedAfterGravity = verticalMove.isGrounded
+                    wasJumpPressed = jumpPressed
+                    val playerYBeforeGravity = playerStep.positionBeforeVertical.y
+                    var player = playerState.position
+                    var playerVelocityY = playerState.velocityY
+                    var isGroundedAfterGravity = playerState.isGrounded
 
                     updateGoombas(goombas, enemyController, deltaSeconds)
                     updateBowser(bowser, enemyController, player, deltaSeconds)
@@ -381,7 +382,7 @@ fun main() {
                         playerVelocityY = playerVelocityY,
                         isGrounded = isGroundedAfterGravity,
                         goombas = goombas,
-                        playerController = playerController,
+                        playerController = playerTerrainController,
                         elapsedSeconds = elapsedSeconds,
                         lastPlayerHitAt = lastPlayerHitAt
                     )
@@ -389,13 +390,16 @@ fun main() {
                     playerVelocityY = goombaCollision.playerVelocityY
                     isGroundedAfterGravity = goombaCollision.isGrounded
                     lastPlayerHitAt = goombaCollision.lastPlayerHitAt
+                    playerState.position = player
+                    playerState.velocityY = playerVelocityY
+                    playerState.isGrounded = isGroundedAfterGravity
                     val bowserCollision = resolvePlayerBowserCollision(
                         player = player,
                         playerYBeforeGravity = playerYBeforeGravity,
                         playerVelocityY = playerVelocityY,
                         isGrounded = isGroundedAfterGravity,
                         bowser = bowser,
-                        playerController = playerController,
+                        playerController = playerTerrainController,
                         elapsedSeconds = elapsedSeconds,
                         lastPlayerHitAt = lastPlayerHitAt
                     )
@@ -403,6 +407,9 @@ fun main() {
                     playerVelocityY = bowserCollision.playerVelocityY
                     isGroundedAfterGravity = bowserCollision.isGrounded
                     lastPlayerHitAt = bowserCollision.lastPlayerHitAt
+                    playerState.position = player
+                    playerState.velocityY = playerVelocityY
+                    playerState.isGrounded = isGroundedAfterGravity
                     if (!bowser.isActive && !summitStar.isCollected) {
                         summitStar.isActive = true
                     }
@@ -432,7 +439,7 @@ fun main() {
                         timeSeconds = marioAnimationTime
                     )
 
-                    cameraFocus = lerp(cameraFocus, player, smoothingFactor(CAMERA_FOLLOW_SMOOTHING, deltaSeconds))
+                    cameraFocus = lerp(cameraFocus, playerState.position, smoothingFactor(CAMERA_FOLLOW_SMOOTHING, deltaSeconds))
                     val camera = createThirdPersonCamera(
                         player = cameraFocus,
                         cameraYaw = cameraYaw,
@@ -508,12 +515,77 @@ fun main() {
                             camera = camera,
                             light = light
                         )
+                        if (debugEnabled) {
+                            debugRenderer.wireCapsule(
+                                frame = frame,
+                                camera = camera,
+                                capsule = playerController.capsuleCollider(playerState, PLAYER_COLLISION_RADIUS),
+                                color = Color.fromHex("5dffcb")
+                            )
+                            val playerForward = forwardForYaw(playerYaw, 1.6)
+                            debugRenderer.line(
+                                frame = frame,
+                                camera = camera,
+                                start = player,
+                                end = Vec3(
+                                    player.x + playerForward.x,
+                                    player.y + 0.15,
+                                    player.z + playerForward.z
+                                ),
+                                color = Color.fromHex("ffffff")
+                            )
+                            playerState.ground?.let { ground ->
+                                debugRenderer.wireSphere(
+                                    frame = frame,
+                                    camera = camera,
+                                    center = ground.position,
+                                    radius = 0.16,
+                                    color = Color.fromHex("ffd447")
+                                )
+                            }
+                            goombas.filter { it.isActive }.forEach { enemy ->
+                                debugRenderer.wireSphere(
+                                    frame = frame,
+                                    camera = camera,
+                                    center = goombaCollider(enemy).center,
+                                    radius = GOOMBA_COLLISION_RADIUS,
+                                    color = Color.fromHex("ff7a5c")
+                                )
+                            }
+                            if (bowser.isActive) {
+                                val collider = bowserCollider(bowser)
+                                debugRenderer.wireSphere(
+                                    frame = frame,
+                                    camera = camera,
+                                    center = collider.center,
+                                    radius = collider.radius,
+                                    color = Color.fromHex("ff4058")
+                                )
+                                debugRenderer.wireSphere(
+                                    frame = frame,
+                                    camera = camera,
+                                    center = bowser.home,
+                                    radius = BOWSER_LEASH_RADIUS,
+                                    color = Color.fromHex("35c9d0")
+                                )
+                            }
+                            if (summitStar.isActive && !summitStar.isCollected) {
+                                debugRenderer.wireSphere(
+                                    frame = frame,
+                                    camera = camera,
+                                    center = summitStarCollider(summitStar).center,
+                                    radius = STAR_PICKUP_RADIUS,
+                                    color = Color.fromHex("f0c84b")
+                                )
+                            }
+                        }
                     }
 
                     mouse.mouse.clearFrameState()
                     SDL_Delay(16u)
                 }
             } finally {
+                debugRenderer.cleanup()
                 texturedRenderer.cleanup()
                 litRenderer.cleanup()
                 meshRenderer.cleanup()
@@ -1108,6 +1180,19 @@ private fun movementDirection(
         x = right.x * inputRight + forward.x * inputForward,
         y = 0.0,
         z = right.z * inputRight + forward.z * inputForward
+    )
+}
+
+private fun horizontalVelocityForMovement(
+    moveDirection: Vec3,
+    moveLength: Double,
+    speed: Double
+): Vec3 {
+    val scale = speed / moveLength.coerceAtLeast(1.0)
+    return Vec3(
+        x = moveDirection.x * scale,
+        y = 0.0,
+        z = moveDirection.z * scale
     )
 }
 
