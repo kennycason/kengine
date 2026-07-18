@@ -8,14 +8,19 @@ import com.kengine.log.Logger
 import com.kengine.math.Vec3
 import com.kengine.sdl.RenderBackend
 import com.kengine.three.Camera3D
+import com.kengine.three.CapsuleCollider3D
+import com.kengine.three.Collision3D
 import com.kengine.three.DirectionalLight3D
 import com.kengine.three.GlbAnimationClipInfo
 import com.kengine.three.GlbMeshLoadOptions
 import com.kengine.three.GlbMeshLoader
 import com.kengine.three.GpuContext
 import com.kengine.three.LitMeshRenderer3D
-import com.kengine.three.LitVertex3D
 import com.kengine.three.Mat4
+import com.kengine.three.TerrainActorController3D
+import com.kengine.three.TerrainActorControllerSettings3D
+import com.kengine.three.TerrainMeshCollider3D
+import com.kengine.three.SphereCollider3D
 import com.kengine.three.TexturedLitMeshRenderer3D
 import com.kengine.three.Transform3D
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -24,7 +29,6 @@ import sdl3.SDL_GetTicks
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
-import kotlin.math.max
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -44,6 +48,16 @@ private const val PLAYER_WALK_SPEED = 5.4
 private const val PLAYER_RUN_SPEED = 8.2
 private const val PLAYER_JUMP_VELOCITY = 9.6
 private const val PLAYER_GRAVITY = 17.5
+private const val PLAYER_MAX_STEP_DOWN = 1.4
+private const val PLAYER_COLLISION_RADIUS = 0.38
+private const val PLAYER_STOMP_BOUNCE_VELOCITY = 7.0
+private const val PLAYER_BUMP_BACK_DISTANCE = 0.58
+private const val PLAYER_HURT_COOLDOWN_SECONDS = 0.75
+private const val ENEMY_MAX_STEP_UP = 0.48
+private const val ENEMY_MAX_STEP_DOWN = 0.58
+private const val GOOMBA_COLLISION_RADIUS = 0.48
+private const val GOOMBA_COLLISION_CENTER_Y = 0.42
+private const val GOOMBA_STOMP_MIN_HEIGHT = 0.28
 private const val MARIO_MODEL_YAW_OFFSET = 3.141592653589793
 private const val GOOMBA_MODEL_YAW_OFFSET = 3.141592653589793
 private const val BOWSER_MODEL_YAW_OFFSET = 3.141592653589793
@@ -85,7 +99,25 @@ fun main() {
                     defaultColor = Color.fromHex("ffffff")
                 )
             )
-            val terrain = TerrainCollision.fromVertices(worldVertices)
+            val terrain = TerrainMeshCollider3D.fromLitVertices(worldVertices)
+            val playerController = TerrainActorController3D(
+                terrain = terrain,
+                settings = TerrainActorControllerSettings3D(
+                    halfHeight = PLAYER_HALF_HEIGHT,
+                    maxStepUp = MAX_STEP_UP,
+                    maxStepDown = PLAYER_MAX_STEP_DOWN,
+                    groundContactEpsilon = GROUND_CONTACT_EPSILON
+                )
+            )
+            val enemyController = TerrainActorController3D(
+                terrain = terrain,
+                settings = TerrainActorControllerSettings3D(
+                    halfHeight = 0.0,
+                    maxStepUp = ENEMY_MAX_STEP_UP,
+                    maxStepDown = ENEMY_MAX_STEP_DOWN,
+                    groundContactEpsilon = GROUND_CONTACT_EPSILON
+                )
+            )
             val mario = GlbMeshLoader.loadSkinnedTexturedLit(
                 gpu = this,
                 assetPath = resolveMarioAsset("models/Mario64Animated.glb"),
@@ -120,7 +152,7 @@ fun main() {
                 diffuseStrength = 0.8f
             )
 
-            var player = Vec3(0.0, terrain.playerYAt(0.0, 0.0) ?: PLAYER_HALF_HEIGHT, 0.0)
+            var player = Vec3(0.0, playerController.actorYAt(0.0, 0.0) ?: PLAYER_HALF_HEIGHT, 0.0)
             var cameraFocus = player
             var playerVelocityY = 0.0
             var playerYaw = 0.0
@@ -130,7 +162,7 @@ fun main() {
             var cameraLookY = 0.0
             var marioAnimationState = MarioAnimationState.IDLE
             var marioAnimationTime = 0.0
-            val goombas = createGoombas(terrain)
+            val goombas = createGoombas(enemyController)
             val bowserAnchor = findHighestGroundRegionCenter(terrain)
             var controllerNeutral: FloatArray? = null
             var calibratedControllerId: UInt? = null
@@ -138,6 +170,7 @@ fun main() {
             var wasJumpPressed = false
             var wasGrounded = true
             var landingAnimationUntil = 0.0
+            var lastPlayerHitAt = -PLAYER_HURT_COOLDOWN_SECONDS
             var wasCameraDistancePressed = false
             var cameraDistanceIndex = 0
             var previousTicks = SDL_GetTicks()
@@ -252,50 +285,63 @@ fun main() {
                     val moveSpeed = (if (runPressed) PLAYER_RUN_SPEED else PLAYER_WALK_SPEED) * deltaSeconds
                     if (isMoving) {
                         val moveScale = moveSpeed / moveLength.coerceAtLeast(1.0)
-                        val currentGroundY = terrain.playerYAt(
+                        val currentGroundY = playerController.actorYAt(
                             x = player.x,
                             z = player.z,
-                            maxPlayerY = player.y + GROUND_CONTACT_EPSILON
+                            maxActorY = player.y + GROUND_CONTACT_EPSILON
                         ) ?: PLAYER_HALF_HEIGHT
                         val isGroundedForMove = player.y <= currentGroundY + GROUND_CONTACT_EPSILON &&
                             playerVelocityY <= 0.1
-                        player = movePlayerOnTerrain(
-                            player = player,
+                        player = playerController.moveHorizontal(
+                            position = player,
                             deltaX = moveDirection.x * moveScale,
                             deltaZ = moveDirection.z * moveScale,
-                            terrain = terrain,
-                            isGrounded = isGroundedForMove
-                        )
+                            isGrounded = isGroundedForMove,
+                            allowLeaveGround = true
+                        ).position
                         playerYaw = atan2(-moveDirection.x, -moveDirection.z)
                     }
 
                     val jumpPressed = keyboardState.isSpacePressed() ||
                         keyboardState.isXPressed() ||
                         controllerState.isButtonPressed(Buttons.B)
-                    val groundYBeforeJump = terrain.playerYAt(
+                    val groundYBeforeJump = playerController.actorYAt(
                         x = player.x,
                         z = player.z,
-                        maxPlayerY = player.y + GROUND_CONTACT_EPSILON
+                        maxActorY = player.y + GROUND_CONTACT_EPSILON
                     ) ?: PLAYER_HALF_HEIGHT
                     val isGrounded = player.y <= groundYBeforeJump + GROUND_CONTACT_EPSILON && playerVelocityY <= 0.1
                     if (jumpPressed && !wasJumpPressed && isGrounded) {
                         playerVelocityY = PLAYER_JUMP_VELOCITY
                     }
                     wasJumpPressed = jumpPressed
-                    val previousPlayerY = player.y
-                    playerVelocityY -= PLAYER_GRAVITY * deltaSeconds
-                    player = Vec3(player.x, player.y + playerVelocityY * deltaSeconds, player.z)
-                    val groundYAfterGravity = terrain.playerYAt(
-                        x = player.x,
-                        z = player.z,
-                        maxPlayerY = max(previousPlayerY, player.y) + GROUND_CONTACT_EPSILON
-                    ) ?: PLAYER_HALF_HEIGHT
-                    if (playerVelocityY <= 0.0 && player.y < groundYAfterGravity) {
-                        player = Vec3(player.x, groundYAfterGravity, player.z)
-                        playerVelocityY = 0.0
-                    }
-                    val isGroundedAfterGravity = player.y <= groundYAfterGravity + GROUND_CONTACT_EPSILON &&
-                        playerVelocityY <= 0.1
+                    val playerYBeforeGravity = player.y
+                    val verticalMove = playerController.applyGravity(
+                        position = player,
+                        velocityY = playerVelocityY,
+                        deltaSeconds = deltaSeconds,
+                        gravity = PLAYER_GRAVITY
+                    )
+                    player = verticalMove.position
+                    playerVelocityY = verticalMove.velocityY
+                    var isGroundedAfterGravity = verticalMove.isGrounded
+
+                    updateGoombas(goombas, enemyController, deltaSeconds)
+                    val goombaCollision = resolvePlayerGoombaCollisions(
+                        player = player,
+                        playerYBeforeGravity = playerYBeforeGravity,
+                        playerVelocityY = playerVelocityY,
+                        isGrounded = isGroundedAfterGravity,
+                        goombas = goombas,
+                        playerController = playerController,
+                        elapsedSeconds = elapsedSeconds,
+                        lastPlayerHitAt = lastPlayerHitAt
+                    )
+                    player = goombaCollision.player
+                    playerVelocityY = goombaCollision.playerVelocityY
+                    isGroundedAfterGravity = goombaCollision.isGrounded
+                    lastPlayerHitAt = goombaCollision.lastPlayerHitAt
+
                     if (!wasGrounded && isGroundedAfterGravity) {
                         landingAnimationUntil = elapsedSeconds + 0.22
                     }
@@ -320,7 +366,6 @@ fun main() {
                         timeSeconds = marioAnimationTime
                     )
 
-                    updateGoombas(goombas, terrain, deltaSeconds)
                     cameraFocus = lerp(cameraFocus, player, smoothingFactor(CAMERA_FOLLOW_SMOOTHING, deltaSeconds))
                     val camera = createThirdPersonCamera(
                         player = cameraFocus,
@@ -337,7 +382,7 @@ fun main() {
                             camera = camera,
                             light = light
                         )
-                        goombas.forEach { enemy ->
+                        goombas.filter { it.isActive }.forEach { enemy ->
                             goomba.draw(
                                 renderer = litRenderer,
                                 frame = frame,
@@ -394,10 +439,18 @@ fun main() {
 private data class RoamingEnemy(
     val center: Vec3,
     val radius: Double,
-    val speed: Double,
+    var speed: Double,
     var angle: Double,
     var position: Vec3,
-    var yaw: Double
+    var yaw: Double,
+    var isActive: Boolean = true
+)
+
+private data class PlayerGoombaCollisionResult(
+    val player: Vec3,
+    val playerVelocityY: Double,
+    val isGrounded: Boolean,
+    val lastPlayerHitAt: Double
 )
 
 private enum class MarioAnimationState(
@@ -452,6 +505,96 @@ private data class MarioAnimationClips(
     }
 }
 
+private fun resolvePlayerGoombaCollisions(
+    player: Vec3,
+    playerYBeforeGravity: Double,
+    playerVelocityY: Double,
+    isGrounded: Boolean,
+    goombas: List<RoamingEnemy>,
+    playerController: TerrainActorController3D,
+    elapsedSeconds: Double,
+    lastPlayerHitAt: Double
+): PlayerGoombaCollisionResult {
+    var resolvedPlayer = player
+    var resolvedVelocityY = playerVelocityY
+    var resolvedGrounded = isGrounded
+    var resolvedLastHitAt = lastPlayerHitAt
+
+    goombas.filter { it.isActive }.forEach { enemy ->
+        val contact = Collision3D.overlap(playerCollider(resolvedPlayer), goombaCollider(enemy)) ?: return@forEach
+        val feetWereAboveStompLine = playerYBeforeGravity - PLAYER_HALF_HEIGHT >=
+            enemy.position.y + GOOMBA_STOMP_MIN_HEIGHT
+        val feetAreAboveGround = resolvedPlayer.y - PLAYER_HALF_HEIGHT >= enemy.position.y - GROUND_CONTACT_EPSILON
+        val isStomp = resolvedVelocityY <= 0.0 && feetWereAboveStompLine && feetAreAboveGround
+        if (isStomp) {
+            enemy.isActive = false
+            resolvedVelocityY = PLAYER_STOMP_BOUNCE_VELOCITY
+            resolvedGrounded = false
+            return@forEach
+        }
+
+        if (elapsedSeconds - resolvedLastHitAt < PLAYER_HURT_COOLDOWN_SECONDS) {
+            return@forEach
+        }
+
+        val away = horizontalAwayFromEnemy(resolvedPlayer, enemy.position)
+        val bumpMove = playerController.moveHorizontal(
+            position = resolvedPlayer,
+            deltaX = away.x * (PLAYER_BUMP_BACK_DISTANCE + contact.depth * 0.25),
+            deltaZ = away.z * (PLAYER_BUMP_BACK_DISTANCE + contact.depth * 0.25),
+            isGrounded = resolvedGrounded,
+            allowLeaveGround = false
+        )
+        resolvedPlayer = bumpMove.position
+        resolvedGrounded = bumpMove.isGrounded
+        resolvedVelocityY = if (resolvedGrounded) {
+            0.0
+        } else {
+            maxOf(resolvedVelocityY, 0.0)
+        }
+        resolvedLastHitAt = elapsedSeconds
+    }
+
+    return PlayerGoombaCollisionResult(
+        player = resolvedPlayer,
+        playerVelocityY = resolvedVelocityY,
+        isGrounded = resolvedGrounded,
+        lastPlayerHitAt = resolvedLastHitAt
+    )
+}
+
+private fun playerCollider(player: Vec3): CapsuleCollider3D {
+    return CapsuleCollider3D(
+        start = Vec3(player.x, player.y - PLAYER_HALF_HEIGHT + PLAYER_COLLISION_RADIUS, player.z),
+        end = Vec3(player.x, player.y + PLAYER_HALF_HEIGHT - PLAYER_COLLISION_RADIUS, player.z),
+        radius = PLAYER_COLLISION_RADIUS
+    )
+}
+
+private fun goombaCollider(enemy: RoamingEnemy): SphereCollider3D {
+    return SphereCollider3D(
+        center = Vec3(
+            enemy.position.x,
+            enemy.position.y + GOOMBA_COLLISION_CENTER_Y,
+            enemy.position.z
+        ),
+        radius = GOOMBA_COLLISION_RADIUS
+    )
+}
+
+private fun horizontalAwayFromEnemy(
+    player: Vec3,
+    enemy: Vec3
+): Vec3 {
+    val deltaX = player.x - enemy.x
+    val deltaZ = player.z - enemy.z
+    val length = sqrt(deltaX * deltaX + deltaZ * deltaZ)
+    if (length < 0.000001) {
+        return Vec3(0.0, 0.0, 1.0)
+    }
+    return Vec3(deltaX / length, 0.0, deltaZ / length)
+}
+
 private data class FollowCamera(
     val eye: Vec3,
     val target: Vec3
@@ -466,112 +609,27 @@ private data class FollowCamera(
     }
 }
 
-private class TerrainCollision private constructor(
-    private val triangles: List<TerrainTriangle>
-) {
-    fun playerYAt(
-        x: Double,
-        z: Double,
-        maxPlayerY: Double? = null
-    ): Double? {
-        return groundYAt(
-            x = x,
-            z = z,
-            maxGroundY = maxPlayerY?.minus(PLAYER_HALF_HEIGHT)
-        )?.plus(PLAYER_HALF_HEIGHT)
-    }
-
-    fun groundYAt(
-        x: Double,
-        z: Double,
-        maxGroundY: Double? = null
-    ): Double? {
-        var bestHeight: Double? = null
-        triangles.forEach { triangle ->
-            val height = triangle.heightAt(x, z) ?: return@forEach
-            if (maxGroundY != null && height > maxGroundY) {
-                return@forEach
-            }
-            if (bestHeight == null || height > bestHeight!!) {
-                bestHeight = height
-            }
-        }
-        return bestHeight
-    }
-
-    companion object {
-        fun fromVertices(vertices: List<LitVertex3D>): TerrainCollision {
-            val triangles = mutableListOf<TerrainTriangle>()
-            for (index in 0 until vertices.size - 2 step 3) {
-                triangles += TerrainTriangle(
-                    a = vertices[index].position,
-                    b = vertices[index + 1].position,
-                    c = vertices[index + 2].position
-                )
-            }
-            return TerrainCollision(triangles)
-        }
-    }
-}
-
-private data class TerrainTriangle(
-    val a: Vec3,
-    val b: Vec3,
-    val c: Vec3
-) {
-    fun heightAt(
-        x: Double,
-        z: Double
-    ): Double? {
-        val v0x = b.x - a.x
-        val v0z = b.z - a.z
-        val v1x = c.x - a.x
-        val v1z = c.z - a.z
-        val v2x = x - a.x
-        val v2z = z - a.z
-        val denominator = v0x * v1z - v1x * v0z
-        if (abs(denominator) < 0.000001) {
-            return null
-        }
-
-        val beta = (v2x * v1z - v1x * v2z) / denominator
-        val gamma = (v0x * v2z - v2x * v0z) / denominator
-        val alpha = 1.0 - beta - gamma
-        val epsilon = 0.0001
-        if (alpha < -epsilon || beta < -epsilon || gamma < -epsilon) {
-            return null
-        }
-        if (alpha > 1.0 + epsilon || beta > 1.0 + epsilon || gamma > 1.0 + epsilon) {
-            return null
-        }
-
-        return a.y * alpha + b.y * beta + c.y * gamma
-    }
-}
-
-private fun createGoombas(terrain: TerrainCollision): MutableList<RoamingEnemy> {
+private fun createGoombas(controller: TerrainActorController3D): MutableList<RoamingEnemy> {
     return mutableListOf(
-        createGoomba(terrain, centerX = -8.0, centerZ = -9.0, radius = 3.4, speed = 0.85, angle = 0.0),
-        createGoomba(terrain, centerX = 7.5, centerZ = -12.0, radius = 4.2, speed = 0.66, angle = 1.7),
-        createGoomba(terrain, centerX = -17.0, centerZ = 7.0, radius = 4.8, speed = 0.72, angle = 3.0),
-        createGoomba(terrain, centerX = 17.0, centerZ = 10.0, radius = 4.0, speed = 0.93, angle = 4.4),
-        createGoomba(terrain, centerX = 0.0, centerZ = 18.0, radius = 5.1, speed = 0.58, angle = 2.2)
+        createGoomba(controller, centerX = -8.0, centerZ = -9.0, radius = 3.4, speed = 0.85, angle = 0.0),
+        createGoomba(controller, centerX = 7.5, centerZ = -12.0, radius = 4.2, speed = 0.66, angle = 1.7),
+        createGoomba(controller, centerX = -17.0, centerZ = 7.0, radius = 4.8, speed = 0.72, angle = 3.0),
+        createGoomba(controller, centerX = 17.0, centerZ = 10.0, radius = 4.0, speed = 0.93, angle = 4.4),
+        createGoomba(controller, centerX = 0.0, centerZ = 18.0, radius = 5.1, speed = 0.58, angle = 2.2)
     )
 }
 
 private fun createGoomba(
-    terrain: TerrainCollision,
+    controller: TerrainActorController3D,
     centerX: Double,
     centerZ: Double,
     radius: Double,
     speed: Double,
     angle: Double
 ): RoamingEnemy {
-    val position = surfacePosition(
-        terrain = terrain,
-        x = centerX + cos(angle) * radius,
-        z = centerZ + sin(angle) * radius
-    )
+    val x = centerX + cos(angle) * radius
+    val z = centerZ + sin(angle) * radius
+    val position = Vec3(x, controller.actorYAt(x, z) ?: 0.0, z)
     return RoamingEnemy(
         center = Vec3(centerX, 0.0, centerZ),
         radius = radius,
@@ -584,29 +642,56 @@ private fun createGoomba(
 
 private fun updateGoombas(
     enemies: List<RoamingEnemy>,
-    terrain: TerrainCollision,
+    controller: TerrainActorController3D,
     deltaSeconds: Double
 ) {
     enemies.forEach { enemy ->
-        val previous = enemy.position
-        enemy.angle += enemy.speed * deltaSeconds
-        val next = surfacePosition(
-            terrain = terrain,
-            x = enemy.center.x + cos(enemy.angle) * enemy.radius,
-            z = enemy.center.z + sin(enemy.angle) * enemy.radius
-        )
-        enemy.position = next
+        if (!enemy.isActive) {
+            return@forEach
+        }
 
-        val deltaX = next.x - previous.x
-        val deltaZ = next.z - previous.z
+        val previous = enemy.position
+        val nextAngle = enemy.angle + enemy.speed * deltaSeconds
+        val next = moveGoombaTowardAngle(enemy, controller, nextAngle)
+        if (next == null) {
+            enemy.speed = -enemy.speed
+            val reversedAngle = enemy.angle + enemy.speed * deltaSeconds
+            moveGoombaTowardAngle(enemy, controller, reversedAngle)?.let { reversedNext ->
+                enemy.angle = reversedAngle
+                enemy.position = reversedNext
+            }
+        } else {
+            enemy.angle = nextAngle
+            enemy.position = next
+        }
+
+        val deltaX = enemy.position.x - previous.x
+        val deltaZ = enemy.position.z - previous.z
         if (deltaX * deltaX + deltaZ * deltaZ > 0.000001) {
             enemy.yaw = atan2(-deltaX, -deltaZ)
         }
     }
 }
 
-private fun surfacePosition(
-    terrain: TerrainCollision,
+private fun moveGoombaTowardAngle(
+    enemy: RoamingEnemy,
+    controller: TerrainActorController3D,
+    angle: Double
+): Vec3? {
+    val nextX = enemy.center.x + cos(angle) * enemy.radius
+    val nextZ = enemy.center.z + sin(angle) * enemy.radius
+    val move = controller.moveHorizontal(
+        position = enemy.position,
+        deltaX = nextX - enemy.position.x,
+        deltaZ = nextZ - enemy.position.z,
+        isGrounded = true,
+        allowLeaveGround = false
+    )
+    return if (move.moved && move.isGrounded) move.position else null
+}
+
+private fun groundPosition(
+    terrain: TerrainMeshCollider3D,
     x: Double,
     z: Double,
     fallbackY: Double = 0.0
@@ -614,7 +699,7 @@ private fun surfacePosition(
     return Vec3(x, terrain.groundYAt(x, z) ?: fallbackY, z)
 }
 
-private fun findHighestGroundRegionCenter(terrain: TerrainCollision): Vec3 {
+private fun findHighestGroundRegionCenter(terrain: TerrainMeshCollider3D): Vec3 {
     val samples = mutableListOf<Vec3>()
     var highestY = Double.NEGATIVE_INFINITY
     var x = -42.0
@@ -642,46 +727,12 @@ private fun findHighestGroundRegionCenter(terrain: TerrainCollision): Vec3 {
     }
     val centerX = summitSamples.map { it.x }.average()
     val centerZ = summitSamples.map { it.z }.average()
-    return surfacePosition(
+    return groundPosition(
         terrain = terrain,
         x = centerX,
         z = centerZ,
         fallbackY = highestY
     )
-}
-
-private fun movePlayerOnTerrain(
-    player: Vec3,
-    deltaX: Double,
-    deltaZ: Double,
-    terrain: TerrainCollision,
-    isGrounded: Boolean
-): Vec3 {
-    fun candidate(
-        xDelta: Double,
-        zDelta: Double
-    ): Vec3? {
-        val nextX = player.x + xDelta
-        val nextZ = player.z + zDelta
-        val nextGroundY = terrain.playerYAt(
-            x = nextX,
-            z = nextZ,
-            maxPlayerY = player.y + if (isGrounded) MAX_STEP_UP else GROUND_CONTACT_EPSILON
-        ) ?: return null
-        if (isGrounded && nextGroundY - player.y > MAX_STEP_UP) {
-            return null
-        }
-        return Vec3(
-            x = nextX,
-            y = if (isGrounded) nextGroundY else player.y,
-            z = nextZ
-        )
-    }
-
-    return candidate(deltaX, deltaZ)
-        ?: candidate(deltaX, 0.0)
-        ?: candidate(0.0, deltaZ)
-        ?: player
 }
 
 private fun createThirdPersonCamera(
