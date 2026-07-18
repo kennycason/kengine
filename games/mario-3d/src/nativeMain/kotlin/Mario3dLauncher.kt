@@ -36,6 +36,7 @@ import sdl3.SDL_GetTicks
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -78,8 +79,11 @@ private const val BOWSER_LEASH_RADIUS = 8.5
 private const val BOWSER_RESET_RADIUS = 15.0
 private const val BOWSER_FALL_RECOVERY_DROP = 5.0
 private const val BOWSER_HOME_STOP_RADIUS = 0.45
-private const val BOWSER_WALK_SPEED = 2.0
-private const val BOWSER_LUNGE_SPEED = 6.3
+private const val BOWSER_WALK_SPEED = 1.35
+private const val BOWSER_LUNGE_SPEED = 5.1
+private const val BOWSER_GROUNDED_TURN_SPEED = 1.55
+private const val BOWSER_AIR_TURN_SPEED = 0.65
+private const val BOWSER_ATTACK_MAX_YAW_ERROR = 0.7
 private const val BOWSER_JUMP_VELOCITY = 8.8
 private const val BOWSER_GRAVITY = 28.0
 private const val BOWSER_TERMINAL_FALL_SPEED = -18.0
@@ -817,25 +821,39 @@ private fun updateBowser(
     val targetDistance = sqrt(targetDeltaX * targetDeltaX + targetDeltaZ * targetDeltaZ)
     val directionX = if (targetDistance > 0.000001) targetDeltaX / targetDistance else 0.0
     val directionZ = if (targetDistance > 0.000001) targetDeltaZ / targetDistance else -1.0
+    val targetYaw = atan2(-directionX, -directionZ)
     if (shouldChasePlayer || targetDistance > BOWSER_HOME_STOP_RADIUS) {
-        bowser.yaw = atan2(-directionX, -directionZ)
+        bowser.yaw = moveAngleToward(
+            current = bowser.yaw,
+            target = targetYaw,
+            maxStep = (if (bowser.isGrounded) BOWSER_GROUNDED_TURN_SPEED else BOWSER_AIR_TURN_SPEED) * deltaSeconds
+        )
     }
 
+    val yawError = abs(shortestAngleDelta(bowser.yaw, targetYaw))
     if (bowser.isGrounded &&
         shouldChasePlayer &&
         playerDistance < BOWSER_AGGRO_RADIUS * 0.72 &&
+        yawError <= BOWSER_ATTACK_MAX_YAW_ERROR &&
         bowser.attackCooldownSeconds <= 0.0
     ) {
         bowser.velocityY = BOWSER_JUMP_VELOCITY
         bowser.isGrounded = false
-        bowser.lungeX = directionX
-        bowser.lungeZ = directionZ
+        val forward = forwardForYaw(bowser.yaw, 1.0)
+        bowser.lungeX = forward.x
+        bowser.lungeZ = forward.z
         bowser.attackCooldownSeconds = BOWSER_ATTACK_COOLDOWN_SECONDS
     }
 
     val horizontalSpeed = if (bowser.isGrounded) BOWSER_WALK_SPEED else BOWSER_LUNGE_SPEED
-    val moveDirectionX = if (bowser.isGrounded || !shouldChasePlayer) directionX else bowser.lungeX
-    val moveDirectionZ = if (bowser.isGrounded || !shouldChasePlayer) directionZ else bowser.lungeZ
+    val facing = forwardForYaw(bowser.yaw, 1.0)
+    val turnAlignment = if (bowser.isGrounded) {
+        ((cos(yawError) + 1.0) * 0.5).coerceIn(0.25, 1.0)
+    } else {
+        1.0
+    }
+    val moveDirectionX = if (bowser.isGrounded || !shouldChasePlayer) facing.x else bowser.lungeX
+    val moveDirectionZ = if (bowser.isGrounded || !shouldChasePlayer) facing.z else bowser.lungeZ
     val shouldMove = if (shouldChasePlayer) {
         playerDistance > BOWSER_COLLISION_RADIUS * 1.4 || !bowser.isGrounded
     } else {
@@ -845,8 +863,8 @@ private fun updateBowser(
         moveBowserSafely(
             bowser = bowser,
             controller = controller,
-            deltaX = moveDirectionX * horizontalSpeed * deltaSeconds,
-            deltaZ = moveDirectionZ * horizontalSpeed * deltaSeconds
+            deltaX = moveDirectionX * horizontalSpeed * turnAlignment * deltaSeconds,
+            deltaZ = moveDirectionZ * horizontalSpeed * turnAlignment * deltaSeconds
         )
     }
 
@@ -1232,6 +1250,34 @@ private fun rightForYaw(
     length: Double
 ): Vec3 {
     return Vec3(cos(yaw) * length, 0.0, -sin(yaw) * length)
+}
+
+private fun moveAngleToward(
+    current: Double,
+    target: Double,
+    maxStep: Double
+): Double {
+    val delta = shortestAngleDelta(current, target)
+    val clampedDelta = delta.coerceIn(-maxStep, maxStep)
+    return wrapAngle(current + clampedDelta)
+}
+
+private fun shortestAngleDelta(
+    current: Double,
+    target: Double
+): Double {
+    return wrapAngle(target - current)
+}
+
+private fun wrapAngle(angle: Double): Double {
+    var wrapped = angle
+    while (wrapped > PI) {
+        wrapped -= PI * 2.0
+    }
+    while (wrapped < -PI) {
+        wrapped += PI * 2.0
+    }
+    return wrapped
 }
 
 private fun horizontalLength(value: Vec3): Double {
