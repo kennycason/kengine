@@ -15,8 +15,10 @@ import com.kengine.three.GlbAnimationClipInfo
 import com.kengine.three.GlbMeshLoadOptions
 import com.kengine.three.GlbMeshLoader
 import com.kengine.three.GpuContext
+import com.kengine.three.GpuMesh
 import com.kengine.three.LitMeshRenderer3D
 import com.kengine.three.Mat4
+import com.kengine.three.MeshRenderer3D
 import com.kengine.three.TerrainActorController3D
 import com.kengine.three.TerrainActorControllerSettings3D
 import com.kengine.three.TerrainMeshCollider3D
@@ -60,9 +62,29 @@ private const val ENEMY_MAX_STEP_DOWN = 0.58
 private const val GOOMBA_COLLISION_RADIUS = 0.48
 private const val GOOMBA_COLLISION_CENTER_Y = 0.42
 private const val GOOMBA_STOMP_MIN_HEIGHT = 0.28
+private const val BOWSER_HEALTH = 3
+private const val BOWSER_COLLISION_RADIUS = 1.48
+private const val BOWSER_COLLISION_CENTER_Y = 1.5
+private const val BOWSER_STOMP_MIN_HEIGHT = 1.35
+private const val BOWSER_STOMP_BOUNCE_VELOCITY = 13.4
+private const val BOWSER_BODY_BUMP_DISTANCE = 1.1
+private const val BOWSER_AGGRO_RADIUS = 16.0
+private const val BOWSER_LEASH_RADIUS = 8.5
+private const val BOWSER_RESET_RADIUS = 15.0
+private const val BOWSER_FALL_RECOVERY_DROP = 5.0
+private const val BOWSER_HOME_STOP_RADIUS = 0.45
+private const val BOWSER_WALK_SPEED = 2.0
+private const val BOWSER_LUNGE_SPEED = 6.3
+private const val BOWSER_JUMP_VELOCITY = 8.8
+private const val BOWSER_GRAVITY = 28.0
+private const val BOWSER_TERMINAL_FALL_SPEED = -18.0
+private const val BOWSER_ATTACK_COOLDOWN_SECONDS = 2.35
+private const val BOWSER_HIT_FLASH_SECONDS = 0.32
+private const val STAR_FLOAT_HEIGHT = 1.65
+private const val STAR_PICKUP_RADIUS = 0.72
 private const val MARIO_MODEL_YAW_OFFSET = 3.141592653589793
 private const val GOOMBA_MODEL_YAW_OFFSET = 3.141592653589793
-private const val BOWSER_MODEL_YAW_OFFSET = 3.141592653589793
+private const val BOWSER_MODEL_YAW_OFFSET = 1.5707963267948966
 private const val GROUND_CONTACT_EPSILON = 0.05
 private const val MAX_STEP_UP = 0.72
 private const val MOVEMENT_INPUT_EPSILON = 0.08
@@ -70,11 +92,14 @@ private const val LOOK_INPUT_EPSILON = 0.04
 private const val CAMERA_STOP_EPSILON = 0.01
 private const val CAMERA_YAW_SPEED = 3.0
 private const val CAMERA_PITCH_SPEED = 1.75
+private const val CAMERA_ZOOM_SPEED = 3.6
 private const val CAMERA_LOOK_SMOOTHING = 18.0
 private const val CAMERA_FOLLOW_SMOOTHING = 10.0
 private const val CAMERA_MIN_PITCH = -0.08
 private const val CAMERA_MAX_PITCH = 0.95
-private val CAMERA_DISTANCES = doubleArrayOf(3.7, 4.9, 6.2)
+private const val CAMERA_MIN_DISTANCE = 2.8
+private const val CAMERA_MAX_DISTANCE = 7.2
+private val CAMERA_DISTANCES = doubleArrayOf(3.5, 4.9, 6.3)
 
 @OptIn(ExperimentalForeignApi::class)
 fun main() {
@@ -137,7 +162,7 @@ fun main() {
                     defaultColor = Color.fromHex("a86432")
                 )
             )
-            val bowser = GlbMeshLoader.loadTexturedLit(
+            val bowserModel = GlbMeshLoader.loadTexturedLit(
                 gpu = this,
                 assetPath = resolveMarioAsset("models/Super Mario 64 Bowser.glb"),
                 options = GlbMeshLoadOptions(
@@ -145,6 +170,14 @@ fun main() {
                     defaultColor = Color.fromHex("ffffff")
                 )
             )
+            val starMesh = GpuMesh.sphere(
+                gpu = this,
+                radius = 0.42,
+                color = Color.fromHex("ffd447"),
+                rings = 10,
+                segments = 16
+            )
+            val meshRenderer = MeshRenderer3D(this)
             val litRenderer = LitMeshRenderer3D(this)
             val texturedRenderer = TexturedLitMeshRenderer3D(this)
             val light = DirectionalLight3D(
@@ -165,7 +198,8 @@ fun main() {
             var marioAnimationState = MarioAnimationState.IDLE
             var marioAnimationTime = 0.0
             val goombas = createGoombas(enemyController)
-            val bowserAnchor = findHighestGroundRegionCenter(terrain)
+            val bowser = createBowser(findHighestGroundRegionCenter(terrain))
+            val summitStar = createSummitStar(bowser.home)
             var controllerNeutral: FloatArray? = null
             var calibratedControllerId: UInt? = null
             var controllerCalibrationUntil = 0.0
@@ -175,6 +209,7 @@ fun main() {
             var lastPlayerHitAt = -PLAYER_HURT_COOLDOWN_SECONDS
             var wasCameraDistancePressed = false
             var cameraDistanceIndex = 0
+            var cameraDistance = CAMERA_DISTANCES[cameraDistanceIndex]
             var previousTicks = SDL_GetTicks()
 
             try {
@@ -273,8 +308,17 @@ fun main() {
                         controllerState.isButtonPressed(Buttons.TRIANGLE)
                     if (cameraDistancePressed && !wasCameraDistancePressed) {
                         cameraDistanceIndex = (cameraDistanceIndex + 1) % CAMERA_DISTANCES.size
+                        cameraDistance = CAMERA_DISTANCES[cameraDistanceIndex]
                     }
                     wasCameraDistancePressed = cameraDistancePressed
+                    val zoomInput = axis(
+                        controllerState.isButtonPressed(Buttons.DPAD_DOWN),
+                        controllerState.isButtonPressed(Buttons.DPAD_UP)
+                    )
+                    if (zoomInput != 0.0) {
+                        cameraDistance = (cameraDistance + zoomInput * CAMERA_ZOOM_SPEED * deltaSeconds)
+                            .coerceIn(CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE)
+                    }
 
                     val runPressed = keyboardState.isLShiftPressed() ||
                         keyboardState.isRShiftPressed() ||
@@ -330,6 +374,7 @@ fun main() {
                     var isGroundedAfterGravity = verticalMove.isGrounded
 
                     updateGoombas(goombas, enemyController, deltaSeconds)
+                    updateBowser(bowser, enemyController, player, deltaSeconds)
                     val goombaCollision = resolvePlayerGoombaCollisions(
                         player = player,
                         playerYBeforeGravity = playerYBeforeGravity,
@@ -344,6 +389,24 @@ fun main() {
                     playerVelocityY = goombaCollision.playerVelocityY
                     isGroundedAfterGravity = goombaCollision.isGrounded
                     lastPlayerHitAt = goombaCollision.lastPlayerHitAt
+                    val bowserCollision = resolvePlayerBowserCollision(
+                        player = player,
+                        playerYBeforeGravity = playerYBeforeGravity,
+                        playerVelocityY = playerVelocityY,
+                        isGrounded = isGroundedAfterGravity,
+                        bowser = bowser,
+                        playerController = playerController,
+                        elapsedSeconds = elapsedSeconds,
+                        lastPlayerHitAt = lastPlayerHitAt
+                    )
+                    player = bowserCollision.player
+                    playerVelocityY = bowserCollision.playerVelocityY
+                    isGroundedAfterGravity = bowserCollision.isGrounded
+                    lastPlayerHitAt = bowserCollision.lastPlayerHitAt
+                    if (!bowser.isActive && !summitStar.isCollected) {
+                        summitStar.isActive = true
+                    }
+                    resolveSummitStarCollection(summitStar, player)
 
                     if (!wasGrounded && isGroundedAfterGravity) {
                         landingAnimationUntil = elapsedSeconds + 0.22
@@ -374,7 +437,7 @@ fun main() {
                         player = cameraFocus,
                         cameraYaw = cameraYaw,
                         cameraPitch = cameraPitch,
-                        distance = CAMERA_DISTANCES[cameraDistanceIndex]
+                        distance = cameraDistance
                     )
 
                     render(0.47f, 0.67f, 0.94f, 1f, enableDepth = true) { frame ->
@@ -398,20 +461,43 @@ fun main() {
                                 timeSeconds = elapsedSeconds * 1.4 + enemy.angle
                             )
                         }
-                        bowser.draw(
-                            renderer = texturedRenderer,
-                            frame = frame,
-                            transform = Transform3D(
-                                position = Vec3(
-                                    bowserAnchor.x,
-                                    bowserAnchor.y + 0.18 + sin(elapsedSeconds * 1.1) * 0.1,
-                                    bowserAnchor.z
+                        if (bowser.isActive) {
+                            val hitPulse = if (elapsedSeconds < bowser.hitFlashUntil) {
+                                1.0 + abs(sin(elapsedSeconds * 52.0)) * 0.12
+                            } else {
+                                1.0
+                            }
+                            bowserModel.draw(
+                                renderer = texturedRenderer,
+                                frame = frame,
+                                transform = Transform3D(
+                                    position = Vec3(
+                                        bowser.position.x,
+                                        bowser.position.y + 0.18 + sin(elapsedSeconds * 1.1) * 0.1,
+                                        bowser.position.z
+                                    ),
+                                    rotation = Vec3(0.0, bowser.yaw + BOWSER_MODEL_YAW_OFFSET, 0.0),
+                                    scale = Vec3(hitPulse, hitPulse, hitPulse)
                                 ),
-                                rotation = Vec3(0.0, elapsedSeconds * -0.22 + BOWSER_MODEL_YAW_OFFSET, 0.0)
-                            ),
-                            camera = camera,
-                            light = light
-                        )
+                                camera = camera,
+                                light = light
+                            )
+                        }
+                        if (summitStar.isActive && !summitStar.isCollected) {
+                            meshRenderer.draw(
+                                frame = frame,
+                                mesh = starMesh,
+                                transform = Transform3D(
+                                    position = Vec3(
+                                        summitStar.position.x,
+                                        summitStar.position.y + sin(elapsedSeconds * 3.1) * 0.16,
+                                        summitStar.position.z
+                                    ),
+                                    rotation = Vec3(0.0, elapsedSeconds * 2.8, elapsedSeconds * 1.5)
+                                ),
+                                camera = camera
+                            )
+                        }
                         mario.draw(
                             renderer = texturedRenderer,
                             frame = frame,
@@ -430,7 +516,9 @@ fun main() {
             } finally {
                 texturedRenderer.cleanup()
                 litRenderer.cleanup()
-                bowser.cleanup()
+                meshRenderer.cleanup()
+                starMesh.cleanup()
+                bowserModel.cleanup()
                 goomba.cleanup()
                 mario.cleanup()
                 world.cleanup()
@@ -449,7 +537,27 @@ private data class RoamingEnemy(
     var isActive: Boolean = true
 )
 
-private data class PlayerGoombaCollisionResult(
+private data class BossEnemy(
+    val home: Vec3,
+    var position: Vec3,
+    var yaw: Double,
+    var velocityY: Double = 0.0,
+    var isGrounded: Boolean = true,
+    var attackCooldownSeconds: Double = 1.0,
+    var lungeX: Double = 0.0,
+    var lungeZ: Double = 0.0,
+    var health: Int = BOWSER_HEALTH,
+    var hitFlashUntil: Double = 0.0,
+    var isActive: Boolean = true
+)
+
+private data class SummitStar(
+    val position: Vec3,
+    var isActive: Boolean = false,
+    var isCollected: Boolean = false
+)
+
+private data class PlayerEnemyCollisionResult(
     val player: Vec3,
     val playerVelocityY: Double,
     val isGrounded: Boolean,
@@ -460,8 +568,8 @@ private enum class MarioAnimationState(
     val playbackSpeed: Double
 ) {
     IDLE(1.0),
-    WALK(1.05),
-    RUN(1.18),
+    WALK(1.42),
+    RUN(2.05),
     JUMP(1.0),
     FALL(1.0),
     LAND(1.0)
@@ -517,7 +625,7 @@ private fun resolvePlayerGoombaCollisions(
     playerController: TerrainActorController3D,
     elapsedSeconds: Double,
     lastPlayerHitAt: Double
-): PlayerGoombaCollisionResult {
+): PlayerEnemyCollisionResult {
     var resolvedPlayer = player
     var resolvedVelocityY = playerVelocityY
     var resolvedGrounded = isGrounded
@@ -558,11 +666,225 @@ private fun resolvePlayerGoombaCollisions(
         resolvedLastHitAt = elapsedSeconds
     }
 
-    return PlayerGoombaCollisionResult(
+    return PlayerEnemyCollisionResult(
         player = resolvedPlayer,
         playerVelocityY = resolvedVelocityY,
         isGrounded = resolvedGrounded,
         lastPlayerHitAt = resolvedLastHitAt
+    )
+}
+
+private fun createBowser(anchor: Vec3): BossEnemy {
+    return BossEnemy(
+        home = anchor,
+        position = anchor,
+        yaw = 0.0
+    )
+}
+
+private fun updateBowser(
+    bowser: BossEnemy,
+    controller: TerrainActorController3D,
+    player: Vec3,
+    deltaSeconds: Double
+) {
+    if (!bowser.isActive) {
+        return
+    }
+
+    bowser.attackCooldownSeconds = maxOf(0.0, bowser.attackCooldownSeconds - deltaSeconds)
+    val homeDistance = horizontalDistance(bowser.position, bowser.home)
+    val nearbyGroundY = controller.actorYAt(
+        x = bowser.position.x,
+        z = bowser.position.z,
+        minActorY = bowser.home.y - BOWSER_FALL_RECOVERY_DROP,
+        maxActorY = bowser.position.y + GROUND_CONTACT_EPSILON
+    )
+    if (nearbyGroundY == null ||
+        bowser.position.y < bowser.home.y - BOWSER_FALL_RECOVERY_DROP ||
+        homeDistance > BOWSER_RESET_RADIUS
+    ) {
+        resetBowserToHome(bowser, controller)
+        return
+    }
+
+    if (bowser.position.y <= nearbyGroundY + GROUND_CONTACT_EPSILON && bowser.velocityY <= 0.1) {
+        bowser.position = Vec3(bowser.position.x, nearbyGroundY, bowser.position.z)
+        bowser.isGrounded = true
+    }
+
+    val playerDistance = horizontalDistance(bowser.position, player)
+    val shouldChasePlayer = playerDistance <= BOWSER_AGGRO_RADIUS && homeDistance <= BOWSER_LEASH_RADIUS
+    val target = if (shouldChasePlayer) player else bowser.home
+    val targetDeltaX = target.x - bowser.position.x
+    val targetDeltaZ = target.z - bowser.position.z
+    val targetDistance = sqrt(targetDeltaX * targetDeltaX + targetDeltaZ * targetDeltaZ)
+    val directionX = if (targetDistance > 0.000001) targetDeltaX / targetDistance else 0.0
+    val directionZ = if (targetDistance > 0.000001) targetDeltaZ / targetDistance else -1.0
+    if (shouldChasePlayer || targetDistance > BOWSER_HOME_STOP_RADIUS) {
+        bowser.yaw = atan2(-directionX, -directionZ)
+    }
+
+    if (bowser.isGrounded &&
+        shouldChasePlayer &&
+        playerDistance < BOWSER_AGGRO_RADIUS * 0.72 &&
+        bowser.attackCooldownSeconds <= 0.0
+    ) {
+        bowser.velocityY = BOWSER_JUMP_VELOCITY
+        bowser.isGrounded = false
+        bowser.lungeX = directionX
+        bowser.lungeZ = directionZ
+        bowser.attackCooldownSeconds = BOWSER_ATTACK_COOLDOWN_SECONDS
+    }
+
+    val horizontalSpeed = if (bowser.isGrounded) BOWSER_WALK_SPEED else BOWSER_LUNGE_SPEED
+    val moveDirectionX = if (bowser.isGrounded || !shouldChasePlayer) directionX else bowser.lungeX
+    val moveDirectionZ = if (bowser.isGrounded || !shouldChasePlayer) directionZ else bowser.lungeZ
+    val shouldMove = if (shouldChasePlayer) {
+        playerDistance > BOWSER_COLLISION_RADIUS * 1.4 || !bowser.isGrounded
+    } else {
+        targetDistance > BOWSER_HOME_STOP_RADIUS
+    }
+    if (shouldMove) {
+        moveBowserSafely(
+            bowser = bowser,
+            controller = controller,
+            deltaX = moveDirectionX * horizontalSpeed * deltaSeconds,
+            deltaZ = moveDirectionZ * horizontalSpeed * deltaSeconds
+        )
+    }
+
+    val verticalMove = controller.applyGravity(
+        position = bowser.position,
+        velocityY = bowser.velocityY,
+        deltaSeconds = deltaSeconds,
+        gravity = BOWSER_GRAVITY,
+        terminalVelocityY = BOWSER_TERMINAL_FALL_SPEED
+    )
+    bowser.position = verticalMove.position
+    bowser.velocityY = verticalMove.velocityY
+    bowser.isGrounded = verticalMove.isGrounded
+}
+
+private fun moveBowserSafely(
+    bowser: BossEnemy,
+    controller: TerrainActorController3D,
+    deltaX: Double,
+    deltaZ: Double
+) {
+    val nextX = bowser.position.x + deltaX
+    val nextZ = bowser.position.z + deltaZ
+    val nextPosition = Vec3(nextX, bowser.position.y, nextZ)
+    if (horizontalDistance(nextPosition, bowser.home) > BOWSER_RESET_RADIUS) {
+        return
+    }
+
+    val groundAhead = controller.actorYAt(
+        x = nextX,
+        z = nextZ,
+        minActorY = bowser.home.y - BOWSER_FALL_RECOVERY_DROP,
+        maxActorY = bowser.position.y + BOWSER_JUMP_VELOCITY
+    ) ?: return
+
+    if (!bowser.isGrounded && groundAhead < bowser.home.y - BOWSER_FALL_RECOVERY_DROP) {
+        return
+    }
+
+    val move = controller.moveHorizontal(
+        position = bowser.position,
+        deltaX = deltaX,
+        deltaZ = deltaZ,
+        isGrounded = bowser.isGrounded,
+        allowLeaveGround = false
+    )
+    bowser.position = move.position
+    bowser.isGrounded = if (bowser.isGrounded) move.isGrounded else false
+}
+
+private fun resetBowserToHome(
+    bowser: BossEnemy,
+    controller: TerrainActorController3D
+) {
+    val homeY = controller.actorYAt(bowser.home.x, bowser.home.z) ?: bowser.home.y
+    bowser.position = Vec3(bowser.home.x, homeY, bowser.home.z)
+    bowser.velocityY = 0.0
+    bowser.isGrounded = true
+    bowser.attackCooldownSeconds = 1.0
+    bowser.lungeX = 0.0
+    bowser.lungeZ = 0.0
+}
+
+private fun createSummitStar(anchor: Vec3): SummitStar {
+    return SummitStar(
+        position = Vec3(anchor.x, anchor.y + STAR_FLOAT_HEIGHT, anchor.z)
+    )
+}
+
+private fun resolveSummitStarCollection(
+    star: SummitStar,
+    player: Vec3
+) {
+    if (!star.isActive || star.isCollected) {
+        return
+    }
+
+    if (Collision3D.overlap(playerCollider(player), summitStarCollider(star)) != null) {
+        star.isCollected = true
+        star.isActive = false
+    }
+}
+
+private fun resolvePlayerBowserCollision(
+    player: Vec3,
+    playerYBeforeGravity: Double,
+    playerVelocityY: Double,
+    isGrounded: Boolean,
+    bowser: BossEnemy,
+    playerController: TerrainActorController3D,
+    elapsedSeconds: Double,
+    lastPlayerHitAt: Double
+): PlayerEnemyCollisionResult {
+    if (!bowser.isActive) {
+        return PlayerEnemyCollisionResult(player, playerVelocityY, isGrounded, lastPlayerHitAt)
+    }
+
+    val contact = Collision3D.overlap(playerCollider(player), bowserCollider(bowser))
+        ?: return PlayerEnemyCollisionResult(player, playerVelocityY, isGrounded, lastPlayerHitAt)
+    val feetWereAboveStompLine = playerYBeforeGravity - PLAYER_HALF_HEIGHT >=
+        bowser.position.y + BOWSER_STOMP_MIN_HEIGHT
+    val feetAreAboveGround = player.y - PLAYER_HALF_HEIGHT >= bowser.position.y - GROUND_CONTACT_EPSILON
+    val isStomp = playerVelocityY <= 0.0 && feetWereAboveStompLine && feetAreAboveGround
+    if (isStomp) {
+        bowser.health -= 1
+        bowser.hitFlashUntil = elapsedSeconds + BOWSER_HIT_FLASH_SECONDS
+        if (bowser.health <= 0) {
+            bowser.isActive = false
+        }
+        return PlayerEnemyCollisionResult(
+            player = player,
+            playerVelocityY = BOWSER_STOMP_BOUNCE_VELOCITY,
+            isGrounded = false,
+            lastPlayerHitAt = lastPlayerHitAt
+        )
+    }
+
+    if (elapsedSeconds - lastPlayerHitAt < PLAYER_HURT_COOLDOWN_SECONDS) {
+        return PlayerEnemyCollisionResult(player, playerVelocityY, isGrounded, lastPlayerHitAt)
+    }
+
+    val away = horizontalAwayFromEnemy(player, bowser.position)
+    val bumpMove = playerController.moveHorizontal(
+        position = player,
+        deltaX = away.x * (BOWSER_BODY_BUMP_DISTANCE + contact.depth * 0.25),
+        deltaZ = away.z * (BOWSER_BODY_BUMP_DISTANCE + contact.depth * 0.25),
+        isGrounded = isGrounded,
+        allowLeaveGround = false
+    )
+    return PlayerEnemyCollisionResult(
+        player = bumpMove.position,
+        playerVelocityY = if (bumpMove.isGrounded) 0.0 else maxOf(playerVelocityY, 0.0),
+        isGrounded = bumpMove.isGrounded,
+        lastPlayerHitAt = elapsedSeconds
     )
 }
 
@@ -582,6 +904,24 @@ private fun goombaCollider(enemy: RoamingEnemy): SphereCollider3D {
             enemy.position.z
         ),
         radius = GOOMBA_COLLISION_RADIUS
+    )
+}
+
+private fun bowserCollider(bowser: BossEnemy): SphereCollider3D {
+    return SphereCollider3D(
+        center = Vec3(
+            bowser.position.x,
+            bowser.position.y + BOWSER_COLLISION_CENTER_Y,
+            bowser.position.z
+        ),
+        radius = BOWSER_COLLISION_RADIUS
+    )
+}
+
+private fun summitStarCollider(star: SummitStar): SphereCollider3D {
+    return SphereCollider3D(
+        center = star.position,
+        radius = STAR_PICKUP_RADIUS
     )
 }
 
@@ -730,7 +1070,9 @@ private fun findHighestGroundRegionCenter(terrain: TerrainMeshCollider3D): Vec3 
     }
     val centerX = summitSamples.map { it.x }.average()
     val centerZ = summitSamples.map { it.z }.average()
-    return groundPosition(
+    return summitSamples.minByOrNull {
+        squaredHorizontalDistance(it, Vec3(centerX, it.y, centerZ))
+    } ?: groundPosition(
         terrain = terrain,
         x = centerX,
         z = centerZ,
@@ -785,6 +1127,22 @@ private fun rightForYaw(
 
 private fun horizontalLength(value: Vec3): Double {
     return sqrt(value.x * value.x + value.z * value.z)
+}
+
+private fun horizontalDistance(
+    a: Vec3,
+    b: Vec3
+): Double {
+    return sqrt(squaredHorizontalDistance(a, b))
+}
+
+private fun squaredHorizontalDistance(
+    a: Vec3,
+    b: Vec3
+): Double {
+    val deltaX = a.x - b.x
+    val deltaZ = a.z - b.z
+    return deltaX * deltaX + deltaZ * deltaZ
 }
 
 private fun smoothingFactor(
