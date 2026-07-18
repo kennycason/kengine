@@ -237,7 +237,7 @@ class TerrainActorController3D(
         )
     }
 
-    private fun groundNearActor(position: Vec3): TerrainSurfaceHit3D? {
+    fun groundNearActor(position: Vec3): TerrainSurfaceHit3D? {
         return terrain.groundAt(
             x = position.x,
             z = position.z,

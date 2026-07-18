@@ -23,6 +23,7 @@ import com.kengine.three.KinematicCharacterState3D
 import com.kengine.three.LitMeshRenderer3D
 import com.kengine.three.Mat4
 import com.kengine.three.MeshRenderer3D
+import com.kengine.three.StaticMeshCollider3D
 import com.kengine.three.TerrainActorController3D
 import com.kengine.three.TerrainActorControllerSettings3D
 import com.kengine.three.TerrainMeshCollider3D
@@ -131,10 +132,12 @@ fun main() {
                 )
             )
             val terrain = TerrainMeshCollider3D.fromLitVertices(worldVertices)
+            val staticWorld = StaticMeshCollider3D.fromLitVertices(worldVertices)
             val playerController = KinematicCharacterController3D(
                 terrain = terrain,
                 settings = KinematicCharacterControllerSettings3D(
                     halfHeight = PLAYER_HALF_HEIGHT,
+                    collisionRadius = PLAYER_COLLISION_RADIUS,
                     maxStepUp = MAX_STEP_UP,
                     maxStepDown = PLAYER_MAX_STEP_DOWN,
                     groundContactEpsilon = GROUND_CONTACT_EPSILON,
@@ -142,7 +145,8 @@ fun main() {
                     gravity = PLAYER_JUMP_GRAVITY,
                     fallingGravity = PLAYER_FALL_GRAVITY,
                     terminalVelocityY = PLAYER_TERMINAL_FALL_SPEED
-                )
+                ),
+                staticCollider = staticWorld
             )
             val playerTerrainController = playerController.terrainController
             val enemyController = TerrainActorController3D(
@@ -541,6 +545,26 @@ fun main() {
                                     center = ground.position,
                                     radius = 0.16,
                                     color = Color.fromHex("ffd447")
+                                )
+                            }
+                            playerState.staticContacts.forEach { contact ->
+                                debugRenderer.wireSphere(
+                                    frame = frame,
+                                    camera = camera,
+                                    center = contact.point,
+                                    radius = 0.11,
+                                    color = Color.fromHex("ff3b6d")
+                                )
+                                debugRenderer.line(
+                                    frame = frame,
+                                    camera = camera,
+                                    start = contact.point,
+                                    end = Vec3(
+                                        contact.point.x + contact.normal.x * 0.85,
+                                        contact.point.y + contact.normal.y * 0.85,
+                                        contact.point.z + contact.normal.z * 0.85
+                                    ),
+                                    color = Color.fromHex("ff3b6d")
                                 )
                             }
                             goombas.filter { it.isActive }.forEach { enemy ->
