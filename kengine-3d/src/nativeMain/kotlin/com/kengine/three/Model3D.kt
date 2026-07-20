@@ -4,6 +4,7 @@ import com.kengine.graphics.Color
 
 enum class ModelFormat3D {
     GLB,
+    GLTF,
     OBJ
 }
 
@@ -428,6 +429,7 @@ object ModelLoader3D {
     ): ParsedModel3D {
         return when (val format = detectFormat(assetPath)) {
             ModelFormat3D.GLB -> loadGlbSource(assetPath, options, format)
+            ModelFormat3D.GLTF -> loadGlbSource(assetPath, options, format)
             ModelFormat3D.OBJ -> loadObjSource(assetPath, options, format)
         }
     }
@@ -470,6 +472,7 @@ object ModelLoader3D {
     fun inspect(assetPath: String): ModelInfo3D {
         return when (val format = detectFormat(assetPath)) {
             ModelFormat3D.GLB -> inspectGlb(assetPath, vertexCount = 0)
+            ModelFormat3D.GLTF -> inspectGlb(assetPath, vertexCount = 0)
             ModelFormat3D.OBJ -> ModelInfo3D(assetPath = assetPath, format = format, vertexCount = 0)
         }
     }
@@ -477,6 +480,7 @@ object ModelLoader3D {
     fun detectFormat(assetPath: String): ModelFormat3D {
         return when (assetPath.substringAfterLast('.', "").lowercase()) {
             "glb" -> ModelFormat3D.GLB
+            "gltf" -> ModelFormat3D.GLTF
             "obj" -> ModelFormat3D.OBJ
             else -> throw IllegalArgumentException("Unsupported 3D model format for asset: $assetPath")
         }
@@ -495,7 +499,7 @@ object ModelLoader3D {
             assetPath = assetPath,
             format = format,
             options = options,
-            info = source.info.toModelInfo3D(assetPath, source.litVertices.size),
+            info = source.info.toModelInfo3D(assetPath, source.litVertices.size, format),
             litVertices = source.litVertices,
             parts = source.parts
         )
@@ -526,17 +530,18 @@ object ModelLoader3D {
         assetPath: String,
         vertexCount: Int
     ): ModelInfo3D {
-        return GlbMeshLoader.inspect(assetPath).toModelInfo3D(assetPath, vertexCount)
+        return GlbMeshLoader.inspect(assetPath).toModelInfo3D(assetPath, vertexCount, detectFormat(assetPath))
     }
 }
 
 internal fun GlbModelInfo.toModelInfo3D(
     assetPath: String,
-    vertexCount: Int
+    vertexCount: Int,
+    format: ModelFormat3D = ModelFormat3D.GLB
 ): ModelInfo3D {
     return ModelInfo3D(
         assetPath = assetPath,
-        format = ModelFormat3D.GLB,
+        format = format,
         vertexCount = vertexCount,
         meshCount = meshCount,
         primitiveCount = primitiveCount,

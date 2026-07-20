@@ -321,7 +321,7 @@ object AnimatedModelLoader3D {
         type: AnimatedModelType3D,
         options: ModelLoadOptions3D = ModelLoadOptions3D()
     ): AnimatedModelSource3D {
-        val format = requireGlbAsset(assetPath, type)
+        val format = requireGltfAsset(assetPath, type)
         return when (type) {
             AnimatedModelType3D.NODE_ANIMATED_LIT -> loadNodeAnimatedLitSource(assetPath, options, format)
             AnimatedModelType3D.SKINNED_TEXTURED_LIT -> loadSkinnedTexturedLitSource(assetPath, options, format)
@@ -340,7 +340,7 @@ object AnimatedModelLoader3D {
         assetPath: String,
         type: AnimatedModelType3D
     ): ModelInfo3D {
-        requireGlbAsset(assetPath, type)
+        requireGltfAsset(assetPath, type)
         return ModelLoader3D.inspect(assetPath)
     }
 
@@ -402,13 +402,13 @@ object AnimatedModelLoader3D {
         )
     }
 
-    private fun requireGlbAsset(
+    private fun requireGltfAsset(
         assetPath: String,
         type: AnimatedModelType3D
     ): ModelFormat3D {
         val format = ModelLoader3D.detectFormat(assetPath)
-        require(format == ModelFormat3D.GLB) {
-            "$type animated model loading currently supports only GLB assets: $assetPath"
+        require(format == ModelFormat3D.GLB || format == ModelFormat3D.GLTF) {
+            "$type animated model loading currently supports only GLB/GLTF assets: $assetPath"
         }
         return format
     }

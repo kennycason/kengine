@@ -768,7 +768,11 @@ object GlbMeshLoader {
 
         val vertexCount = parts.sumOf { it.restVertices.size }
         return SkinnedTexturedLitModelSource3D(
-            info = inspectParsedGlb(parsed, materialInfos).toModelInfo3D(assetPath, vertexCount),
+            info = inspectParsedGlb(parsed, materialInfos).toModelInfo3D(
+                assetPath = assetPath,
+                vertexCount = vertexCount,
+                format = ModelLoader3D.detectFormat(assetPath)
+            ),
             parts = parts,
             nodes = parsed.nodes,
             sceneNodeIndices = parsed.sceneNodeIndices,
@@ -891,7 +895,11 @@ object GlbMeshLoader {
 
         val vertexCount = parts.sumOf { it.vertices.size }
         return NodeAnimatedLitModelSource3D(
-            info = inspectParsedGlb(parsed, materialInfos).toModelInfo3D(assetPath, vertexCount),
+            info = inspectParsedGlb(parsed, materialInfos).toModelInfo3D(
+                assetPath = assetPath,
+                vertexCount = vertexCount,
+                format = ModelLoader3D.detectFormat(assetPath)
+            ),
             parts = parts,
             nodes = parsed.nodes,
             sceneNodeIndices = parsed.sceneNodeIndices,
@@ -989,6 +997,14 @@ object GlbMeshLoader {
 
     private fun parseGlb(assetPath: String): ParsedGlb {
         val filePath = File.resolveAssetPath(assetPath)
+        return when (ModelLoader3D.detectFormat(filePath)) {
+            ModelFormat3D.GLB -> parseBinaryGlb(filePath)
+            ModelFormat3D.GLTF -> parseJsonGltf(filePath)
+            else -> throw IllegalArgumentException("Unsupported glTF model format: $filePath")
+        }
+    }
+
+    private fun parseBinaryGlb(filePath: String): ParsedGlb {
         val bytes = readBinaryFile(filePath)
         require(readIntLE(bytes, 0) == GLB_MAGIC) {
             "GLB file has an invalid magic header: $filePath"
@@ -1020,7 +1036,7 @@ object GlbMeshLoader {
         val json = jsonText ?: throw IllegalArgumentException("GLB file is missing a JSON chunk: $filePath")
         val binary = binaryChunk ?: throw IllegalArgumentException("GLB file is missing a binary chunk: $filePath")
         val document = Json.parseToJsonElement(json).jsonObject
-        val bufferViews = parseBufferViews(document)
+        val bufferViews = parseBufferViews(document, binary.size, filePath)
         val accessors = parseAccessors(document)
         val meshes = parseMeshes(document)
         val nodes = parseNodes(document)
@@ -1035,6 +1051,50 @@ object GlbMeshLoader {
             nodes = nodes,
             sceneNodeIndices = sceneNodeIndices
         )
+    }
+
+    private fun parseJsonGltf(filePath: String): ParsedGlb {
+        val document = Json.parseToJsonElement(readTextFile(filePath)).jsonObject
+        val binary = readGltfPrimaryBuffer(document, filePath)
+        val bufferViews = parseBufferViews(document, binary.size, filePath)
+        val accessors = parseAccessors(document)
+        val meshes = parseMeshes(document)
+        val nodes = parseNodes(document)
+        val sceneNodeIndices = parseSceneNodeIndices(document)
+        return ParsedGlb(
+            filePath = filePath,
+            document = document,
+            binary = binary,
+            bufferViews = bufferViews,
+            accessors = accessors,
+            meshes = meshes,
+            nodes = nodes,
+            sceneNodeIndices = sceneNodeIndices
+        )
+    }
+
+    private fun readGltfPrimaryBuffer(
+        document: JsonObject,
+        filePath: String
+    ): ByteArray {
+        val buffers = document.requiredArray("buffers")
+        require(buffers.isNotEmpty()) {
+            "GLTF file has no buffers: $filePath"
+        }
+        if (buffers.size > 1) {
+            throw IllegalArgumentException("Only single-buffer GLTF files are supported: $filePath")
+        }
+        val buffer = buffers.first().jsonObject
+        val uri = buffer.optionalString("uri")
+            ?: throw IllegalArgumentException("External GLTF buffer is missing uri: $filePath")
+        requireSupportedFileUri(uri, "buffer", filePath)
+        val bufferPath = resolveSiblingPath(filePath, uri)
+        val bytes = readBinaryFile(bufferPath)
+        val declaredByteLength = buffer.requiredInt("byteLength")
+        require(bytes.size >= declaredByteLength) {
+            "GLTF buffer '$uri' is shorter than declared byteLength $declaredByteLength: $filePath"
+        }
+        return bytes
     }
 
     private fun appendMeshVertices(
@@ -1378,6 +1438,13 @@ object GlbMeshLoader {
             ?: throw IllegalArgumentException("GLB texture $textureIndex has no source image: $assetPath")
         val imageInfo = imageInfos.getOrNull(imageIndex)
             ?: throw IllegalArgumentException("GLB texture $textureIndex references missing image $imageIndex: $assetPath")
+        imageInfo.uri?.let { uri ->
+            requireSupportedFileUri(uri, "image", assetPath)
+            return GpuTextureAsset3D.file(
+                assetPath = resolveSiblingPath(File.resolveAssetPath(assetPath), uri),
+                samplerDescriptor = textureInfo.samplerDescriptor
+            )
+        }
         val bufferViewIndex = imageInfo.bufferViewIndex
             ?: throw IllegalArgumentException("Only embedded GLB images are supported for texture $textureIndex: $assetPath")
         val bufferView = bufferViews.getOrNull(bufferViewIndex)
@@ -1393,12 +1460,25 @@ object GlbMeshLoader {
         )
     }
 
-    private fun parseBufferViews(document: JsonObject): List<GlbBufferView> {
-        return document.requiredArray("bufferViews").map { element ->
+    private fun parseBufferViews(
+        document: JsonObject,
+        binarySize: Int,
+        filePath: String
+    ): List<GlbBufferView> {
+        return document.requiredArray("bufferViews").mapIndexed { index, element ->
             val item = element.jsonObject
+            val bufferIndex = item.optionalInt("buffer") ?: 0
+            require(bufferIndex == 0) {
+                "Only single-buffer GLTF/GLB buffer views are supported: bufferView $index in $filePath references buffer $bufferIndex."
+            }
+            val byteOffset = item.optionalInt("byteOffset") ?: 0
+            val byteLength = item.requiredInt("byteLength")
+            require(byteOffset >= 0 && byteLength >= 0 && byteOffset + byteLength <= binarySize) {
+                "GLTF bufferView $index byte range is outside the loaded buffer: $filePath"
+            }
             GlbBufferView(
-                byteOffset = item.optionalInt("byteOffset") ?: 0,
-                byteLength = item.requiredInt("byteLength"),
+                byteOffset = byteOffset,
+                byteLength = byteLength,
                 byteStride = item.optionalInt("byteStride")
             )
         }
@@ -2205,10 +2285,85 @@ object GlbMeshLoader {
             ((data[offset + 3].toLong() and 0xffL) shl 24)
     }
 
+    private fun requireSupportedFileUri(
+        uri: String,
+        kind: String,
+        assetPath: String
+    ) {
+        require(!uri.startsWith("data:", ignoreCase = true)) {
+            "Embedded data URI GLTF $kind resources are not supported yet: $assetPath"
+        }
+        require(!uri.contains("://")) {
+            "Remote or scheme-qualified GLTF $kind resources are not supported yet: $uri in $assetPath"
+        }
+    }
+
+    private fun resolveSiblingPath(
+        filePath: String,
+        uri: String
+    ): String {
+        val decodedUri = decodeUriPath(uri.substringBefore('#'))
+        if (decodedUri.startsWith("/") ||
+            (decodedUri.length > 2 && decodedUri[1] == ':' && (decodedUri[2] == '\\' || decodedUri[2] == '/'))
+        ) {
+            return decodedUri
+        }
+
+        val parent = parentDirectory(filePath)
+        if (parent.endsWith("/") || parent.endsWith("\\")) {
+            return parent + decodedUri
+        }
+        return "$parent/$decodedUri"
+    }
+
+    private fun decodeUriPath(uri: String): String {
+        val result = StringBuilder()
+        var index = 0
+        while (index < uri.length) {
+            val char = uri[index]
+            if (char == '%' && index + 2 < uri.length) {
+                val value = uri.substring(index + 1, index + 3).toIntOrNull(16)
+                if (value != null) {
+                    result.append(value.toChar())
+                    index += 3
+                    continue
+                }
+            }
+            result.append(char)
+            index += 1
+        }
+        return result.toString()
+    }
+
+    private fun parentDirectory(path: String): String {
+        val index = maxOf(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+        return if (index >= 0) path.substring(0, index) else "."
+    }
+
+    @OptIn(ExperimentalForeignApi::class)
+    private fun readTextFile(filePath: String): String {
+        val file = fopen(filePath, "r")
+            ?: throw IllegalArgumentException("Cannot open text file: $filePath. Please ensure the file exists.")
+        val buffer = ByteArray(8192)
+        val content = StringBuilder()
+        try {
+            while (true) {
+                val bytesRead = fread(buffer.refTo(0), 1.toULong(), buffer.size.toULong(), file)
+                if (bytesRead == 0.toULong()) {
+                    break
+                }
+                content.append(buffer.decodeToString(endIndex = bytesRead.toInt()))
+            }
+        } finally {
+            fclose(file)
+        }
+        return content.toString()
+    }
+
     @OptIn(ExperimentalForeignApi::class)
     private fun readBinaryFile(filePath: String): ByteArray {
         val file = fopen(filePath, "rb")
-            ?: throw IllegalArgumentException("Cannot open GLB file: $filePath. Please ensure the file exists.")
+            ?: throw IllegalArgumentException("Cannot open binary file: $filePath. Please ensure the file exists.")
         val chunks = mutableListOf<ByteArray>()
         val buffer = ByteArray(8192)
         var totalBytes = 0

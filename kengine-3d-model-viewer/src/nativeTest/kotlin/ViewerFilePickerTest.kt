@@ -14,6 +14,16 @@ class ViewerFilePickerTest {
     }
 
     @Test
+    fun gltfFileUsesAutoMode() {
+        val preset = viewerModelPresetForFile("/tmp/models/My Scene.gltf")
+
+        assertEquals("My Scene", preset.label)
+        assertEquals("/tmp/models/My Scene.gltf", preset.modelPath)
+        assertEquals(ViewerModelMode.AUTO, preset.mode)
+        assertEquals(DEFAULT_TARGET_SIZE, preset.targetSize)
+    }
+
+    @Test
     fun objFileUsesStaticMode() {
         val preset = viewerModelPresetForFile("C:\\models\\ship.obj")
 

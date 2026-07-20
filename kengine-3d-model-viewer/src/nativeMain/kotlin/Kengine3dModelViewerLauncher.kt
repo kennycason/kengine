@@ -131,7 +131,7 @@ fun main(args: Array<String>) {
 
             var activeModel = activateModel(controls.currentModelPreset)
             var cameraController = createCameraController(controls.currentModelPreset.targetSize)
-            var viewerStatusText = "READY GLB OBJ"
+            var viewerStatusText = "READY GLB GLTF OBJ"
             var pendingModelLoad: ViewerModelPreset? = null
             fun updateWindowTitle() {
                 SDL_SetWindowTitle(sdl.window, viewerWindowTitle(controls, activeModel))
@@ -168,7 +168,7 @@ fun main(args: Array<String>) {
                     cameraController = createCameraController(controls.currentModelPreset.targetSize)
                 },
                 onLoadModel = {
-                    setViewerStatus("Choose GLB or OBJ")
+                    setViewerStatus("Choose GLB GLTF or OBJ")
                     val selectedPath = chooseViewerModelFile()
                     if (selectedPath == null) {
                         printMessage("Model load cancelled.")
@@ -503,7 +503,8 @@ private fun loadViewerModelAuto(
 ): ViewerLoadedModel {
     return when (ModelLoader3D.detectFormat(preset.modelPath)) {
         ModelFormat3D.OBJ -> loadStaticViewerModel(loader, preset, options)
-        ModelFormat3D.GLB -> {
+        ModelFormat3D.GLB,
+        ModelFormat3D.GLTF -> {
             val source = loader.loadSource(ModelAsset3D(preset.modelPath, options))
             when {
                 source.info.skinCount > 0 -> loadAnimatedViewerModel(loader, preset, options, ViewerModelMode.SKINNED)

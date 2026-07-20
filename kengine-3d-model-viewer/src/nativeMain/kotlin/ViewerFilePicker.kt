@@ -5,7 +5,7 @@ fun viewerModelPresetForFile(path: String): ViewerModelPreset {
     val extension = fileName.substringAfterLast('.', "").lowercase()
     val mode = when (extension) {
         "obj" -> ViewerModelMode.STATIC
-        "glb" -> ViewerModelMode.AUTO
+        "glb", "gltf" -> ViewerModelMode.AUTO
         else -> throw IllegalArgumentException("Unsupported model file: $fileName")
     }
     return ViewerModelPreset(

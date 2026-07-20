@@ -74,6 +74,23 @@ class ModelAsset3DTest {
     }
 
     @Test
+    fun resolvesGltfModelAssetDescriptors() {
+        val resolver = ModelAssetPathResolver3D(
+            packagedAssetRoot = "assets",
+            resolveAssetPath = { "/project/$it" },
+            assetExists = { false }
+        )
+        val asset = ModelAsset3D("models/world.GLTF")
+
+        val resolved = resolver.resolve(asset)
+
+        assertEquals(asset, resolved.asset)
+        assertEquals("/project/assets/models/world.GLTF", resolved.assetPath)
+        assertEquals(ModelFormat3D.GLTF, resolved.format)
+        assertEquals(ModelFormat3D.GLTF, asset.format)
+    }
+
+    @Test
     fun createsAnimatedModelAssetDescriptors() {
         val skinned = AnimatedModelAsset3D.skinnedTexturedLit("models/mario.glb")
         val nodeAnimated = AnimatedModelAsset3D.nodeAnimatedLit("models/goomba.glb")

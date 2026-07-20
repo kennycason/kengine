@@ -5,12 +5,13 @@ import platform.UniformTypeIdentifiers.UTType
 actual fun chooseViewerModelFile(): String? {
     val panel = NSOpenPanel.openPanel()
     panel.title = "Load 3D Model"
-    panel.message = "Choose a GLB or OBJ model."
+    panel.message = "Choose a GLB, GLTF, or OBJ model."
     panel.canChooseFiles = true
     panel.canChooseDirectories = false
     panel.allowsMultipleSelection = false
     panel.allowedContentTypes = listOfNotNull(
         UTType.typeWithFilenameExtension("glb"),
+        UTType.typeWithFilenameExtension("gltf"),
         UTType.typeWithFilenameExtension("obj")
     )
 

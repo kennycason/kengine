@@ -2,7 +2,7 @@
 
 Top-level Kengine tooling app for exercising `kengine-3d` model loading and rendering outside a game.
 
-This viewer opens an `SDL_GPU_3D` window, loads bundled demo models or selected local `.glb`/`.obj` files, renders through `Scene3D`, previews animation clips when the model is animated, and provides orbit camera plus a clickable `kengine-3d-ui` inspector.
+This viewer opens an `SDL_GPU_3D` window, loads bundled demo models or selected local `.glb`/`.gltf`/`.obj` files, renders through `Scene3D`, previews animation clips when the model is animated, and provides orbit camera plus a clickable `kengine-3d-ui` inspector.
 
 ## Run
 
@@ -28,11 +28,11 @@ cd kengine-3d-model-viewer
 - `--target-size <size>`: normalized model target size. Defaults to `2.2`.
 - `--clip <name>`: animated clip name to preview when mode is `auto`, `node`, or `skinned`.
 
-Supported model formats are `.glb` and `.obj`.
+Supported model formats are `.glb`, `.gltf`, and `.obj`.
 
 ## Controls
 
-- The inspector panel can cycle bundled model presets, open a native `.glb`/`.obj` file picker with `LOAD`, cycle animation clips, play/pause/stop playback, adjust animation speed, switch lighting/background presets, tune ambient/diffuse strength, toggle axes, and reset the view.
+- The inspector panel can cycle bundled model presets, open a native `.glb`/`.gltf`/`.obj` file picker with `LOAD`, cycle animation clips, play/pause/stop playback, adjust animation speed, switch lighting/background presets, tune ambient/diffuse strength, toggle axes, and reset the view.
 - Mouse drag: orbit camera.
 - Up/Down arrows: zoom.
 - Left/Right arrows: pan target.
