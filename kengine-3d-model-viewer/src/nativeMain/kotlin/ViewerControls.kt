@@ -36,9 +36,11 @@ sealed class ViewerControlAction {
 }
 
 class ViewerControlState(
-    private val modelPresets: List<ViewerModelPreset>,
+    initialModelPresets: List<ViewerModelPreset>,
     initialModelPresetIndex: Int = 0
 ) {
+    private val modelPresets = initialModelPresets.toMutableList()
+
     init {
         require(modelPresets.isNotEmpty()) {
             "Model viewer requires at least one model preset."
@@ -92,6 +94,19 @@ class ViewerControlState(
 
     fun selectModel(step: Int): ViewerModelPreset {
         modelPresetIndex = wrappedIndex(modelPresetIndex, step, modelPresets.size)
+        resetAnimationClock()
+        return currentModelPreset
+    }
+
+    fun selectOrAddModel(preset: ViewerModelPreset): ViewerModelPreset {
+        val existingIndex = modelPresets.indexOfFirst { it.modelPath == preset.modelPath }
+        modelPresetIndex = if (existingIndex >= 0) {
+            modelPresets[existingIndex] = preset
+            existingIndex
+        } else {
+            modelPresets += preset
+            modelPresets.lastIndex
+        }
         resetAnimationClock()
         return currentModelPreset
     }

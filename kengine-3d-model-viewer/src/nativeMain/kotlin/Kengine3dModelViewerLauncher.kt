@@ -16,11 +16,14 @@ import com.kengine.three.GpuTextureCache3D
 import com.kengine.three.ModelAsset3D
 import com.kengine.three.ModelAssetLoader3D
 import com.kengine.three.ModelAssetPathResolver3D
+import com.kengine.three.ModelFormat3D
 import com.kengine.three.ModelInfo3D
+import com.kengine.three.ModelLoader3D
 import com.kengine.three.ModelLoadOptions3D
 import com.kengine.three.ModelSourceCache3D
 import com.kengine.three.Node3D
 import com.kengine.three.OrbitCameraController3D
+import com.kengine.three.ParsedModel3D
 import com.kengine.three.Scene3D
 import com.kengine.three.SceneModel3D
 import com.kengine.three.SceneRenderer3D
@@ -37,7 +40,7 @@ private const val WINDOW_WIDTH = 1280
 private const val WINDOW_HEIGHT = 760
 private const val DEFAULT_ASSET_ROOT = "assets"
 private const val DEFAULT_MODEL_PATH = "models/Mario64Animated.glb"
-private const val DEFAULT_TARGET_SIZE = 2.2
+const val DEFAULT_TARGET_SIZE = 2.2
 private const val DEFAULT_UI_FONT_PATH = "assets/fonts/arcade_classic.ttf"
 
 @OptIn(ExperimentalForeignApi::class)
@@ -72,7 +75,7 @@ fun main(args: Array<String>) {
         ) + defaultPresets
     }
     val controls = ViewerControlState(
-        modelPresets = modelPresets,
+        initialModelPresets = modelPresets,
         initialModelPresetIndex = defaultPresetIndex.coerceAtLeast(0)
     )
 
@@ -105,13 +108,21 @@ fun main(args: Array<String>) {
                 preset: ViewerModelPreset,
                 reload: Boolean = false
             ): ViewerLoadedModel {
+                val previousForReload = if (reload) {
+                    modelCache.remove(preset)
+                } else {
+                    null
+                }
+                val loadedModel = try {
+                    modelCache.getOrPut(preset) {
+                        loadViewerModel(modelAssets, preset)
+                    }
+                } catch (error: Throwable) {
+                    previousForReload?.let { modelCache[preset] = it }
+                    throw error
+                }
                 scene.clear()
-                if (reload) {
-                    modelCache.remove(preset)?.cleanup()
-                }
-                val loadedModel = modelCache.getOrPut(preset) {
-                    loadViewerModel(modelAssets, preset)
-                }
+                previousForReload?.cleanup()
                 loadedModel.addTo(scene)
                 controls.resetAnimationClock()
                 printLoadedModel(preset, loadedModel)
@@ -120,17 +131,24 @@ fun main(args: Array<String>) {
 
             var activeModel = activateModel(controls.currentModelPreset)
             var cameraController = createCameraController(controls.currentModelPreset.targetSize)
+            var viewerStatusText = "READY GLB OBJ"
+            var pendingModelLoad: ViewerModelPreset? = null
             fun updateWindowTitle() {
                 SDL_SetWindowTitle(sdl.window, viewerWindowTitle(controls, activeModel))
             }
+            fun setViewerStatus(message: String) {
+                viewerStatusText = message
+            }
             fun printMessage(message: String) {
                 println(message)
+                setViewerStatus(message)
                 updateWindowTitle()
             }
             updateWindowTitle()
             val inspectorUi = ViewerInspectorUi(
                 controls = controls,
                 activeModel = { activeModel },
+                statusText = { viewerStatusText },
                 onSelectModel = { step ->
                     val preset = controls.selectModel(step)
                     activeModel = activateModel(preset)
@@ -149,10 +167,20 @@ fun main(args: Array<String>) {
                     printMessage(controls.resetControls())
                     cameraController = createCameraController(controls.currentModelPreset.targetSize)
                 },
-                onReloadModel = {
-                    activeModel = activateModel(controls.currentModelPreset, reload = true)
-                    cameraController = createCameraController(controls.currentModelPreset.targetSize)
-                    printMessage("Loaded model: ${controls.currentModelPreset.label}")
+                onLoadModel = {
+                    setViewerStatus("Choose GLB or OBJ")
+                    val selectedPath = chooseViewerModelFile()
+                    if (selectedPath == null) {
+                        printMessage("Model load cancelled.")
+                    } else {
+                        try {
+                            val preset = viewerModelPresetForFile(selectedPath)
+                            pendingModelLoad = preset
+                            setViewerStatus("Loading ${preset.label}")
+                        } catch (error: Throwable) {
+                            printMessage("Error loading model: ${error.message ?: "unknown error"}")
+                        }
+                    }
                 },
                 onMessage = ::printMessage,
                 onChanged = ::updateWindowTitle
@@ -247,6 +275,19 @@ fun main(args: Array<String>) {
                         inspectorUi.render(uiRenderer, frame)
                     }
 
+                    pendingModelLoad?.let { preset ->
+                        pendingModelLoad = null
+                        try {
+                            val loadedModel = activateModel(preset, reload = true)
+                            controls.selectOrAddModel(preset)
+                            activeModel = loadedModel
+                            cameraController = createCameraController(preset.targetSize)
+                            printMessage("Loaded file: ${preset.label}")
+                        } catch (error: Throwable) {
+                            printMessage("Error loading model: ${error.message ?: "unknown error"}")
+                        }
+                    }
+
                     mouse.mouse.clearFrameState()
                     SDL_Delay(16u)
                 }
@@ -258,6 +299,7 @@ fun main(args: Array<String>) {
 }
 
 enum class ViewerModelMode {
+    AUTO,
     STATIC,
     NODE_ANIMATED,
     SKINNED
@@ -324,9 +366,9 @@ private data class ViewerConfig(
                 Options:
                   --model <path>         Model path relative to --asset-root, or an absolute path.
                   --asset-root <path>    Source asset root. Defaults to $DEFAULT_ASSET_ROOT.
-                  --mode <mode>          static, node, or skinned. Defaults to skinned.
+                  --mode <mode>          auto, static, node, or skinned. Defaults to skinned.
                   --target-size <size>   Normalized model height/extent target. Defaults to $DEFAULT_TARGET_SIZE.
-                  --clip <name>          Animated clip name to preview when mode is node or skinned.
+                  --clip <name>          Animated clip name to preview when mode is auto, node, or skinned.
                   --help                 Print this help.
 
                 Controls:
@@ -352,10 +394,11 @@ private data class ViewerConfig(
 
         private fun parseMode(value: String): ViewerModelMode {
             return when (value.lowercase()) {
+                "auto" -> ViewerModelMode.AUTO
                 "static" -> ViewerModelMode.STATIC
                 "node", "node-animated" -> ViewerModelMode.NODE_ANIMATED
                 "skinned", "skinned-textured-lit" -> ViewerModelMode.SKINNED
-                else -> throw IllegalArgumentException("--mode must be static, node, or skinned.")
+                else -> throw IllegalArgumentException("--mode must be auto, static, node, or skinned.")
             }
         }
 
@@ -446,37 +489,81 @@ private fun loadViewerModel(
         defaultColor = Color.fromHex("ffffff")
     )
     return when (preset.mode) {
-        ViewerModelMode.STATIC -> {
-            val asset = ModelAsset3D(preset.modelPath, options)
-            val source = loader.loadSource(asset)
-            val model = loader.uploadModel(source)
-            ViewerLoadedModel.Static(
-                info = source.info,
-                node = Node3D(SceneModel3D(model = model))
-            )
-        }
+        ViewerModelMode.AUTO -> loadViewerModelAuto(loader, preset, options)
+        ViewerModelMode.STATIC -> loadStaticViewerModel(loader, preset, options)
         ViewerModelMode.NODE_ANIMATED,
-        ViewerModelMode.SKINNED -> {
-            val asset = when (preset.mode) {
-                ViewerModelMode.NODE_ANIMATED -> AnimatedModelAsset3D.nodeAnimatedLit(preset.modelPath, options)
-                ViewerModelMode.SKINNED -> AnimatedModelAsset3D.skinnedTexturedLit(preset.modelPath, options)
-                ViewerModelMode.STATIC -> error("Static mode is handled separately.")
+        ViewerModelMode.SKINNED -> loadAnimatedViewerModel(loader, preset, options, preset.mode)
+    }
+}
+
+private fun loadViewerModelAuto(
+    loader: ModelAssetLoader3D,
+    preset: ViewerModelPreset,
+    options: ModelLoadOptions3D
+): ViewerLoadedModel {
+    return when (ModelLoader3D.detectFormat(preset.modelPath)) {
+        ModelFormat3D.OBJ -> loadStaticViewerModel(loader, preset, options)
+        ModelFormat3D.GLB -> {
+            val source = loader.loadSource(ModelAsset3D(preset.modelPath, options))
+            when {
+                source.info.skinCount > 0 -> loadAnimatedViewerModel(loader, preset, options, ViewerModelMode.SKINNED)
+                source.info.animationCount > 0 -> loadAnimatedViewerModel(
+                    loader = loader,
+                    preset = preset,
+                    options = options,
+                    mode = ViewerModelMode.NODE_ANIMATED
+                )
+                else -> uploadStaticViewerSource(loader, source)
             }
-            val source = loader.loadAnimatedSource(asset)
-            val animatedModel = loader.uploadAnimatedModel(source)
-            val info = source.info
-            val clipIndex = selectClipIndex(info, preset.clipName)
-            ViewerLoadedModel.Animated(
-                info = info,
-                node = Node3D(
-                    item = animatedModel.createInstance(
-                        pose = AnimationPose3D(clipIndex = clipIndex)
-                    )
-                ),
-                clipIndex = clipIndex
-            )
         }
     }
+}
+
+private fun loadStaticViewerModel(
+    loader: ModelAssetLoader3D,
+    preset: ViewerModelPreset,
+    options: ModelLoadOptions3D
+): ViewerLoadedModel.Static {
+    val source = loader.loadSource(ModelAsset3D(preset.modelPath, options))
+    return uploadStaticViewerSource(loader, source)
+}
+
+private fun uploadStaticViewerSource(
+    loader: ModelAssetLoader3D,
+    source: ParsedModel3D
+): ViewerLoadedModel.Static {
+    val model = loader.uploadModel(source)
+    return ViewerLoadedModel.Static(
+        info = source.info,
+        node = Node3D(SceneModel3D(model = model))
+    )
+}
+
+private fun loadAnimatedViewerModel(
+    loader: ModelAssetLoader3D,
+    preset: ViewerModelPreset,
+    options: ModelLoadOptions3D,
+    mode: ViewerModelMode
+): ViewerLoadedModel.Animated {
+    val asset = when (mode) {
+        ViewerModelMode.NODE_ANIMATED -> AnimatedModelAsset3D.nodeAnimatedLit(preset.modelPath, options)
+        ViewerModelMode.SKINNED -> AnimatedModelAsset3D.skinnedTexturedLit(preset.modelPath, options)
+        ViewerModelMode.AUTO,
+        ViewerModelMode.STATIC -> error("$mode is not an animated viewer mode.")
+    }
+    val source = loader.loadAnimatedSource(asset)
+    val animatedModel = loader.uploadAnimatedModel(source)
+    val info = source.info
+    val clipIndex = selectClipIndex(info, preset.clipName)
+    return ViewerLoadedModel.Animated(
+        info = info,
+        node = Node3D(
+            item = animatedModel.createInstance(
+                pose = AnimationPose3D(clipIndex = clipIndex)
+            )
+        ),
+        clipIndex = clipIndex
+    )
 }
 
 private fun selectClipIndex(
@@ -518,7 +605,7 @@ private fun createCameraController(targetSize: Double): OrbitCameraController3D 
         distance = targetSize * 2.7,
         yawRadians = 0.0f,
         pitchRadians = 0.2f,
-        minDistance = targetSize * 0.75,
+        minDistance = (targetSize * 0.12).coerceAtLeast(0.12),
         maxDistance = targetSize * 7.0
     )
 }

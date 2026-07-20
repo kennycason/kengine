@@ -32,6 +32,14 @@ kotlin {
 
     sourceSets.maybeCreate("nativeMain").dependsOn(sourceSets.getByName("commonMain"))
     sourceSets.getByName("${nativeTarget.name}Main").dependsOn(sourceSets.getByName("nativeMain"))
+    val platformMainName = when {
+        nativeTarget.name.startsWith("macos") -> "macosMain"
+        nativeTarget.name.startsWith("linux") -> "linuxMain"
+        nativeTarget.name.startsWith("mingw") -> "mingwMain"
+        else -> throw GradleException("Host target [${nativeTarget.name}] is not supported.")
+    }
+    sourceSets.maybeCreate(platformMainName).dependsOn(sourceSets.getByName("nativeMain"))
+    sourceSets.getByName("${nativeTarget.name}Main").dependsOn(sourceSets.getByName(platformMainName))
     sourceSets.maybeCreate("nativeTest").dependsOn(sourceSets.getByName("commonTest"))
     sourceSets.getByName("${nativeTarget.name}Test").dependsOn(sourceSets.getByName("nativeTest"))
 

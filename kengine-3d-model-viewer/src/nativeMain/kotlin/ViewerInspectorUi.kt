@@ -11,10 +11,11 @@ import kotlin.math.roundToInt
 class ViewerInspectorUi(
     private val controls: ViewerControlState,
     private val activeModel: () -> ViewerLoadedModel,
+    private val statusText: () -> String,
     private val onSelectModel: (Int) -> Unit,
     private val onSelectClip: (Int) -> Unit,
     private val onResetView: () -> Unit,
-    private val onReloadModel: () -> Unit,
+    private val onLoadModel: () -> Unit,
     private val onMessage: (String) -> Unit,
     private val onChanged: () -> Unit
 ) {
@@ -43,6 +44,7 @@ class ViewerInspectorUi(
     private fun currentTexts(): List<String> {
         return listOf(
             "KENGINE 3D VIEWER",
+            statusText().compactUiText(34),
             "MODEL ${controls.currentModelPreset.label.compactUiText(18)}",
             "PREV",
             "NEXT",
@@ -68,7 +70,7 @@ class ViewerInspectorUi(
             desiredX = 16.0,
             desiredY = 16.0,
             desiredWidth = 360.0,
-            desiredHeight = 360.0,
+            desiredHeight = 394.0,
             backgroundColor = Color.fromHex("10151ee0"),
             direction = GpuUiDirection3D.COLUMN,
             padding = 12.0,
@@ -83,6 +85,15 @@ class ViewerInspectorUi(
                 align = GpuUiAlign3D.LEFT
             )
 
+            label(
+                id = "status",
+                text = { statusText().compactUiText(34) },
+                width = 336.0,
+                height = ROW_HEIGHT,
+                color = Color.fromHex("98d6ffff"),
+                align = GpuUiAlign3D.LEFT
+            )
+
             controlRow("model-row") {
                 label(
                     id = "model-label",
@@ -93,7 +104,7 @@ class ViewerInspectorUi(
                 )
                 smallButton("model-prev", "PREV") { onSelectModel(-1) }
                 smallButton("model-next", "NEXT") { onSelectModel(1) }
-                smallButton("model-load", "LOAD") { onReloadModel() }
+                smallButton("model-load", "LOAD") { onLoadModel() }
             }
 
             controlRow("clip-row") {

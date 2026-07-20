@@ -15,7 +15,7 @@ class OrbitCameraController3D(
     private val dragSensitivity: Float = 0.007f,
     private val keyboardPanSpeed: Double = 1.8,
     private val keyboardZoomSpeed: Double = 2.4,
-    private val minDistance: Double = 2.0,
+    private val minDistance: Double = 0.2,
     private val maxDistance: Double = 8.0
 ) {
     private var target = target
@@ -51,8 +51,8 @@ class OrbitCameraController3D(
         }
 
         val panDirection = when {
-            keyboard.isLeftPressed() && !keyboard.isRightPressed() -> -1.0
-            keyboard.isRightPressed() && !keyboard.isLeftPressed() -> 1.0
+            keyboard.isLeftPressed() && !keyboard.isRightPressed() -> 1.0
+            keyboard.isRightPressed() && !keyboard.isLeftPressed() -> -1.0
             else -> 0.0
         }
         if (panDirection != 0.0) {
