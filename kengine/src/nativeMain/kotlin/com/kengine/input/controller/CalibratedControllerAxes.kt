@@ -77,10 +77,10 @@ class CalibratedControllerAxes(
         elapsedSeconds: Double
     ): ControllerAxisSample {
         return sample(
-            controllerId = controller.getFirstControllerId(),
+            controllerId = controller.getFirstControllerIdWithAxes(),
             elapsedSeconds = elapsedSeconds
-        ) { controllerId, axisIndex ->
-            controller.getAxisValue(controllerId, axisIndex)
+        ) { _, axisIndex ->
+            controller.getAxisValue(axisIndex)
         }
     }
 

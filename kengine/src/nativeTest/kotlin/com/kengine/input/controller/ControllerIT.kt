@@ -31,6 +31,7 @@ import kotlin.test.Test
  */
 class ControllerIT {
 
+    @Test
     @Ignore
     fun `controller initialization test - joystick and gamepad modes`() {
         createGameContext(

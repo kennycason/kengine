@@ -9,6 +9,7 @@ import com.kengine.input.keyboard.useKeyboardContext
 import com.kengine.log.Logger
 import com.kengine.sdl.useSDLContext
 import com.kengine.time.getCurrentMilliseconds
+import kotlin.test.Ignore
 import kotlin.test.Test
 
 class ControllerMappingIT {
@@ -20,6 +21,7 @@ class ControllerMappingIT {
     )
 
     @Test
+    @Ignore
     fun `interactive controller button mapping`() {
         println("=".repeat(60))
         println("INTERACTIVE CONTROLLER BUTTON MAPPING TEST")

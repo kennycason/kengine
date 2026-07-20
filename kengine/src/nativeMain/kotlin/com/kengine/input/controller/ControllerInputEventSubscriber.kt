@@ -43,9 +43,22 @@ class ControllerInputEventSubscriber(
 
     /**
      * Gets the ID of the first connected controller, if any exist.
+     * Prefer an axis-capable controller because SDL can expose a single physical
+     * controller as multiple logical devices.
      * @return The first controller ID, or null if no controllers are connected
      */
-    fun getFirstControllerId(): UInt? = controllerStates.keys.firstOrNull()
+    fun getFirstControllerId(): UInt? {
+        return getFirstControllerIdWithAxes() ?: controllerStates.keys.firstOrNull()
+    }
+
+    /**
+     * Gets the ID of the first connected controller that can report analog axes.
+     */
+    fun getFirstControllerIdWithAxes(): UInt? {
+        return controllerStates.entries.firstOrNull { (_, state) ->
+            state.axes.isNotEmpty()
+        }?.key
+    }
 
     data class ControllerState(
         var axes: FloatArray,
