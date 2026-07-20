@@ -31,11 +31,10 @@ import sdl3.SDL_GPUStoreOp
 import sdl3.SDL_GPUTextureCreateInfo
 import sdl3.SDL_GPUTextureFormat
 import sdl3.SDL_GPUTextureType
-import sdl3.SDL_GPU_SHADERFORMAT_DXIL
-import sdl3.SDL_GPU_SHADERFORMAT_MSL
-import sdl3.SDL_GPU_SHADERFORMAT_SPIRV
 import sdl3.SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET
 import sdl3.SDL_GetError
+import sdl3.SDL_GetGPUDeviceDriver
+import sdl3.SDL_GetGPUShaderFormats
 import sdl3.SDL_GetGPUSwapchainTextureFormat
 import sdl3.SDL_ReleaseGPUTexture
 import sdl3.SDL_ReleaseWindowFromGPUDevice
@@ -49,6 +48,8 @@ class GpuContext private constructor(
 ) : Context(), Logging {
 
     val device: CPointer<SDL_GPUDevice>
+    val deviceDriver: String
+    val supportedShaderFormats: List<GpuShaderFormat3D>
     val swapchainTextureFormat: SDL_GPUTextureFormat
     val depthTextureFormat: SDL_GPUTextureFormat = SDL_GPUTextureFormat.SDL_GPU_TEXTUREFORMAT_D16_UNORM
     private var cleanedUp = false
@@ -70,6 +71,8 @@ class GpuContext private constructor(
         }
 
         device = createdDevice
+        deviceDriver = SDL_GetGPUDeviceDriver(device)?.toKString() ?: "unknown"
+        supportedShaderFormats = GpuShaderFormat3D.fromMask(SDL_GetGPUShaderFormats(device))
         swapchainTextureFormat = SDL_GetGPUSwapchainTextureFormat(device, sdl.window)
     }
 
@@ -213,7 +216,7 @@ class GpuContext private constructor(
 
     companion object {
         private val defaultShaderFormats: SDL_GPUShaderFormat =
-            SDL_GPU_SHADERFORMAT_SPIRV or SDL_GPU_SHADERFORMAT_MSL or SDL_GPU_SHADERFORMAT_DXIL
+            GpuShaderFormat3D.defaultRequestMask
 
         private var currentContext: GpuContext? = null
 

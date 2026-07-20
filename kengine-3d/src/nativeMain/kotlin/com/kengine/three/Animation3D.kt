@@ -117,6 +117,41 @@ data class AnimationPose3D(
     }
 }
 
+class AnimationPosePreparation3D {
+    var preparedPose: AnimationPose3D? = null
+        private set
+
+    fun invalidate() {
+        preparedPose = null
+    }
+
+    fun isPrepared(pose: AnimationPose3D): Boolean {
+        return preparedPose == pose
+    }
+
+    fun prepare(
+        pose: AnimationPose3D,
+        updatePose: (AnimationPose3D) -> Unit
+    ): Boolean {
+        if (isPrepared(pose)) {
+            return false
+        }
+
+        updatePose(pose)
+        preparedPose = pose
+        return true
+    }
+
+    fun requirePrepared(
+        pose: AnimationPose3D,
+        message: String = "Explicit-update animated model instances must be prepared before drawing."
+    ) {
+        check(isPrepared(pose)) {
+            message
+        }
+    }
+}
+
 fun AnimationPlaybackFrame3D<*>.toAnimationPose3D(): AnimationPose3D {
     return AnimationPose3D.from(this)
 }
@@ -167,6 +202,45 @@ class AnimationPlayer3D<T>(
         clipIndex = selection.clipIndex
         playbackSpeed = selection.playbackSpeed
         timeSeconds = 0.0
+    }
+}
+
+class AnimationStateController3D<T>(
+    val clipMap: AnimationClipMap3D<T>,
+    initialState: T
+) {
+    private val player = AnimationPlayer3D(clipMap.selectionFor(initialState))
+
+    val state: T
+        get() = player.state
+    val clipName: String
+        get() = player.clipName
+    val clipIndex: Int
+        get() = player.clipIndex
+    val timeSeconds: Double
+        get() = player.timeSeconds
+    val playbackSpeed: Double
+        get() = player.playbackSpeed
+
+    fun play(
+        state: T,
+        deltaSeconds: Double
+    ): AnimationPlaybackFrame3D<T> {
+        return player.play(
+            selection = clipMap.selectionFor(state),
+            deltaSeconds = deltaSeconds
+        )
+    }
+
+    fun pose(
+        state: T,
+        deltaSeconds: Double
+    ): AnimationPose3D {
+        return play(state, deltaSeconds).toAnimationPose3D()
+    }
+
+    fun reset(state: T) {
+        player.reset(clipMap.selectionFor(state))
     }
 }
 

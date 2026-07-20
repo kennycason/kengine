@@ -32,7 +32,7 @@ python3 tools/extract_glb_animations.py "$HOME/code/mario64-assets/assets/models
 ## Build Plan
 
 1. Keep the platformer baseline stable: third-person follow camera, camera-relative movement, jump physics, and height-aware terrain collision.
-2. Continue moving validated helpers into `kengine-3d`; static world/Bowser model loading, collision-source parsing, third-person camera controls, animation clip playback, ordered scene submission, animated model facades, and per-instance animated model state now use reusable engine APIs.
-3. Continue improving CPU skeletal playback, then shift skinning to shader/GPU buffers or per-instance skin buffers once the API shape is stable.
+2. Continue moving validated helpers into reusable Kengine modules; controller axis calibration/deadzone shaping, model asset descriptors/path resolution, cached parse-once static and animated source upload, collision reuse, static Bowser model loading, debug collider/contact drawing, third-person camera controls, animation state playback, ordered scene submission, animated model facades, per-instance skinned render state, and actor-to-node render sync now use reusable engine APIs.
+3. Keep Mario on the default `AUTO` animated skinning path, which now uses GPU joint-palette skinning for this asset and keeps CPU skinning as the engine fallback for larger skeletons.
 4. Add action-state controls for the already extracted hip-drop, punch, damage, crouch, and brake clips.
 5. Add richer collision volumes, slope limits, ledges, world bounds, and debug overlays.

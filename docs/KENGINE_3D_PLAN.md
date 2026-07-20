@@ -29,25 +29,32 @@ The first GPU window slice has been added:
 - `kengine-3d` provides `PrimitiveRenderer3D`, a small debug primitive renderer for engine-owned triangle/quad boilerplate.
 - `kengine-3d` provides the first camera abstractions: `Camera3D`, fixed `PerspectiveCamera`, `OrbitCamera3D`, `OrbitCameraController3D`, `ThirdPersonCamera3D`, and `ThirdPersonCameraController3D`.
 - `ThirdPersonCameraController3D` supports configurable Y-look inversion, distance stops, zoom bounds, look smoothing, and follow smoothing while leaving actual keyboard/controller bindings in the game.
+- Core `kengine` provides `CalibratedControllerAxes`, `ControllerAxisInputSettings`, `digitalAxis`, and `snapAxis` so demos can keep simple per-game controls while reusing controller neutral calibration and deadzone shaping.
 - `kengine-3d` provides the first mesh path: `GpuMesh`, `CubeFaceColors`, `Vertex3D`, `MeshRenderer3D`, `Mat4`, and `Transform3D`.
-- `kengine-3d` provides the first texture/material path: `GpuTexture`, `TextureVertex3D`, `TexturedGpuMesh`, and `TexturedMeshRenderer3D`. `GpuTexture` can create procedural RGBA textures or upload image files loaded through SDL_image.
+- `kengine-3d` provides `DebugRenderer3D` for reusable 3D debug lines, rays, wire spheres, wire capsules, wire AABBs, collider overloads, and contact point/normal markers.
+- `kengine-3d` provides the first texture/material path: `GpuTexture`, `GpuTextureAsset3D`, `GpuTextureCache3D`, `MaterialDescriptor3D`, `GpuTextureDescriptor3D`, `GpuSamplerDescriptor3D`, `GpuTextureUploadDescriptor3D`, `GpuResourceOwnership3D`, `TextureVertex3D`, `TexturedGpuMesh`, and `TexturedMeshRenderer3D`. `GpuTexture` can create procedural RGBA textures or upload image files loaded through SDL_image while keeping texture source, shape, sampler policy, upload layout, shared-cache reuse, material upload, and owned/borrowed cleanup explicit.
 - `kengine-3d` provides the first lit mesh path: `LitGpuMesh`, `LitVertex3D`, `LitMeshRenderer3D`, and `DirectionalLight3D`.
-- `kengine-3d` provides the first textured lit mesh path: `TexturedLitGpuMesh`, `TexturedLitVertex3D`, and `TexturedLitMeshRenderer3D`.
+- `kengine-3d` provides textured lit mesh paths: `TexturedLitGpuMesh`, `TexturedLitVertex3D`, and `TexturedLitMeshRenderer3D` for regular textured-lit meshes, plus `SkinnedTexturedLitVertex3D`, `SkinnedTexturedLitGpuMesh`, and `SkinnedTexturedLitMeshRenderer3D` as the first shader-skinning path.
+- `kengine-3d` provides `GpuShader3D` helpers plus generated `Kengine3DShaderSources`, `Kengine3DShaderArtifacts`, and `Kengine3DShaderPrograms` catalogs so renderers share backend-aware SDL GPU shader artifact selection, generated Metal libraries with MSL fallback, stage-aware error messages, shader cleanup behavior, shader resource declarations, and engine-owned shader source files under `src/nativeMain/shaders`.
+- `kengine-3d` provides `GpuPipeline3D` helpers so renderers share graphics pipeline descriptors, vertex input layouts, depth settings, and SDL GPU pipeline creation.
+- `kengine-3d` provides `GpuDraw3D` and `GpuUniforms3D` helpers so renderers share uniform packing, vertex-buffer binding, texture-sampler binding, and primitive draw submission.
+- `kengine-3d` provides `GpuRendererPreset3D`, `Kengine3DVertexLayouts`, and `Kengine3DRendererPresets` so built-in renderer/material styles pair shader programs with matching pipeline layouts in one catalog.
+- `kengine-3d` provides `GpuUpload3D` and `GpuVertexBuffer3D` helpers so textures and mesh classes share upload transfer buffers, copy-pass submission, vertex packing, GPU vertex-buffer creation, texture uploads, and mutable vertex-buffer updates.
 - `kengine-3d` provides `ObjMeshLoader`, a lightweight Wavefront OBJ path that reads vertices/UVs/faces, triangulates polygons, resolves `.mtl` diffuse colors, normalizes imported geometry, and emits `GpuMesh`, `LitGpuMesh`, or `TexturedLitGpuMesh` data.
-- `kengine-3d` provides `ModelLoader3D`, `ParsedModel3D`, `Model3D`, `ModelPart3D`, `Material3D`, and `ModelRenderer3D` as the first reusable model/material facade over the lower-level OBJ/GLB paths.
-- `kengine-3d` provides `Scene3D`, scene item types, and `SceneRenderer3D` for ordered per-frame submission of static models, animated models, and mesh primitives through one renderer bundle.
+- `kengine-3d` provides `ModelLoader3D`, `ModelAsset3D`, `ModelAssetLoader3D`, `ModelAssetPathResolver3D`, `ModelSourceCache3D`, `ParsedModel3D`, `ModelPartSource3D`, `Model3D`, `ModelInfo3D`, `ModelPart3D`, `MaterialDescriptor3D`, `Material3D`, and `ModelRenderer3D` as the first reusable model/material facade over the lower-level OBJ/GLB paths. Callers can parse a CPU model source once, optionally keep it in an explicit `ModelSourceCache3D`, reuse it for collision, and upload it into GPU-backed `Model3D` resources with an optional long-lived `GpuTextureCache3D`; default loads still own and clean up their per-load texture cache.
+- `kengine-3d` provides `Scene3D`, `Node3D`, scene item types, and `SceneRenderer3D` for ordered per-frame submission of static models, animated models, and mesh primitives through one renderer bundle. `Node3D` includes fluent visibility, transform, position/yaw, and animated-pose helpers for simple actor-to-node sync.
 - `kengine-3d` provides `GpuResourceScope3D`, a small cleanup scope for GPU-backed resources owned by demos and games.
-- `kengine-3d` provides `GlbMeshLoader`, a Kotlin-side GLB 2.0 path that loads static textured/lit meshes, CPU-updated skinned textured meshes, node-transform animation clips, embedded textures, and CPU-side lit vertices for collision.
-- `kengine-3d` provides `AnimationClipSet3D`, `AnimationClipMap3D`, `AnimationPose3D`, and `AnimationPlayer3D` for reusable clip lookup, pose values, and stateful animation time advancement.
-- `kengine-3d` provides `AnimatedModel3D`, `AnimatedModelLoader3D`, and `AnimatedModelInstance3D` as the first format-neutral facade over node-animated and CPU-skinned model playback, per-instance transform/pose state, and pre-render pose preparation.
+- `kengine-3d` provides `GlbMeshLoader`, a Kotlin-side GLB 2.0 path that loads static textured/lit CPU source parts, fills engine-owned animated lit/skinned CPU source descriptors, uploads textured/lit meshes, CPU-updated per-instance skinned textured meshes, GPU-ready skinned textured source vertices, node-transform animation clips, embedded textures with parsed sampler wrap/filter intent, per-load or caller-owned texture deduping, model-owned cached texture cleanup for default loads, and CPU-side lit vertices for collision.
+- `kengine-3d` provides `AnimationClipSet3D`, `AnimationClipMap3D`, `AnimationPose3D`, `AnimationPosePreparation3D`, `AnimationPlayer3D`, and `AnimationStateController3D` for reusable clip lookup, pose values, explicit pose preparation, stateful animation time advancement, and state-to-pose playback.
+- `kengine-3d` provides `AnimatedModel3D`, `AnimatedModelSource3D`, `AnimatedModelSourceCache3D`, `AnimatedModelAsset3D`, `AnimatedModelLoader3D`, `AnimatedModelInstanceRenderState3D`, and `AnimatedModelInstance3D` as the first format-neutral facade over node-animated, CPU-skinned, and GPU joint-palette model source parsing, engine-owned source descriptors, source caching, upload, playback, per-instance transform/pose/render state, and pre-render pose preparation.
 - `kengine-3d` provides `TerrainMeshCollider3D`, `StaticMeshCollider3D`, `Collision3D`, `KinematicCharacterController3D`, and `TerrainActorController3D` for the current 3D gameplay collision baseline.
 - `games:kengine-3d-demos` opens a GPU-backed window, uses mouse-drag orbit camera controls plus arrow-key zoom/pan, and renders separated rows of multiple primitives, a rotating color cube, a rotating textured cube, clean color-lit Kenney Space Kit ship/turret OBJ models, and a separate UV-textured meteor OBJ model using a PNG loaded from disk.
-- `games:mario-3d` is now the main 3D platformer validation bed: textured GLB world rendering, terrain/static collision from parsed model vertices, reusable third-person camera controls, skinned Mario animation, animated enemies, controller input, debug drawing, and a simple Bowser encounter.
+- `games:mario-3d` is now the main 3D platformer validation bed: textured GLB world rendering, terrain/static collision from parsed model vertices, reusable third-person camera controls, reusable controller axis calibration, default `AUTO` GPU joint-palette skinned Mario animation, asset-bound scene nodes, animated enemies, debug drawing, and a simple Bowser encounter.
 - `games:rubiks-cube-3d` renders a 27-cubie Rubik's cube with per-face colors, mouse orbit, mouse-picked face turns, keyboard face turns, animated slice rotations, scramble, and reset.
 
 Implementation note: the SDL GPU declarations are already generated by the core `SDL3/SDL.h` cinterop in `kengine`; a separate `sdl3_gpu.def` produced an effectively empty binding and is not needed.
 
-Current shader note: the 3D renderers use inline MSL shader source for the macOS proof. Before treating the renderer as cross-platform, add a repeatable shader build/package path for MSL, SPIR-V, and DXIL.
+Current shader note: the 3D renderers now load shader programs through a backend-aware generated Kotlin shader catalog backed by files in `kengine-3d/src/nativeMain/shaders`. `compileKengine3dShaderArtifacts` establishes `build/generated/kengine3dShaders/nativeMain/{metallib,spirv,dxil}`; when Xcode's `metal` and `metallib` tools are available, it fills `metallib` and the generator packages those byte arrays while keeping MSL source as fallback. `reportKengine3dShaderTools` reports optional compiler availability. The runtime can select among shader artifacts reported by `SDL_GetGPUShaderFormats`. Before treating the renderer as cross-platform, wire a cross-compiler into the existing SPIR-V and DXIL artifact directories.
 
 ## Recommended Stack
 
@@ -304,7 +311,8 @@ Initial approach:
 
 - Keep a small set of built-in shaders for MVP demos.
 - Store precompiled shader artifacts in module resources or generated source.
-- Use a Gradle task later to compile shaders for Metal, Vulkan, and D3D12.
+- Compile Metal libraries from the checked-in MSL files when Xcode tools are available.
+- Use the existing generated `spirv` and `dxil` artifact directories when adding Vulkan and D3D12 compiler tasks.
 
 Candidates to investigate:
 
@@ -403,7 +411,8 @@ Success criteria:
 - Done: Load image pixels from Kengine assets.
 - Done: Load textured OBJ models with UVs for the demo scene.
 - Done: Add reusable `Material3D`, `ModelPart3D`, `Model3D`, `ModelRenderer3D`, `ParsedModel3D`, and `ModelLoader3D` wrappers so simple static models do not need to expose loader-specific return types.
-- Next: Continue moving direct OBJ/GLB usage in demos behind `ModelLoader3D` where animation-specific APIs are not needed.
+- Done: Add `ModelAsset3D`, `AnimatedModelAsset3D`, `ModelAssetPathResolver3D`, and `ModelAssetLoader3D` so games can declare model assets once, use packaged/source asset fallback, and route static/animated loads through a reusable facade.
+- Next: Continue moving direct OBJ/GLB usage in demos behind `ModelAssetLoader3D` where animation-specific APIs are not needed.
 
 Success criteria:
 
@@ -434,7 +443,11 @@ Success criteria:
 - Done: Load node-transform animation clips for rigid/node animated models.
 - Done: Load skinned textured meshes and update skinning on CPU.
 - Next: Add external `.gltf` JSON plus external buffer/image support, or explicitly scope the public API to binary `.glb` until needed.
-- Next: Move CPU skinning toward shader/GPU buffers once animation API shape is stable.
+- Done: Add per-instance CPU-skinned mesh buffers for skinned textured GLB animated model instances.
+- Done: Add `SkinnedTexturedLitVertex3D`, `SkinnedTexturedLitGpuMesh`, and `SkinnedTexturedLitMeshRenderer3D` so skinned source vertices and joint matrices can be drawn by a shader path.
+- Done: Add `AnimatedModelSkinningMode3D.AUTO` as the default policy, preferring `GPU_JOINT_PALETTE` when the asset fits the renderer's joint limit and falling back to `CPU_VERTEX_BUFFER` otherwise.
+- Done: Validate Mario's shader-skinning path visually and let Mario rely on the default `AUTO` mode instead of opting into a renderer path in game code.
+- Done: Add skinned GLB support reporting and stricter skinned primitive validation for missing skinning accessors, accessor count mismatches, invalid skin/mesh references, non-triangle primitives, and out-of-range joint indices.
 
 Success criteria:
 
@@ -446,11 +459,45 @@ Success criteria:
 
 - Done: Extract reusable third-person camera/follow controls from `games:mario-3d`.
 - Done: Add `AnimationPlayer3D` and clip lookup helpers so games do not hand-roll state-to-clip timing.
+- Done: Add `AnimationStateController3D` so games can keep their own state-selection rules while reusing enum-state-to-pose playback.
 - Done: Add lightweight `Scene3D` and `SceneRenderer3D` so games can submit ordered static models and mesh primitives through reusable scene items.
 - Done: Lift GLB animated/skinned models behind a format-neutral animated model facade.
 - Done: Add `AnimatedModelInstance3D` so scene items can retain per-instance transform, visibility, light override, and animation pose instead of being rebuilt inside render passes.
-- Next: Add `Node3D` or entity wrapper if needed.
-- Next: Replace CPU-skinned mesh mutation with GPU skinning or per-instance skin buffers so many skinned instances can share one animated asset with different poses.
+- Done: Add `Node3D` as a lightweight typed wrapper around one scene item, with parent transform/item transform composition, node-level visibility, position/yaw transform helpers, and animated-pose sync helpers.
+- Done: Add `DebugRenderer3D` collider overloads and contact markers so games can debug common 3D collision shapes without repeating draw glue.
+- Done: Centralize explicit pose preparation in `AnimationPosePreparation3D`, keeping shared-buffer animated model limitations guarded in one place.
+- Done: Add `AnimatedModelInstanceRenderState3D` plus per-instance CPU-skinned GLB buffers so many skinned instances can share one animated asset with different poses.
+- Done: Add the first additive shader-skinning renderer path and GLB GPU-skinned instance type while preserving the CPU-skinned fallback.
+- Done: Route skinned animated model instances through selectable `AUTO`, CPU, or GPU skinning modes.
+- Done: Add an early joint-count guard for GPU joint-palette skinning.
+- Done: Make `AUTO` the default animated skinning mode for skinned GLB assets.
+- Done: Harden promoted shader-skinning errors with stage-aware MSL shader creation messages, detailed pipeline context, and safe shader release on renderer init failures.
+- Done: Migrate the shared shader helper across the older primitive, mesh, lit mesh, textured mesh, textured lit mesh, debug, and skinned textured lit renderers.
+- Done: Move renderer MSL source into `src/nativeMain/shaders` and generate the internal `Kengine3DShaderSources` catalog during the `kengine-3d` build.
+- Done: Generate paired shader program descriptors in `Kengine3DShaderPrograms` so renderers no longer repeat labels, source pairs, uniform buffer counts, or sampler counts.
+- Done: Add backend-aware shader artifact descriptors and runtime selection from the active SDL GPU device's supported shader formats.
+- Done: Compile/package per-stage METALLIB artifacts when Xcode shader tools are available, while keeping MSL source artifacts as fallback.
+- Done: Generalize generated shader artifact packaging for METALLIB, SPIR-V, and DXIL and add `reportKengine3dShaderTools` for optional compiler discovery.
+- Done: Add `GpuPipeline3D` descriptors so renderers share vertex layouts, primitive/depth settings, SDL GPU pipeline creation, and pipeline failure context.
+- Done: Add `GpuDraw3D` and `GpuUniforms3D` helpers so renderers share uniform packing, vertex-buffer binding, texture-sampler binding, and primitive draw submission.
+- Done: Add `GpuRendererPreset3D`, `Kengine3DVertexLayouts`, and `Kengine3DRendererPresets` so built-in renderer/material styles pair shader programs with matching pipeline layouts in one catalog.
+- Done: Consolidate repeated GPU vertex-buffer creation, transfer-buffer upload, and mutable mesh update code across mesh classes with `GpuVertexBuffer3D`.
+- Done: Consolidate texture transfer-buffer upload and copy-pass helpers where they overlap with the vertex-buffer upload path.
+- Done: Add texture, sampler, and upload descriptors so texture creation defaults, address modes, filters, and upload metadata are not hard-coded in `GpuTexture`.
+- Done: Add a small texture asset/cache layer so file, embedded GLB, procedural fallback, and repeated material textures share one simple loading path.
+- Done: Add texture ownership controls so materials and GLB parts can borrow cached textures without releasing them directly.
+- Done: Expose a long-lived `GpuTextureCache3D` option through GLB, model, animated model, and asset loaders for cross-model texture reuse.
+- Done: Introduce `MaterialDescriptor3D` so imported models and game-authored materials can share one material upload path backed by optional texture-cache ownership.
+- Done: Separate parsed CPU model sources from uploaded GPU model resources so inspection, collision, rendering, and caching can share one model data flow.
+- Done: Add an optional `ModelSourceCache3D` to `ModelAssetLoader3D` so repeated source loads can reuse CPU data explicitly.
+- Done: Lift animated GLB parsing behind a cacheable `AnimatedModelSource3D` shape so skeletons, clips, and skinned source meshes follow the same source/upload split as static models.
+- Done: Collapse GLB-specific animated source wrappers behind engine-owned source descriptors so future animation formats can reuse the same upload surface.
+- Done: Move shared animation runtime primitives for nodes, skins, matrices, and clip sampling out of `GlbMeshLoader` so GLB is only a file parser.
+- Done: Add an optional model asset bundle/preload helper so games can declare static and animated model assets once and warm source/texture caches up front.
+- Done: Add asset-bound scene and collider helpers so loaded bundles can create terrain/static colliders and scene nodes without repeating lookup glue in games.
+- Done: Continue shrinking Mario startup by moving game-local actor setup and actor-to-node sync behind small builders backed by asset-bound scene nodes and animation controllers.
+- Next: Decide the next major 3D validation app; strongest candidate is `kengine-3d-model-viewer`, using Kengine UI, core engine lifecycle, and `kengine-3d` asset loading to inspect models, animations, cameras, materials, and renderer behavior outside a game.
+- Next: Wire SDL_shadercross/dxc/glslang into the existing SPIR-V and DXIL artifact directories.
 - Decide whether 3D should integrate with Kengine's current scene system.
 
 ## Open Questions

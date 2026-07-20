@@ -1,0 +1,72 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+using namespace metal;
+
+struct Uniforms
+{
+    float4x4 modelViewProjection;
+    float4x4 model;
+    float4x4 skinMatrices[128];
+};
+
+struct VertexIn
+{
+    float3 position [[attribute(0)]];
+    float3 normal [[attribute(1)]];
+    float3 color [[attribute(2)]];
+    float2 uv [[attribute(3)]];
+    float4 joints [[attribute(4)]];
+    float4 weights [[attribute(5)]];
+};
+
+struct VertexOut
+{
+    float3 normal [[user(locn0)]];
+    float3 color [[user(locn1)]];
+    float2 uv [[user(locn2)]];
+    float4 position [[position]];
+};
+
+float4 skinPoint(float3 point, float4 joints, float4 weights, constant Uniforms& uniforms)
+{
+    float4 source = float4(point, 1.0);
+    float totalWeight = weights.x + weights.y + weights.z + weights.w;
+    if (totalWeight <= 0.0) {
+        return source;
+    }
+
+    float4 skinned = float4(0.0);
+    skinned += (uniforms.skinMatrices[uint(joints.x)] * source) * weights.x;
+    skinned += (uniforms.skinMatrices[uint(joints.y)] * source) * weights.y;
+    skinned += (uniforms.skinMatrices[uint(joints.z)] * source) * weights.z;
+    skinned += (uniforms.skinMatrices[uint(joints.w)] * source) * weights.w;
+    return skinned;
+}
+
+float3 skinNormal(float3 normal, float4 joints, float4 weights, constant Uniforms& uniforms)
+{
+    float4 source = float4(normal, 0.0);
+    float totalWeight = weights.x + weights.y + weights.z + weights.w;
+    if (totalWeight <= 0.0) {
+        return normal;
+    }
+
+    float4 skinned = float4(0.0);
+    skinned += (uniforms.skinMatrices[uint(joints.x)] * source) * weights.x;
+    skinned += (uniforms.skinMatrices[uint(joints.y)] * source) * weights.y;
+    skinned += (uniforms.skinMatrices[uint(joints.z)] * source) * weights.z;
+    skinned += (uniforms.skinMatrices[uint(joints.w)] * source) * weights.w;
+    return normalize(skinned.xyz);
+}
+
+vertex VertexOut main0(VertexIn in [[stage_in]], constant Uniforms& uniforms [[buffer(0)]])
+{
+    VertexOut out;
+    float4 skinnedPosition = skinPoint(in.position, in.joints, in.weights, uniforms);
+    float3 skinnedNormal = skinNormal(in.normal, in.joints, in.weights, uniforms);
+    out.normal = normalize((uniforms.model * float4(skinnedNormal, 0.0)).xyz);
+    out.color = in.color;
+    out.uv = in.uv;
+    out.position = uniforms.modelViewProjection * skinnedPosition;
+    return out;
+}

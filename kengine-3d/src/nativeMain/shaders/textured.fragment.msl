@@ -1,0 +1,22 @@
+#include <metal_stdlib>
+using namespace metal;
+
+struct FragmentIn
+{
+    float2 uv [[user(locn0)]];
+};
+
+struct FragmentOut
+{
+    float4 color [[color(0)]];
+};
+
+fragment FragmentOut main0(
+    FragmentIn in [[stage_in]],
+    texture2d<float> baseTexture [[texture(0)]],
+    sampler baseSampler [[sampler(0)]])
+{
+    FragmentOut out;
+    out.color = baseTexture.sample(baseSampler, in.uv);
+    return out;
+}

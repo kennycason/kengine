@@ -1,44 +1,11 @@
 package com.kengine.three
 
 import cnames.structs.SDL_GPUGraphicsPipeline
-import cnames.structs.SDL_GPUShader
 import com.kengine.graphics.Color
 import com.kengine.math.Vec3
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.UByteVar
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.allocArray
-import kotlinx.cinterop.convert
-import kotlinx.cinterop.cstr
-import kotlinx.cinterop.get
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.reinterpret
-import kotlinx.cinterop.toKString
-import kotlinx.cinterop.usePinned
-import sdl3.SDL_BindGPUGraphicsPipeline
-import sdl3.SDL_BindGPUVertexBuffers
-import sdl3.SDL_CreateGPUGraphicsPipeline
-import sdl3.SDL_CreateGPUShader
-import sdl3.SDL_DrawGPUPrimitives
-import sdl3.SDL_GPUBufferBinding
-import sdl3.SDL_GPUColorTargetDescription
-import sdl3.SDL_GPUCompareOp
-import sdl3.SDL_GPUGraphicsPipelineCreateInfo
-import sdl3.SDL_GPUPrimitiveType
-import sdl3.SDL_GPUShaderCreateInfo
-import sdl3.SDL_GPUShaderStage
-import sdl3.SDL_GPUVertexAttribute
-import sdl3.SDL_GPUVertexBufferDescription
-import sdl3.SDL_GPUVertexElementFormat
-import sdl3.SDL_GPUVertexInputRate
-import sdl3.SDL_GPU_SHADERFORMAT_MSL
-import sdl3.SDL_GetError
-import sdl3.SDL_PushGPUVertexUniformData
 import sdl3.SDL_ReleaseGPUGraphicsPipeline
-import sdl3.SDL_ReleaseGPUShader
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -55,14 +22,13 @@ class DebugRenderer3D(
     private var cleanedUp = false
 
     init {
-        val vertexShader = createShader(DEBUG_VERTEX_MSL, SDL_GPUShaderStage.SDL_GPU_SHADERSTAGE_VERTEX)
-        val fragmentShader = createShader(DEBUG_FRAGMENT_MSL, SDL_GPUShaderStage.SDL_GPU_SHADERSTAGE_FRAGMENT)
-
         pipeline = try {
-            createPipeline(vertexShader, fragmentShader)
-        } finally {
-            SDL_ReleaseGPUShader(gpu.device, vertexShader)
-            SDL_ReleaseGPUShader(gpu.device, fragmentShader)
+            gpu.createRendererPipeline3D(Kengine3DRendererPresets.DEBUG)
+        } catch (e: Throwable) {
+            lineMesh.cleanup()
+            sphereMesh.cleanup()
+            boxMesh.cleanup()
+            throw e
         }
     }
 
@@ -106,6 +72,21 @@ class DebugRenderer3D(
             mesh = sphereMesh,
             modelMatrix = Mat4.translation(center) * Mat4.scale(Vec3(radius, radius, radius)),
             camera = camera,
+            color = color
+        )
+    }
+
+    fun wireSphere(
+        frame: GpuFrame,
+        camera: Camera3D,
+        sphere: SphereCollider3D,
+        color: Color
+    ) {
+        wireSphere(
+            frame = frame,
+            camera = camera,
+            center = sphere.center,
+            radius = sphere.radius,
             color = color
         )
     }
@@ -161,6 +142,32 @@ class DebugRenderer3D(
         )
     }
 
+    fun contactPoint(
+        frame: GpuFrame,
+        camera: Camera3D,
+        point: Vec3,
+        normal: Vec3,
+        color: Color,
+        pointRadius: Double = 0.11,
+        normalLength: Double = 0.85
+    ) {
+        wireSphere(
+            frame = frame,
+            camera = camera,
+            center = point,
+            radius = pointRadius,
+            color = color
+        )
+        ray(
+            frame = frame,
+            camera = camera,
+            origin = point,
+            direction = normal,
+            length = normalLength,
+            color = color
+        )
+    }
+
     fun cleanup() {
         if (cleanedUp) {
             return
@@ -185,104 +192,12 @@ class DebugRenderer3D(
         }
 
         val aspect = frame.width.toFloat() / frame.height.toFloat()
-        val modelViewProjection = camera.viewProjection(aspect) * modelMatrix
-        val uniforms = FloatArray(20)
-        modelViewProjection.values.copyInto(uniforms, destinationOffset = 0)
-        uniforms[16] = color.r.toFloat() / 255f
-        uniforms[17] = color.g.toFloat() / 255f
-        uniforms[18] = color.b.toFloat() / 255f
-        uniforms[19] = color.a.toFloat() / 255f
-
-        uniforms.usePinned { pinned ->
-            SDL_PushGPUVertexUniformData(
-                frame.commandBuffer,
-                0u,
-                pinned.addressOf(0).reinterpret<UByteVar>(),
-                (uniforms.size * 4).toUInt()
-            )
-        }
-
-        memScoped {
-            val binding = alloc<SDL_GPUBufferBinding>()
-            binding.buffer = mesh.vertexBuffer
-            binding.offset = 0u
-
-            SDL_BindGPUGraphicsPipeline(frame.renderPass, pipeline)
-            SDL_BindGPUVertexBuffers(frame.renderPass, 0u, binding.ptr, 1u)
-            SDL_DrawGPUPrimitives(frame.renderPass, mesh.vertexCount, 1u, 0u, 0u)
-        }
-    }
-
-    private fun createShader(
-        source: String,
-        stage: SDL_GPUShaderStage
-    ): CPointer<SDL_GPUShader> {
-        val bytes = source.encodeToByteArray()
-
-        return memScoped {
-            bytes.usePinned { pinned ->
-                val createInfo = alloc<SDL_GPUShaderCreateInfo>()
-                createInfo.code_size = bytes.size.convert()
-                createInfo.code = pinned.addressOf(0).reinterpret<UByteVar>()
-                createInfo.entrypoint = "main0".cstr.ptr
-                createInfo.format = SDL_GPU_SHADERFORMAT_MSL
-                createInfo.stage = stage
-                createInfo.num_samplers = 0u
-                createInfo.num_storage_textures = 0u
-                createInfo.num_storage_buffers = 0u
-                createInfo.num_uniform_buffers =
-                    if (stage == SDL_GPUShaderStage.SDL_GPU_SHADERSTAGE_VERTEX) 1u else 0u
-                createInfo.props = 0u
-
-                SDL_CreateGPUShader(gpu.device, createInfo.ptr)
-                    ?: throw IllegalStateException("Error creating debug shader: ${SDL_GetError()?.toKString()}")
-            }
-        }
-    }
-
-    private fun createPipeline(
-        vertexShader: CPointer<SDL_GPUShader>,
-        fragmentShader: CPointer<SDL_GPUShader>
-    ): CPointer<SDL_GPUGraphicsPipeline> {
-        return memScoped {
-            val colorTarget = alloc<SDL_GPUColorTargetDescription>()
-            colorTarget.format = gpu.swapchainTextureFormat
-
-            val vertexBuffer = alloc<SDL_GPUVertexBufferDescription>()
-            vertexBuffer.slot = 0u
-            vertexBuffer.input_rate = SDL_GPUVertexInputRate.SDL_GPU_VERTEXINPUTRATE_VERTEX
-            vertexBuffer.instance_step_rate = 0u
-            vertexBuffer.pitch = Vertex3D.BYTES_PER_VERTEX.toUInt()
-
-            val attributes = allocArray<SDL_GPUVertexAttribute>(1)
-            attributes[0].apply {
-                buffer_slot = 0u
-                format = SDL_GPUVertexElementFormat.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3
-                location = 0u
-                offset = 0u
-            }
-
-            val createInfo = alloc<SDL_GPUGraphicsPipelineCreateInfo>()
-            createInfo.vertex_shader = vertexShader
-            createInfo.fragment_shader = fragmentShader
-            createInfo.primitive_type = SDL_GPUPrimitiveType.SDL_GPU_PRIMITIVETYPE_LINELIST
-            createInfo.rasterizer_state.enable_depth_clip = true
-            createInfo.depth_stencil_state.enable_depth_test = true
-            createInfo.depth_stencil_state.enable_depth_write = false
-            createInfo.depth_stencil_state.compare_op = SDL_GPUCompareOp.SDL_GPU_COMPAREOP_LESS_OR_EQUAL
-            createInfo.vertex_input_state.num_vertex_buffers = 1u
-            createInfo.vertex_input_state.vertex_buffer_descriptions = vertexBuffer.ptr
-            createInfo.vertex_input_state.num_vertex_attributes = 1u
-            createInfo.vertex_input_state.vertex_attributes = attributes
-            createInfo.target_info.num_color_targets = 1u
-            createInfo.target_info.color_target_descriptions = colorTarget.ptr
-            createInfo.target_info.has_depth_stencil_target = true
-            createInfo.target_info.depth_stencil_format = gpu.depthTextureFormat
-            createInfo.props = 0u
-
-            SDL_CreateGPUGraphicsPipeline(gpu.device, createInfo.ptr)
-                ?: throw IllegalStateException("Error creating debug pipeline: ${SDL_GetError()?.toKString()}")
-        }
+        frame.pushVertexUniformFloats3D(coloredModelViewProjectionUniforms3D(aspect, modelMatrix, camera, color))
+        frame.drawPrimitives3D(
+            pipeline = pipeline,
+            vertexCount = mesh.vertexCount,
+            vertexBuffer = GpuVertexBufferDrawBinding3D(mesh.vertexBuffer)
+        )
     }
 
     companion object {
@@ -398,58 +313,5 @@ class DebugRenderer3D(
             }
             return Vec3(value.x / length, value.y / length, value.z / length)
         }
-
-        private const val DEBUG_VERTEX_MSL = """
-#include <metal_stdlib>
-#include <simd/simd.h>
-using namespace metal;
-
-struct Uniforms
-{
-    float4x4 modelViewProjection;
-    float4 color;
-};
-
-struct VertexIn
-{
-    float3 position [[attribute(0)]];
-};
-
-struct VertexOut
-{
-    float4 color [[user(locn0)]];
-    float4 position [[position]];
-};
-
-vertex VertexOut main0(VertexIn in [[stage_in]], constant Uniforms& uniforms [[buffer(0)]])
-{
-    VertexOut out;
-    out.color = uniforms.color;
-    out.position = uniforms.modelViewProjection * float4(in.position, 1.0);
-    return out;
-}
-"""
-
-        private const val DEBUG_FRAGMENT_MSL = """
-#include <metal_stdlib>
-using namespace metal;
-
-struct FragmentIn
-{
-    float4 color [[user(locn0)]];
-};
-
-struct FragmentOut
-{
-    float4 color [[color(0)]];
-};
-
-fragment FragmentOut main0(FragmentIn in [[stage_in]])
-{
-    FragmentOut out;
-    out.color = in.color;
-    return out;
-}
-"""
     }
 }

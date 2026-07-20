@@ -14,8 +14,6 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.math.abs
-import kotlin.math.acos
 import kotlin.math.cos
 import kotlin.math.sin
 import platform.posix.fclose
@@ -42,6 +40,7 @@ data class GlbModelInfo(
     val hasTexturedMaterials: Boolean,
     val animations: List<GlbAnimationClipInfo> = emptyList(),
     val skins: List<GlbSkinInfo> = emptyList(),
+    val skinningSupport: GlbSkinningSupportInfo = GlbSkinningSupportInfo(),
     val hasSkeleton: Boolean = skinCount > 0,
     val hasAnimations: Boolean = animationCount > 0
 )
@@ -69,11 +68,49 @@ data class GlbSkinInfo(
     val inverseBindMatrixCount: Int
 )
 
+data class GlbSkinningSupportInfo(
+    val skinnedNodeCount: Int = 0,
+    val supportedPrimitiveCount: Int = 0,
+    val nonTrianglePrimitiveCount: Int = 0,
+    val missingJointOrWeightPrimitiveCount: Int = 0,
+    val missingMeshReferenceCount: Int = 0,
+    val missingSkinReferenceCount: Int = 0
+) {
+    val unsupportedPrimitiveCount: Int
+        get() = nonTrianglePrimitiveCount +
+            missingJointOrWeightPrimitiveCount +
+            missingMeshReferenceCount +
+            missingSkinReferenceCount
+
+    val hasSupportedPrimitives: Boolean
+        get() = supportedPrimitiveCount > 0
+
+    internal fun unsupportedSummary(): String {
+        val reasons = mutableListOf<String>()
+        if (skinnedNodeCount == 0) {
+            reasons += "no mesh nodes reference a skin"
+        }
+        if (nonTrianglePrimitiveCount > 0) {
+            reasons += "$nonTrianglePrimitiveCount skinned primitive(s) are not triangle lists"
+        }
+        if (missingJointOrWeightPrimitiveCount > 0) {
+            reasons += "$missingJointOrWeightPrimitiveCount triangle primitive(s) are missing JOINTS_0 or WEIGHTS_0"
+        }
+        if (missingMeshReferenceCount > 0) {
+            reasons += "$missingMeshReferenceCount skinned node(s) reference missing meshes"
+        }
+        if (missingSkinReferenceCount > 0) {
+            reasons += "$missingSkinReferenceCount skinned node(s) reference missing skins"
+        }
+        return reasons.joinToString("; ").ifEmpty { "no supported skinned triangle primitives were found" }
+    }
+}
+
 class GlbAnimatedLitModel internal constructor(
     private val parts: List<GlbAnimatedLitMeshPart>,
-    private val nodes: List<GlbNode>,
+    private val nodes: List<ModelNode3D>,
     private val sceneNodeIndices: List<Int>,
-    private val animations: List<GlbAnimationClip>,
+    private val animations: List<ModelAnimationClip3D>,
     private val normalizationMatrix: Mat4
 ) {
     val clips: List<GlbAnimationClipInfo> = animations.map { it.info }
@@ -88,7 +125,7 @@ class GlbAnimatedLitModel internal constructor(
         timeSeconds: Double = 0.0
     ) {
         val modelMatrix = transform.matrix() * normalizationMatrix
-        val nodeWorldMatrices = sampleNodeWorldMatrices(clipIndex, timeSeconds)
+        val nodeWorldMatrices = sampleWorldMatrices(clipIndex, timeSeconds)
         parts.forEach { part ->
             renderer.draw(
                 frame = frame,
@@ -104,11 +141,11 @@ class GlbAnimatedLitModel internal constructor(
         parts.map { it.mesh }.distinct().forEach { it.cleanup() }
     }
 
-    private fun sampleNodeWorldMatrices(
+    private fun sampleWorldMatrices(
         clipIndex: Int,
         timeSeconds: Double
-    ): List<GlbMat4> {
-        return sampleNodeWorldMatrices(
+    ): List<ModelMatrix3D> {
+        return sampleModelNodeWorldMatrices3D(
             nodes = nodes,
             sceneNodeIndices = sceneNodeIndices,
             animations = animations,
@@ -124,8 +161,11 @@ internal data class GlbAnimatedLitMeshPart(
 )
 
 class GlbTexturedLitModel(
-    val parts: List<GlbTexturedLitMeshPart>
-) {
+    val parts: List<GlbTexturedLitMeshPart>,
+    private val ownedResources: List<GpuResource3D> = emptyList()
+) : GpuResource3D {
+    private var cleanedUp = false
+
     fun draw(
         renderer: TexturedLitMeshRenderer3D,
         frame: GpuFrame,
@@ -138,36 +178,281 @@ class GlbTexturedLitModel(
         }
     }
 
-    fun cleanup() {
-        parts.forEach { it.cleanup() }
+    override fun cleanup() {
+        if (cleanedUp) {
+            return
+        }
+
+        cleanedUp = true
+        cleanupGlbResources3D(parts, ownedResources)
     }
 }
 
 data class GlbTexturedLitMeshPart(
     val mesh: TexturedLitGpuMesh,
+    val material: Material3D
+) : GpuResource3D {
     val texture: GpuTexture
-) {
-    fun cleanup() {
+        get() = material.texture ?: throw IllegalStateException("GLB textured lit mesh part requires a material texture.")
+
+    override fun cleanup() {
         mesh.cleanup()
-        texture.cleanup()
+        material.cleanup()
     }
 }
 
+internal data class GlbTexturedLitLoad3D(
+    val parts: List<GlbTexturedLitMeshPart>,
+    val ownedResources: List<GpuResource3D>
+)
+
+internal data class GlbTexturedLitSource3D(
+    val info: GlbModelInfo,
+    val litVertices: List<LitVertex3D>,
+    val parts: List<ModelPartSource3D.TexturedLit>
+)
+
 class GlbSkinnedTexturedLitModel internal constructor(
+    private val gpu: GpuContext,
     private val parts: List<GlbSkinnedTexturedLitMeshPart>,
-    private val nodes: List<GlbNode>,
+    private val nodes: List<ModelNode3D>,
     private val sceneNodeIndices: List<Int>,
-    private val skins: List<GlbSkin>,
-    private val animations: List<GlbAnimationClip>,
-    private val normalizationMatrix: Mat4
+    private val skins: List<ModelSkin3D>,
+    private val animations: List<ModelAnimationClip3D>,
+    private val normalizationMatrix: Mat4,
+    private val ownedResources: List<GpuResource3D> = emptyList()
 ) {
     val clips: List<GlbAnimationClipInfo> = animations.map { it.info }
+    val maxSkinJointCount: Int = skins.maxOf { it.joints.size }
+    private var sharedInstance: GlbSkinnedTexturedLitModelInstance? = null
+    private var cleanedUp = false
 
     fun updatePose(
         clipIndex: Int = 0,
         timeSeconds: Double = 0.0
     ) {
-        val nodeWorldMatrices = sampleNodeWorldMatrices(
+        requireSharedInstance().updatePose(clipIndex, timeSeconds)
+    }
+
+    fun draw(
+        renderer: TexturedLitMeshRenderer3D,
+        frame: GpuFrame,
+        transform: Transform3D,
+        camera: Camera3D,
+        light: DirectionalLight3D = DirectionalLight3D()
+    ) {
+        requireSharedInstance().draw(renderer, frame, transform, camera, light)
+    }
+
+    fun createInstance(): GlbSkinnedTexturedLitModelInstance {
+        check(!cleanedUp) {
+            "GlbSkinnedTexturedLitModel has already been cleaned up."
+        }
+
+        val instanceParts = mutableListOf<GlbSkinnedTexturedLitModelInstancePart>()
+        try {
+            parts.forEach { part ->
+                instanceParts += GlbSkinnedTexturedLitModelInstancePart(
+                    nodeIndex = part.nodeIndex,
+                    skinIndex = part.skinIndex,
+                    mesh = TexturedLitGpuMesh.create(gpu, part.restVertices),
+                    texture = part.texture,
+                    sourceVertices = part.sourceVertices
+                )
+            }
+        } catch (e: Throwable) {
+            instanceParts.forEach { it.cleanup() }
+            throw e
+        }
+
+        return GlbSkinnedTexturedLitModelInstance(
+            parts = instanceParts,
+            nodes = nodes,
+            sceneNodeIndices = sceneNodeIndices,
+            skins = skins,
+            animations = animations,
+            normalizationMatrix = normalizationMatrix
+        )
+    }
+
+    fun createGpuSkinnedInstance(): GlbGpuSkinnedTexturedLitModelInstance {
+        check(!cleanedUp) {
+            "GlbSkinnedTexturedLitModel has already been cleaned up."
+        }
+        require(maxSkinJointCount <= SkinnedTexturedLitMeshRenderer3D.MAX_SKIN_JOINTS) {
+            "GPU joint-palette skinning supports at most ${SkinnedTexturedLitMeshRenderer3D.MAX_SKIN_JOINTS} joints per skin, " +
+                "but this GLB has a skin with $maxSkinJointCount joints. Use ${AnimatedModelSkinningMode3D.CPU_VERTEX_BUFFER} for this asset."
+        }
+
+        val instanceParts = mutableListOf<GlbGpuSkinnedTexturedLitModelInstancePart>()
+        try {
+            parts.forEach { part ->
+                instanceParts += GlbGpuSkinnedTexturedLitModelInstancePart(
+                    skinIndex = part.skinIndex,
+                    mesh = SkinnedTexturedLitGpuMesh.create(gpu, part.skinnedVertices),
+                    texture = part.texture
+                )
+            }
+        } catch (e: Throwable) {
+            instanceParts.forEach { it.cleanup() }
+            throw e
+        }
+
+        return GlbGpuSkinnedTexturedLitModelInstance(
+            parts = instanceParts,
+            nodes = nodes,
+            sceneNodeIndices = sceneNodeIndices,
+            skins = skins,
+            animations = animations,
+            normalizationMatrix = normalizationMatrix
+        )
+    }
+
+    fun cleanup() {
+        if (cleanedUp) {
+            return
+        }
+
+        cleanedUp = true
+        val instance = sharedInstance
+        sharedInstance = null
+        val resources = mutableListOf<GpuResource3D>()
+        instance?.let { resources += it }
+        resources += parts
+        cleanupGlbResources3D(
+            resources = resources,
+            ownedResources = ownedResources
+        )
+    }
+
+    private fun requireSharedInstance(): GlbSkinnedTexturedLitModelInstance {
+        return sharedInstance ?: createInstance().also { sharedInstance = it }
+    }
+}
+
+internal data class GlbSkinnedTexturedLitMeshPart(
+    val nodeIndex: Int,
+    val skinIndex: Int,
+    val material: Material3D,
+    val restVertices: List<TexturedLitVertex3D>,
+    val skinnedVertices: List<SkinnedTexturedLitVertex3D>,
+    val sourceVertices: List<SkinnedTexturedLitVertexSource3D>
+) : GpuResource3D {
+    val texture: GpuTexture
+        get() = material.texture ?: throw IllegalStateException("GLB skinned textured lit mesh part requires a material texture.")
+
+    override fun cleanup() {
+        material.cleanup()
+    }
+}
+
+class GlbGpuSkinnedTexturedLitModelInstance internal constructor(
+    private val parts: List<GlbGpuSkinnedTexturedLitModelInstancePart>,
+    private val nodes: List<ModelNode3D>,
+    private val sceneNodeIndices: List<Int>,
+    private val skins: List<ModelSkin3D>,
+    private val animations: List<ModelAnimationClip3D>,
+    private val normalizationMatrix: Mat4
+) : GpuResource3D {
+    private var skinMatricesBySkin: List<List<Mat4>> = sampleSkinMatrices(emptyList(), 0, 0.0)
+    private var cleanedUp = false
+
+    fun updatePose(
+        clipIndex: Int = 0,
+        timeSeconds: Double = 0.0
+    ) {
+        check(!cleanedUp) {
+            "GlbGpuSkinnedTexturedLitModelInstance has already been cleaned up."
+        }
+
+        skinMatricesBySkin = sampleSkinMatrices(
+            animationClips = animations,
+            clipIndex = clipIndex,
+            timeSeconds = timeSeconds
+        )
+    }
+
+    private fun sampleSkinMatrices(
+        animationClips: List<ModelAnimationClip3D>,
+        clipIndex: Int,
+        timeSeconds: Double
+    ): List<List<Mat4>> {
+        val nodeWorldMatrices = sampleModelNodeWorldMatrices3D(
+            nodes = nodes,
+            sceneNodeIndices = sceneNodeIndices,
+            animations = animationClips,
+            clipIndex = clipIndex,
+            timeSeconds = timeSeconds
+        )
+        return skins.map { skin ->
+            skinMatricesForModelSkin3D(skin, nodeWorldMatrices).map { it.toMat4() }
+        }
+    }
+
+    fun draw(
+        renderer: SkinnedTexturedLitMeshRenderer3D,
+        frame: GpuFrame,
+        transform: Transform3D,
+        camera: Camera3D,
+        light: DirectionalLight3D = DirectionalLight3D()
+    ) {
+        check(!cleanedUp) {
+            "GlbGpuSkinnedTexturedLitModelInstance has already been cleaned up."
+        }
+
+        val modelMatrix = transform.matrix() * normalizationMatrix
+        parts.forEach { part ->
+            renderer.draw(
+                frame = frame,
+                mesh = part.mesh,
+                texture = part.texture,
+                modelMatrix = modelMatrix,
+                camera = camera,
+                skinMatrices = skinMatricesBySkin.getOrElse(part.skinIndex) { listOf(Mat4.identity()) },
+                light = light
+            )
+        }
+    }
+
+    override fun cleanup() {
+        if (cleanedUp) {
+            return
+        }
+
+        cleanedUp = true
+        parts.forEach { it.cleanup() }
+    }
+}
+
+internal data class GlbGpuSkinnedTexturedLitModelInstancePart(
+    val skinIndex: Int,
+    val mesh: SkinnedTexturedLitGpuMesh,
+    val texture: GpuTexture
+) {
+    fun cleanup() {
+        mesh.cleanup()
+    }
+}
+
+class GlbSkinnedTexturedLitModelInstance internal constructor(
+    private val parts: List<GlbSkinnedTexturedLitModelInstancePart>,
+    private val nodes: List<ModelNode3D>,
+    private val sceneNodeIndices: List<Int>,
+    private val skins: List<ModelSkin3D>,
+    private val animations: List<ModelAnimationClip3D>,
+    private val normalizationMatrix: Mat4
+) : GpuResource3D {
+    private var cleanedUp = false
+
+    fun updatePose(
+        clipIndex: Int = 0,
+        timeSeconds: Double = 0.0
+    ) {
+        check(!cleanedUp) {
+            "GlbSkinnedTexturedLitModelInstance has already been cleaned up."
+        }
+
+        val nodeWorldMatrices = sampleModelNodeWorldMatrices3D(
             nodes = nodes,
             sceneNodeIndices = sceneNodeIndices,
             animations = animations,
@@ -176,7 +461,7 @@ class GlbSkinnedTexturedLitModel internal constructor(
         )
         parts.forEach { part ->
             val skin = skins.getOrNull(part.skinIndex) ?: return@forEach
-            val skinMatrices = skinMatricesFor(skin, nodeWorldMatrices)
+            val skinMatrices = skinMatricesForModelSkin3D(skin, nodeWorldMatrices)
             part.mesh.update(part.sourceVertices.map { vertex -> vertex.toTexturedVertex(skinMatrices) })
         }
     }
@@ -188,28 +473,53 @@ class GlbSkinnedTexturedLitModel internal constructor(
         camera: Camera3D,
         light: DirectionalLight3D = DirectionalLight3D()
     ) {
+        check(!cleanedUp) {
+            "GlbSkinnedTexturedLitModelInstance has already been cleaned up."
+        }
+
         val modelMatrix = transform.matrix() * normalizationMatrix
         parts.forEach { part ->
             renderer.draw(frame, part.mesh, part.texture, modelMatrix, camera, light)
         }
     }
 
-    fun cleanup() {
+    override fun cleanup() {
+        if (cleanedUp) {
+            return
+        }
+
+        cleanedUp = true
         parts.forEach { it.cleanup() }
     }
 }
 
-internal data class GlbSkinnedTexturedLitMeshPart(
+internal data class GlbSkinnedTexturedLitModelInstancePart(
     val nodeIndex: Int,
     val skinIndex: Int,
     val mesh: TexturedLitGpuMesh,
     val texture: GpuTexture,
-    val sourceVertices: List<GlbSkinnedTexturedVertex>
+    val sourceVertices: List<SkinnedTexturedLitVertexSource3D>
 ) {
     fun cleanup() {
         mesh.cleanup()
-        texture.cleanup()
     }
+}
+
+private fun cleanupGlbResources3D(
+    resources: List<GpuResource3D>,
+    ownedResources: List<GpuResource3D>
+) {
+    var firstError: Throwable? = null
+    (resources.asReversed() + ownedResources.asReversed()).forEach { resource ->
+        try {
+            resource.cleanup()
+        } catch (e: Throwable) {
+            if (firstError == null) {
+                firstError = e
+            }
+        }
+    }
+    firstError?.let { throw it }
 }
 
 object GlbMeshLoader {
@@ -225,6 +535,12 @@ object GlbMeshLoader {
     private const val GLTF_WRAP_REPEAT = 10497
     private const val GLTF_WRAP_CLAMP_TO_EDGE = 33071
     private const val GLTF_WRAP_MIRRORED_REPEAT = 33648
+    private const val GLTF_FILTER_NEAREST = 9728
+    private const val GLTF_FILTER_LINEAR = 9729
+    private const val GLTF_FILTER_NEAREST_MIPMAP_NEAREST = 9984
+    private const val GLTF_FILTER_LINEAR_MIPMAP_NEAREST = 9985
+    private const val GLTF_FILTER_NEAREST_MIPMAP_LINEAR = 9986
+    private const val GLTF_FILTER_LINEAR_MIPMAP_LINEAR = 9987
     private const val TRIANGLES_MODE = 4
 
     fun loadLit(
@@ -238,8 +554,48 @@ object GlbMeshLoader {
     fun loadTexturedLit(
         gpu: GpuContext,
         assetPath: String,
-        options: GlbMeshLoadOptions = GlbMeshLoadOptions()
+        options: GlbMeshLoadOptions = GlbMeshLoadOptions(),
+        textureCache: GpuTextureCache3D? = null
     ): GlbTexturedLitModel {
+        val loaded = loadTexturedLitParts(gpu, assetPath, options, textureCache)
+        return GlbTexturedLitModel(
+            parts = loaded.parts,
+            ownedResources = loaded.ownedResources
+        )
+    }
+
+    internal fun loadTexturedLitParts(
+        gpu: GpuContext,
+        assetPath: String,
+        options: GlbMeshLoadOptions = GlbMeshLoadOptions(),
+        textureCache: GpuTextureCache3D? = null
+    ): GlbTexturedLitLoad3D {
+        val source = loadTexturedLitSource(assetPath, options)
+        val textureCacheScope = gpu.resolveTextureCache3D(textureCache)
+        val parts = mutableListOf<GlbTexturedLitMeshPart>()
+        try {
+            source.parts.forEach { partSource ->
+                parts += GlbTexturedLitMeshPart(
+                    mesh = TexturedLitGpuMesh.create(gpu, partSource.vertices),
+                    material = partSource.materialDescriptor.upload(gpu, textureCacheScope.cache)
+                )
+            }
+        } catch (e: Throwable) {
+            parts.forEach { it.cleanup() }
+            textureCacheScope.ownedResources.asReversed().forEach { it.cleanup() }
+            throw e
+        }
+
+        return GlbTexturedLitLoad3D(
+            parts = parts,
+            ownedResources = textureCacheScope.ownedResources
+        )
+    }
+
+    internal fun loadTexturedLitSource(
+        assetPath: String,
+        options: GlbMeshLoadOptions = GlbMeshLoadOptions()
+    ): GlbTexturedLitSource3D {
         val parsed = parseGlb(assetPath)
         val materialInfos = parseMaterialInfos(parsed.document, options.defaultColor)
         val textureInfos = parseTextures(parsed.document)
@@ -248,7 +604,7 @@ object GlbMeshLoader {
 
         fun visitNode(
             nodeIndex: Int,
-            parentTransform: GlbMat4
+            parentTransform: ModelMatrix3D
         ) {
             val node = parsed.nodes.getOrNull(nodeIndex) ?: return
             val transform = parentTransform * node.matrix
@@ -268,143 +624,201 @@ object GlbMeshLoader {
             node.children.forEach { childIndex -> visitNode(childIndex, transform) }
         }
 
-        parsed.sceneNodeIndices.forEach { nodeIndex -> visitNode(nodeIndex, GlbMat4.identity()) }
+        parsed.sceneNodeIndices.forEach { nodeIndex -> visitNode(nodeIndex, ModelMatrix3D.identity()) }
         require(verticesByTexture.values.any { it.isNotEmpty() }) {
             "GLB file contains no supported textured triangle mesh vertices: ${parsed.filePath}"
         }
 
         val normalizedParts = normalizeTexturedVertices(verticesByTexture, options)
-        val parts = mutableListOf<GlbTexturedLitMeshPart>()
-        try {
-            normalizedParts.forEach { (textureIndex, vertices) ->
-                val texture = createTextureForPart(
-                    gpu = gpu,
+        val parts = normalizedParts.map { (textureIndex, vertices) ->
+            ModelPartSource3D.TexturedLit(
+                vertices = vertices,
+                materialDescriptor = createMaterialDescriptorForPart(
                     textureIndex = textureIndex,
                     assetPath = assetPath,
                     textureInfos = textureInfos,
                     imageInfos = imageInfos,
                     bufferViews = parsed.bufferViews,
-                    binary = parsed.binary
+                    binary = parsed.binary,
+                    baseColor = Color.fromHex("ffffff"),
+                    name = null
                 )
-                try {
-                    parts += GlbTexturedLitMeshPart(
-                        mesh = TexturedLitGpuMesh.create(gpu, vertices),
-                        texture = texture
-                    )
-                } catch (e: Throwable) {
-                    texture.cleanup()
-                    throw e
-                }
-            }
-        } catch (e: Throwable) {
-            parts.forEach { it.cleanup() }
-            throw e
+            )
         }
+        val litVertices = normalizedParts.values.flatten().map { it.toLitVertex() }
 
-        return GlbTexturedLitModel(parts)
+        return GlbTexturedLitSource3D(
+            info = inspectParsedGlb(parsed, materialInfos),
+            litVertices = litVertices,
+            parts = parts,
+        )
     }
 
     fun loadSkinnedTexturedLit(
         gpu: GpuContext,
         assetPath: String,
-        options: GlbMeshLoadOptions = GlbMeshLoadOptions()
+        options: GlbMeshLoadOptions = GlbMeshLoadOptions(),
+        textureCache: GpuTextureCache3D? = null
     ): GlbSkinnedTexturedLitModel {
+        return uploadSkinnedTexturedLit(
+            gpu = gpu,
+            source = loadSkinnedTexturedLitSource(assetPath, options),
+            textureCache = textureCache
+        )
+    }
+
+    internal fun loadSkinnedTexturedLitSource(
+        assetPath: String,
+        options: GlbMeshLoadOptions = GlbMeshLoadOptions()
+    ): SkinnedTexturedLitModelSource3D {
         val parsed = parseGlb(assetPath)
         val materialInfos = parseMaterialInfos(parsed.document, options.defaultColor)
         val textureInfos = parseTextures(parsed.document)
         val imageInfos = parseImages(parsed.document)
         val skins = parseSkinData(parsed)
+        val skinningSupport = inspectSkinningSupport(parsed, skins.size)
         val animations = parseAnimations(parsed)
-        val restWorldMatrices = sampleNodeWorldMatrices(
+        val restWorldMatrices = sampleModelNodeWorldMatrices3D(
             nodes = parsed.nodes,
             sceneNodeIndices = parsed.sceneNodeIndices,
             animations = emptyList(),
             clipIndex = 0,
             timeSeconds = 0.0
         )
-        val parts = mutableListOf<GlbSkinnedTexturedLitMeshPart>()
+        val parts = mutableListOf<SkinnedTexturedLitMeshPartSource3D>()
         val initialVerticesForBounds = mutableListOf<TexturedLitVertex3D>()
 
         require(skins.isNotEmpty()) {
             "GLB file contains no skins for skeletal animation: ${parsed.filePath}"
         }
 
-        try {
-            parsed.nodes.forEachIndexed { nodeIndex, node ->
-                val meshIndex = node.meshIndex ?: return@forEachIndexed
-                val skinIndex = node.skinIndex ?: return@forEachIndexed
-                val skin = skins.getOrNull(skinIndex)
-                    ?: throw IllegalArgumentException("GLB node references missing skin $skinIndex: ${parsed.filePath}")
-                val mesh = parsed.meshes.getOrNull(meshIndex)
-                    ?: throw IllegalArgumentException("GLB node references missing mesh $meshIndex: ${parsed.filePath}")
-                val skinMatrices = skinMatricesFor(skin, restWorldMatrices)
+        parsed.nodes.forEachIndexed { nodeIndex, node ->
+            val meshIndex = node.meshIndex ?: return@forEachIndexed
+            val skinIndex = node.skinIndex ?: return@forEachIndexed
+            val skin = skins.getOrNull(skinIndex)
+                ?: throw IllegalArgumentException(
+                    "GLB skinned node ${node.label(nodeIndex)} references missing skin $skinIndex " +
+                        "(skins=${skins.size}): ${parsed.filePath}"
+                )
+            val mesh = parsed.meshes.getOrNull(meshIndex)
+                ?: throw IllegalArgumentException(
+                    "GLB skinned node ${node.label(nodeIndex)} references missing mesh $meshIndex " +
+                        "(meshes=${parsed.meshes.size}): ${parsed.filePath}"
+                )
+            val skinMatrices = skinMatricesForModelSkin3D(skin, restWorldMatrices)
 
-                mesh.primitives.forEach { primitive ->
-                    if (primitive.mode != TRIANGLES_MODE) {
-                        return@forEach
-                    }
-                    if (primitive.jointAccessor == null || primitive.weightAccessor == null) {
-                        return@forEach
-                    }
+            mesh.primitives.forEachIndexed { primitiveIndex, primitive ->
+                if (primitive.mode != TRIANGLES_MODE) {
+                    return@forEachIndexed
+                }
+                if (primitive.jointAccessor == null || primitive.weightAccessor == null) {
+                    return@forEachIndexed
+                }
 
-                    val material = materialInfos.getOrNull(primitive.materialIndex ?: -1)
-                    val textureIndex = material?.textureIndex ?: NO_TEXTURE_KEY
-                    val sourceVertices = readSkinnedTexturedVertices(
-                        primitive = primitive,
-                        accessors = parsed.accessors,
-                        bufferViews = parsed.bufferViews,
-                        binary = parsed.binary,
-                        material = material,
-                        fallbackColor = primitiveColor(primitive.materialIndex ?: 0)
-                    )
-                    if (sourceVertices.isEmpty()) {
-                        return@forEach
-                    }
+                val materialInfo = materialInfos.getOrNull(primitive.materialIndex ?: -1)
+                val textureIndex = materialInfo?.textureIndex ?: NO_TEXTURE_KEY
+                val primitiveContext = skinnedPrimitiveContext(
+                    parsed = parsed,
+                    nodeIndex = nodeIndex,
+                    node = node,
+                    meshIndex = meshIndex,
+                    skinIndex = skinIndex,
+                    primitiveIndex = primitiveIndex
+                )
+                val sourceVertices = readSkinnedTexturedVertices(
+                    primitive = primitive,
+                    accessors = parsed.accessors,
+                    bufferViews = parsed.bufferViews,
+                    binary = parsed.binary,
+                    material = materialInfo,
+                    fallbackColor = primitiveColor(primitive.materialIndex ?: 0),
+                    skinJointCount = skin.joints.size,
+                    context = primitiveContext
+                )
+                if (sourceVertices.isEmpty()) {
+                    return@forEachIndexed
+                }
 
-                    val initialVertices = sourceVertices.map { vertex -> vertex.toTexturedVertex(skinMatrices) }
-                    initialVerticesForBounds += initialVertices
-                    val texture = createTextureForPart(
-                        gpu = gpu,
+                val initialVertices = sourceVertices.map { vertex -> vertex.toTexturedVertex(skinMatrices) }
+                initialVerticesForBounds += initialVertices
+                parts += SkinnedTexturedLitMeshPartSource3D(
+                    nodeIndex = nodeIndex,
+                    skinIndex = skinIndex,
+                    materialDescriptor = createMaterialDescriptorForPart(
                         textureIndex = textureIndex,
                         assetPath = assetPath,
                         textureInfos = textureInfos,
                         imageInfos = imageInfos,
                         bufferViews = parsed.bufferViews,
-                        binary = parsed.binary
-                    )
-                    try {
-                        parts += GlbSkinnedTexturedLitMeshPart(
-                            nodeIndex = nodeIndex,
-                            skinIndex = skinIndex,
-                            mesh = TexturedLitGpuMesh.create(gpu, initialVertices),
-                            texture = texture,
-                            sourceVertices = sourceVertices
-                        )
-                    } catch (e: Throwable) {
-                        texture.cleanup()
-                        throw e
-                    }
-                }
+                        binary = parsed.binary,
+                        baseColor = materialInfo?.color ?: primitiveColor(primitive.materialIndex ?: 0),
+                        name = materialInfo?.name
+                    ),
+                    restVertices = initialVertices,
+                    skinnedVertices = sourceVertices.map { vertex -> vertex.toSkinnedTexturedLitVertex() },
+                    sourceVertices = sourceVertices
+                )
             }
-
-            require(parts.isNotEmpty() && initialVerticesForBounds.isNotEmpty()) {
-                "GLB file contains no supported skinned textured triangle mesh vertices: ${parsed.filePath}"
-            }
-        } catch (e: Throwable) {
-            parts.forEach { it.cleanup() }
-            throw e
         }
 
-        return GlbSkinnedTexturedLitModel(
+        require(parts.isNotEmpty() && initialVerticesForBounds.isNotEmpty()) {
+            "GLB file contains no supported skinned textured triangle mesh vertices: ${parsed.filePath}. " +
+                "Skinning support: ${skinningSupport.unsupportedSummary()}."
+        }
+
+        val vertexCount = parts.sumOf { it.restVertices.size }
+        return SkinnedTexturedLitModelSource3D(
+            info = inspectParsedGlb(parsed, materialInfos).toModelInfo3D(assetPath, vertexCount),
             parts = parts,
             nodes = parsed.nodes,
             sceneNodeIndices = parsed.sceneNodeIndices,
             skins = skins,
-            animations = animations,
+            animationClips = animations,
             normalizationMatrix = normalizationMatrix(
                 bounds = GlbBounds.fromTexturedVertices(initialVerticesForBounds),
                 options = options
             ).toMat4()
+        )
+    }
+
+    internal fun uploadSkinnedTexturedLit(
+        gpu: GpuContext,
+        source: SkinnedTexturedLitModelSource3D,
+        textureCache: GpuTextureCache3D? = null
+    ): GlbSkinnedTexturedLitModel {
+        val textureCacheScope =
+            if (source.parts.any { it.materialDescriptor.hasTexture }) {
+                gpu.resolveTextureCache3D(textureCache)
+            } else {
+                null
+            }
+        val parts = mutableListOf<GlbSkinnedTexturedLitMeshPart>()
+        try {
+            source.parts.forEach { partSource ->
+                parts += GlbSkinnedTexturedLitMeshPart(
+                    nodeIndex = partSource.nodeIndex,
+                    skinIndex = partSource.skinIndex,
+                    material = partSource.materialDescriptor.upload(gpu, textureCacheScope?.cache),
+                    restVertices = partSource.restVertices,
+                    skinnedVertices = partSource.skinnedVertices,
+                    sourceVertices = partSource.sourceVertices
+                )
+            }
+        } catch (e: Throwable) {
+            parts.asReversed().forEach { it.cleanup() }
+            textureCacheScope?.ownedResources.orEmpty().asReversed().forEach { it.cleanup() }
+            throw e
+        }
+
+        return GlbSkinnedTexturedLitModel(
+            gpu = gpu,
+            parts = parts,
+            nodes = source.nodes,
+            sceneNodeIndices = source.sceneNodeIndices,
+            skins = source.skins,
+            animations = source.animationClips,
+            normalizationMatrix = source.normalizationMatrix,
+            ownedResources = textureCacheScope?.ownedResources.orEmpty()
         )
     }
 
@@ -413,16 +827,27 @@ object GlbMeshLoader {
         assetPath: String,
         options: GlbMeshLoadOptions = GlbMeshLoadOptions()
     ): GlbAnimatedLitModel {
+        return uploadAnimatedLit(
+            gpu = gpu,
+            source = loadAnimatedLitSource(assetPath, options)
+        )
+    }
+
+    internal fun loadAnimatedLitSource(
+        assetPath: String,
+        options: GlbMeshLoadOptions = GlbMeshLoadOptions()
+    ): NodeAnimatedLitModelSource3D {
         val parsed = parseGlb(assetPath)
-        val materialColors = parseMaterialColors(parsed.document, options.defaultColor)
+        val materialInfos = parseMaterialInfos(parsed.document, options.defaultColor)
+        val materialColors = materialInfos.map { it.color }
         val animations = parseAnimations(parsed)
         val rawWorldVertices = mutableListOf<LitVertex3D>()
-        val meshCache = mutableMapOf<Int, LitGpuMesh>()
-        val parts = mutableListOf<GlbAnimatedLitMeshPart>()
+        val verticesByMesh = mutableMapOf<Int, List<LitVertex3D>>()
+        val parts = mutableListOf<NodeAnimatedLitMeshPartSource3D>()
 
         fun visitNodeForBounds(
             nodeIndex: Int,
-            parentTransform: GlbMat4
+            parentTransform: ModelMatrix3D
         ) {
             val node = parsed.nodes.getOrNull(nodeIndex) ?: return
             val transform = parentTransform * node.matrix
@@ -434,29 +859,59 @@ object GlbMeshLoader {
             node.children.forEach { childIndex -> visitNodeForBounds(childIndex, transform) }
         }
 
-        try {
-            parsed.nodes.forEachIndexed { nodeIndex, node ->
-                val meshIndex = node.meshIndex ?: return@forEachIndexed
-                val mesh = parsed.meshes.getOrNull(meshIndex)
-                    ?: throw IllegalArgumentException("GLB node references missing mesh $meshIndex: ${parsed.filePath}")
-                val gpuMesh = meshCache.getOrPut(meshIndex) {
-                    val vertices = mutableListOf<LitVertex3D>()
-                    appendMeshVertices(
-                        mesh = mesh,
-                        transform = GlbMat4.identity(),
-                        accessors = parsed.accessors,
-                        bufferViews = parsed.bufferViews,
-                        binary = parsed.binary,
-                        materialColors = materialColors,
-                        vertices = vertices
-                    )
-                    LitGpuMesh.create(gpu, vertices)
-                }
-                parts += GlbAnimatedLitMeshPart(nodeIndex, gpuMesh)
+        parsed.nodes.forEachIndexed { nodeIndex, node ->
+            val meshIndex = node.meshIndex ?: return@forEachIndexed
+            val mesh = parsed.meshes.getOrNull(meshIndex)
+                ?: throw IllegalArgumentException("GLB node references missing mesh $meshIndex: ${parsed.filePath}")
+            val vertices = verticesByMesh.getOrPut(meshIndex) {
+                val meshVertices = mutableListOf<LitVertex3D>()
+                appendMeshVertices(
+                    mesh = mesh,
+                    transform = ModelMatrix3D.identity(),
+                    accessors = parsed.accessors,
+                    bufferViews = parsed.bufferViews,
+                    binary = parsed.binary,
+                    materialColors = materialColors,
+                    vertices = meshVertices
+                )
+                meshVertices
             }
-            parsed.sceneNodeIndices.forEach { nodeIndex -> visitNodeForBounds(nodeIndex, GlbMat4.identity()) }
-            require(parts.isNotEmpty() && rawWorldVertices.isNotEmpty()) {
-                "GLB file contains no supported animated lit mesh parts: ${parsed.filePath}"
+            if (vertices.isNotEmpty()) {
+                parts += NodeAnimatedLitMeshPartSource3D(
+                    nodeIndex = nodeIndex,
+                    meshIndex = meshIndex,
+                    vertices = vertices
+                )
+            }
+        }
+        parsed.sceneNodeIndices.forEach { nodeIndex -> visitNodeForBounds(nodeIndex, ModelMatrix3D.identity()) }
+        require(parts.isNotEmpty() && rawWorldVertices.isNotEmpty()) {
+            "GLB file contains no supported animated lit mesh parts: ${parsed.filePath}"
+        }
+
+        val vertexCount = parts.sumOf { it.vertices.size }
+        return NodeAnimatedLitModelSource3D(
+            info = inspectParsedGlb(parsed, materialInfos).toModelInfo3D(assetPath, vertexCount),
+            parts = parts,
+            nodes = parsed.nodes,
+            sceneNodeIndices = parsed.sceneNodeIndices,
+            animationClips = animations,
+            normalizationMatrix = normalizationMatrix(GlbBounds.fromVertices(rawWorldVertices), options).toMat4()
+        )
+    }
+
+    internal fun uploadAnimatedLit(
+        gpu: GpuContext,
+        source: NodeAnimatedLitModelSource3D
+    ): GlbAnimatedLitModel {
+        val meshCache = mutableMapOf<Int, LitGpuMesh>()
+        val parts = mutableListOf<GlbAnimatedLitMeshPart>()
+        try {
+            source.parts.forEach { partSource ->
+                val mesh = meshCache.getOrPut(partSource.meshIndex) {
+                    LitGpuMesh.create(gpu, partSource.vertices)
+                }
+                parts += GlbAnimatedLitMeshPart(partSource.nodeIndex, mesh)
             }
         } catch (e: Throwable) {
             meshCache.values.forEach { it.cleanup() }
@@ -465,10 +920,10 @@ object GlbMeshLoader {
 
         return GlbAnimatedLitModel(
             parts = parts,
-            nodes = parsed.nodes,
-            sceneNodeIndices = parsed.sceneNodeIndices,
-            animations = animations,
-            normalizationMatrix = normalizationMatrix(GlbBounds.fromVertices(rawWorldVertices), options).toMat4()
+            nodes = source.nodes,
+            sceneNodeIndices = source.sceneNodeIndices,
+            animations = source.animationClips,
+            normalizationMatrix = source.normalizationMatrix
         )
     }
 
@@ -482,7 +937,7 @@ object GlbMeshLoader {
 
         fun visitNode(
             nodeIndex: Int,
-            parentTransform: GlbMat4
+            parentTransform: ModelMatrix3D
         ) {
             val node = parsed.nodes.getOrNull(nodeIndex) ?: return
             val transform = parentTransform * node.matrix
@@ -494,7 +949,7 @@ object GlbMeshLoader {
             node.children.forEach { childIndex -> visitNode(childIndex, transform) }
         }
 
-        parsed.sceneNodeIndices.forEach { nodeIndex -> visitNode(nodeIndex, GlbMat4.identity()) }
+        parsed.sceneNodeIndices.forEach { nodeIndex -> visitNode(nodeIndex, ModelMatrix3D.identity()) }
         require(vertices.isNotEmpty()) {
             "GLB file contains no supported triangle mesh vertices: ${parsed.filePath}"
         }
@@ -505,23 +960,30 @@ object GlbMeshLoader {
     fun inspect(assetPath: String): GlbModelInfo {
         val parsed = parseGlb(assetPath)
         val materialInfos = parseMaterialInfos(parsed.document, Color.fromHex("ffffff"))
+        return inspectParsedGlb(parsed, materialInfos)
+    }
+
+    private fun inspectParsedGlb(
+        parsed: ParsedGlb,
+        materialInfos: List<GlbMaterialInfo>
+    ): GlbModelInfo {
         val animations = parseAnimations(parsed).map { it.info }
         val skins = parseSkins(parsed)
+        val skinningSupport = inspectSkinningSupport(parsed, skins.size)
         val primitiveCount = parsed.meshes.sumOf { it.primitives.size }
         return GlbModelInfo(
             skinCount = skins.size,
             animationCount = animations.size,
             meshCount = parsed.meshes.size,
             primitiveCount = primitiveCount,
-            skinnedPrimitiveCount = parsed.meshes.sumOf { mesh ->
-                mesh.primitives.count { it.jointAccessor != null && it.weightAccessor != null }
-            },
+            skinnedPrimitiveCount = skinningSupport.supportedPrimitiveCount,
             materialCount = materialInfos.size,
             textureCount = parsed.document.optionalArray("textures")?.size ?: 0,
             imageCount = parsed.document.optionalArray("images")?.size ?: 0,
             hasTexturedMaterials = materialInfos.any { it.textureIndex != null },
             animations = animations,
-            skins = skins
+            skins = skins,
+            skinningSupport = skinningSupport
         )
     }
 
@@ -577,7 +1039,7 @@ object GlbMeshLoader {
 
     private fun appendMeshVertices(
         mesh: GlbMesh,
-        transform: GlbMat4,
+        transform: ModelMatrix3D,
         accessors: List<GlbAccessor>,
         bufferViews: List<GlbBufferView>,
         binary: ByteArray,
@@ -619,7 +1081,7 @@ object GlbMeshLoader {
 
     private fun appendTexturedMeshVertices(
         mesh: GlbMesh,
-        transform: GlbMat4,
+        transform: ModelMatrix3D,
         accessors: List<GlbAccessor>,
         bufferViews: List<GlbBufferView>,
         binary: ByteArray,
@@ -675,23 +1137,44 @@ object GlbMeshLoader {
         bufferViews: List<GlbBufferView>,
         binary: ByteArray,
         material: GlbMaterialInfo?,
-        fallbackColor: Color
-    ): List<GlbSkinnedTexturedVertex> {
-        val positions = readVec3Accessor(accessors[primitive.positionAccessor], bufferViews, binary)
+        fallbackColor: Color,
+        skinJointCount: Int,
+        context: String
+    ): List<SkinnedTexturedLitVertexSource3D> {
+        val positions = readVec3Accessor(
+            requireAccessor(accessors, primitive.positionAccessor, "POSITION", context),
+            bufferViews,
+            binary
+        )
         val normals = primitive.normalAccessor?.let {
-            readVec3Accessor(accessors[it], bufferViews, binary)
+            readVec3Accessor(requireAccessor(accessors, it, "NORMAL", context), bufferViews, binary)
         }
         val texCoords = primitive.texCoordAccessor?.let {
-            readVec2Accessor(accessors[it], bufferViews, binary)
+            readVec2Accessor(requireAccessor(accessors, it, "TEXCOORD_0", context), bufferViews, binary)
         }
-        val jointIndices = readJointIndexAccessor(accessors[primitive.jointAccessor!!], bufferViews, binary)
-        val weights = readWeightAccessor(accessors[primitive.weightAccessor!!], bufferViews, binary)
+        val jointIndices = readJointIndexAccessor(
+            requireAccessor(accessors, primitive.jointAccessor!!, "JOINTS_0", context),
+            bufferViews,
+            binary
+        )
+        val weights = readWeightAccessor(
+            requireAccessor(accessors, primitive.weightAccessor!!, "WEIGHTS_0", context),
+            bufferViews,
+            binary
+        )
         val indices = primitive.indicesAccessor?.let {
-            readIndexAccessor(accessors[it], bufferViews, binary)
+            readIndexAccessor(requireAccessor(accessors, it, "indices", context), bufferViews, binary)
         } ?: positions.indices.toList()
         val color = material?.color ?: fallbackColor
         val uvTransform = material?.uvTransform ?: GlbUvTransform.IDENTITY
-        val vertices = mutableListOf<GlbSkinnedTexturedVertex>()
+        val vertices = mutableListOf<SkinnedTexturedLitVertexSource3D>()
+
+        require(jointIndices.size >= positions.size) {
+            "GLB skinned primitive has ${positions.size} positions but only ${jointIndices.size} JOINTS_0 entries: $context"
+        }
+        require(weights.size >= positions.size) {
+            "GLB skinned primitive has ${positions.size} positions but only ${weights.size} WEIGHTS_0 entries: $context"
+        }
 
         for (index in 0 until indices.size - 2 step 3) {
             val ia = indices[index]
@@ -727,7 +1210,42 @@ object GlbMeshLoader {
             )
         }
 
+        validateSkinJointReferences(vertices, skinJointCount, context)
         return vertices
+    }
+
+    private fun requireAccessor(
+        accessors: List<GlbAccessor>,
+        accessorIndex: Int,
+        label: String,
+        context: String
+    ): GlbAccessor {
+        return accessors.getOrNull(accessorIndex)
+            ?: throw IllegalArgumentException(
+                "GLB skinned primitive references missing $label accessor $accessorIndex " +
+                    "(accessors=${accessors.size}): $context"
+            )
+    }
+
+    private fun validateSkinJointReferences(
+        vertices: List<SkinnedTexturedLitVertexSource3D>,
+        skinJointCount: Int,
+        context: String
+    ) {
+        vertices.forEachIndexed { vertexIndex, vertex ->
+            for (component in 0 until 4) {
+                val weight = vertex.weights.values[component]
+                if (weight <= 0.0) {
+                    continue
+                }
+
+                val jointIndex = vertex.joints.values[component]
+                require(jointIndex < skinJointCount) {
+                    "GLB skinned primitive vertex $vertexIndex references joint $jointIndex, " +
+                        "but its skin has only $skinJointCount joints: $context"
+                }
+            }
+        }
     }
 
     private fun sourceSkinnedTexturedVertex(
@@ -735,10 +1253,10 @@ object GlbMeshLoader {
         normal: Vec3,
         color: Color,
         uv: GlbVec2,
-        joints: GlbJointIndices,
-        weights: GlbJointWeights
-    ): GlbSkinnedTexturedVertex {
-        return GlbSkinnedTexturedVertex(
+        joints: SkinJointIndicesSource3D,
+        weights: SkinJointWeightsSource3D
+    ): SkinnedTexturedLitVertexSource3D {
+        return SkinnedTexturedLitVertexSource3D(
             position = position,
             normal = normal,
             color = color,
@@ -746,6 +1264,14 @@ object GlbMeshLoader {
             v = uv.v.toFloat(),
             joints = joints,
             weights = weights.normalized()
+        )
+    }
+
+    private fun TexturedLitVertex3D.toLitVertex(): LitVertex3D {
+        return LitVertex3D(
+            position = position,
+            normal = normal,
+            color = color
         )
     }
 
@@ -804,21 +1330,45 @@ object GlbMeshLoader {
         }
     }
 
-    private fun createTextureForPart(
-        gpu: GpuContext,
+    private fun createMaterialDescriptorForPart(
+        textureIndex: Int,
+        assetPath: String,
+        textureInfos: List<GlbTextureInfo>,
+        imageInfos: List<GlbImageInfo>,
+        bufferViews: List<GlbBufferView>,
+        binary: ByteArray,
+        baseColor: Color,
+        name: String?
+    ): MaterialDescriptor3D {
+        return MaterialDescriptor3D.textured(
+            textureAsset = createTextureAssetForPart(
+                textureIndex = textureIndex,
+                assetPath = assetPath,
+                textureInfos = textureInfos,
+                imageInfos = imageInfos,
+                bufferViews = bufferViews,
+                binary = binary
+            ),
+            color = baseColor,
+            name = name ?: if (textureIndex == NO_TEXTURE_KEY) {
+                "glb-material:no-texture"
+            } else {
+                "glb-texture-$textureIndex"
+            }
+        )
+    }
+
+    private fun createTextureAssetForPart(
         textureIndex: Int,
         assetPath: String,
         textureInfos: List<GlbTextureInfo>,
         imageInfos: List<GlbImageInfo>,
         bufferViews: List<GlbBufferView>,
         binary: ByteArray
-    ): GpuTexture {
+    ): GpuTextureAsset3D {
         if (textureIndex == NO_TEXTURE_KEY) {
-            return GpuTexture.createRgba8(
-                gpu = gpu,
-                width = 1u,
-                height = 1u,
-                pixels = byteArrayOf(255.toByte(), 255.toByte(), 255.toByte(), 255.toByte())
+            return GpuTextureAsset3D.whiteRgba8(
+                cacheKey = "$assetPath:no-texture:white-rgba8"
             )
         }
 
@@ -832,13 +1382,14 @@ object GlbMeshLoader {
             ?: throw IllegalArgumentException("Only embedded GLB images are supported for texture $textureIndex: $assetPath")
         val bufferView = bufferViews.getOrNull(bufferViewIndex)
             ?: throw IllegalArgumentException("GLB image $imageIndex references missing bufferView $bufferViewIndex: $assetPath")
-        val imageBytes = binary.copyOfRange(bufferView.byteOffset, bufferView.byteOffset + bufferView.byteLength)
-        return GpuTexture.fromEncodedBytes(
-            gpu = gpu,
-            bytes = imageBytes,
+        val cacheKey = "$assetPath:glb-image:$imageIndex"
+        return GpuTextureAsset3D.encodedByteRange(
+            cacheKey = cacheKey,
+            bytes = binary,
+            byteOffset = bufferView.byteOffset,
+            byteLength = bufferView.byteLength,
             label = "$assetPath image $imageIndex",
-            addressModeU = textureInfo.addressModeU,
-            addressModeV = textureInfo.addressModeV
+            samplerDescriptor = textureInfo.samplerDescriptor
         )
     }
 
@@ -889,10 +1440,10 @@ object GlbMeshLoader {
         }
     }
 
-    private fun parseNodes(document: JsonObject): List<GlbNode> {
+    private fun parseNodes(document: JsonObject): List<ModelNode3D> {
         return document.requiredArray("nodes").map { element ->
             val item = element.jsonObject
-            GlbNode(
+            ModelNode3D(
                 name = item.optionalString("name"),
                 meshIndex = item.optionalInt("mesh"),
                 skinIndex = item.optionalInt("skin"),
@@ -925,10 +1476,9 @@ object GlbMeshLoader {
         defaultColor: Color
     ): List<GlbMaterialInfo> {
         return document.optionalArray("materials")?.mapIndexed { index, element ->
-            val pbr = element.jsonObject.optionalObject("pbrMetallicRoughness")
-            val colorFactor = element.jsonObject
-                .optionalObject("pbrMetallicRoughness")
-                ?.optionalArray("baseColorFactor")
+            val material = element.jsonObject
+            val pbr = material.optionalObject("pbrMetallicRoughness")
+            val colorFactor = pbr?.optionalArray("baseColorFactor")
             val color = if (colorFactor != null && colorFactor.size >= 3) {
                 Color.fromRGBA(
                     r = colorFactor[0].jsonPrimitive.double.toFloat(),
@@ -941,6 +1491,7 @@ object GlbMeshLoader {
             }
             val baseColorTexture = pbr?.optionalObject("baseColorTexture")
             GlbMaterialInfo(
+                name = material.optionalString("name"),
                 color = color,
                 textureIndex = baseColorTexture?.optionalInt("index"),
                 uvTransform = parseUvTransform(baseColorTexture)
@@ -955,16 +1506,19 @@ object GlbMeshLoader {
             val sampler = item.optionalInt("sampler")?.let { samplerIndex -> samplers.getOrNull(samplerIndex) }
             GlbTextureInfo(
                 sourceImageIndex = item.optionalInt("source"),
-                addressModeU = sampler?.addressModeU ?: GpuTextureAddressMode.REPEAT,
-                addressModeV = sampler?.addressModeV ?: GpuTextureAddressMode.REPEAT
+                samplerDescriptor = sampler ?: GpuSamplerDescriptor3D.NEAREST_REPEAT
             )
         }.orEmpty()
     }
 
-    private fun parseTextureSamplers(document: JsonObject): List<GlbTextureSamplerInfo> {
+    private fun parseTextureSamplers(document: JsonObject): List<GpuSamplerDescriptor3D> {
         return document.optionalArray("samplers")?.map { element ->
             val item = element.jsonObject
-            GlbTextureSamplerInfo(
+            val minFilter = parseTextureMinFilter(item.optionalInt("minFilter"))
+            GpuSamplerDescriptor3D(
+                minFilter = minFilter.filter,
+                magFilter = parseTextureMagFilter(item.optionalInt("magFilter")),
+                mipmapMode = minFilter.mipmapMode,
                 addressModeU = parseTextureAddressMode(item.optionalInt("wrapS") ?: GLTF_WRAP_REPEAT),
                 addressModeV = parseTextureAddressMode(item.optionalInt("wrapT") ?: GLTF_WRAP_REPEAT)
             )
@@ -976,6 +1530,42 @@ object GlbMeshLoader {
             GLTF_WRAP_CLAMP_TO_EDGE -> GpuTextureAddressMode.CLAMP_TO_EDGE
             GLTF_WRAP_MIRRORED_REPEAT -> GpuTextureAddressMode.MIRRORED_REPEAT
             else -> GpuTextureAddressMode.REPEAT
+        }
+    }
+
+    private fun parseTextureMinFilter(value: Int?): GlbTextureMinFilter {
+        return when (value) {
+            GLTF_FILTER_LINEAR -> GlbTextureMinFilter(
+                filter = GpuTextureFilter3D.LINEAR,
+                mipmapMode = GpuTextureMipmapMode3D.NEAREST
+            )
+            GLTF_FILTER_NEAREST_MIPMAP_NEAREST -> GlbTextureMinFilter(
+                filter = GpuTextureFilter3D.NEAREST,
+                mipmapMode = GpuTextureMipmapMode3D.NEAREST
+            )
+            GLTF_FILTER_LINEAR_MIPMAP_NEAREST -> GlbTextureMinFilter(
+                filter = GpuTextureFilter3D.LINEAR,
+                mipmapMode = GpuTextureMipmapMode3D.NEAREST
+            )
+            GLTF_FILTER_NEAREST_MIPMAP_LINEAR -> GlbTextureMinFilter(
+                filter = GpuTextureFilter3D.NEAREST,
+                mipmapMode = GpuTextureMipmapMode3D.LINEAR
+            )
+            GLTF_FILTER_LINEAR_MIPMAP_LINEAR -> GlbTextureMinFilter(
+                filter = GpuTextureFilter3D.LINEAR,
+                mipmapMode = GpuTextureMipmapMode3D.LINEAR
+            )
+            else -> GlbTextureMinFilter(
+                filter = GpuTextureFilter3D.NEAREST,
+                mipmapMode = GpuTextureMipmapMode3D.NEAREST
+            )
+        }
+    }
+
+    private fun parseTextureMagFilter(value: Int?): GpuTextureFilter3D {
+        return when (value) {
+            GLTF_FILTER_LINEAR -> GpuTextureFilter3D.LINEAR
+            else -> GpuTextureFilter3D.NEAREST
         }
     }
 
@@ -1002,17 +1592,83 @@ object GlbMeshLoader {
         }
     }
 
-    private fun parseSkinData(parsed: ParsedGlb): List<GlbSkin> {
+    private fun inspectSkinningSupport(
+        parsed: ParsedGlb,
+        skinCount: Int
+    ): GlbSkinningSupportInfo {
+        var skinnedNodeCount = 0
+        var supportedPrimitiveCount = 0
+        var nonTrianglePrimitiveCount = 0
+        var missingJointOrWeightPrimitiveCount = 0
+        var missingMeshReferenceCount = 0
+        var missingSkinReferenceCount = 0
+
+        parsed.nodes.forEach { node ->
+            val meshIndex = node.meshIndex ?: return@forEach
+            val skinIndex = node.skinIndex ?: return@forEach
+            skinnedNodeCount++
+
+            if (skinIndex !in 0 until skinCount) {
+                missingSkinReferenceCount++
+                return@forEach
+            }
+
+            val mesh = parsed.meshes.getOrNull(meshIndex)
+            if (mesh == null) {
+                missingMeshReferenceCount++
+                return@forEach
+            }
+
+            mesh.primitives.forEach { primitive ->
+                if (primitive.mode != TRIANGLES_MODE) {
+                    nonTrianglePrimitiveCount++
+                    return@forEach
+                }
+                if (primitive.jointAccessor == null || primitive.weightAccessor == null) {
+                    missingJointOrWeightPrimitiveCount++
+                    return@forEach
+                }
+
+                supportedPrimitiveCount++
+            }
+        }
+
+        return GlbSkinningSupportInfo(
+            skinnedNodeCount = skinnedNodeCount,
+            supportedPrimitiveCount = supportedPrimitiveCount,
+            nonTrianglePrimitiveCount = nonTrianglePrimitiveCount,
+            missingJointOrWeightPrimitiveCount = missingJointOrWeightPrimitiveCount,
+            missingMeshReferenceCount = missingMeshReferenceCount,
+            missingSkinReferenceCount = missingSkinReferenceCount
+        )
+    }
+
+    private fun skinnedPrimitiveContext(
+        parsed: ParsedGlb,
+        nodeIndex: Int,
+        node: ModelNode3D,
+        meshIndex: Int,
+        skinIndex: Int,
+        primitiveIndex: Int
+    ): String {
+        return "${parsed.filePath} (node ${node.label(nodeIndex)}, mesh $meshIndex, skin $skinIndex, primitive $primitiveIndex)"
+    }
+
+    private fun ModelNode3D.label(index: Int): String {
+        return name?.let { "$index '$it'" } ?: index.toString()
+    }
+
+    private fun parseSkinData(parsed: ParsedGlb): List<ModelSkin3D> {
         return parsed.document.optionalArray("skins")?.map { element ->
             val item = element.jsonObject
             val joints = item.optionalArray("joints")?.map { it.jsonPrimitive.int }.orEmpty()
             val inverseBindMatrices = item.optionalInt("inverseBindMatrices")?.let { accessorIndex ->
                 readMat4Accessor(parsed.accessors[accessorIndex], parsed.bufferViews, parsed.binary)
-            } ?: List(joints.size) { GlbMat4.identity() }
+            } ?: List(joints.size) { ModelMatrix3D.identity() }
             require(inverseBindMatrices.size == joints.size) {
                 "GLB skin inverse bind matrix count must match joint count: ${parsed.filePath}"
             }
-            GlbSkin(
+            ModelSkin3D(
                 name = item.optionalString("name"),
                 skeletonRootNodeIndex = item.optionalInt("skeleton"),
                 joints = joints,
@@ -1021,7 +1677,7 @@ object GlbMeshLoader {
         }.orEmpty()
     }
 
-    private fun parseAnimations(parsed: ParsedGlb): List<GlbAnimationClip> {
+    private fun parseAnimations(parsed: ParsedGlb): List<ModelAnimationClip3D> {
         return parsed.document.optionalArray("animations")?.mapIndexed { animationIndex, element ->
             val animation = element.jsonObject
             val samplers = animation.requiredArray("samplers").map { samplerElement ->
@@ -1043,10 +1699,10 @@ object GlbMeshLoader {
                 val sampler = samplers.getOrNull(samplerIndex)
                     ?: throw IllegalArgumentException("GLB animation references missing sampler $samplerIndex: ${parsed.filePath}")
                 val targetNode = target.requiredInt("node")
-                val path = GlbAnimationPath.from(target.requiredString("path"))
+                val path = ModelAnimationChannelPath3D.from(target.requiredString("path"))
                 val valueSampler = when (path) {
-                    GlbAnimationPath.TRANSLATION,
-                    GlbAnimationPath.SCALE -> GlbAnimationValueSampler.Vec3Sampler(
+                    ModelAnimationChannelPath3D.TRANSLATION,
+                    ModelAnimationChannelPath3D.SCALE -> ModelAnimationValueSampler3D.Vec3Sampler(
                         times = sampler.inputTimes,
                         values = readVec3Accessor(
                             parsed.accessors[sampler.outputAccessorIndex],
@@ -1055,7 +1711,7 @@ object GlbMeshLoader {
                         ),
                         interpolation = sampler.interpolation
                     )
-                    GlbAnimationPath.ROTATION -> GlbAnimationValueSampler.QuatSampler(
+                    ModelAnimationChannelPath3D.ROTATION -> ModelAnimationValueSampler3D.QuatSampler(
                         times = sampler.inputTimes,
                         values = readQuatAccessor(
                             parsed.accessors[sampler.outputAccessorIndex],
@@ -1065,14 +1721,14 @@ object GlbMeshLoader {
                         interpolation = sampler.interpolation
                     )
                 }
-                GlbAnimationChannel(
+                ModelAnimationChannel3D(
                     targetNodeIndex = targetNode,
                     path = path,
                     sampler = valueSampler
                 )
             }
             val durationSeconds = channels.maxOfOrNull { it.sampler.durationSeconds } ?: 0.0
-            GlbAnimationClip(
+            ModelAnimationClip3D(
                 info = GlbAnimationClipInfo(
                     name = animation.optionalString("name") ?: "Animation ${animationIndex + 1}",
                     durationSeconds = durationSeconds,
@@ -1109,17 +1765,17 @@ object GlbMeshLoader {
         )
     }
 
-    private fun parseNodeTransform(node: JsonObject): GlbNodeTransform {
+    private fun parseNodeTransform(node: JsonObject): ModelNodeTransform3D {
         val translation = node.optionalArray("translation")
         val rotation = node.optionalArray("rotation")
         val scale = node.optionalArray("scale")
-        return GlbNodeTransform(
+        return ModelNodeTransform3D(
             translation = Vec3(
                 translation?.getOrNull(0)?.jsonPrimitive?.double ?: 0.0,
                 translation?.getOrNull(1)?.jsonPrimitive?.double ?: 0.0,
                 translation?.getOrNull(2)?.jsonPrimitive?.double ?: 0.0
             ),
-            rotation = GlbQuat(
+            rotation = ModelQuaternion3D(
                 rotation?.getOrNull(0)?.jsonPrimitive?.double ?: 0.0,
                 rotation?.getOrNull(1)?.jsonPrimitive?.double ?: 0.0,
                 rotation?.getOrNull(2)?.jsonPrimitive?.double ?: 0.0,
@@ -1133,12 +1789,12 @@ object GlbMeshLoader {
         )
     }
 
-    private fun parseNodeMatrix(node: JsonObject): GlbMat4 {
+    private fun parseNodeMatrix(node: JsonObject): ModelMatrix3D {
         node.optionalArray("matrix")?.let { matrix ->
             require(matrix.size == 16) {
                 "GLB node matrix must contain 16 numbers."
             }
-            return GlbMat4(DoubleArray(16) { index -> matrix[index].jsonPrimitive.double })
+            return ModelMatrix3D(DoubleArray(16) { index -> matrix[index].jsonPrimitive.double })
         }
 
         val translation = node.optionalArray("translation")
@@ -1173,7 +1829,7 @@ object GlbMeshLoader {
         val m21 = 2.0 * (yz - wx)
         val m22 = 1.0 - 2.0 * (xx + yy)
 
-        return GlbMat4(
+        return ModelMatrix3D(
             doubleArrayOf(
                 m00 * sx, m01 * sx, m02 * sx, 0.0,
                 m10 * sy, m11 * sy, m12 * sy, 0.0,
@@ -1186,9 +1842,9 @@ object GlbMeshLoader {
     private fun normalizationMatrix(
         bounds: GlbBounds,
         options: GlbMeshLoadOptions
-    ): GlbMat4 {
+    ): ModelMatrix3D {
         if (!options.normalize) {
-            return GlbMat4.identity()
+            return ModelMatrix3D.identity()
         }
 
         val maxSpan = maxOf(bounds.width, bounds.height, bounds.depth)
@@ -1196,7 +1852,7 @@ object GlbMeshLoader {
         val centerX = (bounds.min.x + bounds.max.x) * 0.5
         val centerY = if (options.placeOnGround) bounds.min.y else (bounds.min.y + bounds.max.y) * 0.5
         val centerZ = (bounds.min.z + bounds.max.z) * 0.5
-        return GlbMat4(
+        return ModelMatrix3D(
             doubleArrayOf(
                 scale, 0.0, 0.0, 0.0,
                 0.0, scale, 0.0, 0.0,
@@ -1277,7 +1933,7 @@ object GlbMeshLoader {
         accessor: GlbAccessor,
         bufferViews: List<GlbBufferView>,
         binary: ByteArray
-    ): List<GlbQuat> {
+    ): List<ModelQuaternion3D> {
         require(accessor.type == "VEC4") {
             "Expected VEC4 accessor, got ${accessor.type}."
         }
@@ -1289,7 +1945,7 @@ object GlbMeshLoader {
         val stride = bufferView.byteStride ?: accessor.byteSize()
         return List(accessor.count) { index ->
             val offset = bufferView.byteOffset + accessor.byteOffset + index * stride
-            GlbQuat(
+            ModelQuaternion3D(
                 readFloatLE(binary, offset),
                 readFloatLE(binary, offset + 4),
                 readFloatLE(binary, offset + 8),
@@ -1302,7 +1958,7 @@ object GlbMeshLoader {
         accessor: GlbAccessor,
         bufferViews: List<GlbBufferView>,
         binary: ByteArray
-    ): List<GlbMat4> {
+    ): List<ModelMatrix3D> {
         require(accessor.type == "MAT4") {
             "Expected MAT4 accessor, got ${accessor.type}."
         }
@@ -1314,7 +1970,7 @@ object GlbMeshLoader {
         val stride = bufferView.byteStride ?: accessor.byteSize()
         return List(accessor.count) { index ->
             val offset = bufferView.byteOffset + accessor.byteOffset + index * stride
-            GlbMat4(DoubleArray(16) { valueIndex ->
+            ModelMatrix3D(DoubleArray(16) { valueIndex ->
                 readFloatLE(binary, offset + valueIndex * 4)
             })
         }
@@ -1324,7 +1980,7 @@ object GlbMeshLoader {
         accessor: GlbAccessor,
         bufferViews: List<GlbBufferView>,
         binary: ByteArray
-    ): List<GlbJointIndices> {
+    ): List<SkinJointIndicesSource3D> {
         require(accessor.type == "VEC4") {
             "Expected VEC4 joint accessor, got ${accessor.type}."
         }
@@ -1334,7 +1990,7 @@ object GlbMeshLoader {
         val stride = bufferView.byteStride ?: accessor.byteSize()
         return List(accessor.count) { index ->
             val offset = bufferView.byteOffset + accessor.byteOffset + index * stride
-            GlbJointIndices(
+            SkinJointIndicesSource3D(
                 values = IntArray(4) { component ->
                     val componentOffset = offset + component * componentSize
                     when (accessor.componentType) {
@@ -1351,7 +2007,7 @@ object GlbMeshLoader {
         accessor: GlbAccessor,
         bufferViews: List<GlbBufferView>,
         binary: ByteArray
-    ): List<GlbJointWeights> {
+    ): List<SkinJointWeightsSource3D> {
         require(accessor.type == "VEC4") {
             "Expected VEC4 weight accessor, got ${accessor.type}."
         }
@@ -1361,7 +2017,7 @@ object GlbMeshLoader {
         val stride = bufferView.byteStride ?: accessor.byteSize()
         return List(accessor.count) { index ->
             val offset = bufferView.byteOffset + accessor.byteOffset + index * stride
-            GlbJointWeights(
+            SkinJointWeightsSource3D(
                 values = DoubleArray(4) { component ->
                     val componentOffset = offset + component * componentSize
                     when (accessor.componentType) {
@@ -1579,71 +2235,6 @@ object GlbMeshLoader {
     }
 }
 
-private fun sampleNodeWorldMatrices(
-    nodes: List<GlbNode>,
-    sceneNodeIndices: List<Int>,
-    animations: List<GlbAnimationClip>,
-    clipIndex: Int,
-    timeSeconds: Double
-): List<GlbMat4> {
-    val nodeTransforms = nodes.map { it.transform }.toMutableList()
-    animations.getOrNull(clipIndex)?.sampleInto(timeSeconds, nodeTransforms)
-
-    val localMatrices = nodes.mapIndexed { index, node ->
-        if (nodeTransforms[index] == node.transform) {
-            node.matrix
-        } else {
-            nodeTransforms[index].matrix()
-        }
-    }
-    val worldMatrices = MutableList(nodes.size) { GlbMat4.identity() }
-
-    fun visit(
-        nodeIndex: Int,
-        parentTransform: GlbMat4
-    ) {
-        val node = nodes.getOrNull(nodeIndex) ?: return
-        val worldTransform = parentTransform * localMatrices[nodeIndex]
-        worldMatrices[nodeIndex] = worldTransform
-        node.children.forEach { childIndex -> visit(childIndex, worldTransform) }
-    }
-
-    sceneNodeIndices.forEach { nodeIndex -> visit(nodeIndex, GlbMat4.identity()) }
-    return worldMatrices
-}
-
-private fun skinMatricesFor(
-    skin: GlbSkin,
-    nodeWorldMatrices: List<GlbMat4>
-): List<GlbMat4> {
-    return skin.joints.mapIndexed { jointOffset, nodeIndex ->
-        val jointWorld = nodeWorldMatrices.getOrNull(nodeIndex) ?: GlbMat4.identity()
-        jointWorld * skin.inverseBindMatrices.getOrElse(jointOffset) { GlbMat4.identity() }
-    }
-}
-
-private fun addVectors(
-    a: Vec3,
-    b: Vec3
-): Vec3 {
-    return Vec3(a.x + b.x, a.y + b.y, a.z + b.z)
-}
-
-private fun scaleVector(
-    value: Vec3,
-    scale: Double
-): Vec3 {
-    return Vec3(value.x * scale, value.y * scale, value.z * scale)
-}
-
-private fun normalizeVector(value: Vec3): Vec3 {
-    val length = sqrt(value.x * value.x + value.y * value.y + value.z * value.z)
-    if (length == 0.0) {
-        return Vec3(0.0, 1.0, 0.0)
-    }
-    return Vec3(value.x / length, value.y / length, value.z / length)
-}
-
 private data class ParsedGlb(
     val filePath: String,
     val document: JsonObject,
@@ -1651,7 +2242,7 @@ private data class ParsedGlb(
     val bufferViews: List<GlbBufferView>,
     val accessors: List<GlbAccessor>,
     val meshes: List<GlbMesh>,
-    val nodes: List<GlbNode>,
+    val nodes: List<ModelNode3D>,
     val sceneNodeIndices: List<Int>
 )
 
@@ -1685,279 +2276,14 @@ private data class GlbPrimitive(
     val mode: Int
 )
 
-internal data class GlbNode(
-    val name: String?,
-    val meshIndex: Int?,
-    val skinIndex: Int?,
-    val children: List<Int>,
-    val transform: GlbNodeTransform,
-    val matrix: GlbMat4
-)
-
 private data class GlbAnimationSampler(
     val inputTimes: List<Double>,
     val outputAccessorIndex: Int,
     val interpolation: String
 )
 
-internal data class GlbAnimationClip(
-    val info: GlbAnimationClipInfo,
-    val channels: List<GlbAnimationChannel>,
-    val durationSeconds: Double
-) {
-    fun sampleInto(
-        timeSeconds: Double,
-        transforms: MutableList<GlbNodeTransform>
-    ) {
-        if (durationSeconds <= 0.0) {
-            return
-        }
-
-        val localTime = positiveModulo(timeSeconds, durationSeconds)
-        channels.forEach { channel ->
-            val transform = transforms.getOrNull(channel.targetNodeIndex) ?: return@forEach
-            transforms[channel.targetNodeIndex] = when (channel.path) {
-                GlbAnimationPath.TRANSLATION -> transform.copy(
-                    translation = channel.sampler.sampleVec3(localTime)
-                )
-                GlbAnimationPath.ROTATION -> transform.copy(
-                    rotation = channel.sampler.sampleQuat(localTime)
-                )
-                GlbAnimationPath.SCALE -> transform.copy(
-                    scale = channel.sampler.sampleVec3(localTime)
-                )
-            }
-        }
-    }
-
-    private fun positiveModulo(
-        value: Double,
-        divisor: Double
-    ): Double {
-        val result = value % divisor
-        return if (result < 0.0) result + divisor else result
-    }
-}
-
-internal data class GlbAnimationChannel(
-    val targetNodeIndex: Int,
-    val path: GlbAnimationPath,
-    val sampler: GlbAnimationValueSampler
-)
-
-internal enum class GlbAnimationPath(
-    val value: String
-) {
-    TRANSLATION("translation"),
-    ROTATION("rotation"),
-    SCALE("scale");
-
-    companion object {
-        fun from(value: String): GlbAnimationPath {
-            return entries.firstOrNull { it.value == value }
-                ?: throw IllegalArgumentException("Unsupported GLB animation target path: $value")
-        }
-    }
-}
-
-internal sealed class GlbAnimationValueSampler(
-    val times: List<Double>,
-    val interpolation: String
-) {
-    val durationSeconds: Double = times.lastOrNull() ?: 0.0
-    val keyframeCount: Int = times.size
-
-    open fun sampleVec3(timeSeconds: Double): Vec3 {
-        throw IllegalStateException("Animation sampler does not contain Vec3 values.")
-    }
-
-    open fun sampleQuat(timeSeconds: Double): GlbQuat {
-        throw IllegalStateException("Animation sampler does not contain quaternion values.")
-    }
-
-    protected fun frameAt(timeSeconds: Double): GlbAnimationFrame {
-        require(times.isNotEmpty()) {
-            "Animation sampler contains no keyframes."
-        }
-        if (times.size == 1 || timeSeconds <= times.first()) {
-            return GlbAnimationFrame(0, 0, 0.0)
-        }
-        for (index in 0 until times.size - 1) {
-            val start = times[index]
-            val end = times[index + 1]
-            if (timeSeconds <= end) {
-                val amount = if (end > start) ((timeSeconds - start) / (end - start)).coerceIn(0.0, 1.0) else 0.0
-                return if (interpolation == "STEP") {
-                    GlbAnimationFrame(index, index, 0.0)
-                } else {
-                    GlbAnimationFrame(index, index + 1, amount)
-                }
-            }
-        }
-        val lastIndex = times.lastIndex
-        return GlbAnimationFrame(lastIndex, lastIndex, 0.0)
-    }
-
-    class Vec3Sampler(
-        times: List<Double>,
-        private val values: List<Vec3>,
-        interpolation: String
-    ) : GlbAnimationValueSampler(times, interpolation) {
-        override fun sampleVec3(timeSeconds: Double): Vec3 {
-            val frame = frameAt(timeSeconds)
-            val from = values[frame.fromIndex]
-            val to = values[frame.toIndex]
-            return Vec3(
-                x = from.x + (to.x - from.x) * frame.amount,
-                y = from.y + (to.y - from.y) * frame.amount,
-                z = from.z + (to.z - from.z) * frame.amount
-            )
-        }
-    }
-
-    class QuatSampler(
-        times: List<Double>,
-        private val values: List<GlbQuat>,
-        interpolation: String
-    ) : GlbAnimationValueSampler(times, interpolation) {
-        override fun sampleQuat(timeSeconds: Double): GlbQuat {
-            val frame = frameAt(timeSeconds)
-            return values[frame.fromIndex].slerp(values[frame.toIndex], frame.amount)
-        }
-    }
-}
-
-internal data class GlbAnimationFrame(
-    val fromIndex: Int,
-    val toIndex: Int,
-    val amount: Double
-)
-
-internal data class GlbSkin(
-    val name: String?,
-    val skeletonRootNodeIndex: Int?,
-    val joints: List<Int>,
-    val inverseBindMatrices: List<GlbMat4>
-)
-
-internal data class GlbSkinnedTexturedVertex(
-    val position: Vec3,
-    val normal: Vec3,
-    val color: Color,
-    val u: Float,
-    val v: Float,
-    val joints: GlbJointIndices,
-    val weights: GlbJointWeights
-) {
-    fun toTexturedVertex(skinMatrices: List<GlbMat4>): TexturedLitVertex3D {
-        var skinnedPosition = Vec3(0.0, 0.0, 0.0)
-        var skinnedNormal = Vec3(0.0, 0.0, 0.0)
-        var totalWeight = 0.0
-
-        for (index in 0 until 4) {
-            val weight = weights.values[index]
-            if (weight <= 0.0) {
-                continue
-            }
-            val skinMatrix = skinMatrices.getOrNull(joints.values[index]) ?: continue
-            skinnedPosition = addVectors(skinnedPosition, scaleVector(skinMatrix.transformPoint(position), weight))
-            skinnedNormal = addVectors(skinnedNormal, scaleVector(skinMatrix.transformVector(normal), weight))
-            totalWeight += weight
-        }
-
-        if (totalWeight <= 0.0) {
-            skinnedPosition = position
-            skinnedNormal = normal
-        }
-
-        return TexturedLitVertex3D(
-            position = skinnedPosition,
-            normal = normalizeVector(skinnedNormal),
-            color = color,
-            u = u,
-            v = v
-        )
-    }
-}
-
-internal data class GlbJointIndices(
-    val values: IntArray
-)
-
-internal data class GlbJointWeights(
-    val values: DoubleArray
-) {
-    fun normalized(): GlbJointWeights {
-        val total = values.sum()
-        if (total <= 0.0) {
-            return this
-        }
-        return GlbJointWeights(DoubleArray(values.size) { index -> values[index] / total })
-    }
-}
-
-internal data class GlbNodeTransform(
-    val translation: Vec3,
-    val rotation: GlbQuat,
-    val scale: Vec3
-) {
-    fun matrix(): GlbMat4 {
-        return GlbMat4.fromTransform(translation, rotation, scale)
-    }
-}
-
-internal data class GlbQuat(
-    val x: Double,
-    val y: Double,
-    val z: Double,
-    val w: Double
-) {
-    fun normalized(): GlbQuat {
-        val length = sqrt(x * x + y * y + z * z + w * w)
-        if (length == 0.0) {
-            return GlbQuat(0.0, 0.0, 0.0, 1.0)
-        }
-        return GlbQuat(x / length, y / length, z / length, w / length)
-    }
-
-    fun slerp(
-        target: GlbQuat,
-        amount: Double
-    ): GlbQuat {
-        var end = target
-        var cosine = x * target.x + y * target.y + z * target.z + w * target.w
-        if (cosine < 0.0) {
-            cosine = -cosine
-            end = GlbQuat(-target.x, -target.y, -target.z, -target.w)
-        }
-
-        if (cosine > 0.9995) {
-            return GlbQuat(
-                x = x + (end.x - x) * amount,
-                y = y + (end.y - y) * amount,
-                z = z + (end.z - z) * amount,
-                w = w + (end.w - w) * amount
-            ).normalized()
-        }
-
-        val angle = acos(cosine.coerceIn(-1.0, 1.0))
-        val sine = sin(angle)
-        if (abs(sine) < 0.000001) {
-            return this
-        }
-
-        val fromScale = sin((1.0 - amount) * angle) / sine
-        val toScale = sin(amount * angle) / sine
-        return GlbQuat(
-            x = x * fromScale + end.x * toScale,
-            y = y * fromScale + end.y * toScale,
-            z = z * fromScale + end.z * toScale,
-            w = w * fromScale + end.w * toScale
-        ).normalized()
-    }
-}
-
 private data class GlbMaterialInfo(
+    val name: String?,
     val color: Color,
     val textureIndex: Int?,
     val uvTransform: GlbUvTransform
@@ -1965,13 +2291,12 @@ private data class GlbMaterialInfo(
 
 private data class GlbTextureInfo(
     val sourceImageIndex: Int?,
-    val addressModeU: GpuTextureAddressMode,
-    val addressModeV: GpuTextureAddressMode
+    val samplerDescriptor: GpuSamplerDescriptor3D
 )
 
-private data class GlbTextureSamplerInfo(
-    val addressModeU: GpuTextureAddressMode,
-    val addressModeV: GpuTextureAddressMode
+private data class GlbTextureMinFilter(
+    val filter: GpuTextureFilter3D,
+    val mipmapMode: GpuTextureMipmapMode3D
 )
 
 private data class GlbImageInfo(
@@ -2019,92 +2344,6 @@ private data class GlbUvTransform(
             scaleV = 1.0,
             rotation = 0.0
         )
-    }
-}
-
-internal data class GlbMat4(
-    val values: DoubleArray
-) {
-    operator fun times(other: GlbMat4): GlbMat4 {
-        val result = DoubleArray(16)
-        for (column in 0 until 4) {
-            for (row in 0 until 4) {
-                result[column * 4 + row] =
-                    values[0 * 4 + row] * other.values[column * 4 + 0] +
-                    values[1 * 4 + row] * other.values[column * 4 + 1] +
-                    values[2 * 4 + row] * other.values[column * 4 + 2] +
-                    values[3 * 4 + row] * other.values[column * 4 + 3]
-            }
-        }
-        return GlbMat4(result)
-    }
-
-    fun transformPoint(point: Vec3): Vec3 {
-        return Vec3(
-            x = values[0] * point.x + values[4] * point.y + values[8] * point.z + values[12],
-            y = values[1] * point.x + values[5] * point.y + values[9] * point.z + values[13],
-            z = values[2] * point.x + values[6] * point.y + values[10] * point.z + values[14]
-        )
-    }
-
-    fun transformVector(vector: Vec3): Vec3 {
-        return Vec3(
-            x = values[0] * vector.x + values[4] * vector.y + values[8] * vector.z,
-            y = values[1] * vector.x + values[5] * vector.y + values[9] * vector.z,
-            z = values[2] * vector.x + values[6] * vector.y + values[10] * vector.z
-        )
-    }
-
-    fun toMat4(): Mat4 {
-        return Mat4(FloatArray(16) { index -> values[index].toFloat() })
-    }
-
-    companion object {
-        fun identity(): GlbMat4 {
-            return GlbMat4(
-                doubleArrayOf(
-                    1.0, 0.0, 0.0, 0.0,
-                    0.0, 1.0, 0.0, 0.0,
-                    0.0, 0.0, 1.0, 0.0,
-                    0.0, 0.0, 0.0, 1.0
-                )
-            )
-        }
-
-        fun fromTransform(
-            translation: Vec3,
-            rotation: GlbQuat,
-            scale: Vec3
-        ): GlbMat4 {
-            val quat = rotation.normalized()
-            val xx = quat.x * quat.x
-            val yy = quat.y * quat.y
-            val zz = quat.z * quat.z
-            val xy = quat.x * quat.y
-            val xz = quat.x * quat.z
-            val yz = quat.y * quat.z
-            val wx = quat.w * quat.x
-            val wy = quat.w * quat.y
-            val wz = quat.w * quat.z
-            val m00 = 1.0 - 2.0 * (yy + zz)
-            val m01 = 2.0 * (xy + wz)
-            val m02 = 2.0 * (xz - wy)
-            val m10 = 2.0 * (xy - wz)
-            val m11 = 1.0 - 2.0 * (xx + zz)
-            val m12 = 2.0 * (yz + wx)
-            val m20 = 2.0 * (xz + wy)
-            val m21 = 2.0 * (yz - wx)
-            val m22 = 1.0 - 2.0 * (xx + yy)
-            return GlbMat4(
-                doubleArrayOf(
-                    m00 * scale.x, m01 * scale.x, m02 * scale.x, 0.0,
-                    m10 * scale.y, m11 * scale.y, m12 * scale.y, 0.0,
-                    m20 * scale.z, m21 * scale.z, m22 * scale.z, 0.0,
-                    translation.x, translation.y, translation.z, 1.0
-                )
-            )
-        }
-
     }
 }
 

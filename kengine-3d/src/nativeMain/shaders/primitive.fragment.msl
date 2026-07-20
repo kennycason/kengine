@@ -1,0 +1,19 @@
+#include <metal_stdlib>
+using namespace metal;
+
+struct FragmentIn
+{
+    float4 color [[user(locn0)]];
+};
+
+struct FragmentOut
+{
+    float4 color [[color(0)]];
+};
+
+fragment FragmentOut main0(FragmentIn in [[stage_in]])
+{
+    FragmentOut out;
+    out.color = in.color;
+    return out;
+}

@@ -2,8 +2,9 @@ package com.kengine.three
 
 class Scene3D(
     var light: DirectionalLight3D = DirectionalLight3D()
-) {
+) : GpuResource3D {
     private val renderItems = mutableListOf<SceneItem3D>()
+    private var cleanedUp = false
 
     val items: List<SceneItem3D>
         get() = renderItems
@@ -12,8 +13,134 @@ class Scene3D(
         get() = renderItems.filter { it.isVisible }
 
     fun <T : SceneItem3D> add(item: T): T {
+        check(!cleanedUp) {
+            "Scene3D has already been cleaned up."
+        }
         renderItems += item
         return item
+    }
+
+    fun <T : SceneItem3D> addNode(node: Node3D<T>): Node3D<T> {
+        return add(node)
+    }
+
+    fun addModelNode(
+        model: Model3D,
+        transform: Transform3D = Transform3D(),
+        itemTransform: Transform3D = Transform3D(),
+        light: DirectionalLight3D? = null,
+        isVisible: Boolean = true
+    ): Node3D<SceneModel3D> {
+        return addNode(
+            Node3D(
+                item = SceneModel3D(
+                    model = model,
+                    light = light
+                ),
+                transform = transform,
+                itemTransform = itemTransform,
+                isVisible = isVisible
+            )
+        )
+    }
+
+    fun addAnimatedModelNode(
+        model: AnimatedModel3D,
+        transform: Transform3D = Transform3D(),
+        itemTransform: Transform3D = Transform3D(),
+        pose: AnimationPose3D = AnimationPose3D(),
+        light: DirectionalLight3D? = null,
+        isVisible: Boolean = true
+    ): Node3D<AnimatedModelInstance3D> {
+        return addNode(
+            Node3D(
+                item = model.createInstance(
+                    pose = pose,
+                    light = light
+                ),
+                transform = transform,
+                itemTransform = itemTransform,
+                isVisible = isVisible
+            )
+        )
+    }
+
+    fun addMeshNode(
+        mesh: GpuMesh,
+        transform: Transform3D = Transform3D(),
+        itemTransform: Transform3D = Transform3D(),
+        isVisible: Boolean = true
+    ): Node3D<SceneMesh3D> {
+        return addNode(
+            Node3D(
+                item = SceneMesh3D(mesh = mesh),
+                transform = transform,
+                itemTransform = itemTransform,
+                isVisible = isVisible
+            )
+        )
+    }
+
+    fun addLitMeshNode(
+        mesh: LitGpuMesh,
+        transform: Transform3D = Transform3D(),
+        itemTransform: Transform3D = Transform3D(),
+        light: DirectionalLight3D? = null,
+        isVisible: Boolean = true
+    ): Node3D<SceneLitMesh3D> {
+        return addNode(
+            Node3D(
+                item = SceneLitMesh3D(
+                    mesh = mesh,
+                    light = light
+                ),
+                transform = transform,
+                itemTransform = itemTransform,
+                isVisible = isVisible
+            )
+        )
+    }
+
+    fun addTexturedMeshNode(
+        mesh: TexturedGpuMesh,
+        texture: GpuTexture,
+        transform: Transform3D = Transform3D(),
+        itemTransform: Transform3D = Transform3D(),
+        isVisible: Boolean = true
+    ): Node3D<SceneTexturedMesh3D> {
+        return addNode(
+            Node3D(
+                item = SceneTexturedMesh3D(
+                    mesh = mesh,
+                    texture = texture
+                ),
+                transform = transform,
+                itemTransform = itemTransform,
+                isVisible = isVisible
+            )
+        )
+    }
+
+    fun addTexturedLitMeshNode(
+        mesh: TexturedLitGpuMesh,
+        texture: GpuTexture,
+        transform: Transform3D = Transform3D(),
+        itemTransform: Transform3D = Transform3D(),
+        light: DirectionalLight3D? = null,
+        isVisible: Boolean = true
+    ): Node3D<SceneTexturedLitMesh3D> {
+        return addNode(
+            Node3D(
+                item = SceneTexturedLitMesh3D(
+                    mesh = mesh,
+                    texture = texture,
+                    light = light
+                ),
+                transform = transform,
+                itemTransform = itemTransform,
+                isVisible = isVisible
+            )
+        )
     }
 
     fun addModel(
@@ -147,10 +274,16 @@ class Scene3D(
     }
 
     private fun validateExplicitAnimatedModelPoses() {
-        val posesByModel = mutableMapOf<AnimatedModel3D, AnimationPose3D>()
+        val instances = mutableListOf<AnimatedModelInstance3D>()
         renderItems.forEach { item ->
-            val instance = item as? AnimatedModelInstance3D ?: return@forEach
-            if (!instance.isVisible || !instance.requiresExplicitPoseUpdate) {
+            if (item.isVisible) {
+                item.collectAnimatedModelInstances(instances)
+            }
+        }
+
+        val posesByModel = mutableMapOf<AnimatedModel3D, AnimationPose3D>()
+        instances.forEach { instance ->
+            if (!instance.isVisible || !instance.requiresSharedExplicitPoseUpdate) {
                 return@forEach
             }
 
@@ -162,6 +295,26 @@ class Scene3D(
             posesByModel[instance.model] = instance.pose
         }
     }
+
+    override fun cleanup() {
+        if (cleanedUp) {
+            return
+        }
+
+        cleanedUp = true
+        var firstError: Throwable? = null
+        renderItems.asReversed().forEach { item ->
+            try {
+                item.cleanup()
+            } catch (e: Throwable) {
+                if (firstError == null) {
+                    firstError = e
+                }
+            }
+        }
+        renderItems.clear()
+        firstError?.let { throw it }
+    }
 }
 
 interface SceneItem3D {
@@ -169,6 +322,12 @@ interface SceneItem3D {
     var isVisible: Boolean
 
     fun prepareForDraw() {
+    }
+
+    fun collectAnimatedModelInstances(instances: MutableList<AnimatedModelInstance3D>) {
+    }
+
+    fun cleanup() {
     }
 
     fun draw(
@@ -296,6 +455,9 @@ class SceneRenderer3D(
     val litRenderer: LitMeshRenderer3D = LitMeshRenderer3D(gpu)
     val texturedMeshRenderer: TexturedMeshRenderer3D = TexturedMeshRenderer3D(gpu)
     val texturedLitRenderer: TexturedLitMeshRenderer3D = TexturedLitMeshRenderer3D(gpu)
+    private val skinnedTexturedLitRendererValue = lazy { SkinnedTexturedLitMeshRenderer3D(gpu) }
+    val skinnedTexturedLitRenderer: SkinnedTexturedLitMeshRenderer3D
+        get() = skinnedTexturedLitRendererValue.value
     val modelRenderer: ModelRenderer3D = ModelRenderer3D(
         litRenderer = litRenderer,
         texturedLitRenderer = texturedLitRenderer
@@ -375,12 +537,27 @@ class SceneRenderer3D(
         texturedLitRenderer.draw(frame, mesh, texture, transform, camera, light)
     }
 
+    fun draw(
+        mesh: SkinnedTexturedLitGpuMesh,
+        texture: GpuTexture,
+        frame: GpuFrame,
+        transform: Transform3D,
+        camera: Camera3D,
+        skinMatrices: List<Mat4>,
+        light: DirectionalLight3D = DirectionalLight3D()
+    ) {
+        skinnedTexturedLitRenderer.draw(frame, mesh, texture, transform, camera, skinMatrices, light)
+    }
+
     override fun cleanup() {
         if (cleanedUp) {
             return
         }
 
         cleanedUp = true
+        if (skinnedTexturedLitRendererValue.isInitialized()) {
+            skinnedTexturedLitRenderer.cleanup()
+        }
         texturedLitRenderer.cleanup()
         texturedMeshRenderer.cleanup()
         litRenderer.cleanup()

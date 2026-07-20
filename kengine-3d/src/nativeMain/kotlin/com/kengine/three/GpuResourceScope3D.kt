@@ -4,6 +4,20 @@ interface GpuResource3D {
     fun cleanup()
 }
 
+enum class GpuResourceOwnership3D {
+    OWNED,
+    BORROWED
+}
+
+internal inline fun <T> GpuResourceOwnership3D.cleanupIfOwned(
+    resource: T?,
+    cleanup: (T) -> Unit
+) {
+    if (this == GpuResourceOwnership3D.OWNED && resource != null) {
+        cleanup(resource)
+    }
+}
+
 class GpuResourceScope3D : GpuResource3D {
     private val cleanupTasks = mutableListOf<() -> Unit>()
     private var cleanedUp = false

@@ -2,7 +2,9 @@ package com.kengine.three
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class Animation3DTest {
     private enum class TestState {
@@ -94,6 +96,59 @@ class Animation3DTest {
     }
 
     @Test
+    fun stateControllerPlaysMappedStates() {
+        val controller = AnimationStateController3D(
+            clipMap = testClipMap(),
+            initialState = TestState.IDLE
+        )
+
+        val idleFrame = controller.play(TestState.IDLE, deltaSeconds = 0.25)
+        val runFrame = controller.play(TestState.RUN, deltaSeconds = 0.25)
+
+        assertEquals(TestState.IDLE, idleFrame.state)
+        assertEquals(0, idleFrame.clipIndex)
+        assertEquals(0.25, idleFrame.timeSeconds)
+        assertEquals(false, idleFrame.restarted)
+        assertEquals(TestState.RUN, runFrame.state)
+        assertEquals(1, runFrame.clipIndex)
+        assertEquals(0.0, runFrame.timeSeconds)
+        assertEquals(true, runFrame.restarted)
+        assertEquals(TestState.RUN, controller.state)
+        assertEquals("Run", controller.clipName)
+        assertEquals(1, controller.clipIndex)
+        assertEquals(2.0, controller.playbackSpeed)
+    }
+
+    @Test
+    fun stateControllerCreatesPoseFrames() {
+        val controller = AnimationStateController3D(
+            clipMap = testClipMap(),
+            initialState = TestState.RUN
+        )
+
+        val pose = controller.pose(TestState.RUN, deltaSeconds = 0.25)
+
+        assertEquals(1, pose.clipIndex)
+        assertEquals(0.5, pose.timeSeconds)
+    }
+
+    @Test
+    fun stateControllerResetsToMappedState() {
+        val controller = AnimationStateController3D(
+            clipMap = testClipMap(),
+            initialState = TestState.IDLE
+        )
+        controller.play(TestState.IDLE, deltaSeconds = 0.5)
+
+        controller.reset(TestState.RUN)
+
+        assertEquals(TestState.RUN, controller.state)
+        assertEquals("Run", controller.clipName)
+        assertEquals(1, controller.clipIndex)
+        assertEquals(0.0, controller.timeSeconds)
+    }
+
+    @Test
     fun rejectsNegativePoseValues() {
         assertFailsWith<IllegalArgumentException> {
             AnimationPose3D(clipIndex = -1)
@@ -101,5 +156,57 @@ class Animation3DTest {
         assertFailsWith<IllegalArgumentException> {
             AnimationPose3D(timeSeconds = -0.01)
         }
+    }
+
+    @Test
+    fun posePreparationUpdatesOnlyWhenPoseChanges() {
+        val preparation = AnimationPosePreparation3D()
+        val pose = AnimationPose3D(clipIndex = 1, timeSeconds = 0.5)
+        val updates = mutableListOf<AnimationPose3D>()
+
+        assertTrue(preparation.prepare(pose) { updates += it })
+        assertFalse(preparation.prepare(pose) { updates += it })
+
+        val nextPose = AnimationPose3D(clipIndex = 1, timeSeconds = 0.75)
+        assertTrue(preparation.prepare(nextPose) { updates += it })
+
+        assertEquals(listOf(pose, nextPose), updates)
+        assertEquals(nextPose, preparation.preparedPose)
+    }
+
+    @Test
+    fun posePreparationCanBeInvalidated() {
+        val preparation = AnimationPosePreparation3D()
+        val pose = AnimationPose3D(clipIndex = 1, timeSeconds = 0.5)
+        val updates = mutableListOf<AnimationPose3D>()
+
+        preparation.prepare(pose) { updates += it }
+        preparation.invalidate()
+        preparation.prepare(pose) { updates += it }
+
+        assertEquals(listOf(pose, pose), updates)
+    }
+
+    @Test
+    fun posePreparationRejectsUnpreparedPose() {
+        val preparation = AnimationPosePreparation3D()
+        val pose = AnimationPose3D(clipIndex = 1, timeSeconds = 0.5)
+
+        assertFailsWith<IllegalStateException> {
+            preparation.requirePrepared(pose)
+        }
+
+        preparation.prepare(pose) {}
+        preparation.requirePrepared(pose)
+    }
+
+    private fun testClipMap(): AnimationClipMap3D<TestState> {
+        return AnimationClipMap3D.fromClipNames(
+            clips = AnimationClipSet3D.fromNames(listOf("Idle", "Run")),
+            references = listOf(
+                AnimationClipReference3D(TestState.IDLE, "Idle"),
+                AnimationClipReference3D(TestState.RUN, "Run", playbackSpeed = 2.0)
+            )
+        )
     }
 }

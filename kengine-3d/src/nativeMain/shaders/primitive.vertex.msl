@@ -1,0 +1,48 @@
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexOut
+{
+    float4 position [[position]];
+    float4 color [[user(locn0)]];
+};
+
+vertex VertexOut main0(uint vertexID [[vertex_id]], constant float4* uniforms [[buffer(0)]])
+{
+    const float2 trianglePositions[3] = {
+        float2(0.0, 0.66),
+        float2(-0.58, -0.44),
+        float2(0.58, -0.44)
+    };
+
+    const float2 quadPositions[6] = {
+        float2(-0.5, 0.5),
+        float2(0.5, 0.5),
+        float2(-0.5, -0.5),
+        float2(0.5, 0.5),
+        float2(0.5, -0.5),
+        float2(-0.5, -0.5)
+    };
+
+    const float4 placement = uniforms[0];
+    const float4 scaleRotation = uniforms[1];
+    const float4 color = uniforms[2];
+
+    float2 local = placement.w > 0.5 ? quadPositions[vertexID] : trianglePositions[vertexID];
+    float c = cos(scaleRotation.z);
+    float s = sin(scaleRotation.z);
+    float2 rotated = float2(
+        local.x * c - local.y * s,
+        local.x * s + local.y * c
+    );
+
+    VertexOut out;
+    out.position = float4(
+        placement.x + rotated.x * scaleRotation.x,
+        placement.y + rotated.y * scaleRotation.y,
+        placement.z,
+        1.0
+    );
+    out.color = color;
+    return out;
+}

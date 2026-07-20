@@ -1,0 +1,28 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+using namespace metal;
+
+struct Uniforms
+{
+    float4x4 modelViewProjection;
+};
+
+struct VertexIn
+{
+    float3 position [[attribute(0)]];
+    float2 uv [[attribute(1)]];
+};
+
+struct VertexOut
+{
+    float2 uv [[user(locn0)]];
+    float4 position [[position]];
+};
+
+vertex VertexOut main0(VertexIn in [[stage_in]], constant Uniforms& uniforms [[buffer(0)]])
+{
+    VertexOut out;
+    out.uv = in.uv;
+    out.position = uniforms.modelViewProjection * float4(in.position, 1.0);
+    return out;
+}

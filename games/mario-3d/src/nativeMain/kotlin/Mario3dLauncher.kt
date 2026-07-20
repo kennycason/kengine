@@ -1,8 +1,10 @@
 import com.kengine.createGameContext
-import com.kengine.file.File
 import com.kengine.graphics.Color
 import com.kengine.hooks.context.useContext
-import com.kengine.input.controller.ControllerInputEventSubscriber
+import com.kengine.input.digitalAxis
+import com.kengine.input.snapAxis
+import com.kengine.input.controller.CalibratedControllerAxes
+import com.kengine.input.controller.ControllerAxisInputSettings
 import com.kengine.input.controller.controls.Buttons
 import com.kengine.log.Logger
 import com.kengine.math.Vec3
@@ -10,9 +12,11 @@ import com.kengine.sdl.RenderBackend
 import com.kengine.three.AnimationClipMap3D
 import com.kengine.three.AnimationClipReference3D
 import com.kengine.three.AnimationClipSet3D
-import com.kengine.three.AnimationPlayer3D
 import com.kengine.three.AnimationPose3D
-import com.kengine.three.AnimatedModelLoader3D
+import com.kengine.three.AnimationStateController3D
+import com.kengine.three.AnimatedModelInstance3D
+import com.kengine.three.AnimatedModelAsset3D
+import com.kengine.three.AnimatedModelSourceCache3D
 import com.kengine.three.CapsuleCollider3D
 import com.kengine.three.Collision3D
 import com.kengine.three.DebugRenderer3D
@@ -20,13 +24,21 @@ import com.kengine.three.DirectionalLight3D
 import com.kengine.three.GpuContext
 import com.kengine.three.GpuMesh
 import com.kengine.three.GpuResourceScope3D
+import com.kengine.three.GpuTextureCache3D
 import com.kengine.three.KinematicCharacterController3D
 import com.kengine.three.KinematicCharacterControllerSettings3D
 import com.kengine.three.KinematicCharacterState3D
-import com.kengine.three.Model3D
+import com.kengine.three.LoadedModelAssetBundle3D
+import com.kengine.three.ModelAsset3D
+import com.kengine.three.ModelAssetBundle3D
+import com.kengine.three.ModelAssetLoader3D
+import com.kengine.three.ModelAssetPathResolver3D
 import com.kengine.three.ModelLoadOptions3D
-import com.kengine.three.ModelLoader3D
+import com.kengine.three.ModelSourceCache3D
+import com.kengine.three.Node3D
 import com.kengine.three.Scene3D
+import com.kengine.three.SceneMesh3D
+import com.kengine.three.SceneModel3D
 import com.kengine.three.SceneRenderer3D
 import com.kengine.three.TerrainActorController3D
 import com.kengine.three.TerrainActorControllerSettings3D
@@ -36,14 +48,18 @@ import com.kengine.three.ThirdPersonCameraController3D
 import com.kengine.three.ThirdPersonCameraInput3D
 import com.kengine.three.ThirdPersonCameraSettings3D
 import com.kengine.three.Transform3D
+import com.kengine.three.addAnimatedModelAssetNode
+import com.kengine.three.addModelAssetNode
+import com.kengine.three.createStaticCollider
+import com.kengine.three.createTerrainCollider
 import com.kengine.three.forwardForYaw
 import com.kengine.three.horizontalDistance
 import com.kengine.three.horizontalLength
 import com.kengine.three.horizontalVelocityForMovement
 import com.kengine.three.moveAngleToward
+import com.kengine.three.setPose
 import com.kengine.three.shortestAngleDelta
 import com.kengine.three.squaredHorizontalDistance
-import com.kengine.three.toAnimationPose3D
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.SDL_Delay
 import sdl3.SDL_GetTicks
@@ -59,10 +75,6 @@ private const val LEFT_STICK_X_AXIS = 0
 private const val LEFT_STICK_Y_AXIS = 1
 private const val RIGHT_STICK_X_AXIS = 2
 private const val RIGHT_STICK_Y_AXIS = 3
-private const val CONTROLLER_AXIS_COUNT = 6
-private const val CONTROLLER_DEADZONE = 0.14
-private const val CONTROLLER_RAW_RELEASE_DEADZONE = 0.08f
-private const val CONTROLLER_CALIBRATION_SECONDS = 0.2
 private const val WORLD_TARGET_SIZE = 105.0
 private const val PLAYER_HALF_HEIGHT = 0.82
 private const val PLAYER_WALK_SPEED = 5.4
@@ -122,6 +134,47 @@ private const val CAMERA_MAX_PITCH = 0.95
 private const val CAMERA_MIN_DISTANCE = 2.8
 private const val CAMERA_MAX_DISTANCE = 7.2
 private val CAMERA_DISTANCES = listOf(3.5, 4.9, 6.3)
+private val CONTROLLER_AXIS_SETTINGS = ControllerAxisInputSettings(
+    axisCount = 6,
+    deadzone = 0.14,
+    rawReleaseDeadzone = 0.08f,
+    calibrationSeconds = 0.2
+)
+
+private object MarioModelAssets {
+    val World = ModelAsset3D(
+        relativePath = "models/Super Mario 64 Bob-Omb Battlefield.glb",
+        options = ModelLoadOptions3D(
+            targetSize = WORLD_TARGET_SIZE,
+            defaultColor = Color.fromHex("ffffff")
+        )
+    )
+    val Mario = AnimatedModelAsset3D.skinnedTexturedLit(
+        relativePath = "models/Mario64Animated.glb",
+        options = ModelLoadOptions3D(
+            targetSize = 1.58,
+            defaultColor = Color.fromHex("ffffff")
+        )
+    )
+    val Goomba = AnimatedModelAsset3D.nodeAnimatedLit(
+        relativePath = "models/Animated Goomba Super Mario Bros.glb",
+        options = ModelLoadOptions3D(
+            targetSize = 0.92,
+            defaultColor = Color.fromHex("a86432")
+        )
+    )
+    val Bowser = ModelAsset3D(
+        relativePath = "models/Super Mario 64 Bowser.glb",
+        options = ModelLoadOptions3D(
+            targetSize = 4.4,
+            defaultColor = Color.fromHex("ffffff")
+        )
+    )
+    val Bundle = ModelAssetBundle3D(
+        models = listOf(World, Bowser),
+        animatedModels = listOf(Mario, Goomba)
+    )
+}
 
 @OptIn(ExperimentalForeignApi::class)
 fun main() {
@@ -134,92 +187,18 @@ fun main() {
     ) {
         useContext(GpuContext.create(sdl), cleanup = true) {
             val resources = GpuResourceScope3D()
-            val worldAsset = resolveMarioAsset("models/Super Mario 64 Bob-Omb Battlefield.glb")
-            val worldSource = ModelLoader3D.loadParsed(
-                assetPath = worldAsset,
-                options = ModelLoadOptions3D(
-                    targetSize = WORLD_TARGET_SIZE,
-                    defaultColor = Color.fromHex("7fbf72")
-                )
+            val textureCache = resources.track(GpuTextureCache3D(this))
+            val sourceCache = ModelSourceCache3D()
+            val animatedSourceCache = AnimatedModelSourceCache3D()
+            val modelAssets = ModelAssetLoader3D(
+                gpu = this,
+                resources = resources,
+                resolver = ModelAssetPathResolver3D(sourceAssetRoot = "games/mario-3d/assets"),
+                textureCache = textureCache,
+                sourceCache = sourceCache,
+                animatedSourceCache = animatedSourceCache
             )
-            val world = resources.track(
-                Model3D.load(
-                    gpu = this,
-                    assetPath = worldAsset,
-                    options = ModelLoadOptions3D(
-                        targetSize = WORLD_TARGET_SIZE,
-                        defaultColor = Color.fromHex("ffffff")
-                    )
-                )
-            )
-            val terrain = worldSource.createTerrainCollider()
-            val staticWorld = worldSource.createStaticCollider()
-            val playerController = KinematicCharacterController3D(
-                terrain = terrain,
-                settings = KinematicCharacterControllerSettings3D(
-                    halfHeight = PLAYER_HALF_HEIGHT,
-                    collisionRadius = PLAYER_COLLISION_RADIUS,
-                    maxStepUp = MAX_STEP_UP,
-                    maxStepDown = PLAYER_MAX_STEP_DOWN,
-                    groundContactEpsilon = GROUND_CONTACT_EPSILON,
-                    jumpVelocity = PLAYER_JUMP_VELOCITY,
-                    gravity = PLAYER_JUMP_GRAVITY,
-                    fallingGravity = PLAYER_FALL_GRAVITY,
-                    terminalVelocityY = PLAYER_TERMINAL_FALL_SPEED
-                ),
-                staticCollider = staticWorld
-            )
-            val playerTerrainController = playerController.terrainController
-            val enemyController = TerrainActorController3D(
-                terrain = terrain,
-                settings = TerrainActorControllerSettings3D(
-                    halfHeight = 0.0,
-                    maxStepUp = ENEMY_MAX_STEP_UP,
-                    maxStepDown = ENEMY_MAX_STEP_DOWN,
-                    groundContactEpsilon = GROUND_CONTACT_EPSILON
-                )
-            )
-            val mario = resources.track(
-                AnimatedModelLoader3D.loadSkinnedTexturedLit(
-                    gpu = this,
-                    assetPath = resolveMarioAsset("models/Mario64Animated.glb"),
-                    options = ModelLoadOptions3D(
-                        targetSize = 1.58,
-                        defaultColor = Color.fromHex("ffffff")
-                    )
-                )
-            )
-            val marioClips = marioAnimationClips(mario.clips)
-            val marioAnimationPlayer = AnimationPlayer3D(marioClips.selectionFor(MarioAnimationState.IDLE))
-            val goomba = resources.track(
-                AnimatedModelLoader3D.loadNodeAnimatedLit(
-                    gpu = this,
-                    assetPath = resolveMarioAsset("models/Animated Goomba Super Mario Bros.glb"),
-                    options = ModelLoadOptions3D(
-                        targetSize = 0.92,
-                        defaultColor = Color.fromHex("a86432")
-                    )
-                )
-            )
-            val bowserModel = resources.track(
-                Model3D.load(
-                    gpu = this,
-                    assetPath = resolveMarioAsset("models/Super Mario 64 Bowser.glb"),
-                    options = ModelLoadOptions3D(
-                        targetSize = 4.4,
-                        defaultColor = Color.fromHex("ffffff")
-                    )
-                )
-            )
-            val starMesh = resources.track(
-                GpuMesh.sphere(
-                    gpu = this,
-                    radius = 0.42,
-                    color = Color.fromHex("ffd447"),
-                    rings = 10,
-                    segments = 16
-                )
-            ) { it.cleanup() }
+            val loadedAssets = modelAssets.loadBundle(MarioModelAssets.Bundle)
             val sceneRenderer = resources.track(SceneRenderer3D(this))
             val debugRenderer = resources.track(DebugRenderer3D(this)) { it.cleanup() }
             val light = DirectionalLight3D(
@@ -229,9 +208,16 @@ fun main() {
                 diffuseStrength = 0.8f
             )
             val scene = Scene3D(light)
+            val content = createMarioSceneContent(
+                gpu = this,
+                resources = resources,
+                loadedAssets = loadedAssets,
+                scene = scene
+            )
+            resources.track(scene)
 
             val playerState = KinematicCharacterState3D(
-                position = Vec3(0.0, playerController.actorYAt(0.0, 0.0) ?: PLAYER_HALF_HEIGHT, 0.0),
+                position = Vec3(0.0, content.playerController.actorYAt(0.0, 0.0) ?: PLAYER_HALF_HEIGHT, 0.0),
                 isGrounded = true
             )
             val cameraController = ThirdPersonCameraController3D(
@@ -254,19 +240,7 @@ fun main() {
                 )
             )
             var playerYaw = 0.0
-            val goombas = createGoombas(enemyController)
-            val bowser = createBowser(findHighestGroundRegionCenter(terrain))
-            val summitStar = createSummitStar(bowser.home)
-            scene.addModel(world)
-            val bowserItem = scene.addModel(bowserModel, isVisible = false)
-            val starItem = scene.addMesh(starMesh, isVisible = false)
-            val goombaItems = goombas.map {
-                scene.addAnimatedModel(goomba, isVisible = false)
-            }
-            val marioItem = scene.addAnimatedModel(mario)
-            var controllerNeutral: FloatArray? = null
-            var calibratedControllerId: UInt? = null
-            var controllerCalibrationUntil = 0.0
+            val controllerAxes = CalibratedControllerAxes(CONTROLLER_AXIS_SETTINGS)
             var wasJumpPressed = false
             var wasGrounded = true
             var landingAnimationUntil = 0.0
@@ -286,76 +260,29 @@ fun main() {
                     val elapsedSeconds = ticks.toDouble() / 1000.0
                     val keyboardState = keyboard.keyboard
                     val controllerState = controller.controller
-                    val controllerId = controllerState.getFirstControllerId()
-                    val isControllerCalibrating = if (controllerId == null) {
-                        controllerNeutral = null
-                        calibratedControllerId = null
-                        false
-                    } else {
-                        if (controllerId != calibratedControllerId) {
-                            calibratedControllerId = controllerId
-                            controllerNeutral = captureControllerNeutral(controllerState, controllerId)
-                            controllerCalibrationUntil = elapsedSeconds + CONTROLLER_CALIBRATION_SECONDS
-                        }
-                        val isCalibrating = elapsedSeconds <= controllerCalibrationUntil
-                        if (controllerNeutral == null) {
-                            controllerNeutral = captureControllerNeutral(controllerState, controllerId)
-                        }
-                        isCalibrating
-                    }
+                    val controllerAxisSample = controllerAxes.sample(controllerState, elapsedSeconds)
+                    val leftStickX = controllerAxisSample.axis(LEFT_STICK_X_AXIS)
+                    val leftStickY = controllerAxisSample.axis(LEFT_STICK_Y_AXIS, invert = true)
+                    val rightStickX = controllerAxisSample.axis(RIGHT_STICK_X_AXIS)
+                    val rightStickY = controllerAxisSample.axis(RIGHT_STICK_Y_AXIS, invert = true)
 
-                    val leftStickX = normalizedControllerAxis(
-                        controllerAxisValue(
-                            controllerState,
-                            controllerId,
-                            controllerNeutral,
-                            LEFT_STICK_X_AXIS,
-                            isControllerCalibrating
-                        )
+                    val moveRightInput = snapAxis(
+                        digitalAxis(keyboardState.isDPressed(), keyboardState.isAPressed()) +
+                            leftStickX,
+                        MOVEMENT_INPUT_EPSILON
                     )
-                    val leftStickY = -normalizedControllerAxis(
-                        controllerAxisValue(
-                            controllerState,
-                            controllerId,
-                            controllerNeutral,
-                            LEFT_STICK_Y_AXIS,
-                            isControllerCalibrating
-                        )
+                    val moveForwardInput = snapAxis(
+                        digitalAxis(keyboardState.isWPressed(), keyboardState.isSPressed()) +
+                            leftStickY,
+                        MOVEMENT_INPUT_EPSILON
                     )
-                    val rightStickX = normalizedControllerAxis(
-                        controllerAxisValue(
-                            controllerState,
-                            controllerId,
-                            controllerNeutral,
-                            RIGHT_STICK_X_AXIS,
-                            isControllerCalibrating
-                        )
-                    )
-                    val rightStickY = -normalizedControllerAxis(
-                        controllerAxisValue(
-                            controllerState,
-                            controllerId,
-                            controllerNeutral,
-                            RIGHT_STICK_Y_AXIS,
-                            isControllerCalibrating
-                        )
-                    )
-
-                    val moveRightInput = snapInput(
-                        axis(keyboardState.isDPressed(), keyboardState.isAPressed()) +
-                            leftStickX
-                    )
-                    val moveForwardInput = snapInput(
-                        axis(keyboardState.isWPressed(), keyboardState.isSPressed()) +
-                            leftStickY
-                    )
-                    val lookX = snapInput(
-                        axis(keyboardState.isRightPressed(), keyboardState.isLeftPressed()) +
+                    val lookX = snapAxis(
+                        digitalAxis(keyboardState.isRightPressed(), keyboardState.isLeftPressed()) +
                             -rightStickX,
                         LOOK_INPUT_EPSILON
                     )
-                    val lookY = snapInput(
-                        axis(keyboardState.isUpPressed(), keyboardState.isDownPressed()) +
+                    val lookY = snapAxis(
+                        digitalAxis(keyboardState.isUpPressed(), keyboardState.isDownPressed()) +
                             rightStickY,
                         LOOK_INPUT_EPSILON
                     )
@@ -368,7 +295,7 @@ fun main() {
                         debugEnabled = !debugEnabled
                     }
                     wasDebugPressed = debugPressed
-                    val zoomInput = axis(
+                    val zoomInput = digitalAxis(
                         controllerState.isButtonPressed(Buttons.DPAD_DOWN),
                         controllerState.isButtonPressed(Buttons.DPAD_UP)
                     )
@@ -403,7 +330,7 @@ fun main() {
                     val jumpPressed = keyboardState.isSpacePressed() ||
                         keyboardState.isXPressed() ||
                         controllerState.isButtonPressed(Buttons.B)
-                    val playerStep = playerController.step(
+                    val playerStep = content.playerController.step(
                         state = playerState,
                         horizontalVelocity = horizontalVelocity,
                         deltaSeconds = deltaSeconds,
@@ -416,15 +343,15 @@ fun main() {
                     var playerVelocityY = playerState.velocityY
                     var isGroundedAfterGravity = playerState.isGrounded
 
-                    updateGoombas(goombas, enemyController, deltaSeconds)
-                    updateBowser(bowser, enemyController, player, deltaSeconds)
+                    updateGoombas(content.goombas, content.enemyController, deltaSeconds)
+                    updateBowser(content.bowser, content.enemyController, player, deltaSeconds)
                     val goombaCollision = resolvePlayerGoombaCollisions(
                         player = player,
                         playerYBeforeGravity = playerYBeforeGravity,
                         playerVelocityY = playerVelocityY,
                         isGrounded = isGroundedAfterGravity,
-                        goombas = goombas,
-                        playerController = playerTerrainController,
+                        goombas = content.goombas,
+                        playerController = content.playerTerrainController,
                         elapsedSeconds = elapsedSeconds,
                         lastPlayerHitAt = lastPlayerHitAt
                     )
@@ -440,8 +367,8 @@ fun main() {
                         playerYBeforeGravity = playerYBeforeGravity,
                         playerVelocityY = playerVelocityY,
                         isGrounded = isGroundedAfterGravity,
-                        bowser = bowser,
-                        playerController = playerTerrainController,
+                        bowser = content.bowser,
+                        playerController = content.playerTerrainController,
                         elapsedSeconds = elapsedSeconds,
                         lastPlayerHitAt = lastPlayerHitAt
                     )
@@ -452,10 +379,10 @@ fun main() {
                     playerState.position = player
                     playerState.velocityY = playerVelocityY
                     playerState.isGrounded = isGroundedAfterGravity
-                    if (!bowser.isActive && !summitStar.isCollected) {
-                        summitStar.isActive = true
+                    if (!content.bowser.isActive && !content.summitStar.isCollected) {
+                        content.summitStar.isActive = true
                     }
-                    resolveSummitStarCollection(summitStar, player)
+                    resolveSummitStarCollection(content.summitStar, player)
 
                     if (!wasGrounded && isGroundedAfterGravity) {
                         landingAnimationUntil = elapsedSeconds + 0.22
@@ -470,62 +397,17 @@ fun main() {
                         isMoving -> MarioAnimationState.WALK
                         else -> MarioAnimationState.IDLE
                     }
-                    val marioFrame = marioAnimationPlayer.play(
-                        selection = marioClips.selectionFor(nextMarioAnimationState),
-                        deltaSeconds = deltaSeconds
-                    )
-                    val marioPose = marioFrame.toAnimationPose3D()
+                    val marioPose = content.marioAnimation.pose(nextMarioAnimationState, deltaSeconds)
 
                     cameraController.follow(playerState.position, deltaSeconds)
                     val camera = cameraController.camera()
 
-                    bowserItem.isVisible = bowser.isActive
-                    if (bowser.isActive) {
-                        val hitPulse = if (elapsedSeconds < bowser.hitFlashUntil) {
-                            1.0 + abs(sin(elapsedSeconds * 52.0)) * 0.12
-                        } else {
-                            1.0
-                        }
-                        bowserItem.transform = Transform3D(
-                            position = Vec3(
-                                bowser.position.x,
-                                bowser.position.y + 0.18 + sin(elapsedSeconds * 1.1) * 0.1,
-                                bowser.position.z
-                            ),
-                            rotation = Vec3(0.0, bowser.yaw + BOWSER_MODEL_YAW_OFFSET, 0.0),
-                            scale = Vec3(hitPulse, hitPulse, hitPulse)
-                        )
-                    }
-
-                    starItem.isVisible = summitStar.isActive && !summitStar.isCollected
-                    if (starItem.isVisible) {
-                        starItem.transform = Transform3D(
-                            position = Vec3(
-                                summitStar.position.x,
-                                summitStar.position.y + sin(elapsedSeconds * 3.1) * 0.16,
-                                summitStar.position.z
-                            ),
-                            rotation = Vec3(0.0, elapsedSeconds * 2.8, elapsedSeconds * 1.5)
-                        )
-                    }
-
-                    goombaItems.forEachIndexed { index, item ->
-                        val enemy = goombas[index]
-                        item.isVisible = enemy.isActive
-                        if (enemy.isActive) {
-                            item.transform = Transform3D(
-                                position = enemy.position,
-                                rotation = Vec3(0.0, enemy.yaw + GOOMBA_MODEL_YAW_OFFSET, 0.0)
-                            )
-                            item.setPose(AnimationPose3D(timeSeconds = elapsedSeconds * 1.4 + enemy.angle))
-                        }
-                    }
-
-                    marioItem.transform = Transform3D(
-                        position = Vec3(player.x, player.y - PLAYER_HALF_HEIGHT, player.z),
-                        rotation = Vec3(0.0, playerYaw + MARIO_MODEL_YAW_OFFSET, 0.0)
+                    content.syncSceneNodes(
+                        player = player,
+                        playerYaw = playerYaw,
+                        marioPose = marioPose,
+                        elapsedSeconds = elapsedSeconds
                     )
-                    marioItem.setPose(marioPose)
                     scene.prepareForDraw()
 
                     render(0.47f, 0.67f, 0.94f, 1f, enableDepth = true) { frame ->
@@ -534,7 +416,7 @@ fun main() {
                             debugRenderer.wireCapsule(
                                 frame = frame,
                                 camera = camera,
-                                capsule = playerController.capsuleCollider(playerState, PLAYER_COLLISION_RADIUS),
+                                capsule = content.playerController.capsuleCollider(playerState, PLAYER_COLLISION_RADIUS),
                                 color = Color.fromHex("5dffcb")
                             )
                             val playerForward = forwardForYaw(playerYaw, 1.6)
@@ -559,57 +441,42 @@ fun main() {
                                 )
                             }
                             playerState.staticContacts.forEach { contact ->
-                                debugRenderer.wireSphere(
+                                debugRenderer.contactPoint(
                                     frame = frame,
                                     camera = camera,
-                                    center = contact.point,
-                                    radius = 0.11,
-                                    color = Color.fromHex("ff3b6d")
-                                )
-                                debugRenderer.line(
-                                    frame = frame,
-                                    camera = camera,
-                                    start = contact.point,
-                                    end = Vec3(
-                                        contact.point.x + contact.normal.x * 0.85,
-                                        contact.point.y + contact.normal.y * 0.85,
-                                        contact.point.z + contact.normal.z * 0.85
-                                    ),
+                                    point = contact.point,
+                                    normal = contact.normal,
                                     color = Color.fromHex("ff3b6d")
                                 )
                             }
-                            goombas.filter { it.isActive }.forEach { enemy ->
+                            content.goombas.filter { it.isActive }.forEach { enemy ->
                                 debugRenderer.wireSphere(
                                     frame = frame,
                                     camera = camera,
-                                    center = goombaCollider(enemy).center,
-                                    radius = GOOMBA_COLLISION_RADIUS,
+                                    sphere = goombaCollider(enemy),
                                     color = Color.fromHex("ff7a5c")
                                 )
                             }
-                            if (bowser.isActive) {
-                                val collider = bowserCollider(bowser)
+                            if (content.bowser.isActive) {
                                 debugRenderer.wireSphere(
                                     frame = frame,
                                     camera = camera,
-                                    center = collider.center,
-                                    radius = collider.radius,
+                                    sphere = bowserCollider(content.bowser),
                                     color = Color.fromHex("ff4058")
                                 )
                                 debugRenderer.wireSphere(
                                     frame = frame,
                                     camera = camera,
-                                    center = bowser.home,
+                                    center = content.bowser.home,
                                     radius = BOWSER_LEASH_RADIUS,
                                     color = Color.fromHex("35c9d0")
                                 )
                             }
-                            if (summitStar.isActive && !summitStar.isCollected) {
+                            if (content.summitStar.isActive && !content.summitStar.isCollected) {
                                 debugRenderer.wireSphere(
                                     frame = frame,
                                     camera = camera,
-                                    center = summitStarCollider(summitStar).center,
-                                    radius = STAR_PICKUP_RADIUS,
+                                    sphere = summitStarCollider(content.summitStar),
                                     color = Color.fromHex("f0c84b")
                                 )
                             }
@@ -624,6 +491,151 @@ fun main() {
             }
         }
     }
+}
+
+private data class MarioSceneContent(
+    val playerController: KinematicCharacterController3D,
+    val playerTerrainController: TerrainActorController3D,
+    val enemyController: TerrainActorController3D,
+    val marioAnimation: AnimationStateController3D<MarioAnimationState>,
+    val goombas: List<RoamingEnemy>,
+    val bowser: BossEnemy,
+    val summitStar: SummitStar,
+    val bowserNode: Node3D<SceneModel3D>,
+    val starNode: Node3D<SceneMesh3D>,
+    val goombaNodes: List<Node3D<AnimatedModelInstance3D>>,
+    val marioNode: Node3D<AnimatedModelInstance3D>
+)
+
+private fun createMarioSceneContent(
+    gpu: GpuContext,
+    resources: GpuResourceScope3D,
+    loadedAssets: LoadedModelAssetBundle3D,
+    scene: Scene3D
+): MarioSceneContent {
+    val terrain = loadedAssets.createTerrainCollider(MarioModelAssets.World)
+    val staticWorld = loadedAssets.createStaticCollider(MarioModelAssets.World)
+    val playerController = KinematicCharacterController3D(
+        terrain = terrain,
+        settings = KinematicCharacterControllerSettings3D(
+            halfHeight = PLAYER_HALF_HEIGHT,
+            collisionRadius = PLAYER_COLLISION_RADIUS,
+            maxStepUp = MAX_STEP_UP,
+            maxStepDown = PLAYER_MAX_STEP_DOWN,
+            groundContactEpsilon = GROUND_CONTACT_EPSILON,
+            jumpVelocity = PLAYER_JUMP_VELOCITY,
+            gravity = PLAYER_JUMP_GRAVITY,
+            fallingGravity = PLAYER_FALL_GRAVITY,
+            terminalVelocityY = PLAYER_TERMINAL_FALL_SPEED
+        ),
+        staticCollider = staticWorld
+    )
+    val playerTerrainController = playerController.terrainController
+    val enemyController = TerrainActorController3D(
+        terrain = terrain,
+        settings = TerrainActorControllerSettings3D(
+            halfHeight = 0.0,
+            maxStepUp = ENEMY_MAX_STEP_UP,
+            maxStepDown = ENEMY_MAX_STEP_DOWN,
+            groundContactEpsilon = GROUND_CONTACT_EPSILON
+        )
+    )
+    val marioAnimation = AnimationStateController3D(
+        clipMap = marioAnimationClips(loadedAssets.animatedModel(MarioModelAssets.Mario).clips),
+        initialState = MarioAnimationState.IDLE
+    )
+    val starMesh = resources.track(
+        GpuMesh.sphere(
+            gpu = gpu,
+            radius = 0.42,
+            color = Color.fromHex("ffd447"),
+            rings = 10,
+            segments = 16
+        )
+    ) { it.cleanup() }
+    val goombas = createGoombas(enemyController)
+    val bowser = createBowser(findHighestGroundRegionCenter(terrain))
+    val summitStar = createSummitStar(bowser.home)
+
+    scene.addModelAssetNode(loadedAssets, MarioModelAssets.World)
+    val bowserNode = scene.addModelAssetNode(loadedAssets, MarioModelAssets.Bowser, isVisible = false)
+    val starNode = scene.addMeshNode(starMesh, isVisible = false)
+    val goombaNodes = goombas.map {
+        scene.addAnimatedModelAssetNode(loadedAssets, MarioModelAssets.Goomba, isVisible = false)
+    }
+    val marioNode = scene.addAnimatedModelAssetNode(loadedAssets, MarioModelAssets.Mario)
+
+    return MarioSceneContent(
+        playerController = playerController,
+        playerTerrainController = playerTerrainController,
+        enemyController = enemyController,
+        marioAnimation = marioAnimation,
+        goombas = goombas,
+        bowser = bowser,
+        summitStar = summitStar,
+        bowserNode = bowserNode,
+        starNode = starNode,
+        goombaNodes = goombaNodes,
+        marioNode = marioNode
+    )
+}
+
+private fun MarioSceneContent.syncSceneNodes(
+    player: Vec3,
+    playerYaw: Double,
+    marioPose: AnimationPose3D,
+    elapsedSeconds: Double
+) {
+    bowserNode.setVisible(bowser.isActive)
+    if (bowser.isActive) {
+        val hitPulse = if (elapsedSeconds < bowser.hitFlashUntil) {
+            1.0 + abs(sin(elapsedSeconds * 52.0)) * 0.12
+        } else {
+            1.0
+        }
+        bowserNode.setPositionYaw(
+            position = bowser.position,
+            yawRadians = bowser.yaw,
+            yOffset = 0.18 + sin(elapsedSeconds * 1.1) * 0.1,
+            yawOffsetRadians = BOWSER_MODEL_YAW_OFFSET,
+            scale = Vec3(hitPulse, hitPulse, hitPulse)
+        )
+    }
+
+    starNode.setVisible(summitStar.isActive && !summitStar.isCollected)
+    if (starNode.isVisible) {
+        starNode.setTransform(
+            Transform3D(
+                position = Vec3(
+                    summitStar.position.x,
+                    summitStar.position.y + sin(elapsedSeconds * 3.1) * 0.16,
+                    summitStar.position.z
+                ),
+                rotation = Vec3(0.0, elapsedSeconds * 2.8, elapsedSeconds * 1.5)
+            )
+        )
+    }
+
+    goombaNodes.forEachIndexed { index, node ->
+        val enemy = goombas[index]
+        node.setVisible(enemy.isActive)
+        if (enemy.isActive) {
+            node.setPositionYaw(
+                position = enemy.position,
+                yawRadians = enemy.yaw,
+                yawOffsetRadians = GOOMBA_MODEL_YAW_OFFSET
+            ).setPose(AnimationPose3D(timeSeconds = elapsedSeconds * 1.4 + enemy.angle))
+        }
+    }
+
+    marioNode
+        .setPositionYaw(
+            position = player,
+            yawRadians = playerYaw,
+            yOffset = -PLAYER_HALF_HEIGHT,
+            yawOffsetRadians = MARIO_MODEL_YAW_OFFSET
+        )
+        .setPose(marioPose)
 }
 
 private data class RoamingEnemy(
@@ -1148,75 +1160,4 @@ private fun findHighestGroundRegionCenter(terrain: TerrainMeshCollider3D): Vec3 
         z = centerZ,
         fallbackY = highestY
     )
-}
-
-private fun snapInput(
-    value: Double,
-    epsilon: Double = MOVEMENT_INPUT_EPSILON
-): Double {
-    val clamped = value.coerceIn(-1.0, 1.0)
-    return if (abs(clamped) < epsilon) 0.0 else clamped
-}
-
-private fun axis(positivePressed: Boolean, negativePressed: Boolean): Double {
-    return when {
-        positivePressed && !negativePressed -> 1.0
-        negativePressed && !positivePressed -> -1.0
-        else -> 0.0
-    }
-}
-
-private fun controllerAxisValue(
-    controller: ControllerInputEventSubscriber,
-    controllerId: UInt?,
-    neutral: FloatArray?,
-    axisIndex: Int,
-    isCalibrating: Boolean
-): Float {
-    if (isCalibrating) {
-        return 0f
-    }
-
-    val rawValue = controllerId?.let { controller.getAxisValue(it, axisIndex) } ?: 0f
-    if (abs(rawValue) < CONTROLLER_RAW_RELEASE_DEADZONE) {
-        return 0f
-    }
-
-    val neutralValue = neutral?.getOrNull(axisIndex) ?: 0f
-    val adjustedValue = (rawValue - neutralValue).coerceIn(-1f, 1f)
-    return if (abs(adjustedValue) < CONTROLLER_RAW_RELEASE_DEADZONE) 0f else adjustedValue
-}
-
-private fun captureControllerNeutral(
-    controller: ControllerInputEventSubscriber,
-    controllerId: UInt
-): FloatArray {
-    return FloatArray(CONTROLLER_AXIS_COUNT) { axisIndex ->
-        controller.getAxisValue(controllerId, axisIndex)
-    }
-}
-
-private fun normalizedControllerAxis(value: Float): Double {
-    val raw = value.toDouble().coerceIn(-1.0, 1.0)
-    val magnitude = abs(raw)
-    if (magnitude < CONTROLLER_DEADZONE) {
-        return 0.0
-    }
-
-    val normalized = ((magnitude - CONTROLLER_DEADZONE) / (1.0 - CONTROLLER_DEADZONE)).coerceIn(0.0, 1.0)
-    return if (raw < 0.0) -normalized else normalized
-}
-
-private fun resolveMarioAsset(relativePath: String): String {
-    val builtAssetPath = File.resolveAssetPath("assets/$relativePath")
-    if (File.isExist(builtAssetPath)) {
-        return builtAssetPath
-    }
-
-    val sourceAssetPath = File.resolveAssetPath("games/mario-3d/assets/$relativePath")
-    if (File.isExist(sourceAssetPath)) {
-        return sourceAssetPath
-    }
-
-    return builtAssetPath
 }

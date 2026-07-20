@@ -1,0 +1,39 @@
+#include <metal_stdlib>
+using namespace metal;
+
+struct LightUniforms
+{
+    float4 directionAndAmbient;
+    float4 colorAndDiffuseStrength;
+};
+
+struct FragmentIn
+{
+    float3 normal [[user(locn0)]];
+    float3 color [[user(locn1)]];
+    float2 uv [[user(locn2)]];
+};
+
+struct FragmentOut
+{
+    float4 color [[color(0)]];
+};
+
+fragment FragmentOut main0(
+    FragmentIn in [[stage_in]],
+    constant LightUniforms& lightUniforms [[buffer(0)]],
+    texture2d<float> baseTexture [[texture(0)]],
+    sampler baseSampler [[sampler(0)]])
+{
+    FragmentOut out;
+    float3 normal = normalize(in.normal);
+    float3 lightDirection = normalize(lightUniforms.directionAndAmbient.xyz);
+    float diffuse = max(dot(normal, -lightDirection), 0.0);
+    float ambient = lightUniforms.directionAndAmbient.w;
+    float3 lightColor = lightUniforms.colorAndDiffuseStrength.xyz;
+    float diffuseStrength = lightUniforms.colorAndDiffuseStrength.w;
+    float3 textureColor = baseTexture.sample(baseSampler, in.uv).rgb;
+    float3 color = in.color * textureColor * lightColor * (ambient + diffuse * diffuseStrength);
+    out.color = float4(min(color, float3(1.0)), 1.0);
+    return out;
+}

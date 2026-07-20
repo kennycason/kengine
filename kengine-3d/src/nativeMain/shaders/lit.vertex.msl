@@ -1,0 +1,32 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+using namespace metal;
+
+struct Uniforms
+{
+    float4x4 modelViewProjection;
+    float4x4 model;
+};
+
+struct VertexIn
+{
+    float3 position [[attribute(0)]];
+    float3 normal [[attribute(1)]];
+    float3 color [[attribute(2)]];
+};
+
+struct VertexOut
+{
+    float3 normal [[user(locn0)]];
+    float3 color [[user(locn1)]];
+    float4 position [[position]];
+};
+
+vertex VertexOut main0(VertexIn in [[stage_in]], constant Uniforms& uniforms [[buffer(0)]])
+{
+    VertexOut out;
+    out.normal = normalize((uniforms.model * float4(in.normal, 0.0)).xyz);
+    out.color = in.color;
+    out.position = uniforms.modelViewProjection * float4(in.position, 1.0);
+    return out;
+}
