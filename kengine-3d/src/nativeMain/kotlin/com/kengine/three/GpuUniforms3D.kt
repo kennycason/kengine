@@ -77,3 +77,15 @@ internal fun directionalLightUniforms3D(light: DirectionalLight3D): FloatArray {
         light.diffuseStrength
     )
 }
+
+internal fun texturedDirectionalLightUniforms3D(
+    light: DirectionalLight3D,
+    useNormalTexture: Boolean = false
+): FloatArray {
+    return directionalLightUniforms3D(light) + floatArrayOf(
+        if (useNormalTexture) 1f else 0f,
+        0f,
+        0f,
+        0f
+    )
+}

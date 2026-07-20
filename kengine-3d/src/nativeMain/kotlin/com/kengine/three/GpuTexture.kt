@@ -80,8 +80,13 @@ class GpuTexture private constructor(
             samplerDescriptor: GpuSamplerDescriptor3D
         ): GpuTexture {
             val resolvedPath = File.resolveAssetPath(assetPath)
+            if (!File.isExist(resolvedPath)) {
+                throw IllegalArgumentException("GPU texture image was not found: $resolvedPath")
+            }
             val surface = IMG_Load(resolvedPath)
-                ?: throw IllegalStateException("Error loading image for GPU texture: ${SDL_GetError()?.toKString()}")
+                ?: throw IllegalStateException(
+                    "Error loading image for GPU texture $resolvedPath: ${SDL_GetError()?.toKString()}"
+                )
 
             return fromSurface(gpu, surface, assetPath, samplerDescriptor)
         }

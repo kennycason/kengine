@@ -52,6 +52,6 @@ Supported model formats are `.glb`, `.gltf`, and `.obj`.
 
 ## Next
 
-- Add material and texture diagnostics to the inspector.
 - Add camera preset/save controls.
+- Add a one-click "show in importer" handoff for source formats once `kengine-3d-importer` has converter adapters.
 - Add drag-and-drop model loading once Kengine has a small native drop-target story.

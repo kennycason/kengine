@@ -37,6 +37,7 @@ data class GlbModelInfo(
     val materialCount: Int,
     val textureCount: Int,
     val imageCount: Int,
+    val textureSlotUsage: MaterialTextureSlotUsage3D,
     val hasTexturedMaterials: Boolean,
     val animations: List<GlbAnimationClipInfo> = emptyList(),
     val skins: List<GlbSkinInfo> = emptyList(),
@@ -174,7 +175,16 @@ class GlbTexturedLitModel(
         light: DirectionalLight3D = DirectionalLight3D()
     ) {
         parts.forEach { part ->
-            renderer.draw(frame, part.mesh, part.texture, transform, camera, light)
+            renderer.draw(
+                frame = frame,
+                mesh = part.mesh,
+                texture = part.texture,
+                transform = transform,
+                camera = camera,
+                light = light,
+                normalTexture = part.normalTexture,
+                useNormalTexture = part.material.hasAuthoredNormalTexture
+            )
         }
     }
 
@@ -194,6 +204,8 @@ data class GlbTexturedLitMeshPart(
 ) : GpuResource3D {
     val texture: GpuTexture
         get() = material.texture ?: throw IllegalStateException("GLB textured lit mesh part requires a material texture.")
+    val normalTexture: GpuTexture
+        get() = material.normalTexture ?: throw IllegalStateException("GLB textured lit mesh part requires a material normal texture.")
 
     override fun cleanup() {
         mesh.cleanup()
@@ -257,6 +269,8 @@ class GlbSkinnedTexturedLitModel internal constructor(
                     skinIndex = part.skinIndex,
                     mesh = TexturedLitGpuMesh.create(gpu, part.restVertices),
                     texture = part.texture,
+                    normalTexture = part.normalTexture,
+                    useNormalTexture = part.material.hasAuthoredNormalTexture,
                     sourceVertices = part.sourceVertices
                 )
             }
@@ -290,7 +304,9 @@ class GlbSkinnedTexturedLitModel internal constructor(
                 instanceParts += GlbGpuSkinnedTexturedLitModelInstancePart(
                     skinIndex = part.skinIndex,
                     mesh = SkinnedTexturedLitGpuMesh.create(gpu, part.skinnedVertices),
-                    texture = part.texture
+                    texture = part.texture,
+                    normalTexture = part.normalTexture,
+                    useNormalTexture = part.material.hasAuthoredNormalTexture
                 )
             }
         } catch (e: Throwable) {
@@ -340,6 +356,8 @@ internal data class GlbSkinnedTexturedLitMeshPart(
 ) : GpuResource3D {
     val texture: GpuTexture
         get() = material.texture ?: throw IllegalStateException("GLB skinned textured lit mesh part requires a material texture.")
+    val normalTexture: GpuTexture
+        get() = material.normalTexture ?: throw IllegalStateException("GLB skinned textured lit mesh part requires a material normal texture.")
 
     override fun cleanup() {
         material.cleanup()
@@ -409,7 +427,9 @@ class GlbGpuSkinnedTexturedLitModelInstance internal constructor(
                 modelMatrix = modelMatrix,
                 camera = camera,
                 skinMatrices = skinMatricesBySkin.getOrElse(part.skinIndex) { listOf(Mat4.identity()) },
-                light = light
+                light = light,
+                normalTexture = part.normalTexture,
+                useNormalTexture = part.useNormalTexture
             )
         }
     }
@@ -427,7 +447,9 @@ class GlbGpuSkinnedTexturedLitModelInstance internal constructor(
 internal data class GlbGpuSkinnedTexturedLitModelInstancePart(
     val skinIndex: Int,
     val mesh: SkinnedTexturedLitGpuMesh,
-    val texture: GpuTexture
+    val texture: GpuTexture,
+    val normalTexture: GpuTexture,
+    val useNormalTexture: Boolean
 ) {
     fun cleanup() {
         mesh.cleanup()
@@ -479,7 +501,16 @@ class GlbSkinnedTexturedLitModelInstance internal constructor(
 
         val modelMatrix = transform.matrix() * normalizationMatrix
         parts.forEach { part ->
-            renderer.draw(frame, part.mesh, part.texture, modelMatrix, camera, light)
+            renderer.draw(
+                frame = frame,
+                mesh = part.mesh,
+                texture = part.texture,
+                modelMatrix = modelMatrix,
+                camera = camera,
+                light = light,
+                normalTexture = part.normalTexture,
+                useNormalTexture = part.useNormalTexture
+            )
         }
     }
 
@@ -498,6 +529,8 @@ internal data class GlbSkinnedTexturedLitModelInstancePart(
     val skinIndex: Int,
     val mesh: TexturedLitGpuMesh,
     val texture: GpuTexture,
+    val normalTexture: GpuTexture,
+    val useNormalTexture: Boolean,
     val sourceVertices: List<SkinnedTexturedLitVertexSource3D>
 ) {
     fun cleanup() {
@@ -600,7 +633,7 @@ object GlbMeshLoader {
         val materialInfos = parseMaterialInfos(parsed.document, options.defaultColor)
         val textureInfos = parseTextures(parsed.document)
         val imageInfos = parseImages(parsed.document)
-        val verticesByTexture = linkedMapOf<Int, MutableList<TexturedLitVertex3D>>()
+        val verticesByMaterial = linkedMapOf<GlbMaterialPartKey, MutableList<TexturedLitVertex3D>>()
 
         fun visitNode(
             nodeIndex: Int,
@@ -618,30 +651,35 @@ object GlbMeshLoader {
                     bufferViews = parsed.bufferViews,
                     binary = parsed.binary,
                     materialInfos = materialInfos,
-                    verticesByTexture = verticesByTexture
+                    verticesByMaterial = verticesByMaterial
                 )
             }
             node.children.forEach { childIndex -> visitNode(childIndex, transform) }
         }
 
         parsed.sceneNodeIndices.forEach { nodeIndex -> visitNode(nodeIndex, ModelMatrix3D.identity()) }
-        require(verticesByTexture.values.any { it.isNotEmpty() }) {
+        require(verticesByMaterial.values.any { it.isNotEmpty() }) {
             "GLB file contains no supported textured triangle mesh vertices: ${parsed.filePath}"
         }
 
-        val normalizedParts = normalizeTexturedVertices(verticesByTexture, options)
-        val parts = normalizedParts.map { (textureIndex, vertices) ->
+        val normalizedParts = normalizeTexturedVertices(verticesByMaterial, options)
+        val parts = normalizedParts.map { (materialKey, vertices) ->
+            val materialInfo = materialKey.materialIndex?.let { materialInfos.getOrNull(it) }
             ModelPartSource3D.TexturedLit(
                 vertices = vertices,
                 materialDescriptor = createMaterialDescriptorForPart(
-                    textureIndex = textureIndex,
+                    materialInfo = materialInfo,
                     assetPath = assetPath,
                     textureInfos = textureInfos,
                     imageInfos = imageInfos,
                     bufferViews = parsed.bufferViews,
                     binary = parsed.binary,
-                    baseColor = Color.fromHex("ffffff"),
-                    name = null
+                    fallbackBaseColor = Color.fromHex("ffffff"),
+                    fallbackName = if (materialKey.baseColorTextureIndex == NO_TEXTURE_KEY) {
+                        "glb-material:no-texture"
+                    } else {
+                        "glb-texture-${materialKey.baseColorTextureIndex}"
+                    }
                 )
             )
         }
@@ -716,7 +754,6 @@ object GlbMeshLoader {
                 }
 
                 val materialInfo = materialInfos.getOrNull(primitive.materialIndex ?: -1)
-                val textureIndex = materialInfo?.textureIndex ?: NO_TEXTURE_KEY
                 val primitiveContext = skinnedPrimitiveContext(
                     parsed = parsed,
                     nodeIndex = nodeIndex,
@@ -745,14 +782,14 @@ object GlbMeshLoader {
                     nodeIndex = nodeIndex,
                     skinIndex = skinIndex,
                     materialDescriptor = createMaterialDescriptorForPart(
-                        textureIndex = textureIndex,
+                        materialInfo = materialInfo,
                         assetPath = assetPath,
                         textureInfos = textureInfos,
                         imageInfos = imageInfos,
                         bufferViews = parsed.bufferViews,
                         binary = parsed.binary,
-                        baseColor = materialInfo?.color ?: primitiveColor(primitive.materialIndex ?: 0),
-                        name = materialInfo?.name
+                        fallbackBaseColor = primitiveColor(primitive.materialIndex ?: 0),
+                        fallbackName = null
                     ),
                     restVertices = initialVertices,
                     skinnedVertices = sourceVertices.map { vertex -> vertex.toSkinnedTexturedLitVertex() },
@@ -988,7 +1025,8 @@ object GlbMeshLoader {
             materialCount = materialInfos.size,
             textureCount = parsed.document.optionalArray("textures")?.size ?: 0,
             imageCount = parsed.document.optionalArray("images")?.size ?: 0,
-            hasTexturedMaterials = materialInfos.any { it.textureIndex != null },
+            textureSlotUsage = materialTextureSlotUsage3D(materialInfos),
+            hasTexturedMaterials = materialInfos.any { it.textureSlots.baseColor != null },
             animations = animations,
             skins = skins,
             skinningSupport = skinningSupport
@@ -1005,7 +1043,10 @@ object GlbMeshLoader {
     }
 
     private fun parseBinaryGlb(filePath: String): ParsedGlb {
-        val bytes = readBinaryFile(filePath)
+        val bytes = readBinaryFile(
+            filePath = filePath,
+            description = "GLB model file"
+        )
         require(readIntLE(bytes, 0) == GLB_MAGIC) {
             "GLB file has an invalid magic header: $filePath"
         }
@@ -1054,7 +1095,12 @@ object GlbMeshLoader {
     }
 
     private fun parseJsonGltf(filePath: String): ParsedGlb {
-        val document = Json.parseToJsonElement(readTextFile(filePath)).jsonObject
+        val document = Json.parseToJsonElement(
+            readTextFile(
+                filePath = filePath,
+                description = "GLTF model file"
+            )
+        ).jsonObject
         val binary = readGltfPrimaryBuffer(document, filePath)
         val bufferViews = parseBufferViews(document, binary.size, filePath)
         val accessors = parseAccessors(document)
@@ -1088,8 +1134,17 @@ object GlbMeshLoader {
         val uri = buffer.optionalString("uri")
             ?: throw IllegalArgumentException("External GLTF buffer is missing uri: $filePath")
         requireSupportedFileUri(uri, "buffer", filePath)
-        val bufferPath = resolveSiblingPath(filePath, uri)
-        val bytes = readBinaryFile(bufferPath)
+        val bufferPath = ModelResourcePath3D.resolveSiblingPath(
+            filePath = filePath,
+            path = uri,
+            decodeUriPath = true,
+            stripFragment = true
+        )
+        val bytes = readBinaryFile(
+            filePath = bufferPath,
+            description = "GLTF buffer '$uri'",
+            referencedBy = filePath
+        )
         val declaredByteLength = buffer.requiredInt("byteLength")
         require(bytes.size >= declaredByteLength) {
             "GLTF buffer '$uri' is shorter than declared byteLength $declaredByteLength: $filePath"
@@ -1146,7 +1201,7 @@ object GlbMeshLoader {
         bufferViews: List<GlbBufferView>,
         binary: ByteArray,
         materialInfos: List<GlbMaterialInfo>,
-        verticesByTexture: MutableMap<Int, MutableList<TexturedLitVertex3D>>
+        verticesByMaterial: MutableMap<GlbMaterialPartKey, MutableList<TexturedLitVertex3D>>
     ) {
         mesh.primitives.forEach { primitive ->
             if (primitive.mode != TRIANGLES_MODE) {
@@ -1165,9 +1220,12 @@ object GlbMeshLoader {
             } ?: positions.indices.toList()
             val material = materialInfos.getOrNull(primitive.materialIndex ?: -1)
             val color = material?.color ?: primitiveColor(primitive.materialIndex ?: 0)
-            val textureIndex = material?.textureIndex ?: NO_TEXTURE_KEY
             val uvTransform = material?.uvTransform ?: GlbUvTransform.IDENTITY
-            val destination = verticesByTexture.getOrPut(textureIndex) { mutableListOf() }
+            val materialKey = GlbMaterialPartKey(
+                materialIndex = primitive.materialIndex,
+                baseColorTextureIndex = material?.textureSlots?.baseColor ?: NO_TEXTURE_KEY
+            )
+            val destination = verticesByMaterial.getOrPut(materialKey) { mutableListOf() }
 
             for (index in 0 until indices.size - 2 step 3) {
                 val ia = indices[index]
@@ -1362,14 +1420,14 @@ object GlbMeshLoader {
     }
 
     private fun normalizeTexturedVertices(
-        verticesByTexture: Map<Int, List<TexturedLitVertex3D>>,
+        verticesByMaterial: Map<GlbMaterialPartKey, List<TexturedLitVertex3D>>,
         options: GlbMeshLoadOptions
-    ): Map<Int, List<TexturedLitVertex3D>> {
+    ): Map<GlbMaterialPartKey, List<TexturedLitVertex3D>> {
         if (!options.normalize) {
-            return verticesByTexture
+            return verticesByMaterial
         }
 
-        val allVertices = verticesByTexture.values.flatten()
+        val allVertices = verticesByMaterial.values.flatten()
         val bounds = GlbBounds.fromTexturedVertices(allVertices)
         val maxSpan = maxOf(bounds.width, bounds.height, bounds.depth)
         val scale = if (maxSpan > 0.0) options.targetSize / maxSpan else 1.0
@@ -1377,7 +1435,7 @@ object GlbMeshLoader {
         val centerY = if (options.placeOnGround) bounds.min.y else (bounds.min.y + bounds.max.y) * 0.5
         val centerZ = (bounds.min.z + bounds.max.z) * 0.5
 
-        return verticesByTexture.mapValues { (_, vertices) ->
+        return verticesByMaterial.mapValues { (_, vertices) ->
             vertices.map { vertex ->
                 vertex.copy(
                     position = Vec3(
@@ -1391,30 +1449,72 @@ object GlbMeshLoader {
     }
 
     private fun createMaterialDescriptorForPart(
-        textureIndex: Int,
+        materialInfo: GlbMaterialInfo?,
         assetPath: String,
         textureInfos: List<GlbTextureInfo>,
         imageInfos: List<GlbImageInfo>,
         bufferViews: List<GlbBufferView>,
         binary: ByteArray,
-        baseColor: Color,
-        name: String?
+        fallbackBaseColor: Color,
+        fallbackName: String?
     ): MaterialDescriptor3D {
+        val textureSlots = materialInfo?.textureSlots ?: GlbMaterialTextureSlots()
+        val baseColorTextureIndex = textureSlots.baseColor ?: NO_TEXTURE_KEY
         return MaterialDescriptor3D.textured(
             textureAsset = createTextureAssetForPart(
-                textureIndex = textureIndex,
+                textureIndex = baseColorTextureIndex,
                 assetPath = assetPath,
                 textureInfos = textureInfos,
                 imageInfos = imageInfos,
                 bufferViews = bufferViews,
                 binary = binary
             ),
-            color = baseColor,
-            name = name ?: if (textureIndex == NO_TEXTURE_KEY) {
+            color = materialInfo?.color ?: fallbackBaseColor,
+            name = materialInfo?.name ?: fallbackName ?: if (baseColorTextureIndex == NO_TEXTURE_KEY) {
                 "glb-material:no-texture"
             } else {
-                "glb-texture-$textureIndex"
+                "glb-texture-$baseColorTextureIndex"
+            },
+            textures = createMaterialTextureSetForPart(
+                textureSlots = textureSlots,
+                assetPath = assetPath,
+                textureInfos = textureInfos,
+                imageInfos = imageInfos,
+                bufferViews = bufferViews,
+                binary = binary
+            )
+        )
+    }
+
+    private fun createMaterialTextureSetForPart(
+        textureSlots: GlbMaterialTextureSlots,
+        assetPath: String,
+        textureInfos: List<GlbTextureInfo>,
+        imageInfos: List<GlbImageInfo>,
+        bufferViews: List<GlbBufferView>,
+        binary: ByteArray
+    ): MaterialTextureSet3D {
+        fun textureAsset(textureIndex: Int?): GpuTextureAsset3D? {
+            if (textureIndex == null) {
+                return null
             }
+            return createTextureAssetForPart(
+                textureIndex = textureIndex,
+                assetPath = assetPath,
+                textureInfos = textureInfos,
+                imageInfos = imageInfos,
+                bufferViews = bufferViews,
+                binary = binary
+            )
+        }
+
+        return MaterialTextureSet3D(
+            baseColor = textureAsset(textureSlots.baseColor),
+            normal = textureAsset(textureSlots.normal),
+            metallicRoughness = textureAsset(textureSlots.metallicRoughness),
+            specular = textureAsset(textureSlots.specular),
+            emissive = textureAsset(textureSlots.emissive),
+            ambient = textureAsset(textureSlots.occlusion)
         )
     }
 
@@ -1440,8 +1540,18 @@ object GlbMeshLoader {
             ?: throw IllegalArgumentException("GLB texture $textureIndex references missing image $imageIndex: $assetPath")
         imageInfo.uri?.let { uri ->
             requireSupportedFileUri(uri, "image", assetPath)
+            val imagePath = ModelResourcePath3D.requireExistingFile(
+                path = ModelResourcePath3D.resolveSiblingPath(
+                    filePath = File.resolveAssetPath(assetPath),
+                    path = uri,
+                    decodeUriPath = true,
+                    stripFragment = true
+                ),
+                description = "GLTF image '$uri'",
+                referencedBy = assetPath
+            )
             return GpuTextureAsset3D.file(
-                assetPath = resolveSiblingPath(File.resolveAssetPath(assetPath), uri),
+                assetPath = imagePath,
                 samplerDescriptor = textureInfo.samplerDescriptor
             )
         }
@@ -1570,11 +1680,26 @@ object GlbMeshLoader {
                 primitiveColor(index, defaultColor)
             }
             val baseColorTexture = pbr?.optionalObject("baseColorTexture")
+            val materialExtensions = material.optionalObject("extensions")
+            val specularExtension = materialExtensions?.optionalObject("KHR_materials_specular")
+            val specularGlossinessExtension = materialExtensions?.optionalObject("KHR_materials_pbrSpecularGlossiness")
+            val fallbackDiffuseTexture = specularGlossinessExtension?.optionalObject("diffuseTexture")
+            val baseColorTextureInfo = baseColorTexture ?: fallbackDiffuseTexture
+            val specularTexture = specularExtension?.optionalObject("specularColorTexture")
+                ?: specularExtension?.optionalObject("specularTexture")
+                ?: specularGlossinessExtension?.optionalObject("specularGlossinessTexture")
             GlbMaterialInfo(
                 name = material.optionalString("name"),
                 color = color,
-                textureIndex = baseColorTexture?.optionalInt("index"),
-                uvTransform = parseUvTransform(baseColorTexture)
+                textureSlots = GlbMaterialTextureSlots(
+                    baseColor = baseColorTextureInfo?.optionalInt("index"),
+                    normal = material.optionalObject("normalTexture")?.optionalInt("index"),
+                    metallicRoughness = pbr?.optionalObject("metallicRoughnessTexture")?.optionalInt("index"),
+                    specular = specularTexture?.optionalInt("index"),
+                    emissive = material.optionalObject("emissiveTexture")?.optionalInt("index"),
+                    occlusion = material.optionalObject("occlusionTexture")?.optionalInt("index")
+                ),
+                uvTransform = parseUvTransform(baseColorTextureInfo)
             )
         }.orEmpty()
     }
@@ -1589,6 +1714,33 @@ object GlbMeshLoader {
                 samplerDescriptor = sampler ?: GpuSamplerDescriptor3D.NEAREST_REPEAT
             )
         }.orEmpty()
+    }
+
+    private fun materialTextureSlotUsage3D(materialInfos: List<GlbMaterialInfo>): MaterialTextureSlotUsage3D {
+        var baseColor = 0
+        var normal = 0
+        var metallicRoughness = 0
+        var specular = 0
+        var emissive = 0
+        var ambient = 0
+
+        materialInfos.forEach { material ->
+            if (material.textureSlots.baseColor != null) baseColor += 1
+            if (material.textureSlots.normal != null) normal += 1
+            if (material.textureSlots.metallicRoughness != null) metallicRoughness += 1
+            if (material.textureSlots.specular != null) specular += 1
+            if (material.textureSlots.emissive != null) emissive += 1
+            if (material.textureSlots.occlusion != null) ambient += 1
+        }
+
+        return MaterialTextureSlotUsage3D(
+            baseColor = baseColor,
+            normal = normal,
+            metallicRoughness = metallicRoughness,
+            specular = specular,
+            emissive = emissive,
+            ambient = ambient
+        )
     }
 
     private fun parseTextureSamplers(document: JsonObject): List<GpuSamplerDescriptor3D> {
@@ -2298,52 +2450,17 @@ object GlbMeshLoader {
         }
     }
 
-    private fun resolveSiblingPath(
-        filePath: String,
-        uri: String
-    ): String {
-        val decodedUri = decodeUriPath(uri.substringBefore('#'))
-        if (decodedUri.startsWith("/") ||
-            (decodedUri.length > 2 && decodedUri[1] == ':' && (decodedUri[2] == '\\' || decodedUri[2] == '/'))
-        ) {
-            return decodedUri
-        }
-
-        val parent = parentDirectory(filePath)
-        if (parent.endsWith("/") || parent.endsWith("\\")) {
-            return parent + decodedUri
-        }
-        return "$parent/$decodedUri"
-    }
-
-    private fun decodeUriPath(uri: String): String {
-        val result = StringBuilder()
-        var index = 0
-        while (index < uri.length) {
-            val char = uri[index]
-            if (char == '%' && index + 2 < uri.length) {
-                val value = uri.substring(index + 1, index + 3).toIntOrNull(16)
-                if (value != null) {
-                    result.append(value.toChar())
-                    index += 3
-                    continue
-                }
-            }
-            result.append(char)
-            index += 1
-        }
-        return result.toString()
-    }
-
-    private fun parentDirectory(path: String): String {
-        val index = maxOf(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-        return if (index >= 0) path.substring(0, index) else "."
-    }
-
     @OptIn(ExperimentalForeignApi::class)
-    private fun readTextFile(filePath: String): String {
+    private fun readTextFile(
+        filePath: String,
+        description: String,
+        referencedBy: String? = null
+    ): String {
+        ModelResourcePath3D.requireExistingFile(filePath, description, referencedBy)
         val file = fopen(filePath, "r")
-            ?: throw IllegalArgumentException("Cannot open text file: $filePath. Please ensure the file exists.")
+            ?: throw IllegalArgumentException(
+                ModelResourcePath3D.cannotOpenFileMessage(filePath, description, referencedBy)
+            )
         val buffer = ByteArray(8192)
         val content = StringBuilder()
         try {
@@ -2361,9 +2478,16 @@ object GlbMeshLoader {
     }
 
     @OptIn(ExperimentalForeignApi::class)
-    private fun readBinaryFile(filePath: String): ByteArray {
+    private fun readBinaryFile(
+        filePath: String,
+        description: String,
+        referencedBy: String? = null
+    ): ByteArray {
+        ModelResourcePath3D.requireExistingFile(filePath, description, referencedBy)
         val file = fopen(filePath, "rb")
-            ?: throw IllegalArgumentException("Cannot open binary file: $filePath. Please ensure the file exists.")
+            ?: throw IllegalArgumentException(
+                ModelResourcePath3D.cannotOpenFileMessage(filePath, description, referencedBy)
+            )
         val chunks = mutableListOf<ByteArray>()
         val buffer = ByteArray(8192)
         var totalBytes = 0
@@ -2440,8 +2564,22 @@ private data class GlbAnimationSampler(
 private data class GlbMaterialInfo(
     val name: String?,
     val color: Color,
-    val textureIndex: Int?,
+    val textureSlots: GlbMaterialTextureSlots,
     val uvTransform: GlbUvTransform
+)
+
+private data class GlbMaterialTextureSlots(
+    val baseColor: Int? = null,
+    val normal: Int? = null,
+    val metallicRoughness: Int? = null,
+    val specular: Int? = null,
+    val emissive: Int? = null,
+    val occlusion: Int? = null
+)
+
+private data class GlbMaterialPartKey(
+    val materialIndex: Int?,
+    val baseColorTextureIndex: Int
 )
 
 private data class GlbTextureInfo(

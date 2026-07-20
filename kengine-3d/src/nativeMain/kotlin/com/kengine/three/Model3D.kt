@@ -46,6 +46,7 @@ data class ModelInfo3D(
     val materialCount: Int = 0,
     val textureCount: Int = 0,
     val imageCount: Int = 0,
+    val textureSlotUsage: MaterialTextureSlotUsage3D = MaterialTextureSlotUsage3D(),
     val skinCount: Int = 0,
     val animationCount: Int = 0,
     val hasTexturedMaterials: Boolean = false,
@@ -230,13 +231,20 @@ data class Material3D(
     val name: String? = null,
     val baseColor: Color = Color.fromHex("ffffff"),
     val texture: GpuTexture? = null,
-    val textureOwnership: GpuResourceOwnership3D = GpuResourceOwnership3D.OWNED
+    val textureOwnership: GpuResourceOwnership3D = GpuResourceOwnership3D.OWNED,
+    val normalTexture: GpuTexture? = null,
+    val normalTextureOwnership: GpuResourceOwnership3D = GpuResourceOwnership3D.OWNED,
+    val hasAuthoredNormalTexture: Boolean = false
 ) : GpuResource3D {
     val hasTexture: Boolean
         get() = texture != null
 
+    val hasNormalTexture: Boolean
+        get() = normalTexture != null
+
     override fun cleanup() {
         textureOwnership.cleanupIfOwned(texture) { it.cleanup() }
+        normalTextureOwnership.cleanupIfOwned(normalTexture) { it.cleanup() }
     }
 
     companion object {
@@ -376,7 +384,18 @@ class ModelPart3D private constructor(
             texturedLitMesh != null -> {
                 val texture = material.texture
                     ?: throw IllegalStateException("Textured model parts require a material texture.")
-                renderer.texturedLitRenderer.draw(frame, texturedLitMesh, texture, transform, camera, light)
+                val normalTexture = material.normalTexture
+                    ?: throw IllegalStateException("Textured model parts require a material normal texture.")
+                renderer.texturedLitRenderer.draw(
+                    frame = frame,
+                    mesh = texturedLitMesh,
+                    texture = texture,
+                    normalTexture = normalTexture,
+                    useNormalTexture = material.hasAuthoredNormalTexture,
+                    transform = transform,
+                    camera = camera,
+                    light = light
+                )
             }
 
             litMesh != null -> renderer.litRenderer.draw(frame, litMesh, transform, camera, light)
@@ -510,7 +529,7 @@ object ModelLoader3D {
         options: ModelLoadOptions3D,
         format: ModelFormat3D
     ): ParsedModel3D {
-        val vertices = ObjMeshLoader.loadLitVertices(assetPath, options.toObjOptions())
+        val source = ObjMeshLoader.loadModelSource(assetPath, options.toObjOptions())
         return ParsedModel3D(
             assetPath = assetPath,
             format = format,
@@ -518,11 +537,16 @@ object ModelLoader3D {
             info = ModelInfo3D(
                 assetPath = assetPath,
                 format = format,
-                vertexCount = vertices.size,
-                primitiveCount = vertices.size / 3
+                vertexCount = source.litVertices.size,
+                primitiveCount = source.litVertices.size / 3,
+                materialCount = source.materialCount,
+                textureCount = source.textureCount,
+                imageCount = source.textureCount,
+                textureSlotUsage = source.textureSlotUsage,
+                hasTexturedMaterials = source.parts.any { it.materialDescriptor.hasTexture }
             ),
-            litVertices = vertices,
-            parts = listOf(ModelPartSource3D.lit(vertices))
+            litVertices = source.litVertices,
+            parts = source.parts
         )
     }
 
@@ -548,6 +572,7 @@ internal fun GlbModelInfo.toModelInfo3D(
         materialCount = materialCount,
         textureCount = textureCount,
         imageCount = imageCount,
+        textureSlotUsage = textureSlotUsage,
         skinCount = skinCount,
         animationCount = animationCount,
         hasTexturedMaterials = hasTexturedMaterials,

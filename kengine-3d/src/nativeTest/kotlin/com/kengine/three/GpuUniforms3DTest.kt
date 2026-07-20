@@ -118,6 +118,34 @@ class GpuUniforms3DTest {
         )
     }
 
+    @Test
+    fun texturedDirectionalLightUniformsAppendMaterialFlags() {
+        val light = DirectionalLight3D(
+            direction = Vec3(1.0, 2.0, 3.0),
+            color = Color.fromHex("804020"),
+            ambientStrength = 0.25f,
+            diffuseStrength = 0.75f
+        )
+
+        assertContentEquals(
+            floatArrayOf(
+                1f,
+                2f,
+                3f,
+                0.25f,
+                128f / 255f,
+                64f / 255f,
+                32f / 255f,
+                0.75f,
+                1f,
+                0f,
+                0f,
+                0f
+            ),
+            texturedDirectionalLightUniforms3D(light, useNormalTexture = true)
+        )
+    }
+
     private class FixedCamera(
         private val matrix: Mat4
     ) : Camera3D {

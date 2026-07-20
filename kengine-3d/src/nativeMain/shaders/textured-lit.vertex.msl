@@ -21,6 +21,7 @@ struct VertexOut
     float3 normal [[user(locn0)]];
     float3 color [[user(locn1)]];
     float2 uv [[user(locn2)]];
+    float3 worldPosition [[user(locn3)]];
     float4 position [[position]];
 };
 
@@ -30,6 +31,7 @@ vertex VertexOut main0(VertexIn in [[stage_in]], constant Uniforms& uniforms [[b
     out.normal = normalize((uniforms.model * float4(in.normal, 0.0)).xyz);
     out.color = in.color;
     out.uv = in.uv;
+    out.worldPosition = (uniforms.model * float4(in.position, 1.0)).xyz;
     out.position = uniforms.modelViewProjection * float4(in.position, 1.0);
     return out;
 }

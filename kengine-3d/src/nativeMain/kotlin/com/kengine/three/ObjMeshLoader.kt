@@ -50,7 +50,7 @@ object ObjMeshLoader {
         options: ObjMeshLoadOptions = ObjMeshLoadOptions()
     ): List<Vertex3D> {
         val filePath = File.resolveAssetPath(assetPath)
-        val source = readTextFile(filePath)
+        val source = readTextFile(filePath, "OBJ model file")
         val triangles = parseObj(source, filePath, options)
         return buildVertices(triangles, options)
     }
@@ -60,7 +60,7 @@ object ObjMeshLoader {
         options: ObjMeshLoadOptions = ObjMeshLoadOptions()
     ): List<LitVertex3D> {
         val filePath = File.resolveAssetPath(assetPath)
-        val source = readTextFile(filePath)
+        val source = readTextFile(filePath, "OBJ model file")
         val triangles = parseObj(source, filePath, options)
         return buildLitVertices(triangles, options)
     }
@@ -70,9 +70,19 @@ object ObjMeshLoader {
         options: ObjMeshLoadOptions = ObjMeshLoadOptions()
     ): List<TexturedLitVertex3D> {
         val filePath = File.resolveAssetPath(assetPath)
-        val source = readTextFile(filePath)
+        val source = readTextFile(filePath, "OBJ model file")
         val triangles = parseObj(source, filePath, options)
         return buildTexturedLitVertices(triangles, options)
+    }
+
+    internal fun loadModelSource(
+        assetPath: String,
+        options: ObjMeshLoadOptions = ObjMeshLoadOptions()
+    ): ObjModelSource3D {
+        val filePath = File.resolveAssetPath(assetPath)
+        val source = readTextFile(filePath, "OBJ model file")
+        val triangles = parseObj(source, filePath, options)
+        return buildModelSource(triangles, options)
     }
 
     private fun parseObj(
@@ -82,9 +92,9 @@ object ObjMeshLoader {
     ): List<ObjTriangle> {
         val positions = mutableListOf<Vec3>()
         val textureCoordinates = mutableListOf<ObjUv>()
-        val materialColors = mutableMapOf<String, Color>()
+        val materials = mutableMapOf<String, ObjMaterial>()
         val triangles = mutableListOf<ObjTriangle>()
-        var currentColor = options.defaultColor
+        var currentMaterial = ObjMaterial(color = options.defaultColor)
 
         source.lines().forEachIndexed { lineIndex, rawLine ->
             val line = rawLine.substringBefore("#").trim()
@@ -112,12 +122,27 @@ object ObjMeshLoader {
                     require(tokens.size >= 2) {
                         "Invalid OBJ material library at ${lineIndex + 1} in $filePath: $rawLine"
                     }
-                    val materialPath = joinPath(parentDirectory(filePath), tokens.drop(1).joinToString(" "))
-                    materialColors.putAll(parseMaterialLibrary(readTextFile(materialPath)))
+                    val materialPath = ModelResourcePath3D.resolveSiblingPath(
+                        filePath = filePath,
+                        path = tokens.drop(1).joinToString(" "),
+                        resolveRootRelativeFromParent = true
+                    )
+                    materials.putAll(
+                        parseMaterialLibrary(
+                            source = readTextFile(
+                                filePath = materialPath,
+                                description = "OBJ material library",
+                                referencedBy = filePath
+                            ),
+                            materialPath = materialPath
+                        )
+                    )
                 }
 
                 "usemtl" -> {
-                    currentColor = materialColors[tokens.drop(1).joinToString(" ")] ?: options.defaultColor
+                    val materialName = tokens.drop(1).joinToString(" ")
+                    currentMaterial = materials[materialName]
+                        ?: ObjMaterial(name = materialName, color = options.defaultColor)
                 }
 
                 "f" -> {
@@ -132,7 +157,7 @@ object ObjMeshLoader {
                             faceVertices[0],
                             faceVertices[index],
                             faceVertices[index + 1],
-                            currentColor
+                            currentMaterial
                         )
                     }
                 }
@@ -146,9 +171,34 @@ object ObjMeshLoader {
         return triangles
     }
 
-    private fun parseMaterialLibrary(source: String): Map<String, Color> {
-        val colors = mutableMapOf<String, Color>()
+    private fun parseMaterialLibrary(
+        source: String,
+        materialPath: String
+    ): Map<String, ObjMaterial> {
+        val materials = mutableMapOf<String, ObjMaterial>()
         var materialName: String? = null
+        var materialColor = Color.fromHex("ffffff")
+        var materialTexturePaths = ObjMaterialTexturePaths()
+
+        fun commitMaterial() {
+            val name = materialName ?: return
+            materials[name] = ObjMaterial(
+                name = name,
+                color = materialColor,
+                texturePaths = materialTexturePaths
+            )
+        }
+
+        fun parseTexturePath(tokens: List<String>): String? {
+            return parseMapPath(tokens)
+                ?.let {
+                    ModelResourcePath3D.resolveSiblingPath(
+                        filePath = materialPath,
+                        path = it,
+                        resolveRootRelativeFromParent = true
+                    )
+                }
+        }
 
         source.lines().forEach { rawLine ->
             val line = rawLine.substringBefore("#").trim()
@@ -159,57 +209,102 @@ object ObjMeshLoader {
             val tokens = line.split(WHITESPACE)
             when (tokens.first()) {
                 "newmtl" -> {
+                    commitMaterial()
                     materialName = tokens.drop(1).joinToString(" ")
+                    materialColor = Color.fromHex("ffffff")
+                    materialTexturePaths = ObjMaterialTexturePaths()
                 }
 
                 "Kd" -> {
-                    val name = materialName ?: return@forEach
                     if (tokens.size >= 4) {
-                        colors[name] = Color.fromRGBA(
+                        materialColor = Color.fromRGBA(
                             tokens[1].toFloat(),
                             tokens[2].toFloat(),
                             tokens[3].toFloat()
                         )
                     }
                 }
+
+                "map_Kd" -> {
+                    materialTexturePaths = materialTexturePaths.copy(baseColor = parseTexturePath(tokens))
+                }
+
+                "map_Bump", "bump", "norm" -> {
+                    materialTexturePaths = materialTexturePaths.copy(normal = parseTexturePath(tokens))
+                }
+
+                "map_Ks" -> {
+                    materialTexturePaths = materialTexturePaths.copy(specular = parseTexturePath(tokens))
+                }
+
+                "map_Pr" -> {
+                    materialTexturePaths = materialTexturePaths.copy(roughness = parseTexturePath(tokens))
+                }
+
+                "map_Pm" -> {
+                    materialTexturePaths = materialTexturePaths.copy(metallic = parseTexturePath(tokens))
+                }
+
+                "map_Ke" -> {
+                    materialTexturePaths = materialTexturePaths.copy(emissive = parseTexturePath(tokens))
+                }
+
+                "map_Ka" -> {
+                    materialTexturePaths = materialTexturePaths.copy(ambient = parseTexturePath(tokens))
+                }
+
+                "map_d" -> {
+                    materialTexturePaths = materialTexturePaths.copy(alpha = parseTexturePath(tokens))
+                }
+
+                "disp", "map_disp" -> {
+                    materialTexturePaths = materialTexturePaths.copy(displacement = parseTexturePath(tokens))
+                }
             }
         }
 
-        return colors
+        commitMaterial()
+        return materials
+    }
+
+    private fun parseMapPath(tokens: List<String>): String? {
+        var index = 1
+        while (index < tokens.size) {
+            val token = tokens[index]
+            if (!token.startsWith("-")) {
+                return tokens.drop(index).joinToString(" ")
+            }
+            index += when (token) {
+                "-blendu", "-blendv", "-boost", "-bm", "-cc", "-clamp", "-imfchan", "-texres", "-type" -> 2
+                "-mm" -> 3
+                "-o", "-s", "-t" -> 4
+                else -> 1
+            }
+        }
+        return null
     }
 
     private fun buildVertices(
         triangles: List<ObjTriangle>,
         options: ObjMeshLoadOptions
     ): List<Vertex3D> {
-        val bounds = ObjBounds.fromTriangles(triangles)
-        val center = bounds.center()
-        val scale = if (options.normalize) {
-            val maxSpan = maxOf(bounds.width, bounds.height, bounds.depth)
-            if (maxSpan > 0.0) options.targetSize / maxSpan else 1.0
-        } else {
-            1.0
-        }
+        val transform = ObjGeometryTransform.fromTriangles(triangles, options)
+        return buildVertices(triangles, transform, options)
+    }
 
-        fun transform(position: Vec3): Vec3 {
-            if (!options.normalize) {
-                return position
-            }
-            return Vec3(
-                (position.x - center.x) * scale,
-                (position.y - center.y) * scale,
-                (position.z - center.z) * scale
-            )
-        }
-
+    private fun buildVertices(
+        triangles: List<ObjTriangle>,
+        transform: ObjGeometryTransform,
+        options: ObjMeshLoadOptions
+    ): List<Vertex3D> {
         return triangles.flatMap { triangle ->
-            val a = transform(triangle.a.position)
-            val b = transform(triangle.b.position)
-            val c = transform(triangle.c.position)
+            val a = transform.apply(triangle.a.position)
+            val b = transform.apply(triangle.b.position)
+            val c = transform.apply(triangle.c.position)
             val color = if (options.shadeFaces) {
-                shadeColor(triangle.color, faceLight(a, b, c))
+                shadeColor(triangle.material.color, faceLight(a, b, c))
             } else {
-                triangle.color
+                triangle.material.color
             }
 
             listOf(
@@ -224,36 +319,24 @@ object ObjMeshLoader {
         triangles: List<ObjTriangle>,
         options: ObjMeshLoadOptions
     ): List<LitVertex3D> {
-        val bounds = ObjBounds.fromTriangles(triangles)
-        val center = bounds.center()
-        val scale = if (options.normalize) {
-            val maxSpan = maxOf(bounds.width, bounds.height, bounds.depth)
-            if (maxSpan > 0.0) options.targetSize / maxSpan else 1.0
-        } else {
-            1.0
-        }
+        val transform = ObjGeometryTransform.fromTriangles(triangles, options)
+        return buildLitVertices(triangles, transform)
+    }
 
-        fun transform(position: Vec3): Vec3 {
-            if (!options.normalize) {
-                return position
-            }
-            return Vec3(
-                (position.x - center.x) * scale,
-                (position.y - center.y) * scale,
-                (position.z - center.z) * scale
-            )
-        }
-
+    private fun buildLitVertices(
+        triangles: List<ObjTriangle>,
+        transform: ObjGeometryTransform
+    ): List<LitVertex3D> {
         return triangles.flatMap { triangle ->
-            val a = transform(triangle.a.position)
-            val b = transform(triangle.b.position)
-            val c = transform(triangle.c.position)
+            val a = transform.apply(triangle.a.position)
+            val b = transform.apply(triangle.b.position)
+            val c = transform.apply(triangle.c.position)
             val normal = normalize(cross(subtract(b, a), subtract(c, a)))
 
             listOf(
-                LitVertex3D(a, normal, triangle.color),
-                LitVertex3D(b, normal, triangle.color),
-                LitVertex3D(c, normal, triangle.color)
+                LitVertex3D(a, normal, triangle.material.color),
+                LitVertex3D(b, normal, triangle.material.color),
+                LitVertex3D(c, normal, triangle.material.color)
             )
         }
     }
@@ -262,26 +345,15 @@ object ObjMeshLoader {
         triangles: List<ObjTriangle>,
         options: ObjMeshLoadOptions
     ): List<TexturedLitVertex3D> {
-        val bounds = ObjBounds.fromTriangles(triangles)
-        val center = bounds.center()
-        val scale = if (options.normalize) {
-            val maxSpan = maxOf(bounds.width, bounds.height, bounds.depth)
-            if (maxSpan > 0.0) options.targetSize / maxSpan else 1.0
-        } else {
-            1.0
-        }
+        val transform = ObjGeometryTransform.fromTriangles(triangles, options)
+        return buildTexturedLitVertices(triangles, transform, options)
+    }
 
-        fun transform(position: Vec3): Vec3 {
-            if (!options.normalize) {
-                return position
-            }
-            return Vec3(
-                (position.x - center.x) * scale,
-                (position.y - center.y) * scale,
-                (position.z - center.z) * scale
-            )
-        }
-
+    private fun buildTexturedLitVertices(
+        triangles: List<ObjTriangle>,
+        transform: ObjGeometryTransform,
+        options: ObjMeshLoadOptions
+    ): List<TexturedLitVertex3D> {
         fun uvOrFallback(
             uv: ObjUv?,
             fallback: ObjUv
@@ -294,20 +366,73 @@ object ObjMeshLoader {
         }
 
         return triangles.flatMap { triangle ->
-            val a = transform(triangle.a.position)
-            val b = transform(triangle.b.position)
-            val c = transform(triangle.c.position)
+            val a = transform.apply(triangle.a.position)
+            val b = transform.apply(triangle.b.position)
+            val c = transform.apply(triangle.c.position)
             val normal = normalize(cross(subtract(b, a), subtract(c, a)))
             val uvA = uvOrFallback(triangle.a.uv, ObjUv(0f, 1f))
             val uvB = uvOrFallback(triangle.b.uv, ObjUv(0f, 0f))
             val uvC = uvOrFallback(triangle.c.uv, ObjUv(1f, 0f))
 
             listOf(
-                TexturedLitVertex3D(a, normal, triangle.color, uvA.u, textureV(uvA)),
-                TexturedLitVertex3D(b, normal, triangle.color, uvB.u, textureV(uvB)),
-                TexturedLitVertex3D(c, normal, triangle.color, uvC.u, textureV(uvC))
+                TexturedLitVertex3D(a, normal, triangle.material.color, uvA.u, textureV(uvA)),
+                TexturedLitVertex3D(b, normal, triangle.material.color, uvB.u, textureV(uvB)),
+                TexturedLitVertex3D(c, normal, triangle.material.color, uvC.u, textureV(uvC))
             )
         }
+    }
+
+    private fun buildModelSource(
+        triangles: List<ObjTriangle>,
+        options: ObjMeshLoadOptions
+    ): ObjModelSource3D {
+        val transform = ObjGeometryTransform.fromTriangles(triangles, options)
+        val trianglesByMaterial = linkedMapOf<ObjMaterial, MutableList<ObjTriangle>>()
+        triangles.forEach { triangle ->
+            trianglesByMaterial.getOrPut(triangle.material) { mutableListOf() } += triangle
+        }
+
+        val parts = mutableListOf<ModelPartSource3D>()
+        val litVertices = mutableListOf<LitVertex3D>()
+        trianglesByMaterial.forEach { (material, materialTriangles) ->
+            val textureAsset = material.texturePaths.baseColor?.let(GpuTextureAsset3D::file)
+            val textureSet = material.texturePaths.toTextureSet3D()
+            if (textureAsset != null) {
+                val texturedVertices = buildTexturedLitVertices(materialTriangles, transform, options)
+                litVertices += texturedVertices.map { it.toLitVertex() }
+                parts += ModelPartSource3D.texturedLit(
+                    vertices = texturedVertices,
+                    materialDescriptor = MaterialDescriptor3D.textured(
+                        textureAsset = textureAsset,
+                        color = material.color,
+                        name = material.name,
+                        textures = textureSet
+                    )
+                )
+            } else {
+                val partVertices = buildLitVertices(materialTriangles, transform)
+                litVertices += partVertices
+                parts += ModelPartSource3D.lit(
+                    vertices = partVertices,
+                    materialDescriptor = MaterialDescriptor3D.solid(
+                        color = material.color,
+                        name = material.name,
+                        textures = textureSet
+                    )
+                )
+            }
+        }
+
+        val usedMaterials = trianglesByMaterial.keys
+        return ObjModelSource3D(
+            litVertices = litVertices,
+            parts = parts,
+            materialCount = usedMaterials.count { it.name != null },
+            textureCount = usedMaterials.flatMap { it.texturePaths.all }.distinct().size,
+            textureSlotUsage = MaterialTextureSlotUsage3D.fromTextureSets(
+                usedMaterials.map { it.texturePaths.toTextureSet3D() }
+            )
+        )
     }
 
     private fun parseFaceVertex(
@@ -411,25 +536,17 @@ object ObjMeshLoader {
         return Vec3(value.x / length, value.y / length, value.z / length)
     }
 
-    private fun parentDirectory(path: String): String {
-        val index = maxOf(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-        return if (index >= 0) path.substring(0, index) else "."
-    }
-
-    private fun joinPath(
-        parent: String,
-        child: String
-    ): String {
-        if (parent.endsWith("/") || parent.endsWith("\\")) {
-            return parent + child
-        }
-        return "$parent/$child"
-    }
-
     @OptIn(ExperimentalForeignApi::class)
-    private fun readTextFile(filePath: String): String {
+    private fun readTextFile(
+        filePath: String,
+        description: String,
+        referencedBy: String? = null
+    ): String {
+        ModelResourcePath3D.requireExistingFile(filePath, description, referencedBy)
         val file = fopen(filePath, "r")
-            ?: throw IllegalArgumentException("Cannot open file: $filePath. Please ensure the file exists and the path is correct.")
+            ?: throw IllegalArgumentException(
+                ModelResourcePath3D.cannotOpenFileMessage(filePath, description, referencedBy)
+            )
         val buffer = ByteArray(8192)
         val content = StringBuilder()
         try {
@@ -449,12 +566,65 @@ object ObjMeshLoader {
     private val WHITESPACE = Regex("\\s+")
 }
 
+internal data class ObjModelSource3D(
+    val litVertices: List<LitVertex3D>,
+    val parts: List<ModelPartSource3D>,
+    val materialCount: Int,
+    val textureCount: Int,
+    val textureSlotUsage: MaterialTextureSlotUsage3D
+)
+
 private data class ObjTriangle(
     val a: ObjFaceVertex,
     val b: ObjFaceVertex,
     val c: ObjFaceVertex,
-    val color: Color
+    val material: ObjMaterial
 )
+
+private data class ObjMaterial(
+    val name: String? = null,
+    val color: Color,
+    val texturePaths: ObjMaterialTexturePaths = ObjMaterialTexturePaths()
+)
+
+private data class ObjMaterialTexturePaths(
+    val baseColor: String? = null,
+    val normal: String? = null,
+    val specular: String? = null,
+    val roughness: String? = null,
+    val metallic: String? = null,
+    val emissive: String? = null,
+    val ambient: String? = null,
+    val alpha: String? = null,
+    val displacement: String? = null
+) {
+    val all: List<String>
+        get() = listOfNotNull(
+            baseColor,
+            normal,
+            specular,
+            roughness,
+            metallic,
+            emissive,
+            ambient,
+            alpha,
+            displacement
+        )
+
+    fun toTextureSet3D(): MaterialTextureSet3D {
+        return MaterialTextureSet3D(
+            baseColor = baseColor?.let(GpuTextureAsset3D::file),
+            normal = normal?.let(GpuTextureAsset3D::file),
+            specular = specular?.let(GpuTextureAsset3D::file),
+            roughness = roughness?.let(GpuTextureAsset3D::file),
+            metallic = metallic?.let(GpuTextureAsset3D::file),
+            emissive = emissive?.let(GpuTextureAsset3D::file),
+            ambient = ambient?.let(GpuTextureAsset3D::file),
+            alpha = alpha?.let(GpuTextureAsset3D::file),
+            displacement = displacement?.let(GpuTextureAsset3D::file)
+        )
+    }
+}
 
 private data class ObjFaceVertex(
     val position: Vec3,
@@ -465,6 +635,53 @@ private data class ObjUv(
     val u: Float,
     val v: Float
 )
+
+private data class ObjGeometryTransform(
+    val center: Vec3,
+    val scale: Double,
+    val enabled: Boolean
+) {
+    fun apply(position: Vec3): Vec3 {
+        if (!enabled) {
+            return position
+        }
+        return Vec3(
+            (position.x - center.x) * scale,
+            (position.y - center.y) * scale,
+            (position.z - center.z) * scale
+        )
+    }
+
+    companion object {
+        fun fromTriangles(
+            triangles: List<ObjTriangle>,
+            options: ObjMeshLoadOptions
+        ): ObjGeometryTransform {
+            if (!options.normalize) {
+                return ObjGeometryTransform(
+                    center = Vec3(0.0, 0.0, 0.0),
+                    scale = 1.0,
+                    enabled = false
+                )
+            }
+            val bounds = ObjBounds.fromTriangles(triangles)
+            val maxSpan = maxOf(bounds.width, bounds.height, bounds.depth)
+            return ObjGeometryTransform(
+                center = bounds.center(),
+                scale = if (maxSpan > 0.0) options.targetSize / maxSpan else 1.0,
+                enabled = true
+            )
+        }
+    }
+}
+
+private fun TexturedLitVertex3D.toLitVertex(): LitVertex3D {
+    return LitVertex3D(
+        position = position,
+        normal = normal,
+        color = color
+    )
+}
 
 private data class ObjBounds(
     val min: Vec3,

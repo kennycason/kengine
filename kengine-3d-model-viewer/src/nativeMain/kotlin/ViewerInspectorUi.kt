@@ -1,6 +1,7 @@
 import com.kengine.graphics.Color
 import com.kengine.input.mouse.MouseInputEventSubscriber
 import com.kengine.three.GpuFrame
+import com.kengine.three.ModelInfo3D
 import com.kengine.three.ui.GpuUiAlign3D
 import com.kengine.three.ui.GpuUiContext3D
 import com.kengine.three.ui.GpuUiDirection3D
@@ -45,6 +46,9 @@ class ViewerInspectorUi(
         return listOf(
             "KENGINE 3D VIEWER",
             statusText().compactUiText(34),
+            activeModel().info.viewerStatsLine().compactUiText(34),
+            activeModel().info.viewerTextureLine().compactUiText(34),
+            activeModel().info.viewerRenderLine().compactUiText(34),
             "MODEL ${controls.currentModelPreset.label.compactUiText(18)}",
             "PREV",
             "NEXT",
@@ -70,7 +74,7 @@ class ViewerInspectorUi(
             desiredX = 16.0,
             desiredY = 16.0,
             desiredWidth = 360.0,
-            desiredHeight = 394.0,
+            desiredHeight = 472.0,
             backgroundColor = Color.fromHex("10151ee0"),
             direction = GpuUiDirection3D.COLUMN,
             padding = 12.0,
@@ -91,6 +95,33 @@ class ViewerInspectorUi(
                 width = 336.0,
                 height = ROW_HEIGHT,
                 color = Color.fromHex("98d6ffff"),
+                align = GpuUiAlign3D.LEFT
+            )
+
+            label(
+                id = "model-stats",
+                text = { activeModel().info.viewerStatsLine().compactUiText(34) },
+                width = 336.0,
+                height = ROW_HEIGHT,
+                color = Color.fromHex("c8d6f0"),
+                align = GpuUiAlign3D.LEFT
+            )
+
+            label(
+                id = "texture-stats",
+                text = { activeModel().info.viewerTextureLine().compactUiText(34) },
+                width = 336.0,
+                height = ROW_HEIGHT,
+                color = Color.fromHex("c8d6f0"),
+                align = GpuUiAlign3D.LEFT
+            )
+
+            label(
+                id = "render-stats",
+                text = { activeModel().info.viewerRenderLine().compactUiText(34) },
+                width = 336.0,
+                height = ROW_HEIGHT,
+                color = Color.fromHex("c8d6f0"),
                 align = GpuUiAlign3D.LEFT
             )
 
@@ -324,5 +355,30 @@ class ViewerInspectorUi(
         private val BUTTON_BG = Color.fromHex("273244f2")
         private val BUTTON_HOVER = Color.fromHex("3b4a62ff")
         private val BUTTON_PRESS = Color.fromHex("5ca8ffff")
+    }
+}
+
+private fun ModelInfo3D.viewerStatsLine(): String {
+    return "${format.name} V${vertexCount} P${primitiveCount} MESH${meshCount}"
+}
+
+private fun ModelInfo3D.viewerTextureLine(): String {
+    return "MAT${materialCount} TEX${textureCount} IMG${imageCount} SKIN${skinCount}"
+}
+
+private fun ModelInfo3D.viewerRenderLine(): String {
+    val slots = textureSlotUsage
+    if (slots.totalSlotCount == 0) {
+        return "SLOTS NONE"
+    }
+    val rendered = mutableListOf<String>()
+    if (slots.baseColor > 0) rendered += "BASE${slots.baseColor}"
+    if (slots.normal > 0) rendered += "NORM${slots.normal}"
+    val pending = slots.secondarySlotCount - slots.normal
+    val renderedText = if (rendered.isEmpty()) "NONE" else rendered.joinToString(" ")
+    return if (pending > 0) {
+        "SLOTS $renderedText META$pending"
+    } else {
+        "SLOTS $renderedText"
     }
 }

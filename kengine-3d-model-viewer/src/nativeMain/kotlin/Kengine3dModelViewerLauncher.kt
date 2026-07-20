@@ -144,6 +144,16 @@ fun main(args: Array<String>) {
                 setViewerStatus(message)
                 updateWindowTitle()
             }
+            fun printModelLoadError(error: Throwable) {
+                val status = viewerModelLoadStatus(error)
+                val details = viewerModelLoadDetails(error)
+                println(status)
+                if (!status.endsWith(details)) {
+                    println("  details: $details")
+                }
+                setViewerStatus(status)
+                updateWindowTitle()
+            }
             updateWindowTitle()
             val inspectorUi = ViewerInspectorUi(
                 controls = controls,
@@ -178,7 +188,7 @@ fun main(args: Array<String>) {
                             pendingModelLoad = preset
                             setViewerStatus("Loading ${preset.label}")
                         } catch (error: Throwable) {
-                            printMessage("Error loading model: ${error.message ?: "unknown error"}")
+                            printModelLoadError(error)
                         }
                     }
                 },
@@ -280,13 +290,13 @@ fun main(args: Array<String>) {
                         try {
                             val loadedModel = activateModel(preset, reload = true)
                             controls.selectOrAddModel(preset)
-                            activeModel = loadedModel
-                            cameraController = createCameraController(preset.targetSize)
-                            printMessage("Loaded file: ${preset.label}")
-                        } catch (error: Throwable) {
-                            printMessage("Error loading model: ${error.message ?: "unknown error"}")
-                        }
+                        activeModel = loadedModel
+                        cameraController = createCameraController(preset.targetSize)
+                        printMessage("Loaded file: ${preset.label}")
+                    } catch (error: Throwable) {
+                        printModelLoadError(error)
                     }
+                }
 
                     mouse.mouse.clearFrameState()
                     SDL_Delay(16u)
@@ -592,6 +602,7 @@ private fun printLoadedModel(
     println("Loaded ${preset.label} (${preset.mode.name.lowercase()}): ${info.assetPath}")
     println("  format=${info.format} vertices=${info.vertexCount} meshes=${info.meshCount} primitives=${info.primitiveCount}")
     println("  materials=${info.materialCount} textures=${info.textureCount} skins=${info.skinCount} animations=${info.animationCount}")
+    println("  textureSlots=${viewerTextureSlotSummary(info)}")
     if (info.animations.isNotEmpty()) {
         model.selectedClipName()?.let { selected ->
             println("  previewClip=$selected")
@@ -662,6 +673,30 @@ private fun printViewerStatus(
     println("  background=${controls.currentBackground.label} light=${controls.currentLightPreset.label}")
     println("  animationSpeed=${controls.animationSpeed} paused=${controls.animationPaused} axes=${controls.showAxes}")
     println("  ambient=${controls.currentLight.ambientStrength} diffuse=${controls.currentLight.diffuseStrength}")
+    println("  textureSlots=${viewerTextureSlotSummary(model.info)}")
+}
+
+private fun viewerTextureSlotSummary(info: ModelInfo3D): String {
+    val slots = info.textureSlotUsage
+    if (slots.totalSlotCount == 0) {
+        return "none"
+    }
+    val values = mutableListOf<String>()
+    if (slots.baseColor > 0) values += "base=${slots.baseColor}"
+    if (slots.normal > 0) values += "normal=${slots.normal} rendered"
+    if (slots.metallicRoughness > 0) values += "metallicRoughness=${slots.metallicRoughness}"
+    if (slots.roughness > 0) values += "roughness=${slots.roughness}"
+    if (slots.metallic > 0) values += "metallic=${slots.metallic}"
+    if (slots.specular > 0) values += "specular=${slots.specular}"
+    if (slots.emissive > 0) values += "emissive=${slots.emissive}"
+    if (slots.ambient > 0) values += "ambient=${slots.ambient}"
+    if (slots.alpha > 0) values += "alpha=${slots.alpha}"
+    if (slots.displacement > 0) values += "displacement=${slots.displacement}"
+    val pending = slots.secondarySlotCount - slots.normal
+    if (pending > 0) {
+        values += "metadataOnly=$pending"
+    }
+    return values.joinToString(", ")
 }
 
 private fun drawAxes(

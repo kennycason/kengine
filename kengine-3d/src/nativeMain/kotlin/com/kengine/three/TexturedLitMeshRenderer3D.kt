@@ -22,9 +22,20 @@ class TexturedLitMeshRenderer3D(
         texture: GpuTexture,
         transform: Transform3D,
         camera: Camera3D,
-        light: DirectionalLight3D = DirectionalLight3D()
+        light: DirectionalLight3D = DirectionalLight3D(),
+        normalTexture: GpuTexture = texture,
+        useNormalTexture: Boolean = false
     ) {
-        draw(frame, mesh, texture, transform.matrix(), camera, light)
+        draw(
+            frame = frame,
+            mesh = mesh,
+            texture = texture,
+            modelMatrix = transform.matrix(),
+            camera = camera,
+            light = light,
+            normalTexture = normalTexture,
+            useNormalTexture = useNormalTexture
+        )
     }
 
     fun draw(
@@ -33,7 +44,9 @@ class TexturedLitMeshRenderer3D(
         texture: GpuTexture,
         modelMatrix: Mat4,
         camera: Camera3D,
-        light: DirectionalLight3D = DirectionalLight3D()
+        light: DirectionalLight3D = DirectionalLight3D(),
+        normalTexture: GpuTexture = texture,
+        useNormalTexture: Boolean = false
     ) {
         check(!cleanedUp) {
             "TexturedLitMeshRenderer3D has already been cleaned up."
@@ -41,12 +54,15 @@ class TexturedLitMeshRenderer3D(
 
         val aspect = frame.width.toFloat() / frame.height.toFloat()
         frame.pushVertexUniformFloats3D(modelAndModelViewProjectionUniforms3D(aspect, modelMatrix, camera))
-        frame.pushFragmentUniformFloats3D(directionalLightUniforms3D(light))
+        frame.pushFragmentUniformFloats3D(texturedDirectionalLightUniforms3D(light, useNormalTexture))
         frame.drawPrimitives3D(
             pipeline = pipeline,
             vertexCount = mesh.vertexCount,
             vertexBuffer = GpuVertexBufferDrawBinding3D(mesh.vertexBuffer),
-            fragmentTexture = GpuFragmentTextureDrawBinding3D(texture)
+            fragmentTextures = listOf(
+                GpuFragmentTextureDrawBinding3D(texture, slot = 0u),
+                GpuFragmentTextureDrawBinding3D(normalTexture, slot = 1u)
+            )
         )
     }
 

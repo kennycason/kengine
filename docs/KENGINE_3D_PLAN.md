@@ -1,6 +1,6 @@
 # Kengine 3D Plan
 
-Status: GPU window, primitive rendering, depth proof, mesh rendering, Rubik's cube, OBJ mesh import, directional lighting, UV texture sampling, image-backed GPU textures, GLB static/skinned/animated loading, basic 3D collision, camera controls, animation helpers, scene submission, model-viewer tooling, and first GPU UI primitives started
+Status: GPU window, primitive rendering, depth proof, mesh rendering, Rubik's cube, OBJ mesh import, directional lighting, UV texture sampling, image-backed GPU textures, GLB/GLTF static/skinned/animated loading, material texture slot metadata, normal-map rendering, basic 3D collision, camera controls, animation helpers, scene submission, model-viewer tooling, import planning, and first GPU UI primitives started
 
 ## Summary
 
@@ -40,11 +40,11 @@ The first GPU window slice has been added:
 - `kengine-3d` provides `GpuDraw3D` and `GpuUniforms3D` helpers so renderers share uniform packing, vertex-buffer binding, texture-sampler binding, and primitive draw submission.
 - `kengine-3d` provides `GpuRendererPreset3D`, `Kengine3DVertexLayouts`, and `Kengine3DRendererPresets` so built-in renderer/material styles pair shader programs with matching pipeline layouts in one catalog.
 - `kengine-3d` provides `GpuUpload3D` and `GpuVertexBuffer3D` helpers so textures and mesh classes share upload transfer buffers, copy-pass submission, vertex packing, GPU vertex-buffer creation, texture uploads, and mutable vertex-buffer updates.
-- `kengine-3d` provides `ObjMeshLoader`, a lightweight Wavefront OBJ path that reads vertices/UVs/faces, triangulates polygons, resolves `.mtl` diffuse colors, normalizes imported geometry, and emits `GpuMesh`, `LitGpuMesh`, or `TexturedLitGpuMesh` data.
-- `kengine-3d` provides `ModelLoader3D`, `ModelAsset3D`, `ModelAssetLoader3D`, `ModelAssetPathResolver3D`, `ModelSourceCache3D`, `ParsedModel3D`, `ModelPartSource3D`, `Model3D`, `ModelInfo3D`, `ModelPart3D`, `MaterialDescriptor3D`, `Material3D`, and `ModelRenderer3D` as the first reusable model/material facade over the lower-level OBJ/GLB paths. Callers can parse a CPU model source once, optionally keep it in an explicit `ModelSourceCache3D`, reuse it for collision, and upload it into GPU-backed `Model3D` resources with an optional long-lived `GpuTextureCache3D`; default loads still own and clean up their per-load texture cache.
+- `kengine-3d` provides `ObjMeshLoader`, a lightweight Wavefront OBJ path that reads vertices/UVs/faces, triangulates polygons, resolves `.mtl` diffuse colors, base-color textures, normal maps, and secondary material texture metadata, normalizes imported geometry, and emits `GpuMesh`, `LitGpuMesh`, or `TexturedLitGpuMesh` data.
+- `kengine-3d` provides `ModelLoader3D`, `ModelAsset3D`, `ModelAssetLoader3D`, `ModelAssetPathResolver3D`, `ModelSourceCache3D`, `ParsedModel3D`, `ModelPartSource3D`, `Model3D`, `ModelInfo3D`, `ModelPart3D`, `MaterialDescriptor3D`, `MaterialTextureSet3D`, `MaterialTextureSlotUsage3D`, `Material3D`, and `ModelRenderer3D` as the first reusable model/material facade over the lower-level OBJ/GLB/GLTF paths. Callers can parse a CPU model source once, optionally keep it in an explicit `ModelSourceCache3D`, reuse it for collision, inspect material/texture slot usage, and upload it into GPU-backed `Model3D` resources with an optional long-lived `GpuTextureCache3D`; default loads still own and clean up their per-load texture cache.
 - `kengine-3d` provides `Scene3D`, `Node3D`, scene item types, and `SceneRenderer3D` for ordered per-frame submission of static models, animated models, and mesh primitives through one renderer bundle. `Node3D` includes fluent visibility, transform, position/yaw, and animated-pose helpers for simple actor-to-node sync.
 - `kengine-3d` provides `GpuResourceScope3D`, a small cleanup scope for GPU-backed resources owned by demos and games.
-- `kengine-3d` provides `GlbMeshLoader`, a Kotlin-side GLB 2.0 path that loads static textured/lit CPU source parts, fills engine-owned animated lit/skinned CPU source descriptors, uploads textured/lit meshes, CPU-updated per-instance skinned textured meshes, GPU-ready skinned textured source vertices, node-transform animation clips, embedded textures with parsed sampler wrap/filter intent, per-load or caller-owned texture deduping, model-owned cached texture cleanup for default loads, and CPU-side lit vertices for collision.
+- `kengine-3d` provides `GlbMeshLoader`, a Kotlin-side GLB/GLTF 2.0 path that loads static textured/lit CPU source parts, fills engine-owned animated lit/skinned CPU source descriptors, uploads textured/lit meshes, CPU-updated per-instance skinned textured meshes, GPU-ready skinned textured source vertices, node-transform animation clips, embedded and sibling-file textures with parsed sampler wrap/filter intent, material texture-slot metadata, base/normal material rendering, per-load or caller-owned texture deduping, model-owned cached texture cleanup for default loads, and CPU-side lit vertices for collision.
 - `kengine-3d` provides `AnimationClipSet3D`, `AnimationClipMap3D`, `AnimationPose3D`, `AnimationPosePreparation3D`, `AnimationPlayer3D`, and `AnimationStateController3D` for reusable clip lookup, pose values, explicit pose preparation, stateful animation time advancement, and state-to-pose playback.
 - `kengine-3d` provides `AnimatedModel3D`, `AnimatedModelSource3D`, `AnimatedModelSourceCache3D`, `AnimatedModelAsset3D`, `AnimatedModelLoader3D`, `AnimatedModelInstanceRenderState3D`, and `AnimatedModelInstance3D` as the first format-neutral facade over node-animated, CPU-skinned, and GPU joint-palette model source parsing, engine-owned source descriptors, source caching, upload, playback, per-instance transform/pose/render state, and pre-render pose preparation.
 - `kengine-3d` provides `TerrainMeshCollider3D`, `StaticMeshCollider3D`, `Collision3D`, `KinematicCharacterController3D`, and `TerrainActorController3D` for the current 3D gameplay collision baseline.
@@ -52,7 +52,8 @@ The first GPU window slice has been added:
 - `games:kengine-3d-demos` opens a GPU-backed window, uses mouse-drag orbit camera controls plus arrow-key zoom/pan, and renders separated rows of multiple primitives, a rotating color cube, a rotating textured cube, clean color-lit Kenney Space Kit ship/turret OBJ models, and a separate UV-textured meteor OBJ model using a PNG loaded from disk.
 - `games:mario-3d` is now the main 3D platformer validation bed: textured GLB world rendering, terrain/static collision from parsed model vertices, reusable third-person camera controls, reusable controller axis calibration, default `AUTO` GPU joint-palette skinned Mario animation, asset-bound scene nodes, animated enemies, debug drawing, and a simple Bowser encounter.
 - `games:rubiks-cube-3d` renders a 27-cubie Rubik's cube with per-face colors, mouse orbit, mouse-picked face turns, keyboard face turns, animated slice rotations, scramble, and reset.
-- `kengine-3d-model-viewer` is a top-level 3D tooling app that opens an SDL GPU window, loads bundled static or animated model assets through the reusable source/upload path, previews animated clips, and provides orbit camera, model preset, reload, clip, playback, background, and lighting controls outside a game demo through keyboard shortcuts and a clickable `kengine-3d-ui` inspector panel.
+- `kengine-3d-model-viewer` is a top-level 3D tooling app that opens an SDL GPU window, loads bundled static or animated model assets through the reusable source/upload path, previews animated clips, and provides orbit camera, model preset, local file loading, reload, clip, playback, background, lighting, material/texture diagnostics, and clear load-error status outside a game demo through keyboard shortcuts and a clickable `kengine-3d-ui` inspector panel.
+- `kengine-3d-importer` is a top-level 3D tooling module that keeps runtime loaders honest: GLB/GLTF/OBJ are identified as runtime-ready, FBX/USD-family inputs are planned as offline GLB conversion candidates, unsupported source formats receive actionable messages, and future converter adapters have a tested module boundary outside games and runtime rendering.
 
 Implementation note: the SDL GPU declarations are already generated by the core `SDL3/SDL.h` cinterop in `kengine`; a separate `sdl3_gpu.def` produced an effectively empty binding and is not needed.
 
@@ -78,9 +79,11 @@ Tradeoffs:
 - Shaders need a real workflow. SDL GPU backends use different shader formats for Metal, Vulkan, and D3D12.
 - It is newer than older rendering libraries, so examples and ecosystem are thinner.
 
-### Asset Loading: OBJ Now, glTF 2.0 Next
+### Asset Loading: Runtime Formats And Import Pipeline
 
-The first native model-loading step is Wavefront OBJ:
+The current runtime-loading formats are GLB, GLTF, and Wavefront OBJ. Games should load those through `ModelLoader3D` / `AnimatedModelLoader3D` and keep source-format conversion offline.
+
+Wavefront OBJ remains intentionally small:
 
 - Simple text format.
 - Easy to parse directly in Kotlin/Native.
@@ -90,23 +93,11 @@ The first native model-loading step is Wavefront OBJ:
 
 Keep this OBJ path intentionally small. It should be a practical importer for static low-poly meshes, not a replacement for a full scene format.
 
-The next material step is to parse `.mtl` `map_Kd` entries, load those image files with `GpuTexture.fromFile`, and bind textures per material instead of assigning one texture to an entire mesh.
+GLB/GLTF is the main runtime scene format. The Kotlin-side loader now covers static meshes, material colors, texture metadata, base/normal texture rendering, node animation, and skinned animation well enough for the current demos and tooling.
 
-Next, add glTF 2.0 as the main 3D asset format.
+For source formats such as FBX and USDZ, prefer an offline conversion path into GLB. `kengine-3d-importer` owns that boundary. The first implementation is a planner/CLI; the next implementation should add converter adapters there, then validate the resulting GLB through `ModelLoader3D.inspect`.
 
-Start with static glTF meshes first, then materials/textures, then animation.
-
-Good first loader:
-
-- `cgltf`: https://github.com/jkuhlmann/cgltf
-
-Reasons:
-
-- Single-file C loader.
-- Friendly to Kotlin/Native via cinterop or a tiny C wrapper.
-- Focused on glTF instead of every possible 3D format.
-
-Avoid starting with Assimp unless we need many legacy formats. Assimp is powerful, but heavier and C++ based.
+Avoid putting Assimp, Blender scripting, or USD tooling into `kengine-3d` runtime loading. Those dependencies belong in tooling modules unless we have a concrete game-runtime reason to ship them.
 
 ### Alternatives To Reconsider Later
 
@@ -444,12 +435,14 @@ Success criteria:
 - Done: Load base color textures from embedded GLB images.
 - Done: Load node-transform animation clips for rigid/node animated models.
 - Done: Load skinned textured meshes and update skinning on CPU.
-- Next: Add external `.gltf` JSON plus external buffer/image support, or explicitly scope the public API to binary `.glb` until needed.
+- Done: Add external `.gltf` JSON plus sibling external buffer/image support.
 - Done: Add per-instance CPU-skinned mesh buffers for skinned textured GLB animated model instances.
 - Done: Add `SkinnedTexturedLitVertex3D`, `SkinnedTexturedLitGpuMesh`, and `SkinnedTexturedLitMeshRenderer3D` so skinned source vertices and joint matrices can be drawn by a shader path.
 - Done: Add `AnimatedModelSkinningMode3D.AUTO` as the default policy, preferring `GPU_JOINT_PALETTE` when the asset fits the renderer's joint limit and falling back to `CPU_VERTEX_BUFFER` otherwise.
 - Done: Validate Mario's shader-skinning path visually and let Mario rely on the default `AUTO` mode instead of opting into a renderer path in game code.
 - Done: Add skinned GLB support reporting and stricter skinned primitive validation for missing skinning accessors, accessor count mismatches, invalid skin/mesh references, non-triangle primitives, and out-of-range joint indices.
+- Done: Add material texture slot metadata for base color, normal, metallic/roughness, specular, emissive, ambient/occlusion, alpha, and displacement where available.
+- Done: Render authored normal maps for textured GLB/GLTF/OBJ materials, with a flat normal fallback for textured materials without authored normals.
 
 Success criteria:
 
@@ -503,7 +496,10 @@ Success criteria:
 - Done: Add a top-level `kengine-3d-ui` module with GPU-compatible retained views, labels, buttons, sliders, text rendering, and mouse handling.
 - Done: Add a clickable `kengine-3d-model-viewer` inspector for model preset selection, animation clip selection, playback controls, lighting/background controls, axes toggle, and reset.
 - Done: Bundle a small model-viewer demo asset set and add an inspector `LOAD` button for reloading the current preset.
-- Next: Extend the model-viewer inspector with material/texture diagnostics and camera preset controls.
+- Done: Add native model file picking to the model viewer for `.glb`, `.gltf`, and `.obj`.
+- Done: Extend the model-viewer inspector and status output with material/texture slot diagnostics and clearer load errors for missing model resources.
+- Done: Add `kengine-3d-importer` as the top-level planning boundary for runtime-ready formats versus offline GLB conversion candidates.
+- Next: Add camera preset/save controls to the model viewer.
 - Next: Wire SDL_shadercross/dxc/glslang into the existing SPIR-V and DXIL artifact directories.
 - Decide whether 3D should integrate with Kengine's current scene system.
 

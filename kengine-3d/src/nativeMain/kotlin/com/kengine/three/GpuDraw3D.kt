@@ -75,6 +75,7 @@ internal fun GpuFrame.drawPrimitives3D(
     vertexCount: UInt,
     vertexBuffer: GpuVertexBufferDrawBinding3D? = null,
     fragmentTexture: GpuFragmentTextureDrawBinding3D? = null,
+    fragmentTextures: List<GpuFragmentTextureDrawBinding3D> = emptyList(),
     instanceCount: UInt = 1u,
     firstVertex: UInt = 0u,
     firstInstance: UInt = 0u
@@ -85,6 +86,15 @@ internal fun GpuFrame.drawPrimitives3D(
     require(instanceCount > 0u) {
         "GPU draw instance count must be greater than zero."
     }
+    val textureBindings = listOfNotNull(fragmentTexture) + fragmentTextures
+    val duplicateTextureSlots = textureBindings
+        .groupingBy { it.slot }
+        .eachCount()
+        .filterValues { it > 1 }
+        .keys
+    require(duplicateTextureSlots.isEmpty()) {
+        "GPU fragment texture slots must be unique: ${duplicateTextureSlots.joinToString()}."
+    }
 
     memScoped {
         val nativeVertexBinding = vertexBuffer?.let { binding ->
@@ -94,19 +104,16 @@ internal fun GpuFrame.drawPrimitives3D(
             }
         }
 
-        val nativeTextureBinding = fragmentTexture?.let { binding ->
-            alloc<SDL_GPUTextureSamplerBinding>().also {
-                it.texture = binding.texture.texture
-                it.sampler = binding.texture.sampler
-            }
-        }
-
         SDL_BindGPUGraphicsPipeline(renderPass, pipeline)
         if (vertexBuffer != null && nativeVertexBinding != null) {
             SDL_BindGPUVertexBuffers(renderPass, vertexBuffer.slot, nativeVertexBinding.ptr, 1u)
         }
-        if (fragmentTexture != null && nativeTextureBinding != null) {
-            SDL_BindGPUFragmentSamplers(renderPass, fragmentTexture.slot, nativeTextureBinding.ptr, 1u)
+        textureBindings.forEach { binding ->
+            val nativeTextureBinding = alloc<SDL_GPUTextureSamplerBinding>().also {
+                it.texture = binding.texture.texture
+                it.sampler = binding.texture.sampler
+            }
+            SDL_BindGPUFragmentSamplers(renderPass, binding.slot, nativeTextureBinding.ptr, 1u)
         }
         SDL_DrawGPUPrimitives(renderPass, vertexCount, instanceCount, firstVertex, firstInstance)
     }

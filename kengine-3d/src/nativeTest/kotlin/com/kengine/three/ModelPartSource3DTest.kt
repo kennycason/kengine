@@ -42,6 +42,22 @@ class ModelPartSource3DTest {
     }
 
     @Test
+    fun litSourceAllowsSecondaryTextureMetadata() {
+        val descriptor = MaterialDescriptor3D.solid(
+            textures = MaterialTextureSet3D(
+                normal = GpuTextureAsset3D.whiteRgba8("test:normal")
+            )
+        )
+
+        val part = ModelPartSource3D.lit(
+            vertices = testLitTriangle(),
+            materialDescriptor = descriptor
+        )
+
+        assertEquals(descriptor, part.materialDescriptor)
+    }
+
+    @Test
     fun texturedLitSourceRequiresTexturedMaterialDescriptor() {
         assertFailsWith<IllegalArgumentException> {
             ModelPartSource3D.texturedLit(

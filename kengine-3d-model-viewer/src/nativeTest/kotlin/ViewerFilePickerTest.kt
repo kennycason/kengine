@@ -1,6 +1,7 @@
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class ViewerFilePickerTest {
     @Test
@@ -38,5 +39,25 @@ class ViewerFilePickerTest {
         assertFailsWith<IllegalArgumentException> {
             viewerModelPresetForFile("/tmp/models/ship.fbx")
         }
+    }
+
+    @Test
+    fun unsupportedFormatStatusListsSupportedFormats() {
+        assertEquals(
+            "Error loading model: Unsupported model file: ship.fbx. Supported formats: GLB, GLTF, OBJ.",
+            viewerModelLoadStatus(IllegalArgumentException("Unsupported model file: ship.fbx"))
+        )
+    }
+
+    @Test
+    fun longLoadStatusIsShortButDetailsKeepTheFullMessage() {
+        val details =
+            "GLTF buffer 'triangle mesh.bin' was not found: /tmp/kengine/model folder/triangle mesh.bin referenced by /tmp/kengine/model folder/scene.gltf"
+
+        val status = viewerModelLoadStatus(IllegalArgumentException(details))
+
+        assertTrue(status.startsWith("Error loading model: GLTF buffer"))
+        assertTrue(status.endsWith("..."))
+        assertEquals(details, viewerModelLoadDetails(IllegalArgumentException(details)))
     }
 }

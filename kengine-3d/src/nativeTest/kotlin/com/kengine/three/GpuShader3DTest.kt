@@ -30,12 +30,12 @@ class GpuShader3DTest {
         assertEquals("textured lit mesh", Kengine3DShaderPrograms.TEXTURED_LIT.label)
         assertEquals(1u, Kengine3DShaderPrograms.TEXTURED_LIT.vertex.uniformBuffers)
         assertEquals(1u, Kengine3DShaderPrograms.TEXTURED_LIT.fragment.uniformBuffers)
-        assertEquals(1u, Kengine3DShaderPrograms.TEXTURED_LIT.fragment.samplers)
+        assertEquals(2u, Kengine3DShaderPrograms.TEXTURED_LIT.fragment.samplers)
 
         assertEquals("skinned textured lit mesh", Kengine3DShaderPrograms.SKINNED_TEXTURED_LIT.label)
         assertEquals(1u, Kengine3DShaderPrograms.SKINNED_TEXTURED_LIT.vertex.uniformBuffers)
         assertEquals(1u, Kengine3DShaderPrograms.SKINNED_TEXTURED_LIT.fragment.uniformBuffers)
-        assertEquals(1u, Kengine3DShaderPrograms.SKINNED_TEXTURED_LIT.fragment.samplers)
+        assertEquals(2u, Kengine3DShaderPrograms.SKINNED_TEXTURED_LIT.fragment.samplers)
     }
 
     @Test

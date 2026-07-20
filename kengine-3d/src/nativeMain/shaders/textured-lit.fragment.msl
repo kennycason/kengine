@@ -5,6 +5,7 @@ struct LightUniforms
 {
     float4 directionAndAmbient;
     float4 colorAndDiffuseStrength;
+    float4 materialFlags;
 };
 
 struct FragmentIn
@@ -12,6 +13,7 @@ struct FragmentIn
     float3 normal [[user(locn0)]];
     float3 color [[user(locn1)]];
     float2 uv [[user(locn2)]];
+    float3 worldPosition [[user(locn3)]];
 };
 
 struct FragmentOut
@@ -23,10 +25,26 @@ fragment FragmentOut main0(
     FragmentIn in [[stage_in]],
     constant LightUniforms& lightUniforms [[buffer(0)]],
     texture2d<float> baseTexture [[texture(0)]],
-    sampler baseSampler [[sampler(0)]])
+    sampler baseSampler [[sampler(0)]],
+    texture2d<float> normalTexture [[texture(1)]],
+    sampler normalSampler [[sampler(1)]])
 {
     FragmentOut out;
     float3 normal = normalize(in.normal);
+    if (lightUniforms.materialFlags.x > 0.5) {
+        float3 dpdx = dfdx(in.worldPosition);
+        float3 dpdy = dfdy(in.worldPosition);
+        float2 duvdx = dfdx(in.uv);
+        float2 duvdy = dfdy(in.uv);
+        float determinant = duvdx.x * duvdy.y - duvdx.y * duvdy.x;
+        if (abs(determinant) > 0.00001) {
+            float invDeterminant = 1.0 / determinant;
+            float3 tangent = normalize((dpdx * duvdy.y - dpdy * duvdx.y) * invDeterminant);
+            float3 bitangent = normalize((dpdy * duvdx.x - dpdx * duvdy.x) * invDeterminant);
+            float3 sampledNormal = normalTexture.sample(normalSampler, in.uv).xyz * 2.0 - 1.0;
+            normal = normalize(tangent * sampledNormal.x + bitangent * sampledNormal.y + normal * sampledNormal.z);
+        }
+    }
     float3 lightDirection = normalize(lightUniforms.directionAndAmbient.xyz);
     float diffuse = max(dot(normal, -lightDirection), 0.0);
     float ambient = lightUniforms.directionAndAmbient.w;

@@ -23,9 +23,21 @@ class SkinnedTexturedLitMeshRenderer3D(
         transform: Transform3D,
         camera: Camera3D,
         skinMatrices: List<Mat4>,
-        light: DirectionalLight3D = DirectionalLight3D()
+        light: DirectionalLight3D = DirectionalLight3D(),
+        normalTexture: GpuTexture = texture,
+        useNormalTexture: Boolean = false
     ) {
-        draw(frame, mesh, texture, transform.matrix(), camera, skinMatrices, light)
+        draw(
+            frame = frame,
+            mesh = mesh,
+            texture = texture,
+            modelMatrix = transform.matrix(),
+            camera = camera,
+            skinMatrices = skinMatrices,
+            light = light,
+            normalTexture = normalTexture,
+            useNormalTexture = useNormalTexture
+        )
     }
 
     fun draw(
@@ -35,7 +47,9 @@ class SkinnedTexturedLitMeshRenderer3D(
         modelMatrix: Mat4,
         camera: Camera3D,
         skinMatrices: List<Mat4>,
-        light: DirectionalLight3D = DirectionalLight3D()
+        light: DirectionalLight3D = DirectionalLight3D(),
+        normalTexture: GpuTexture = texture,
+        useNormalTexture: Boolean = false
     ) {
         check(!cleanedUp) {
             "SkinnedTexturedLitMeshRenderer3D has already been cleaned up."
@@ -57,12 +71,15 @@ class SkinnedTexturedLitMeshRenderer3D(
                 maxSkinJoints = MAX_SKIN_JOINTS
             )
         )
-        frame.pushFragmentUniformFloats3D(directionalLightUniforms3D(light))
+        frame.pushFragmentUniformFloats3D(texturedDirectionalLightUniforms3D(light, useNormalTexture))
         frame.drawPrimitives3D(
             pipeline = pipeline,
             vertexCount = mesh.vertexCount,
             vertexBuffer = GpuVertexBufferDrawBinding3D(mesh.vertexBuffer),
-            fragmentTexture = GpuFragmentTextureDrawBinding3D(texture)
+            fragmentTextures = listOf(
+                GpuFragmentTextureDrawBinding3D(texture, slot = 0u),
+                GpuFragmentTextureDrawBinding3D(normalTexture, slot = 1u)
+            )
         )
     }
 

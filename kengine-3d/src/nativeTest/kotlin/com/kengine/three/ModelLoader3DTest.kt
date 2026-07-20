@@ -49,6 +49,8 @@ class ModelLoader3DTest {
         assertEquals(1, source.info.materialCount)
         assertEquals(1, source.info.textureCount)
         assertEquals(1, source.info.imageCount)
+        assertEquals(1, source.info.textureSlotUsage.baseColor)
+        assertEquals(0, source.info.textureSlotUsage.normal)
         assertEquals(ModelFormat3D.GLTF, info.format)
         assertEquals(1, info.meshCount)
         assertEquals(1, info.materialCount)
@@ -63,22 +65,166 @@ class ModelLoader3DTest {
             source.parts.single().materialDescriptor.textureAsset?.key?.id
         )
     }
+
+    @Test
+    fun loadsGltfMaterialTextureSlots() {
+        val fixture = GltfFixture.write(includeMaterialTextureSlots = true)
+
+        val source = ModelLoader3D.loadSource(
+            assetPath = fixture.modelPath,
+            options = ModelLoadOptions3D(normalize = false)
+        )
+
+        assertEquals(6, source.info.textureCount)
+        assertEquals(6, source.info.imageCount)
+        assertEquals(1, source.info.textureSlotUsage.baseColor)
+        assertEquals(1, source.info.textureSlotUsage.normal)
+        assertEquals(1, source.info.textureSlotUsage.metallicRoughness)
+        assertEquals(1, source.info.textureSlotUsage.emissive)
+        assertEquals(1, source.info.textureSlotUsage.ambient)
+        assertEquals(1, source.info.textureSlotUsage.specular)
+        val descriptor = source.parts.single().materialDescriptor
+        assertTrue(descriptor.hasTexture)
+        assertTrue(descriptor.hasSecondaryTextures)
+        assertEquals(6, descriptor.textureCount)
+        assertEquals("file:${fixture.texturePath}", descriptor.textures.baseColor?.key?.id)
+        assertEquals("file:${fixture.secondaryTexturePaths.getValue("normal")}", descriptor.textures.normal?.key?.id)
+        assertEquals(
+            "file:${fixture.secondaryTexturePaths.getValue("metallicRoughness")}",
+            descriptor.textures.metallicRoughness?.key?.id
+        )
+        assertEquals("file:${fixture.secondaryTexturePaths.getValue("emissive")}", descriptor.textures.emissive?.key?.id)
+        assertEquals("file:${fixture.secondaryTexturePaths.getValue("occlusion")}", descriptor.textures.ambient?.key?.id)
+        assertEquals("file:${fixture.secondaryTexturePaths.getValue("specular")}", descriptor.textures.specular?.key?.id)
+    }
+
+    @Test
+    fun missingGltfExternalBufferReportsReferencedPath() {
+        val fixture = GltfFixture.write(writeBuffer = false)
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            ModelLoader3D.loadSource(
+                assetPath = fixture.modelPath,
+                options = ModelLoadOptions3D(normalize = false)
+            )
+        }
+        val message = error.message.orEmpty()
+
+        assertTrue(message.contains("GLTF buffer 'triangle%20mesh.bin' was not found: ${fixture.bufferPath}"))
+        assertTrue(message.contains("referenced by ${fixture.modelPath}"))
+    }
+
+    @Test
+    fun missingGltfExternalImageReportsReferencedPath() {
+        val fixture = GltfFixture.write(writeImages = false)
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            ModelLoader3D.loadSource(
+                assetPath = fixture.modelPath,
+                options = ModelLoadOptions3D(normalize = false)
+            )
+        }
+        val message = error.message.orEmpty()
+
+        assertTrue(message.contains("GLTF image 'texture%20albedo.png' was not found: ${fixture.texturePath}"))
+        assertTrue(message.contains("referenced by ${fixture.modelPath}"))
+    }
 }
 
 private data class GltfFixture(
     val modelPath: String,
-    val texturePath: String
+    val bufferPath: String,
+    val texturePath: String,
+    val secondaryTexturePaths: Map<String, String> = emptyMap()
 ) {
     companion object {
         @OptIn(ExperimentalForeignApi::class)
-        fun write(): GltfFixture {
-            val dir = "/tmp/kengine-3d-gltf-test-${getpid()}"
+        fun write(
+            includeMaterialTextureSlots: Boolean = false,
+            writeBuffer: Boolean = true,
+            writeImages: Boolean = true
+        ): GltfFixture {
+            val suffix = when {
+                includeMaterialTextureSlots -> "material-slots"
+                !writeBuffer -> "missing-buffer"
+                !writeImages -> "missing-image"
+                else -> "basic"
+            }
+            val dir = "/tmp/kengine-3d-gltf-test-${getpid()}-$suffix"
             system("mkdir -p $dir")
             val modelPath = "$dir/triangle.gltf"
             val bufferPath = "$dir/triangle mesh.bin"
             val texturePath = "$dir/texture albedo.png"
+            val secondaryTexturePaths = if (includeMaterialTextureSlots) {
+                mapOf(
+                    "normal" to "$dir/normal map.png",
+                    "metallicRoughness" to "$dir/metallic roughness map.png",
+                    "emissive" to "$dir/emissive map.png",
+                    "occlusion" to "$dir/occlusion map.png",
+                    "specular" to "$dir/specular map.png"
+                )
+            } else {
+                emptyMap()
+            }
+            val pbrTextureProperties = if (includeMaterialTextureSlots) {
+                """
+                          "metallicRoughnessTexture": { "index": 2 }
+                """.trimIndent()
+            } else {
+                ""
+            }
+            val materialTextureProperties = if (includeMaterialTextureSlots) {
+                """
+                        "normalTexture": { "index": 1 },
+                        "emissiveTexture": { "index": 3 },
+                        "occlusionTexture": { "index": 4 },
+                        "extensions": {
+                          "KHR_materials_specular": {
+                            "specularColorTexture": { "index": 5 }
+                          }
+                        }
+                """.trimIndent()
+            } else {
+                ""
+            }
+            val texturesJson = if (includeMaterialTextureSlots) {
+                """
+                      "textures": [
+                        { "source": 0 },
+                        { "source": 1 },
+                        { "source": 2 },
+                        { "source": 3 },
+                        { "source": 4 },
+                        { "source": 5 }
+                      ],
+                """.trimIndent()
+            } else {
+                """                      "textures": [{ "source": 0 }],"""
+            }
+            val imagesJson = if (includeMaterialTextureSlots) {
+                """
+                      "images": [
+                        { "uri": "texture%20albedo.png" },
+                        { "uri": "normal%20map.png" },
+                        { "uri": "metallic%20roughness%20map.png" },
+                        { "uri": "emissive%20map.png" },
+                        { "uri": "occlusion%20map.png" },
+                        { "uri": "specular%20map.png" }
+                      ],
+                """.trimIndent()
+            } else {
+                """                      "images": [{ "uri": "texture%20albedo.png" }],"""
+            }
 
-            writeBytes(bufferPath, triangleBuffer())
+            if (writeBuffer) {
+                writeBytes(bufferPath, triangleBuffer())
+            }
+            if (writeImages) {
+                writeBytes(texturePath, byteArrayOf(0))
+                secondaryTexturePaths.values.forEach { path ->
+                    writeBytes(path, byteArrayOf(0))
+                }
+            }
             writeText(
                 path = modelPath,
                 text = """
@@ -103,10 +249,12 @@ private data class GltfFixture(
                         "pbrMetallicRoughness": {
                           "baseColorFactor": [0.5, 0.75, 1.0, 1.0],
                           "baseColorTexture": { "index": 0 }
+                          ${pbrTextureProperties.prependCommaIfNotBlank()}
                         }
+                        ${materialTextureProperties.prependCommaIfNotBlank()}
                       }],
-                      "textures": [{ "source": 0 }],
-                      "images": [{ "uri": "texture%20albedo.png" }],
+                      $texturesJson
+                      $imagesJson
                       "buffers": [{
                         "uri": "triangle%20mesh.bin",
                         "byteLength": 102
@@ -129,7 +277,9 @@ private data class GltfFixture(
 
             return GltfFixture(
                 modelPath = modelPath,
-                texturePath = texturePath
+                bufferPath = bufferPath,
+                texturePath = texturePath,
+                secondaryTexturePaths = secondaryTexturePaths
             )
         }
 
@@ -202,4 +352,11 @@ private data class GltfFixture(
             }
         }
     }
+}
+
+private fun String.prependCommaIfNotBlank(): String {
+    if (isBlank()) {
+        return ""
+    }
+    return ",\n$this"
 }

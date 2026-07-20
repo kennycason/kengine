@@ -146,6 +146,16 @@ sealed class GpuTextureAsset3D {
             )
         }
 
+        fun flatNormalRgba8(
+            cacheKey: String = "procedural:flat-normal-rgba8"
+        ): GpuTextureAsset3D {
+            return rgba8(
+                cacheKey = cacheKey,
+                descriptor = GpuTextureDescriptor3D.rgba8(width = 1u, height = 1u),
+                pixels = byteArrayOf(128.toByte(), 128.toByte(), 255.toByte(), 255.toByte())
+            )
+        }
+
         fun checkerboard(
             cacheKey: String? = null,
             width: UInt = 128u,
