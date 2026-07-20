@@ -26,6 +26,7 @@ import com.kengine.three.SceneModel3D
 import com.kengine.three.SceneRenderer3D
 import com.kengine.three.createInstance
 import com.kengine.three.setPose
+import com.kengine.three.ui.GpuUiRenderer3D
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.SDL_Delay
 import sdl3.SDL_GetTicks
@@ -34,9 +35,10 @@ import kotlin.math.sqrt
 
 private const val WINDOW_WIDTH = 1280
 private const val WINDOW_HEIGHT = 760
-private const val DEFAULT_ASSET_ROOT = "../games/mario-3d/assets"
+private const val DEFAULT_ASSET_ROOT = "assets"
 private const val DEFAULT_MODEL_PATH = "models/Mario64Animated.glb"
 private const val DEFAULT_TARGET_SIZE = 2.2
+private const val DEFAULT_UI_FONT_PATH = "assets/fonts/arcade_classic.ttf"
 
 @OptIn(ExperimentalForeignApi::class)
 fun main(args: Array<String>) {
@@ -93,12 +95,20 @@ fun main(args: Array<String>) {
             )
             val sceneRenderer = resources.track(SceneRenderer3D(this))
             val debugRenderer = resources.track(DebugRenderer3D(this)) { it.cleanup() }
+            val uiFont = font.addFont("viewer-ui", DEFAULT_UI_FONT_PATH, fontSize = 14f)
+            val uiRenderer = resources.track(GpuUiRenderer3D(this, uiFont))
             val scene = Scene3D(controls.currentLight)
             resources.track(scene)
             val modelCache = mutableMapOf<ViewerModelPreset, ViewerLoadedModel>()
 
-            fun activateModel(preset: ViewerModelPreset): ViewerLoadedModel {
+            fun activateModel(
+                preset: ViewerModelPreset,
+                reload: Boolean = false
+            ): ViewerLoadedModel {
                 scene.clear()
+                if (reload) {
+                    modelCache.remove(preset)?.cleanup()
+                }
                 val loadedModel = modelCache.getOrPut(preset) {
                     loadViewerModel(modelAssets, preset)
                 }
@@ -113,7 +123,40 @@ fun main(args: Array<String>) {
             fun updateWindowTitle() {
                 SDL_SetWindowTitle(sdl.window, viewerWindowTitle(controls, activeModel))
             }
+            fun printMessage(message: String) {
+                println(message)
+                updateWindowTitle()
+            }
             updateWindowTitle()
+            val inspectorUi = ViewerInspectorUi(
+                controls = controls,
+                activeModel = { activeModel },
+                onSelectModel = { step ->
+                    val preset = controls.selectModel(step)
+                    activeModel = activateModel(preset)
+                    cameraController = createCameraController(preset.targetSize)
+                    updateWindowTitle()
+                },
+                onSelectClip = { step ->
+                    val clipName = activeModel.selectClip(step)
+                    controls.resetAnimationClock()
+                    printMessage(
+                        clipName?.let { "Animation clip: $it" }
+                            ?: "This model has no animation clips."
+                    )
+                },
+                onResetView = {
+                    printMessage(controls.resetControls())
+                    cameraController = createCameraController(controls.currentModelPreset.targetSize)
+                },
+                onReloadModel = {
+                    activeModel = activateModel(controls.currentModelPreset, reload = true)
+                    cameraController = createCameraController(controls.currentModelPreset.targetSize)
+                    printMessage("Loaded model: ${controls.currentModelPreset.label}")
+                },
+                onMessage = ::printMessage,
+                onChanged = ::updateWindowTitle
+            )
             printViewerControls()
             var previousTicks = SDL_GetTicks()
             var controlsPrimed = false
@@ -132,6 +175,8 @@ fun main(args: Array<String>) {
                     if (keyboardState.isEscapePressed()) {
                         isRunning = false
                     }
+
+                    val uiHandledMouse = inspectorUi.handleMouse(mouse.mouse)
 
                     if (!controlsPrimed) {
                         controls.primeKeyboard(keyboardState)
@@ -172,15 +217,18 @@ fun main(args: Array<String>) {
                             }
                         }
                     }
-                    cameraController.update(
-                        mouse = mouse.mouse,
-                        keyboard = keyboardState,
-                        deltaSeconds = deltaSeconds
-                    )
+                    if (!uiHandledMouse) {
+                        cameraController.update(
+                            mouse = mouse.mouse,
+                            keyboard = keyboardState,
+                            deltaSeconds = deltaSeconds
+                        )
+                    }
                     controls.updateAnimationClock(deltaSeconds)
                     scene.light = controls.currentLight
                     activeModel.update(controls.animationTimeSeconds)
                     scene.prepareForDraw()
+                    inspectorUi.prepare(uiRenderer)
                     val camera = cameraController.camera()
                     val background = controls.currentBackground
 
@@ -196,6 +244,7 @@ fun main(args: Array<String>) {
                             lightDirection = controls.currentLight.direction,
                             targetSize = controls.currentModelPreset.targetSize
                         )
+                        inspectorUi.render(uiRenderer, frame)
                     }
 
                     mouse.mouse.clearFrameState()
@@ -320,7 +369,7 @@ private data class ViewerConfig(
     }
 }
 
-private sealed class ViewerLoadedModel {
+sealed class ViewerLoadedModel {
     abstract val info: ModelInfo3D
 
     abstract fun addTo(scene: Scene3D)
@@ -336,12 +385,18 @@ private sealed class ViewerLoadedModel {
         return null
     }
 
+    abstract fun cleanup()
+
     data class Static(
         override val info: ModelInfo3D,
         val node: Node3D<SceneModel3D>
     ) : ViewerLoadedModel() {
         override fun addTo(scene: Scene3D) {
             scene.addNode(node)
+        }
+
+        override fun cleanup() {
+            node.cleanup()
         }
     }
 
@@ -352,6 +407,10 @@ private sealed class ViewerLoadedModel {
     ) : ViewerLoadedModel() {
         override fun addTo(scene: Scene3D) {
             scene.addNode(node)
+        }
+
+        override fun cleanup() {
+            node.cleanup()
         }
 
         override fun update(animationTimeSeconds: Double) {

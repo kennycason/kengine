@@ -17,6 +17,7 @@ val modules = mutableListOf(
     "kengine-test",
     "kengine-reactive",
     "kengine-3d",
+    "kengine-3d-ui",
     "kengine-3d-model-viewer",
     "kengine-network",
     "kengine-physics",

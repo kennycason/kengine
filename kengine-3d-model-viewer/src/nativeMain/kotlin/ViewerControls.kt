@@ -100,6 +100,66 @@ class ViewerControlState(
         animationTimeSeconds = 0.0
     }
 
+    fun toggleAnimationPlayback(): String {
+        animationPaused = !animationPaused
+        return if (animationPaused) "Animation paused." else "Animation playing."
+    }
+
+    fun stopAnimationPlayback(): String {
+        animationPaused = true
+        resetAnimationClock()
+        return "Animation stopped."
+    }
+
+    fun setAnimationSpeed(value: Double): String {
+        animationSpeed = value.coerceIn(0.25, 3.0)
+        return "Animation speed: ${animationSpeed.oneDecimal()}x"
+    }
+
+    fun adjustAnimationSpeed(delta: Double): String {
+        return setAnimationSpeed(animationSpeed + delta)
+    }
+
+    fun cycleBackground(step: Int = 1): String {
+        backgroundPresetIndex = wrappedIndex(backgroundPresetIndex, step, defaultBackgroundPresets.size)
+        return "Background: ${currentBackground.label}"
+    }
+
+    fun cycleLight(step: Int = 1): String {
+        lightPresetIndex = wrappedIndex(lightPresetIndex, step, defaultLightPresets.size)
+        lightAmbientStrength = currentLightPreset.light.ambientStrength
+        lightDiffuseStrength = currentLightPreset.light.diffuseStrength
+        return "Light preset: ${currentLightPreset.label}"
+    }
+
+    fun setAmbientStrength(value: Double): String {
+        lightAmbientStrength = value.toFloat().coerceIn(0.0f, 1.0f)
+        return "Ambient light: ${lightAmbientStrength.twoDecimals()}"
+    }
+
+    fun adjustAmbientStrength(delta: Float): String {
+        return setAmbientStrength((lightAmbientStrength + delta).toDouble())
+    }
+
+    fun setDiffuseStrength(value: Double): String {
+        lightDiffuseStrength = value.toFloat().coerceIn(0.0f, 1.5f)
+        return "Diffuse light: ${lightDiffuseStrength.twoDecimals()}"
+    }
+
+    fun adjustDiffuseStrength(delta: Float): String {
+        return setDiffuseStrength((lightDiffuseStrength + delta).toDouble())
+    }
+
+    fun toggleAxes(): String {
+        showAxes = !showAxes
+        return if (showAxes) "Axes visible." else "Axes hidden."
+    }
+
+    fun resetControls(): String {
+        resetViewState()
+        return "Viewer controls reset."
+    }
+
     fun handleKeyboard(keyboard: KeyboardInputEventSubscriber): List<ViewerControlAction> {
         val actions = mutableListOf<ViewerControlAction>()
 
@@ -116,48 +176,34 @@ class ViewerControlState(
             actions += ViewerControlAction.SelectClip(step = -1)
         }
         if (keyEdges.justPressed(keyboard, Keys.SPACE)) {
-            animationPaused = !animationPaused
-            actions += ViewerControlAction.Message(
-                if (animationPaused) "Animation paused." else "Animation playing."
-            )
+            actions += ViewerControlAction.Message(toggleAnimationPlayback())
         }
         if (keyEdges.justPressed(keyboard, Keys.Z)) {
-            animationSpeed = (animationSpeed - 0.25).coerceAtLeast(0.25)
-            actions += ViewerControlAction.Message("Animation speed: ${animationSpeed.oneDecimal()}x")
+            actions += ViewerControlAction.Message(adjustAnimationSpeed(-0.25))
         }
         if (keyEdges.justPressed(keyboard, Keys.X)) {
-            animationSpeed = (animationSpeed + 0.25).coerceAtMost(3.0)
-            actions += ViewerControlAction.Message("Animation speed: ${animationSpeed.oneDecimal()}x")
+            actions += ViewerControlAction.Message(adjustAnimationSpeed(0.25))
         }
         if (keyEdges.justPressed(keyboard, Keys.B)) {
-            backgroundPresetIndex = wrappedIndex(backgroundPresetIndex, 1, defaultBackgroundPresets.size)
-            actions += ViewerControlAction.Message("Background: ${currentBackground.label}")
+            actions += ViewerControlAction.Message(cycleBackground())
         }
         if (keyEdges.justPressed(keyboard, Keys.L)) {
-            lightPresetIndex = wrappedIndex(lightPresetIndex, 1, defaultLightPresets.size)
-            lightAmbientStrength = currentLightPreset.light.ambientStrength
-            lightDiffuseStrength = currentLightPreset.light.diffuseStrength
-            actions += ViewerControlAction.Message("Light preset: ${currentLightPreset.label}")
+            actions += ViewerControlAction.Message(cycleLight())
         }
         if (keyEdges.justPressed(keyboard, Keys.J)) {
-            lightAmbientStrength = (lightAmbientStrength - 0.05f).coerceAtLeast(0.0f)
-            actions += ViewerControlAction.Message("Ambient light: ${lightAmbientStrength.twoDecimals()}")
+            actions += ViewerControlAction.Message(adjustAmbientStrength(-0.05f))
         }
         if (keyEdges.justPressed(keyboard, Keys.K)) {
-            lightAmbientStrength = (lightAmbientStrength + 0.05f).coerceAtMost(1.0f)
-            actions += ViewerControlAction.Message("Ambient light: ${lightAmbientStrength.twoDecimals()}")
+            actions += ViewerControlAction.Message(adjustAmbientStrength(0.05f))
         }
         if (keyEdges.justPressed(keyboard, Keys.U)) {
-            lightDiffuseStrength = (lightDiffuseStrength - 0.05f).coerceAtLeast(0.0f)
-            actions += ViewerControlAction.Message("Diffuse light: ${lightDiffuseStrength.twoDecimals()}")
+            actions += ViewerControlAction.Message(adjustDiffuseStrength(-0.05f))
         }
         if (keyEdges.justPressed(keyboard, Keys.I)) {
-            lightDiffuseStrength = (lightDiffuseStrength + 0.05f).coerceAtMost(1.5f)
-            actions += ViewerControlAction.Message("Diffuse light: ${lightDiffuseStrength.twoDecimals()}")
+            actions += ViewerControlAction.Message(adjustDiffuseStrength(0.05f))
         }
         if (keyEdges.justPressed(keyboard, Keys.G)) {
-            showAxes = !showAxes
-            actions += ViewerControlAction.Message(if (showAxes) "Axes visible." else "Axes hidden.")
+            actions += ViewerControlAction.Message(toggleAxes())
         }
         if (keyEdges.justPressed(keyboard, Keys.R)) {
             resetViewState()
@@ -282,6 +328,24 @@ fun defaultViewerModelPresets(): List<ViewerModelPreset> {
             modelPath = "models/Super Mario 64 Bob-Omb Battlefield.glb",
             mode = ViewerModelMode.STATIC,
             targetSize = 5.2
+        ),
+        ViewerModelPreset(
+            label = "Kenney craft",
+            modelPath = "models/kenney-space-kit/craft_racer.obj",
+            mode = ViewerModelMode.STATIC,
+            targetSize = 2.2
+        ),
+        ViewerModelPreset(
+            label = "Kenney turret",
+            modelPath = "models/kenney-space-kit/turret_double.obj",
+            mode = ViewerModelMode.STATIC,
+            targetSize = 2.2
+        ),
+        ViewerModelPreset(
+            label = "Kenney meteor",
+            modelPath = "models/kenney-space-kit/meteor_detailed.obj",
+            mode = ViewerModelMode.STATIC,
+            targetSize = 1.8
         )
     )
 }

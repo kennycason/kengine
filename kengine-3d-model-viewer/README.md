@@ -2,7 +2,7 @@
 
 Top-level Kengine tooling app for exercising `kengine-3d` model loading and rendering outside a game.
 
-This viewer opens an `SDL_GPU_3D` window, loads a model, renders it through `Scene3D`, previews animation clips when the model is animated, and provides orbit camera plus inspection controls.
+This viewer opens an `SDL_GPU_3D` window, loads bundled demo models, renders through `Scene3D`, previews animation clips when the model is animated, and provides orbit camera plus a clickable `kengine-3d-ui` inspector.
 
 ## Run
 
@@ -10,7 +10,7 @@ This viewer opens an `SDL_GPU_3D` window, loads a model, renders it through `Sce
 ./gradlew :kengine-3d-model-viewer:runDebugExecutableMacosArm64
 ```
 
-The default asset is Mario's animated GLB from `../games/mario-3d/assets`, relative to this module's Gradle run directory.
+The default asset is Mario's animated GLB from this module's bundled `assets/` directory.
 
 To load another model:
 
@@ -30,6 +30,7 @@ cd kengine-3d-model-viewer
 
 ## Controls
 
+- The inspector panel can cycle bundled model presets, reload the current model with `LOAD`, cycle animation clips, play/pause/stop playback, adjust animation speed, switch lighting/background presets, tune ambient/diffuse strength, toggle axes, and reset the view.
 - Mouse drag: orbit camera.
 - Up/Down arrows: zoom.
 - Left/Right arrows: pan target.
@@ -49,4 +50,6 @@ cd kengine-3d-model-viewer
 
 ## Next
 
-The existing Kengine UI components are currently SDL renderer-backed, while this viewer uses the `SDL_GPU_3D` backend. The next viewer slice should add a deliberate GPU-compatible inspector surface for clickable controls and text instead of mixing the old 2D renderer path into the same window by accident.
+- Add material and texture diagnostics to the inspector.
+- Add camera preset/save controls.
+- Add drag-and-drop or file-picker model loading once Kengine has a small native picker story.
