@@ -9,7 +9,6 @@ import com.kengine.three.AnimatedModelSourceCache3D
 import com.kengine.three.AnimationPose3D
 import com.kengine.three.Camera3D
 import com.kengine.three.DebugRenderer3D
-import com.kengine.three.DirectionalLight3D
 import com.kengine.three.GpuContext
 import com.kengine.three.GpuFrame
 import com.kengine.three.GpuResourceScope3D
@@ -25,10 +24,13 @@ import com.kengine.three.OrbitCameraController3D
 import com.kengine.three.Scene3D
 import com.kengine.three.SceneModel3D
 import com.kengine.three.SceneRenderer3D
+import com.kengine.three.createInstance
 import com.kengine.three.setPose
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.SDL_Delay
 import sdl3.SDL_GetTicks
+import sdl3.SDL_SetWindowTitle
+import kotlin.math.sqrt
 
 private const val WINDOW_WIDTH = 1280
 private const val WINDOW_HEIGHT = 760
@@ -52,6 +54,26 @@ fun main(args: Array<String>) {
         return
     }
 
+    val defaultPresets = defaultViewerModelPresets()
+    val defaultPresetIndex = defaultPresets.indexOfFirst { it.matches(config) }
+    val modelPresets = if (defaultPresetIndex >= 0) {
+        defaultPresets
+    } else {
+        listOf(
+            ViewerModelPreset(
+                label = "CLI model",
+                modelPath = config.modelPath,
+                mode = config.mode,
+                targetSize = config.targetSize,
+                clipName = config.clipName
+            )
+        ) + defaultPresets
+    }
+    val controls = ViewerControlState(
+        modelPresets = modelPresets,
+        initialModelPresetIndex = defaultPresetIndex.coerceAtLeast(0)
+    )
+
     createGameContext(
         title = "Kengine 3D Model Viewer - ${config.modelPath.substringAfterLast('/')}",
         width = WINDOW_WIDTH,
@@ -71,27 +93,30 @@ fun main(args: Array<String>) {
             )
             val sceneRenderer = resources.track(SceneRenderer3D(this))
             val debugRenderer = resources.track(DebugRenderer3D(this)) { it.cleanup() }
-            val scene = Scene3D(
-                DirectionalLight3D(
-                    direction = Vec3(-0.35, -0.85, -0.45),
-                    color = Color.fromHex("fff4dc"),
-                    ambientStrength = 0.48f,
-                    diffuseStrength = 0.82f
-                )
-            )
-            val model = loadViewerModel(modelAssets, scene, config)
+            val scene = Scene3D(controls.currentLight)
             resources.track(scene)
-            printLoadedModel(config, model.info)
+            val modelCache = mutableMapOf<ViewerModelPreset, ViewerLoadedModel>()
 
-            val cameraController = OrbitCameraController3D(
-                target = Vec3(0.0, config.targetSize * 0.42, 0.0),
-                distance = config.targetSize * 2.7,
-                yawRadians = 0.0f,
-                pitchRadians = 0.2f,
-                minDistance = config.targetSize * 0.75,
-                maxDistance = config.targetSize * 7.0
-            )
+            fun activateModel(preset: ViewerModelPreset): ViewerLoadedModel {
+                scene.clear()
+                val loadedModel = modelCache.getOrPut(preset) {
+                    loadViewerModel(modelAssets, preset)
+                }
+                loadedModel.addTo(scene)
+                controls.resetAnimationClock()
+                printLoadedModel(preset, loadedModel)
+                return loadedModel
+            }
+
+            var activeModel = activateModel(controls.currentModelPreset)
+            var cameraController = createCameraController(controls.currentModelPreset.targetSize)
+            fun updateWindowTitle() {
+                SDL_SetWindowTitle(sdl.window, viewerWindowTitle(controls, activeModel))
+            }
+            updateWindowTitle()
+            printViewerControls()
             var previousTicks = SDL_GetTicks()
+            var controlsPrimed = false
 
             try {
                 while (isRunning) {
@@ -108,18 +133,69 @@ fun main(args: Array<String>) {
                         isRunning = false
                     }
 
+                    if (!controlsPrimed) {
+                        controls.primeKeyboard(keyboardState)
+                        controlsPrimed = true
+                    } else {
+                        controls.handleKeyboard(keyboardState).forEach { controlAction ->
+                            when (controlAction) {
+                                is ViewerControlAction.SelectModel -> {
+                                    val preset = controls.selectModel(controlAction.step)
+                                    activeModel = activateModel(preset)
+                                    cameraController = createCameraController(preset.targetSize)
+                                    updateWindowTitle()
+                                }
+                                is ViewerControlAction.SelectClip -> {
+                                    val clipName = activeModel.selectClip(controlAction.step)
+                                    controls.resetAnimationClock()
+                                    println(
+                                        clipName?.let { "Animation clip: $it" }
+                                            ?: "This model has no animation clips."
+                                    )
+                                    updateWindowTitle()
+                                }
+                                ViewerControlAction.ResetView -> {
+                                    cameraController = createCameraController(controls.currentModelPreset.targetSize)
+                                    println("Viewer controls reset.")
+                                    updateWindowTitle()
+                                }
+                                ViewerControlAction.PrintHelp -> {
+                                    printViewerControls()
+                                }
+                                ViewerControlAction.PrintStatus -> {
+                                    printViewerStatus(controls, activeModel)
+                                }
+                                is ViewerControlAction.Message -> {
+                                    println(controlAction.text)
+                                    updateWindowTitle()
+                                }
+                            }
+                        }
+                    }
                     cameraController.update(
                         mouse = mouse.mouse,
                         keyboard = keyboardState,
                         deltaSeconds = deltaSeconds
                     )
-                    model.update(elapsedSeconds)
+                    controls.updateAnimationClock(deltaSeconds)
+                    scene.light = controls.currentLight
+                    activeModel.update(controls.animationTimeSeconds)
                     scene.prepareForDraw()
                     val camera = cameraController.camera()
+                    val background = controls.currentBackground
 
-                    render(0.045f, 0.055f, 0.07f, 1f, enableDepth = true) { frame ->
+                    render(background.r, background.g, background.b, background.a, enableDepth = true) { frame ->
                         sceneRenderer.draw(scene, frame, camera)
-                        drawAxes(debugRenderer, frame, camera, config.targetSize)
+                        if (controls.showAxes) {
+                            drawAxes(debugRenderer, frame, camera, controls.currentModelPreset.targetSize)
+                        }
+                        drawLightDirection(
+                            debugRenderer = debugRenderer,
+                            frame = frame,
+                            camera = camera,
+                            lightDirection = controls.currentLight.direction,
+                            targetSize = controls.currentModelPreset.targetSize
+                        )
                     }
 
                     mouse.mouse.clearFrameState()
@@ -132,7 +208,7 @@ fun main(args: Array<String>) {
     }
 }
 
-private enum class ViewerModelMode {
+enum class ViewerModelMode {
     STATIC,
     NODE_ANIMATED,
     SKINNED
@@ -208,6 +284,18 @@ private data class ViewerConfig(
                   Mouse drag             Orbit camera.
                   Up/Down arrows         Zoom camera.
                   Left/Right arrows      Pan camera target.
+                  M/N                    Next/previous model preset.
+                  C/V                    Next/previous animation clip.
+                  Space                  Pause/resume animation.
+                  Z/X                    Decrease/increase animation speed.
+                  B                      Cycle background preset.
+                  L                      Cycle lighting preset.
+                  J/K                    Decrease/increase ambient light.
+                  U/I                    Decrease/increase diffuse light.
+                  G                      Toggle axes.
+                  R                      Reset viewer controls and camera.
+                  H or F1                Print controls.
+                  T                      Print current viewer status.
                   Escape                 Quit.
                 """.trimIndent()
             )
@@ -235,70 +323,98 @@ private data class ViewerConfig(
 private sealed class ViewerLoadedModel {
     abstract val info: ModelInfo3D
 
-    open fun update(elapsedSeconds: Double) {
+    abstract fun addTo(scene: Scene3D)
+
+    open fun update(animationTimeSeconds: Double) {
+    }
+
+    open fun selectedClipName(): String? {
+        return null
+    }
+
+    open fun selectClip(step: Int): String? {
+        return null
     }
 
     data class Static(
         override val info: ModelInfo3D,
         val node: Node3D<SceneModel3D>
-    ) : ViewerLoadedModel()
+    ) : ViewerLoadedModel() {
+        override fun addTo(scene: Scene3D) {
+            scene.addNode(node)
+        }
+    }
 
     data class Animated(
         override val info: ModelInfo3D,
         val node: Node3D<AnimatedModelInstance3D>,
-        val clipIndex: Int,
-        val clipDurationSeconds: Double
+        var clipIndex: Int
     ) : ViewerLoadedModel() {
-        override fun update(elapsedSeconds: Double) {
+        override fun addTo(scene: Scene3D) {
+            scene.addNode(node)
+        }
+
+        override fun update(animationTimeSeconds: Double) {
+            val clipDurationSeconds = info.animations.getOrNull(clipIndex)?.durationSeconds ?: 0.0
             val time = if (clipDurationSeconds > 0.0) {
-                elapsedSeconds % clipDurationSeconds
+                animationTimeSeconds % clipDurationSeconds
             } else {
-                elapsedSeconds
+                animationTimeSeconds
             }
             node.setPose(AnimationPose3D(clipIndex = clipIndex, timeSeconds = time))
+        }
+
+        override fun selectedClipName(): String? {
+            return info.animations.getOrNull(clipIndex)?.name
+        }
+
+        override fun selectClip(step: Int): String? {
+            if (info.animations.isEmpty()) {
+                return null
+            }
+            clipIndex = ((clipIndex + step) % info.animations.size + info.animations.size) % info.animations.size
+            return selectedClipName()
         }
     }
 }
 
 private fun loadViewerModel(
     loader: ModelAssetLoader3D,
-    scene: Scene3D,
-    config: ViewerConfig
+    preset: ViewerModelPreset
 ): ViewerLoadedModel {
     val options = ModelLoadOptions3D(
-        targetSize = config.targetSize,
+        targetSize = preset.targetSize,
         defaultColor = Color.fromHex("ffffff")
     )
-    return when (config.mode) {
+    return when (preset.mode) {
         ViewerModelMode.STATIC -> {
-            val asset = ModelAsset3D(config.modelPath, options)
+            val asset = ModelAsset3D(preset.modelPath, options)
             val source = loader.loadSource(asset)
             val model = loader.uploadModel(source)
             ViewerLoadedModel.Static(
                 info = source.info,
-                node = scene.addModelNode(model)
+                node = Node3D(SceneModel3D(model = model))
             )
         }
         ViewerModelMode.NODE_ANIMATED,
         ViewerModelMode.SKINNED -> {
-            val asset = when (config.mode) {
-                ViewerModelMode.NODE_ANIMATED -> AnimatedModelAsset3D.nodeAnimatedLit(config.modelPath, options)
-                ViewerModelMode.SKINNED -> AnimatedModelAsset3D.skinnedTexturedLit(config.modelPath, options)
+            val asset = when (preset.mode) {
+                ViewerModelMode.NODE_ANIMATED -> AnimatedModelAsset3D.nodeAnimatedLit(preset.modelPath, options)
+                ViewerModelMode.SKINNED -> AnimatedModelAsset3D.skinnedTexturedLit(preset.modelPath, options)
                 ViewerModelMode.STATIC -> error("Static mode is handled separately.")
             }
             val source = loader.loadAnimatedSource(asset)
             val animatedModel = loader.uploadAnimatedModel(source)
             val info = source.info
-            val clipIndex = selectClipIndex(info, config.clipName)
-            val clipDuration = info.animations.getOrNull(clipIndex)?.durationSeconds ?: 0.0
+            val clipIndex = selectClipIndex(info, preset.clipName)
             ViewerLoadedModel.Animated(
                 info = info,
-                node = scene.addAnimatedModelNode(
-                    model = animatedModel,
-                    pose = AnimationPose3D(clipIndex = clipIndex)
+                node = Node3D(
+                    item = animatedModel.createInstance(
+                        pose = AnimationPose3D(clipIndex = clipIndex)
+                    )
                 ),
-                clipIndex = clipIndex,
-                clipDurationSeconds = clipDuration
+                clipIndex = clipIndex
             )
         }
     }
@@ -322,17 +438,83 @@ private fun selectClipIndex(
 }
 
 private fun printLoadedModel(
-    config: ViewerConfig,
-    info: ModelInfo3D
+    preset: ViewerModelPreset,
+    model: ViewerLoadedModel
 ) {
-    println("Loaded ${config.mode.name.lowercase()} model: ${info.assetPath}")
+    val info = model.info
+    println("Loaded ${preset.label} (${preset.mode.name.lowercase()}): ${info.assetPath}")
     println("  format=${info.format} vertices=${info.vertexCount} meshes=${info.meshCount} primitives=${info.primitiveCount}")
     println("  materials=${info.materialCount} textures=${info.textureCount} skins=${info.skinCount} animations=${info.animationCount}")
     if (info.animations.isNotEmpty()) {
-        val selected = config.clipName ?: info.animations.first().name
-        println("  previewClip=$selected")
+        model.selectedClipName()?.let { selected ->
+            println("  previewClip=$selected")
+        } ?: println("  availableClips=${info.animations.size}")
         println("  clips=${info.animations.take(8).joinToString { it.name }}")
     }
+}
+
+private fun createCameraController(targetSize: Double): OrbitCameraController3D {
+    return OrbitCameraController3D(
+        target = Vec3(0.0, targetSize * 0.42, 0.0),
+        distance = targetSize * 2.7,
+        yawRadians = 0.0f,
+        pitchRadians = 0.2f,
+        minDistance = targetSize * 0.75,
+        maxDistance = targetSize * 7.0
+    )
+}
+
+private fun ViewerModelPreset.matches(config: ViewerConfig): Boolean {
+    return modelPath == config.modelPath &&
+        mode == config.mode &&
+        targetSize == config.targetSize &&
+        clipName == config.clipName
+}
+
+private fun viewerWindowTitle(
+    controls: ViewerControlState,
+    model: ViewerLoadedModel
+): String {
+    val clip = model.selectedClipName()?.let { " | clip: $it" } ?: ""
+    val playback = if (controls.animationPaused) "paused" else "${controls.animationSpeed}x"
+    return "Kengine 3D Model Viewer - ${controls.currentModelPreset.label}$clip | ${controls.currentLightPreset.label} | $playback"
+}
+
+private fun printViewerControls() {
+    println(
+        """
+        Viewer controls:
+          Mouse drag             Orbit camera.
+          Up/Down arrows         Zoom camera.
+          Left/Right arrows      Pan camera target.
+          M/N                    Next/previous model preset.
+          C/V                    Next/previous animation clip.
+          Space                  Pause/resume animation.
+          Z/X                    Decrease/increase animation speed.
+          B                      Cycle background preset.
+          L                      Cycle lighting preset.
+          J/K                    Decrease/increase ambient light.
+          U/I                    Decrease/increase diffuse light.
+          G                      Toggle axes.
+          R                      Reset viewer controls and camera.
+          H or F1                Print controls.
+          T                      Print current viewer status.
+          Escape                 Quit.
+        """.trimIndent()
+    )
+}
+
+private fun printViewerStatus(
+    controls: ViewerControlState,
+    model: ViewerLoadedModel
+) {
+    val clip = model.selectedClipName() ?: "none"
+    println("Viewer status:")
+    println("  model=${controls.currentModelPreset.label}")
+    println("  mode=${controls.currentModelPreset.mode.name.lowercase()} clip=$clip")
+    println("  background=${controls.currentBackground.label} light=${controls.currentLightPreset.label}")
+    println("  animationSpeed=${controls.animationSpeed} paused=${controls.animationPaused} axes=${controls.showAxes}")
+    println("  ambient=${controls.currentLight.ambientStrength} diffuse=${controls.currentLight.diffuseStrength}")
 }
 
 private fun drawAxes(
@@ -363,4 +545,43 @@ private fun drawAxes(
         end = Vec3(0.0, 0.0, length),
         color = Color.fromHex("5ca8ff")
     )
+}
+
+private fun drawLightDirection(
+    debugRenderer: DebugRenderer3D,
+    frame: GpuFrame,
+    camera: Camera3D,
+    lightDirection: Vec3,
+    targetSize: Double
+) {
+    val direction = normalize(Vec3(-lightDirection.x, -lightDirection.y, -lightDirection.z))
+    val start = Vec3(0.0, targetSize * 0.62, 0.0)
+    val length = targetSize * 0.95
+    debugRenderer.ray(
+        frame = frame,
+        camera = camera,
+        origin = start,
+        direction = direction,
+        length = length,
+        color = Color.fromHex("ffe070")
+    )
+    debugRenderer.wireSphere(
+        frame = frame,
+        camera = camera,
+        center = Vec3(
+            start.x + direction.x * length,
+            start.y + direction.y * length,
+            start.z + direction.z * length
+        ),
+        radius = targetSize * 0.045,
+        color = Color.fromHex("ffe070")
+    )
+}
+
+private fun normalize(value: Vec3): Vec3 {
+    val length = sqrt(value.x * value.x + value.y * value.y + value.z * value.z)
+    if (length <= 0.0000001) {
+        return Vec3(0.0, 1.0, 0.0)
+    }
+    return Vec3(value.x / length, value.y / length, value.z / length)
 }

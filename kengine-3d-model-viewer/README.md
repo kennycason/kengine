@@ -2,7 +2,7 @@
 
 Top-level Kengine tooling app for exercising `kengine-3d` model loading and rendering outside a game.
 
-This first slice opens an `SDL_GPU_3D` window, loads a model, renders it through `Scene3D`, previews the first animation clip when the model is animated, and provides orbit camera controls.
+This viewer opens an `SDL_GPU_3D` window, loads a model, renders it through `Scene3D`, previews animation clips when the model is animated, and provides orbit camera plus inspection controls.
 
 ## Run
 
@@ -33,8 +33,20 @@ cd kengine-3d-model-viewer
 - Mouse drag: orbit camera.
 - Up/Down arrows: zoom.
 - Left/Right arrows: pan target.
+- `M` / `N`: next/previous built-in model preset.
+- `C` / `V`: next/previous animation clip.
+- Space: pause/resume animation.
+- `Z` / `X`: decrease/increase animation playback speed.
+- `B`: cycle background preset.
+- `L`: cycle lighting preset.
+- `J` / `K`: decrease/increase ambient light.
+- `U` / `I`: decrease/increase diffuse light.
+- `G`: toggle axes.
+- `R`: reset viewer controls and camera.
+- `H` or `F1`: print controls.
+- `T`: print current status.
 - Escape: quit.
 
 ## Next
 
-The existing Kengine UI components are currently SDL renderer-backed, while this viewer uses the `SDL_GPU_3D` backend. The next viewer slice should add a deliberate GPU-compatible inspector surface instead of mixing the old 2D renderer path into the same window by accident.
+The existing Kengine UI components are currently SDL renderer-backed, while this viewer uses the `SDL_GPU_3D` backend. The next viewer slice should add a deliberate GPU-compatible inspector surface for clickable controls and text instead of mixing the old 2D renderer path into the same window by accident.
