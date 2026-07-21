@@ -4,8 +4,10 @@ import com.kengine.hooks.context.useContext
 import com.kengine.input.digitalAxis
 import com.kengine.input.snapAxis
 import com.kengine.input.controller.CalibratedControllerAxes
+import com.kengine.input.controller.ControllerInputEventSubscriber
 import com.kengine.input.controller.ControllerAxisInputSettings
 import com.kengine.input.controller.controls.Buttons
+import com.kengine.input.keyboard.KeyboardInputEventSubscriber
 import com.kengine.log.Logger
 import com.kengine.math.Vec3
 import com.kengine.sdl.RenderBackend
@@ -17,11 +19,12 @@ import com.kengine.three.AnimationStateController3D
 import com.kengine.three.AnimatedModelInstance3D
 import com.kengine.three.AnimatedModelAsset3D
 import com.kengine.three.AnimatedModelSourceCache3D
-import com.kengine.three.CapsuleCollider3D
+import com.kengine.three.Camera3D
 import com.kengine.three.Collision3D
 import com.kengine.three.DebugRenderer3D
 import com.kengine.three.DirectionalLight3D
 import com.kengine.three.GpuContext
+import com.kengine.three.GpuFrame
 import com.kengine.three.GpuMesh
 import com.kengine.three.GpuResourceScope3D
 import com.kengine.three.GpuTextureCache3D
@@ -258,66 +261,31 @@ fun main() {
                     val deltaSeconds = ((ticks - previousTicks).toDouble() / 1000.0).coerceIn(0.0, 0.1)
                     previousTicks = ticks
                     val elapsedSeconds = ticks.toDouble() / 1000.0
-                    val keyboardState = keyboard.keyboard
-                    val controllerState = controller.controller
-                    val controllerAxisSample = controllerAxes.sample(controllerState, elapsedSeconds)
-                    val leftStickX = controllerAxisSample.axis(LEFT_STICK_X_AXIS)
-                    val leftStickY = controllerAxisSample.axis(LEFT_STICK_Y_AXIS, invert = true)
-                    val rightStickX = controllerAxisSample.axis(RIGHT_STICK_X_AXIS)
-                    val rightStickY = controllerAxisSample.axis(RIGHT_STICK_Y_AXIS, invert = true)
-
-                    val moveRightInput = snapAxis(
-                        digitalAxis(keyboardState.isDPressed(), keyboardState.isAPressed()) +
-                            leftStickX,
-                        MOVEMENT_INPUT_EPSILON
-                    )
-                    val moveForwardInput = snapAxis(
-                        digitalAxis(keyboardState.isWPressed(), keyboardState.isSPressed()) +
-                            leftStickY,
-                        MOVEMENT_INPUT_EPSILON
-                    )
-                    val lookX = snapAxis(
-                        digitalAxis(keyboardState.isRightPressed(), keyboardState.isLeftPressed()) +
-                            -rightStickX,
-                        LOOK_INPUT_EPSILON
-                    )
-                    val lookY = snapAxis(
-                        digitalAxis(keyboardState.isUpPressed(), keyboardState.isDownPressed()) +
-                            rightStickY,
-                        LOOK_INPUT_EPSILON
+                    val input = sampleMarioFrameInput(
+                        keyboard = keyboard.keyboard,
+                        controller = controller.controller,
+                        controllerAxes = controllerAxes,
+                        elapsedSeconds = elapsedSeconds
                     )
 
-                    val cameraDistancePressed = keyboardState.isTPressed() ||
-                        controllerState.isButtonPressed(Buttons.TRIANGLE)
-                    val debugPressed = keyboardState.isF1Pressed() ||
-                        controllerState.isButtonPressed(Buttons.START)
-                    if (debugPressed && !wasDebugPressed) {
+                    if (input.debugPressed && !wasDebugPressed) {
                         debugEnabled = !debugEnabled
                     }
-                    wasDebugPressed = debugPressed
-                    val zoomInput = digitalAxis(
-                        controllerState.isButtonPressed(Buttons.DPAD_DOWN),
-                        controllerState.isButtonPressed(Buttons.DPAD_UP)
-                    )
+                    wasDebugPressed = input.debugPressed
                     cameraController.updateInput(
                         input = ThirdPersonCameraInput3D(
-                            lookX = lookX,
-                            lookY = lookY,
-                            zoom = zoomInput,
-                            cycleDistance = cameraDistancePressed
+                            lookX = input.lookX,
+                            lookY = input.lookY,
+                            zoom = input.zoom,
+                            cycleDistance = input.cycleCameraDistance
                         ),
                         deltaSeconds = deltaSeconds
                     )
 
-                    val runPressed = keyboardState.isLShiftPressed() ||
-                        keyboardState.isRShiftPressed() ||
-                        keyboardState.isBPressed() ||
-                        controllerState.isButtonPressed(Buttons.SQUARE) ||
-                        controllerState.isButtonPressed(Buttons.Y)
-                    val moveDirection = cameraController.movementDirection(moveRightInput, moveForwardInput)
+                    val moveDirection = cameraController.movementDirection(input.moveRight, input.moveForward)
                     val moveLength = horizontalLength(moveDirection)
                     val isMoving = moveLength > MOVEMENT_INPUT_EPSILON
-                    val moveSpeed = if (runPressed) PLAYER_RUN_SPEED else PLAYER_WALK_SPEED
+                    val moveSpeed = if (input.runPressed) PLAYER_RUN_SPEED else PLAYER_WALK_SPEED
                     val horizontalVelocity = if (isMoving) {
                         horizontalVelocityForMovement(moveDirection, moveLength, moveSpeed)
                     } else {
@@ -327,17 +295,14 @@ fun main() {
                         playerYaw = atan2(-moveDirection.x, -moveDirection.z)
                     }
 
-                    val jumpPressed = keyboardState.isSpacePressed() ||
-                        keyboardState.isXPressed() ||
-                        controllerState.isButtonPressed(Buttons.B)
                     val playerStep = content.playerController.step(
                         state = playerState,
                         horizontalVelocity = horizontalVelocity,
                         deltaSeconds = deltaSeconds,
-                        jumpRequested = jumpPressed && !wasJumpPressed,
+                        jumpRequested = input.jumpPressed && !wasJumpPressed,
                         allowLeaveGround = true
                     )
-                    wasJumpPressed = jumpPressed
+                    wasJumpPressed = input.jumpPressed
                     val playerYBeforeGravity = playerStep.positionBeforeVertical.y
                     var player = playerState.position
                     var playerVelocityY = playerState.velocityY
@@ -351,38 +316,34 @@ fun main() {
                         playerVelocityY = playerVelocityY,
                         isGrounded = isGroundedAfterGravity,
                         goombas = content.goombas,
-                        playerController = content.playerTerrainController,
+                        playerController = content.playerController,
                         elapsedSeconds = elapsedSeconds,
                         lastPlayerHitAt = lastPlayerHitAt
                     )
-                    player = goombaCollision.player
-                    playerVelocityY = goombaCollision.playerVelocityY
-                    isGroundedAfterGravity = goombaCollision.isGrounded
+                    goombaCollision.applyTo(playerState)
+                    player = playerState.position
+                    playerVelocityY = playerState.velocityY
+                    isGroundedAfterGravity = playerState.isGrounded
                     lastPlayerHitAt = goombaCollision.lastPlayerHitAt
-                    playerState.position = player
-                    playerState.velocityY = playerVelocityY
-                    playerState.isGrounded = isGroundedAfterGravity
                     val bowserCollision = resolvePlayerBowserCollision(
                         player = player,
                         playerYBeforeGravity = playerYBeforeGravity,
                         playerVelocityY = playerVelocityY,
                         isGrounded = isGroundedAfterGravity,
                         bowser = content.bowser,
-                        playerController = content.playerTerrainController,
+                        playerController = content.playerController,
                         elapsedSeconds = elapsedSeconds,
                         lastPlayerHitAt = lastPlayerHitAt
                     )
-                    player = bowserCollision.player
-                    playerVelocityY = bowserCollision.playerVelocityY
-                    isGroundedAfterGravity = bowserCollision.isGrounded
+                    bowserCollision.applyTo(playerState)
+                    player = playerState.position
+                    playerVelocityY = playerState.velocityY
+                    isGroundedAfterGravity = playerState.isGrounded
                     lastPlayerHitAt = bowserCollision.lastPlayerHitAt
-                    playerState.position = player
-                    playerState.velocityY = playerVelocityY
-                    playerState.isGrounded = isGroundedAfterGravity
                     if (!content.bowser.isActive && !content.summitStar.isCollected) {
                         content.summitStar.isActive = true
                     }
-                    resolveSummitStarCollection(content.summitStar, player)
+                    resolveSummitStarCollection(content.summitStar, content.playerController, player)
 
                     if (!wasGrounded && isGroundedAfterGravity) {
                         landingAnimationUntil = elapsedSeconds + 0.22
@@ -393,7 +354,7 @@ fun main() {
                         !isGroundedAfterGravity && playerVelocityY > 0.0 -> MarioAnimationState.JUMP
                         !isGroundedAfterGravity -> MarioAnimationState.FALL
                         elapsedSeconds < landingAnimationUntil -> MarioAnimationState.LAND
-                        isMoving && runPressed -> MarioAnimationState.RUN
+                        isMoving && input.runPressed -> MarioAnimationState.RUN
                         isMoving -> MarioAnimationState.WALK
                         else -> MarioAnimationState.IDLE
                     }
@@ -413,73 +374,15 @@ fun main() {
                     render(0.47f, 0.67f, 0.94f, 1f, enableDepth = true) { frame ->
                         sceneRenderer.draw(scene, frame, camera)
                         if (debugEnabled) {
-                            debugRenderer.wireCapsule(
+                            drawMarioDebugOverlay(
+                                debugRenderer = debugRenderer,
                                 frame = frame,
                                 camera = camera,
-                                capsule = content.playerController.capsuleCollider(playerState, PLAYER_COLLISION_RADIUS),
-                                color = Color.fromHex("5dffcb")
+                                content = content,
+                                playerState = playerState,
+                                player = player,
+                                playerYaw = playerYaw
                             )
-                            val playerForward = forwardForYaw(playerYaw, 1.6)
-                            debugRenderer.line(
-                                frame = frame,
-                                camera = camera,
-                                start = player,
-                                end = Vec3(
-                                    player.x + playerForward.x,
-                                    player.y + 0.15,
-                                    player.z + playerForward.z
-                                ),
-                                color = Color.fromHex("ffffff")
-                            )
-                            playerState.ground?.let { ground ->
-                                debugRenderer.wireSphere(
-                                    frame = frame,
-                                    camera = camera,
-                                    center = ground.position,
-                                    radius = 0.16,
-                                    color = Color.fromHex("ffd447")
-                                )
-                            }
-                            playerState.staticContacts.forEach { contact ->
-                                debugRenderer.contactPoint(
-                                    frame = frame,
-                                    camera = camera,
-                                    point = contact.point,
-                                    normal = contact.normal,
-                                    color = Color.fromHex("ff3b6d")
-                                )
-                            }
-                            content.goombas.filter { it.isActive }.forEach { enemy ->
-                                debugRenderer.wireSphere(
-                                    frame = frame,
-                                    camera = camera,
-                                    sphere = goombaCollider(enemy),
-                                    color = Color.fromHex("ff7a5c")
-                                )
-                            }
-                            if (content.bowser.isActive) {
-                                debugRenderer.wireSphere(
-                                    frame = frame,
-                                    camera = camera,
-                                    sphere = bowserCollider(content.bowser),
-                                    color = Color.fromHex("ff4058")
-                                )
-                                debugRenderer.wireSphere(
-                                    frame = frame,
-                                    camera = camera,
-                                    center = content.bowser.home,
-                                    radius = BOWSER_LEASH_RADIUS,
-                                    color = Color.fromHex("35c9d0")
-                                )
-                            }
-                            if (content.summitStar.isActive && !content.summitStar.isCollected) {
-                                debugRenderer.wireSphere(
-                                    frame = frame,
-                                    camera = camera,
-                                    sphere = summitStarCollider(content.summitStar),
-                                    color = Color.fromHex("f0c84b")
-                                )
-                            }
                         }
                     }
 
@@ -495,7 +398,6 @@ fun main() {
 
 private data class MarioSceneContent(
     val playerController: KinematicCharacterController3D,
-    val playerTerrainController: TerrainActorController3D,
     val enemyController: TerrainActorController3D,
     val marioAnimation: AnimationStateController3D<MarioAnimationState>,
     val goombas: List<RoamingEnemy>,
@@ -506,6 +408,64 @@ private data class MarioSceneContent(
     val goombaNodes: List<Node3D<AnimatedModelInstance3D>>,
     val marioNode: Node3D<AnimatedModelInstance3D>
 )
+
+private data class MarioFrameInput(
+    val moveRight: Double,
+    val moveForward: Double,
+    val lookX: Double,
+    val lookY: Double,
+    val zoom: Double,
+    val cycleCameraDistance: Boolean,
+    val runPressed: Boolean,
+    val jumpPressed: Boolean,
+    val debugPressed: Boolean
+)
+
+private fun sampleMarioFrameInput(
+    keyboard: KeyboardInputEventSubscriber,
+    controller: ControllerInputEventSubscriber,
+    controllerAxes: CalibratedControllerAxes,
+    elapsedSeconds: Double
+): MarioFrameInput {
+    val controllerAxisSample = controllerAxes.sample(controller, elapsedSeconds)
+    val leftStickX = controllerAxisSample.axis(LEFT_STICK_X_AXIS)
+    val leftStickY = controllerAxisSample.axis(LEFT_STICK_Y_AXIS, invert = true)
+    val rightStickX = controllerAxisSample.axis(RIGHT_STICK_X_AXIS)
+    val rightStickY = controllerAxisSample.axis(RIGHT_STICK_Y_AXIS, invert = true)
+
+    return MarioFrameInput(
+        moveRight = snapAxis(
+            digitalAxis(keyboard.isDPressed(), keyboard.isAPressed()) + leftStickX,
+            MOVEMENT_INPUT_EPSILON
+        ),
+        moveForward = snapAxis(
+            digitalAxis(keyboard.isWPressed(), keyboard.isSPressed()) + leftStickY,
+            MOVEMENT_INPUT_EPSILON
+        ),
+        lookX = snapAxis(
+            digitalAxis(keyboard.isRightPressed(), keyboard.isLeftPressed()) - rightStickX,
+            LOOK_INPUT_EPSILON
+        ),
+        lookY = snapAxis(
+            digitalAxis(keyboard.isUpPressed(), keyboard.isDownPressed()) + rightStickY,
+            LOOK_INPUT_EPSILON
+        ),
+        zoom = digitalAxis(
+            controller.isButtonPressed(Buttons.DPAD_DOWN),
+            controller.isButtonPressed(Buttons.DPAD_UP)
+        ),
+        cycleCameraDistance = keyboard.isTPressed() || controller.isButtonPressed(Buttons.TRIANGLE),
+        runPressed = keyboard.isLShiftPressed() ||
+            keyboard.isRShiftPressed() ||
+            keyboard.isBPressed() ||
+            controller.isButtonPressed(Buttons.SQUARE) ||
+            controller.isButtonPressed(Buttons.Y),
+        jumpPressed = keyboard.isSpacePressed() ||
+            keyboard.isXPressed() ||
+            controller.isButtonPressed(Buttons.B),
+        debugPressed = keyboard.isF1Pressed() || controller.isButtonPressed(Buttons.START)
+    )
+}
 
 private fun createMarioSceneContent(
     gpu: GpuContext,
@@ -530,7 +490,6 @@ private fun createMarioSceneContent(
         ),
         staticCollider = staticWorld
     )
-    val playerTerrainController = playerController.terrainController
     val enemyController = TerrainActorController3D(
         terrain = terrain,
         settings = TerrainActorControllerSettings3D(
@@ -567,7 +526,6 @@ private fun createMarioSceneContent(
 
     return MarioSceneContent(
         playerController = playerController,
-        playerTerrainController = playerTerrainController,
         enemyController = enemyController,
         marioAnimation = marioAnimation,
         goombas = goombas,
@@ -578,6 +536,84 @@ private fun createMarioSceneContent(
         goombaNodes = goombaNodes,
         marioNode = marioNode
     )
+}
+
+private fun drawMarioDebugOverlay(
+    debugRenderer: DebugRenderer3D,
+    frame: GpuFrame,
+    camera: Camera3D,
+    content: MarioSceneContent,
+    playerState: KinematicCharacterState3D,
+    player: Vec3,
+    playerYaw: Double
+) {
+    debugRenderer.wireCapsule(
+        frame = frame,
+        camera = camera,
+        capsule = content.playerController.capsuleCollider(playerState, PLAYER_COLLISION_RADIUS),
+        color = Color.fromHex("5dffcb")
+    )
+    val playerForward = forwardForYaw(playerYaw, 1.6)
+    debugRenderer.line(
+        frame = frame,
+        camera = camera,
+        start = player,
+        end = Vec3(
+            player.x + playerForward.x,
+            player.y + 0.15,
+            player.z + playerForward.z
+        ),
+        color = Color.fromHex("ffffff")
+    )
+    playerState.ground?.let { ground ->
+        debugRenderer.wireSphere(
+            frame = frame,
+            camera = camera,
+            center = ground.position,
+            radius = 0.16,
+            color = Color.fromHex("ffd447")
+        )
+    }
+    playerState.staticContacts.forEach { contact ->
+        debugRenderer.contactPoint(
+            frame = frame,
+            camera = camera,
+            point = contact.point,
+            normal = contact.normal,
+            color = Color.fromHex("ff3b6d")
+        )
+    }
+    content.goombas.filter { it.isActive }.forEach { enemy ->
+        debugRenderer.wireSphere(
+            frame = frame,
+            camera = camera,
+            sphere = goombaCollider(enemy),
+            color = Color.fromHex("ff7a5c")
+        )
+    }
+    if (content.bowser.isActive) {
+        debugRenderer.wireSphere(
+            frame = frame,
+            camera = camera,
+            sphere = bowserCollider(content.bowser),
+            color = Color.fromHex("ff4058")
+        )
+        debugRenderer.wireSphere(
+            frame = frame,
+            camera = camera,
+            center = content.bowser.home,
+            radius = BOWSER_LEASH_RADIUS,
+            color = Color.fromHex("35c9d0")
+        )
+    }
+    if (content.summitStar.isActive && !content.summitStar.isCollected) {
+        debugRenderer.wireSphere(
+            frame = frame,
+            camera = camera,
+            sphere = summitStarCollider(content.summitStar),
+            color = Color.fromHex("f0c84b")
+        )
+    }
 }
 
 private fun MarioSceneContent.syncSceneNodes(
@@ -673,7 +709,13 @@ private data class PlayerEnemyCollisionResult(
     val playerVelocityY: Double,
     val isGrounded: Boolean,
     val lastPlayerHitAt: Double
-)
+) {
+    fun applyTo(state: KinematicCharacterState3D) {
+        state.position = player
+        state.velocityY = playerVelocityY
+        state.isGrounded = isGrounded
+    }
+}
 
 private enum class MarioAnimationState {
     IDLE,
@@ -704,7 +746,7 @@ private fun resolvePlayerGoombaCollisions(
     playerVelocityY: Double,
     isGrounded: Boolean,
     goombas: List<RoamingEnemy>,
-    playerController: TerrainActorController3D,
+    playerController: KinematicCharacterController3D,
     elapsedSeconds: Double,
     lastPlayerHitAt: Double
 ): PlayerEnemyCollisionResult {
@@ -714,7 +756,10 @@ private fun resolvePlayerGoombaCollisions(
     var resolvedLastHitAt = lastPlayerHitAt
 
     goombas.filter { it.isActive }.forEach { enemy ->
-        val contact = Collision3D.overlap(playerCollider(resolvedPlayer), goombaCollider(enemy)) ?: return@forEach
+        val contact = Collision3D.overlap(
+            playerController.capsuleCollider(resolvedPlayer, PLAYER_COLLISION_RADIUS),
+            goombaCollider(enemy)
+        ) ?: return@forEach
         val feetWereAboveStompLine = playerYBeforeGravity - PLAYER_HALF_HEIGHT >=
             enemy.position.y + GOOMBA_STOMP_MIN_HEIGHT
         val feetAreAboveGround = resolvedPlayer.y - PLAYER_HALF_HEIGHT >= enemy.position.y - GROUND_CONTACT_EPSILON
@@ -731,7 +776,7 @@ private fun resolvePlayerGoombaCollisions(
         }
 
         val away = horizontalAwayFromEnemy(resolvedPlayer, enemy.position)
-        val bumpMove = playerController.moveHorizontal(
+        val bumpMove = playerController.terrainController.moveHorizontal(
             position = resolvedPlayer,
             deltaX = away.x * (PLAYER_BUMP_BACK_DISTANCE + contact.depth * 0.25),
             deltaZ = away.z * (PLAYER_BUMP_BACK_DISTANCE + contact.depth * 0.25),
@@ -918,13 +963,18 @@ private fun createSummitStar(anchor: Vec3): SummitStar {
 
 private fun resolveSummitStarCollection(
     star: SummitStar,
+    playerController: KinematicCharacterController3D,
     player: Vec3
 ) {
     if (!star.isActive || star.isCollected) {
         return
     }
 
-    if (Collision3D.overlap(playerCollider(player), summitStarCollider(star)) != null) {
+    if (Collision3D.overlap(
+            playerController.capsuleCollider(player, PLAYER_COLLISION_RADIUS),
+            summitStarCollider(star)
+        ) != null
+    ) {
         star.isCollected = true
         star.isActive = false
     }
@@ -936,7 +986,7 @@ private fun resolvePlayerBowserCollision(
     playerVelocityY: Double,
     isGrounded: Boolean,
     bowser: BossEnemy,
-    playerController: TerrainActorController3D,
+    playerController: KinematicCharacterController3D,
     elapsedSeconds: Double,
     lastPlayerHitAt: Double
 ): PlayerEnemyCollisionResult {
@@ -944,7 +994,10 @@ private fun resolvePlayerBowserCollision(
         return PlayerEnemyCollisionResult(player, playerVelocityY, isGrounded, lastPlayerHitAt)
     }
 
-    val contact = Collision3D.overlap(playerCollider(player), bowserCollider(bowser))
+    val contact = Collision3D.overlap(
+        playerController.capsuleCollider(player, PLAYER_COLLISION_RADIUS),
+        bowserCollider(bowser)
+    )
         ?: return PlayerEnemyCollisionResult(player, playerVelocityY, isGrounded, lastPlayerHitAt)
     val feetWereAboveStompLine = playerYBeforeGravity - PLAYER_HALF_HEIGHT >=
         bowser.position.y + BOWSER_STOMP_MIN_HEIGHT
@@ -969,7 +1022,7 @@ private fun resolvePlayerBowserCollision(
     }
 
     val away = horizontalAwayFromEnemy(player, bowser.position)
-    val bumpMove = playerController.moveHorizontal(
+    val bumpMove = playerController.terrainController.moveHorizontal(
         position = player,
         deltaX = away.x * (BOWSER_BODY_BUMP_DISTANCE + contact.depth * 0.25),
         deltaZ = away.z * (BOWSER_BODY_BUMP_DISTANCE + contact.depth * 0.25),
@@ -981,14 +1034,6 @@ private fun resolvePlayerBowserCollision(
         playerVelocityY = if (bumpMove.isGrounded) 0.0 else maxOf(playerVelocityY, 0.0),
         isGrounded = bumpMove.isGrounded,
         lastPlayerHitAt = elapsedSeconds
-    )
-}
-
-private fun playerCollider(player: Vec3): CapsuleCollider3D {
-    return CapsuleCollider3D(
-        start = Vec3(player.x, player.y - PLAYER_HALF_HEIGHT + PLAYER_COLLISION_RADIUS, player.z),
-        end = Vec3(player.x, player.y + PLAYER_HALF_HEIGHT - PLAYER_COLLISION_RADIUS, player.z),
-        radius = PLAYER_COLLISION_RADIUS
     )
 }
 
