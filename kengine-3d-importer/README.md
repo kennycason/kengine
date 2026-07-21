@@ -8,7 +8,7 @@ Runtime loading stays in `kengine-3d` and currently supports:
 - `.gltf`
 - `.obj`
 
-The importer module owns the offline path for source formats that should not be parsed directly by games. The first slice is a tested planner plus CLI: it identifies runtime-ready files, marks `.fbx` and USD-family files as GLB conversion candidates, and returns a clear unsupported-format message for everything else.
+The importer module owns asset preflight for source formats that should not be parsed directly by games. It validates runtime-ready files with `ModelLoader3D.inspect`, marks `.fbx` and USD-family files as requiring external GLB export, and returns a clear unsupported-format message for everything else. It does not run Blender, Assimp, the FBX SDK, or any other converter.
 
 ## Run
 
@@ -17,14 +17,14 @@ The importer module owns the offline path for source formats that should not be 
 ./kengine-3d-importer/build/bin/macosArm64/debugExecutable/kengine-3d-importer.kexe models/source.fbx
 ```
 
-Use `--output` to choose the planned GLB path:
+Use `--suggested-output` to choose the suggested runtime GLB path reported for source formats:
 
 ```shell
-./kengine-3d-importer/build/bin/macosArm64/debugExecutable/kengine-3d-importer.kexe models/source.usdz --output models/source.glb
+./kengine-3d-importer/build/bin/macosArm64/debugExecutable/kengine-3d-importer.kexe models/source.usdz --suggested-output models/source.glb
 ```
 
 ## Next
 
-- Add external converter adapters behind this module, starting with a Blender-backed GLB export path.
-- Add validation that the converted GLB can be inspected by `ModelLoader3D`.
-- Add batch import manifests once game/tool asset folders need repeatable conversion.
+- Add batch preflight manifests once game/tool asset folders need repeatable checks.
+- Add packaging checks for model folders with external `.gltf` buffers/images or OBJ `.mtl` textures.
+- Add optional asset-copy helpers for moving validated runtime models into game/tool asset directories.

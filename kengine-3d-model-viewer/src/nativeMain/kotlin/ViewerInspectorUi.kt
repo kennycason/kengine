@@ -9,22 +9,36 @@ import com.kengine.three.ui.GpuUiRenderer3D
 import com.kengine.three.ui.GpuUiView3D
 import kotlin.math.roundToInt
 
+enum class ViewerInspectorPane(
+    val label: String
+) {
+    VIEW("VIEW"),
+    ANIM("ANIM"),
+    LIGHT("LIGHT"),
+    ASSET("ASSET")
+}
+
 class ViewerInspectorUi(
     private val controls: ViewerControlState,
     private val activeModel: () -> ViewerLoadedModel,
     private val statusText: () -> String,
+    private val assetHealthText: () -> String,
     private val onSelectModel: (Int) -> Unit,
     private val onSelectClip: (Int) -> Unit,
     private val onResetView: () -> Unit,
+    private val onSelectCamera: (Int) -> Unit,
+    private val onPreflightModel: () -> Unit,
+    private val onPreflightAllModels: () -> Unit,
     private val onLoadModel: () -> Unit,
     private val onMessage: (String) -> Unit,
     private val onChanged: () -> Unit
 ) {
     val ui = GpuUiContext3D()
+    private var selectedPane = ViewerInspectorPane.VIEW
+    private var layoutDirty = false
 
     init {
-        ui.addView(buildPanel())
-        ui.performLayout()
+        rebuildPanel()
     }
 
     fun handleMouse(mouse: MouseInputEventSubscriber): Boolean {
@@ -32,6 +46,7 @@ class ViewerInspectorUi(
     }
 
     fun prepare(renderer: GpuUiRenderer3D) {
+        rebuildPanelIfNeeded()
         currentTexts().forEach(renderer::preloadText)
     }
 
@@ -46,26 +61,48 @@ class ViewerInspectorUi(
         return listOf(
             "KENGINE 3D VIEWER",
             statusText().compactUiText(34),
-            activeModel().info.viewerStatsLine().compactUiText(34),
-            activeModel().info.viewerTextureLine().compactUiText(34),
-            activeModel().info.viewerRenderLine().compactUiText(34),
+            ViewerInspectorPane.VIEW.label,
+            ViewerInspectorPane.ANIM.label,
+            ViewerInspectorPane.LIGHT.label,
+            ViewerInspectorPane.ASSET.label,
             "MODEL ${controls.currentModelPreset.label.compactUiText(18)}",
             "PREV",
             "NEXT",
-            "LOAD",
-            "CLIP ${activeModel().selectedClipName()?.compactUiText(20) ?: "NONE"}",
-            "SPEED ${controls.animationSpeed.formatUiPercent()} PCT",
-            if (controls.animationPaused) "PLAY" else "PAUSE",
-            "STOP",
-            "ANIMATION SPEED",
-            "LIGHT ${controls.currentLightPreset.label.compactUiText(18)}",
-            "BG",
-            "AMBIENT ${controls.currentLight.ambientStrength.formatUiPercent()} PCT",
-            "DIFFUSE ${controls.currentLight.diffuseStrength.formatUiPercent()} PCT",
-            "BACKGROUND ${controls.currentBackground.label.compactUiText(14)}",
-            if (controls.showAxes) "AXES ON" else "AXES OFF",
-            "RESET"
-        )
+            "LOAD"
+        ) + selectedPaneTexts()
+    }
+
+    private fun selectedPaneTexts(): List<String> {
+        return when (selectedPane) {
+            ViewerInspectorPane.VIEW -> listOf(
+                "CAM ${controls.currentCameraPreset.label.compactUiText(20)}",
+                "BACKGROUND ${controls.currentBackground.label.compactUiText(14)}",
+                if (controls.showAxes) "AXES ON" else "AXES OFF",
+                "RESET"
+            )
+            ViewerInspectorPane.ANIM -> listOf(
+                "CLIP ${activeModel().selectedClipName()?.compactUiText(20) ?: "NONE"}",
+                "SPEED ${controls.animationSpeed.formatUiPercent()} PCT",
+                if (controls.animationPaused) "PLAY" else "PAUSE",
+                "STOP",
+                "ANIMATION SPEED"
+            )
+            ViewerInspectorPane.LIGHT -> listOf(
+                "LIGHT ${controls.currentLightPreset.label.compactUiText(18)}",
+                "BG",
+                "AMBIENT ${controls.currentLight.ambientStrength.formatUiPercent()} PCT",
+                "DIFFUSE ${controls.currentLight.diffuseStrength.formatUiPercent()} PCT"
+            )
+            ViewerInspectorPane.ASSET -> listOf(
+                activeModel().info.viewerStatsLine().compactUiText(34),
+                activeModel().info.viewerTextureLine().compactUiText(34),
+                activeModel().info.viewerRenderLine().compactUiText(34),
+                assetHealthText().compactUiText(34),
+                "ASSET PREFLIGHT",
+                "CHECK",
+                "ALL"
+            )
+        }
     }
 
     private fun buildPanel(): GpuUiView3D {
@@ -74,7 +111,7 @@ class ViewerInspectorUi(
             desiredX = 16.0,
             desiredY = 16.0,
             desiredWidth = 360.0,
-            desiredHeight = 472.0,
+            desiredHeight = selectedPane.panelHeight(),
             backgroundColor = Color.fromHex("10151ee0"),
             direction = GpuUiDirection3D.COLUMN,
             padding = 12.0,
@@ -98,32 +135,7 @@ class ViewerInspectorUi(
                 align = GpuUiAlign3D.LEFT
             )
 
-            label(
-                id = "model-stats",
-                text = { activeModel().info.viewerStatsLine().compactUiText(34) },
-                width = 336.0,
-                height = ROW_HEIGHT,
-                color = Color.fromHex("c8d6f0"),
-                align = GpuUiAlign3D.LEFT
-            )
-
-            label(
-                id = "texture-stats",
-                text = { activeModel().info.viewerTextureLine().compactUiText(34) },
-                width = 336.0,
-                height = ROW_HEIGHT,
-                color = Color.fromHex("c8d6f0"),
-                align = GpuUiAlign3D.LEFT
-            )
-
-            label(
-                id = "render-stats",
-                text = { activeModel().info.viewerRenderLine().compactUiText(34) },
-                width = 336.0,
-                height = ROW_HEIGHT,
-                color = Color.fromHex("c8d6f0"),
-                align = GpuUiAlign3D.LEFT
-            )
+            paneTabs()
 
             controlRow("model-row") {
                 label(
@@ -138,107 +150,196 @@ class ViewerInspectorUi(
                 smallButton("model-load", "LOAD") { onLoadModel() }
             }
 
-            controlRow("clip-row") {
-                label(
-                    id = "clip-label",
-                    text = { "CLIP ${activeModel().selectedClipName()?.compactUiText(20) ?: "NONE"}" },
-                    width = 180.0,
-                    height = ROW_HEIGHT,
-                    color = Color.fromHex("f5f7fb")
-                )
-                smallButton("clip-prev", "PREV") { onSelectClip(-1) }
-                smallButton("clip-next", "NEXT") { onSelectClip(1) }
+            when (selectedPane) {
+                ViewerInspectorPane.VIEW -> viewPane()
+                ViewerInspectorPane.ANIM -> animationPane()
+                ViewerInspectorPane.LIGHT -> lightPane()
+                ViewerInspectorPane.ASSET -> assetPane()
             }
+        }
+    }
 
-            controlRow("playback-row") {
-                label(
-                    id = "playback-label",
-                    text = { "SPEED ${controls.animationSpeed.formatUiPercent()} PCT" },
-                    width = 182.0,
-                    height = ROW_HEIGHT,
-                    color = Color.fromHex("f5f7fb")
-                )
-                button(
-                    id = "play-pause",
-                    text = { if (controls.animationPaused) "PLAY" else "PAUSE" },
-                    width = 74.0,
-                    height = ROW_HEIGHT,
-                    backgroundColor = BUTTON_BG,
-                    hoverColor = BUTTON_HOVER,
-                    pressColor = BUTTON_PRESS,
-                    onClick = { onMessage(controls.toggleAnimationPlayback()) }
-                )
-                smallButton("stop", "STOP") { onMessage(controls.stopAnimationPlayback()) }
+    private fun GpuUiView3D.paneTabs() {
+        view(
+            id = "pane-tabs",
+            width = 336.0,
+            height = ROW_HEIGHT,
+            direction = GpuUiDirection3D.ROW,
+            spacing = 6.0
+        ) {
+            ViewerInspectorPane.values().forEach { pane ->
+                paneButton(pane)
             }
+        }
+    }
 
-            sliderRow(
-                id = "speed-slider",
-                label = { "ANIMATION SPEED" },
-                value = { controls.animationSpeed },
-                min = 0.25,
-                max = 3.0,
-                onValueChanged = {
-                    controls.setAnimationSpeed(it)
-                    onChanged()
-                }
+    private fun GpuUiView3D.viewPane() {
+        controlRow("camera-row") {
+            label(
+                id = "camera-label",
+                text = { "CAM ${controls.currentCameraPreset.label.compactUiText(20)}" },
+                width = 180.0,
+                height = ROW_HEIGHT,
+                color = Color.fromHex("f5f7fb")
             )
+            smallButton("camera-prev", "PREV") { onSelectCamera(-1) }
+            smallButton("camera-next", "NEXT") { onSelectCamera(1) }
+        }
 
-            controlRow("light-row") {
-                label(
-                    id = "light-label",
-                    text = { "LIGHT ${controls.currentLightPreset.label.compactUiText(18)}" },
-                    width = 180.0,
-                    height = ROW_HEIGHT,
-                    color = Color.fromHex("f5f7fb")
-                )
-                smallButton("light-next", "NEXT") { onMessage(controls.cycleLight()) }
-                smallButton("background-next", "BG") { onMessage(controls.cycleBackground()) }
-            }
-
-            sliderRow(
-                id = "ambient-slider",
-                label = { "AMBIENT ${controls.currentLight.ambientStrength.formatUiPercent()} PCT" },
-                value = { controls.currentLight.ambientStrength.toDouble() },
-                min = 0.0,
-                max = 1.0,
-                onValueChanged = {
-                    controls.setAmbientStrength(it)
-                    onChanged()
-                }
+        controlRow("debug-row") {
+            label(
+                id = "debug-label",
+                text = { "BACKGROUND ${controls.currentBackground.label.compactUiText(14)}" },
+                width = 180.0,
+                height = ROW_HEIGHT,
+                color = Color.fromHex("f5f7fb")
             )
-
-            sliderRow(
-                id = "diffuse-slider",
-                label = { "DIFFUSE ${controls.currentLight.diffuseStrength.formatUiPercent()} PCT" },
-                value = { controls.currentLight.diffuseStrength.toDouble() },
-                min = 0.0,
-                max = 1.5,
-                onValueChanged = {
-                    controls.setDiffuseStrength(it)
-                    onChanged()
-                }
+            button(
+                id = "axes-toggle",
+                text = { if (controls.showAxes) "AXES ON" else "AXES OFF" },
+                width = 74.0,
+                height = ROW_HEIGHT,
+                backgroundColor = BUTTON_BG,
+                hoverColor = BUTTON_HOVER,
+                pressColor = BUTTON_PRESS,
+                onClick = { onMessage(controls.toggleAxes()) }
             )
+            smallButton("reset", "RESET") { onResetView() }
+        }
+    }
 
-            controlRow("debug-row") {
-                label(
-                    id = "debug-label",
-                    text = { "BACKGROUND ${controls.currentBackground.label.compactUiText(14)}" },
-                    width = 180.0,
-                    height = ROW_HEIGHT,
-                    color = Color.fromHex("f5f7fb")
-                )
-                button(
-                    id = "axes-toggle",
-                    text = { if (controls.showAxes) "AXES ON" else "AXES OFF" },
-                    width = 74.0,
-                    height = ROW_HEIGHT,
-                    backgroundColor = BUTTON_BG,
-                    hoverColor = BUTTON_HOVER,
-                    pressColor = BUTTON_PRESS,
-                    onClick = { onMessage(controls.toggleAxes()) }
-                )
-                smallButton("reset", "RESET") { onResetView() }
+    private fun GpuUiView3D.animationPane() {
+        controlRow("clip-row") {
+            label(
+                id = "clip-label",
+                text = { "CLIP ${activeModel().selectedClipName()?.compactUiText(20) ?: "NONE"}" },
+                width = 180.0,
+                height = ROW_HEIGHT,
+                color = Color.fromHex("f5f7fb")
+            )
+            smallButton("clip-prev", "PREV") { onSelectClip(-1) }
+            smallButton("clip-next", "NEXT") { onSelectClip(1) }
+        }
+
+        controlRow("playback-row") {
+            label(
+                id = "playback-label",
+                text = { "SPEED ${controls.animationSpeed.formatUiPercent()} PCT" },
+                width = 182.0,
+                height = ROW_HEIGHT,
+                color = Color.fromHex("f5f7fb")
+            )
+            button(
+                id = "play-pause",
+                text = { if (controls.animationPaused) "PLAY" else "PAUSE" },
+                width = 74.0,
+                height = ROW_HEIGHT,
+                backgroundColor = BUTTON_BG,
+                hoverColor = BUTTON_HOVER,
+                pressColor = BUTTON_PRESS,
+                onClick = { onMessage(controls.toggleAnimationPlayback()) }
+            )
+            smallButton("stop", "STOP") { onMessage(controls.stopAnimationPlayback()) }
+        }
+
+        sliderRow(
+            id = "speed-slider",
+            label = { "ANIMATION SPEED" },
+            value = { controls.animationSpeed },
+            min = 0.25,
+            max = 3.0,
+            onValueChanged = {
+                controls.setAnimationSpeed(it)
+                onChanged()
             }
+        )
+    }
+
+    private fun GpuUiView3D.lightPane() {
+        controlRow("light-row") {
+            label(
+                id = "light-label",
+                text = { "LIGHT ${controls.currentLightPreset.label.compactUiText(18)}" },
+                width = 180.0,
+                height = ROW_HEIGHT,
+                color = Color.fromHex("f5f7fb")
+            )
+            smallButton("light-next", "NEXT") { onMessage(controls.cycleLight()) }
+            smallButton("background-next", "BG") { onMessage(controls.cycleBackground()) }
+        }
+
+        sliderRow(
+            id = "ambient-slider",
+            label = { "AMBIENT ${controls.currentLight.ambientStrength.formatUiPercent()} PCT" },
+            value = { controls.currentLight.ambientStrength.toDouble() },
+            min = 0.0,
+            max = 1.0,
+            onValueChanged = {
+                controls.setAmbientStrength(it)
+                onChanged()
+            }
+        )
+
+        sliderRow(
+            id = "diffuse-slider",
+            label = { "DIFFUSE ${controls.currentLight.diffuseStrength.formatUiPercent()} PCT" },
+            value = { controls.currentLight.diffuseStrength.toDouble() },
+            min = 0.0,
+            max = 1.5,
+            onValueChanged = {
+                controls.setDiffuseStrength(it)
+                onChanged()
+            }
+        )
+    }
+
+    private fun GpuUiView3D.assetPane() {
+        label(
+            id = "model-stats",
+            text = { activeModel().info.viewerStatsLine().compactUiText(34) },
+            width = 336.0,
+            height = ROW_HEIGHT,
+            color = Color.fromHex("c8d6f0"),
+            align = GpuUiAlign3D.LEFT
+        )
+
+        label(
+            id = "texture-stats",
+            text = { activeModel().info.viewerTextureLine().compactUiText(34) },
+            width = 336.0,
+            height = ROW_HEIGHT,
+            color = Color.fromHex("c8d6f0"),
+            align = GpuUiAlign3D.LEFT
+        )
+
+        label(
+            id = "render-stats",
+            text = { activeModel().info.viewerRenderLine().compactUiText(34) },
+            width = 336.0,
+            height = ROW_HEIGHT,
+            color = Color.fromHex("c8d6f0"),
+            align = GpuUiAlign3D.LEFT
+        )
+
+        label(
+            id = "asset-health",
+            text = { assetHealthText().compactUiText(34) },
+            width = 336.0,
+            height = ROW_HEIGHT,
+            color = Color.fromHex("bfffcfff"),
+            align = GpuUiAlign3D.LEFT
+        )
+
+        controlRow("preflight-row") {
+            label(
+                id = "preflight-label",
+                text = { "ASSET PREFLIGHT" },
+                width = 206.0,
+                height = ROW_HEIGHT,
+                color = Color.fromHex("f5f7fb")
+            )
+            smallButton("preflight-check", "CHECK") { onPreflightModel() }
+            smallButton("preflight-all", "ALL") { onPreflightAllModels() }
         }
     }
 
@@ -290,6 +391,19 @@ class ViewerInspectorUi(
         }
     }
 
+    private fun GpuUiView3D.paneButton(pane: ViewerInspectorPane) {
+        button(
+            id = "pane-${pane.label.lowercase()}",
+            text = { pane.label },
+            width = 78.0,
+            height = ROW_HEIGHT,
+            backgroundColor = if (selectedPane == pane) TAB_SELECTED_BG else BUTTON_BG,
+            hoverColor = BUTTON_HOVER,
+            pressColor = BUTTON_PRESS,
+            onClick = { selectPane(pane) }
+        )
+    }
+
     private fun GpuUiView3D.smallButton(
         id: String,
         text: String,
@@ -305,6 +419,26 @@ class ViewerInspectorUi(
             pressColor = BUTTON_PRESS,
             onClick = onClick
         )
+    }
+
+    private fun selectPane(pane: ViewerInspectorPane) {
+        if (selectedPane != pane) {
+            selectedPane = pane
+            layoutDirty = true
+        }
+    }
+
+    private fun rebuildPanelIfNeeded() {
+        if (layoutDirty) {
+            rebuildPanel()
+        }
+    }
+
+    private fun rebuildPanel() {
+        layoutDirty = false
+        ui.clear()
+        ui.addView(buildPanel())
+        ui.performLayout()
     }
 
     private fun String.compactUiText(maxLength: Int): String {
@@ -353,8 +487,18 @@ class ViewerInspectorUi(
     companion object {
         private const val ROW_HEIGHT = 26.0
         private val BUTTON_BG = Color.fromHex("273244f2")
+        private val TAB_SELECTED_BG = Color.fromHex("425d7dff")
         private val BUTTON_HOVER = Color.fromHex("3b4a62ff")
         private val BUTTON_PRESS = Color.fromHex("5ca8ffff")
+    }
+}
+
+private fun ViewerInspectorPane.panelHeight(): Double {
+    return when (this) {
+        ViewerInspectorPane.ASSET -> 364.0
+        ViewerInspectorPane.ANIM,
+        ViewerInspectorPane.LIGHT -> 312.0
+        ViewerInspectorPane.VIEW -> 286.0
     }
 }
 

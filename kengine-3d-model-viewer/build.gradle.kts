@@ -66,6 +66,7 @@ kotlin {
             dependencies {
                 implementation(project(":kengine"))
                 implementation(project(":kengine-3d"))
+                implementation(project(":kengine-3d-importer"))
                 implementation(project(":kengine-3d-ui"))
             }
         }

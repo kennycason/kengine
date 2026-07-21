@@ -16,52 +16,52 @@ class ModelImportPlanner3DTest {
         assertEquals(ModelImportFormat3D.GLB, glb.inputFormat)
         assertEquals(ModelImportAction3D.LOAD_DIRECTLY, glb.action)
         assertTrue(glb.runtimeReady)
-        assertFalse(glb.requiresConversion)
-        assertNull(glb.outputPath)
+        assertFalse(glb.requiresExternalExport)
+        assertNull(glb.suggestedRuntimePath)
         assertEquals(ModelImportFormat3D.OBJ, obj.inputFormat)
         assertEquals(ModelImportAction3D.LOAD_DIRECTLY, obj.action)
     }
 
     @Test
-    fun fbxPlansGlbConversionBesideInput() {
+    fun fbxRequiresExternalGlbExportBesideInput() {
         val plan = ModelImportPlanner3D.plan("assets/source/vehicle.fbx")
 
         assertEquals(ModelImportFormat3D.FBX, plan.inputFormat)
-        assertEquals(ModelImportAction3D.CONVERT_TO_GLB, plan.action)
+        assertEquals(ModelImportAction3D.EXTERNAL_EXPORT_REQUIRED, plan.action)
         assertFalse(plan.runtimeReady)
-        assertTrue(plan.requiresConversion)
-        assertEquals("assets/source/vehicle.glb", plan.outputPath)
+        assertTrue(plan.requiresExternalExport)
+        assertEquals("assets/source/vehicle.glb", plan.suggestedRuntimePath)
     }
 
     @Test
     fun usdzCanUseExplicitGlbOutput() {
         val plan = ModelImportPlanner3D.plan(
             inputPath = "assets/source/scene.usdz",
-            outputPath = "assets/runtime/scene.glb"
+            suggestedRuntimePath = "assets/runtime/scene.glb"
         )
 
         assertEquals(ModelImportFormat3D.USDZ, plan.inputFormat)
-        assertEquals(ModelImportAction3D.CONVERT_TO_GLB, plan.action)
-        assertEquals("assets/runtime/scene.glb", plan.outputPath)
+        assertEquals(ModelImportAction3D.EXTERNAL_EXPORT_REQUIRED, plan.action)
+        assertEquals("assets/runtime/scene.glb", plan.suggestedRuntimePath)
     }
 
     @Test
-    fun conversionOutputMustBeGlb() {
+    fun suggestedRuntimeOutputMustBeGlb() {
         assertFailsWith<IllegalArgumentException> {
             ModelImportPlanner3D.plan(
                 inputPath = "assets/source/scene.fbx",
-                outputPath = "assets/runtime/scene.gltf"
+                suggestedRuntimePath = "assets/runtime/scene.gltf"
             )
         }
     }
 
     @Test
-    fun unsupportedFormatExplainsRuntimeAndConversionFormats() {
+    fun unsupportedFormatExplainsRuntimeAndExternalExportFormats() {
         val plan = ModelImportPlanner3D.plan("assets/source/scene.blend")
 
         assertNull(plan.inputFormat)
         assertEquals(ModelImportAction3D.UNSUPPORTED, plan.action)
         assertTrue(plan.message.contains("Runtime formats: glb, gltf, obj."))
-        assertTrue(plan.message.contains("Conversion candidates: fbx, usd, usda, usdc, usdz."))
+        assertTrue(plan.message.contains("Source formats that require external GLB export: fbx, usd, usda, usdc, usdz."))
     }
 }

@@ -492,7 +492,7 @@ object ModelLoader3D {
         return when (val format = detectFormat(assetPath)) {
             ModelFormat3D.GLB -> inspectGlb(assetPath, vertexCount = 0)
             ModelFormat3D.GLTF -> inspectGlb(assetPath, vertexCount = 0)
-            ModelFormat3D.OBJ -> ModelInfo3D(assetPath = assetPath, format = format, vertexCount = 0)
+            ModelFormat3D.OBJ -> loadObjSource(assetPath, ModelLoadOptions3D(), format).info
         }
     }
 

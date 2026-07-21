@@ -2,7 +2,7 @@ package com.kengine.three.importer
 
 enum class ModelImportAction3D {
     LOAD_DIRECTLY,
-    CONVERT_TO_GLB,
+    EXTERNAL_EXPORT_REQUIRED,
     UNSUPPORTED
 }
 
@@ -38,7 +38,7 @@ enum class ModelImportFormat3D(
                 .sorted()
         }
 
-        fun conversionCandidateExtensions(): List<String> {
+        fun externalExportExtensions(): List<String> {
             return values()
                 .filterNot { it.runtimeReady }
                 .flatMap { it.extensions }
@@ -51,20 +51,20 @@ data class ModelImportPlan3D(
     val inputPath: String,
     val inputFormat: ModelImportFormat3D?,
     val action: ModelImportAction3D,
-    val outputPath: String?,
+    val suggestedRuntimePath: String?,
     val message: String
 ) {
     val runtimeReady: Boolean
         get() = action == ModelImportAction3D.LOAD_DIRECTLY
 
-    val requiresConversion: Boolean
-        get() = action == ModelImportAction3D.CONVERT_TO_GLB
+    val requiresExternalExport: Boolean
+        get() = action == ModelImportAction3D.EXTERNAL_EXPORT_REQUIRED
 }
 
 object ModelImportPlanner3D {
     fun plan(
         inputPath: String,
-        outputPath: String? = null
+        suggestedRuntimePath: String? = null
     ): ModelImportPlan3D {
         require(inputPath.isNotBlank()) {
             "Model import input path must not be blank."
@@ -76,7 +76,7 @@ object ModelImportPlanner3D {
                 inputPath = inputPath,
                 inputFormat = null,
                 action = ModelImportAction3D.UNSUPPORTED,
-                outputPath = null,
+                suggestedRuntimePath = null,
                 message = unsupportedFormatMessage(inputPath)
             )
         }
@@ -86,28 +86,28 @@ object ModelImportPlanner3D {
                 inputPath = inputPath,
                 inputFormat = format,
                 action = ModelImportAction3D.LOAD_DIRECTLY,
-                outputPath = outputPath,
+                suggestedRuntimePath = null,
                 message = "${format.label} is runtime-ready. Load it directly with ModelLoader3D."
             )
         }
 
-        val resolvedOutput = outputPath ?: inputPath.withExtension("glb")
+        val resolvedOutput = suggestedRuntimePath ?: inputPath.withExtension("glb")
         require(resolvedOutput.fileName().substringAfterLast('.', "").lowercase() == "glb") {
-            "Model import conversion output must end in .glb: $resolvedOutput"
+            "Suggested runtime model path must end in .glb: $resolvedOutput"
         }
         return ModelImportPlan3D(
             inputPath = inputPath,
             inputFormat = format,
-            action = ModelImportAction3D.CONVERT_TO_GLB,
-            outputPath = resolvedOutput,
-            message = "${format.label} requires offline conversion to GLB before runtime loading."
+            action = ModelImportAction3D.EXTERNAL_EXPORT_REQUIRED,
+            suggestedRuntimePath = resolvedOutput,
+            message = "${format.label} is not a Kengine runtime format. Export it to GLB from your asset tool, then load the GLB."
         )
     }
 
     private fun unsupportedFormatMessage(inputPath: String): String {
         return "Unsupported model format for asset: $inputPath. " +
             "Runtime formats: ${ModelImportFormat3D.runtimeExtensions().joinToString(", ")}. " +
-            "Conversion candidates: ${ModelImportFormat3D.conversionCandidateExtensions().joinToString(", ")}."
+            "Source formats that require external GLB export: ${ModelImportFormat3D.externalExportExtensions().joinToString(", ")}."
     }
 }
 

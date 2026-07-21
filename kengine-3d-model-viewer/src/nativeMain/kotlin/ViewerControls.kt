@@ -3,6 +3,7 @@ import com.kengine.input.keyboard.KeyboardInputEventSubscriber
 import com.kengine.input.keyboard.Keys
 import com.kengine.math.Vec3
 import com.kengine.three.DirectionalLight3D
+import kotlin.math.PI
 import kotlin.math.roundToInt
 
 data class ViewerModelPreset(
@@ -26,9 +27,20 @@ data class ViewerLightPreset(
     val light: DirectionalLight3D
 )
 
+data class ViewerCameraPreset(
+    val label: String,
+    val yawRadians: Float,
+    val pitchRadians: Float,
+    val distanceMultiplier: Double,
+    val targetHeightMultiplier: Double = 0.42
+)
+
 sealed class ViewerControlAction {
     data class SelectModel(val step: Int) : ViewerControlAction()
     data class SelectClip(val step: Int) : ViewerControlAction()
+    data class SelectCameraPreset(val index: Int) : ViewerControlAction()
+    object PreflightModel : ViewerControlAction()
+    object PreflightAllModels : ViewerControlAction()
     object ResetView : ViewerControlAction()
     object PrintHelp : ViewerControlAction()
     object PrintStatus : ViewerControlAction()
@@ -55,6 +67,7 @@ class ViewerControlState(
     private var lightAmbientStrength = defaultLightPresets[lightPresetIndex].light.ambientStrength
     private var lightDiffuseStrength = defaultLightPresets[lightPresetIndex].light.diffuseStrength
     private var backgroundPresetIndex = 0
+    private var cameraPresetIndex = 0
 
     var modelPresetIndex: Int = initialModelPresetIndex
         private set
@@ -70,6 +83,10 @@ class ViewerControlState(
     val currentModelPreset: ViewerModelPreset
         get() = modelPresets[modelPresetIndex]
 
+    fun modelPresetsSnapshot(): List<ViewerModelPreset> {
+        return modelPresets.toList()
+    }
+
     val currentBackground: ViewerBackgroundPreset
         get() = defaultBackgroundPresets[backgroundPresetIndex]
 
@@ -81,6 +98,9 @@ class ViewerControlState(
             ambientStrength = lightAmbientStrength,
             diffuseStrength = lightDiffuseStrength
         )
+
+    val currentCameraPreset: ViewerCameraPreset
+        get() = defaultCameraPresets[cameraPresetIndex]
 
     fun primeKeyboard(keyboard: KeyboardInputEventSubscriber) {
         keyEdges.prime(keyboard, controlledKeys)
@@ -145,6 +165,16 @@ class ViewerControlState(
         lightAmbientStrength = currentLightPreset.light.ambientStrength
         lightDiffuseStrength = currentLightPreset.light.diffuseStrength
         return "Light preset: ${currentLightPreset.label}"
+    }
+
+    fun selectCameraPreset(index: Int): String {
+        cameraPresetIndex = index.coerceIn(defaultCameraPresets.indices)
+        return "Camera: ${currentCameraPreset.label}"
+    }
+
+    fun cycleCameraPreset(step: Int = 1): String {
+        cameraPresetIndex = wrappedIndex(cameraPresetIndex, step, defaultCameraPresets.size)
+        return "Camera: ${currentCameraPreset.label}"
     }
 
     fun setAmbientStrength(value: Double): String {
@@ -220,6 +250,24 @@ class ViewerControlState(
         if (keyEdges.justPressed(keyboard, Keys.G)) {
             actions += ViewerControlAction.Message(toggleAxes())
         }
+        if (keyEdges.justPressed(keyboard, Keys.ONE)) {
+            actions += ViewerControlAction.SelectCameraPreset(index = 0)
+        }
+        if (keyEdges.justPressed(keyboard, Keys.TWO)) {
+            actions += ViewerControlAction.SelectCameraPreset(index = 1)
+        }
+        if (keyEdges.justPressed(keyboard, Keys.THREE)) {
+            actions += ViewerControlAction.SelectCameraPreset(index = 2)
+        }
+        if (keyEdges.justPressed(keyboard, Keys.FOUR)) {
+            actions += ViewerControlAction.SelectCameraPreset(index = 3)
+        }
+        if (keyEdges.justPressed(keyboard, Keys.P)) {
+            actions += ViewerControlAction.PreflightModel
+        }
+        if (keyEdges.justPressed(keyboard, Keys.A)) {
+            actions += ViewerControlAction.PreflightAllModels
+        }
         if (keyEdges.justPressed(keyboard, Keys.R)) {
             resetViewState()
             actions += ViewerControlAction.ResetView
@@ -239,6 +287,7 @@ class ViewerControlState(
         animationSpeed = 1.0
         resetAnimationClock()
         showAxes = true
+        cameraPresetIndex = 0
         backgroundPresetIndex = 0
         lightPresetIndex = 0
         lightAmbientStrength = currentLightPreset.light.ambientStrength
@@ -300,10 +349,44 @@ private val controlledKeys = listOf(
     Keys.U,
     Keys.I,
     Keys.G,
+    Keys.ONE,
+    Keys.TWO,
+    Keys.THREE,
+    Keys.FOUR,
+    Keys.P,
+    Keys.A,
     Keys.R,
     Keys.H,
     Keys.F1,
     Keys.T
+)
+
+val defaultCameraPresets = listOf(
+    ViewerCameraPreset(
+        label = "Front",
+        yawRadians = 0.0f,
+        pitchRadians = 0.2f,
+        distanceMultiplier = 2.7
+    ),
+    ViewerCameraPreset(
+        label = "Three quarter",
+        yawRadians = (PI * 0.25).toFloat(),
+        pitchRadians = 0.26f,
+        distanceMultiplier = 2.9
+    ),
+    ViewerCameraPreset(
+        label = "Side",
+        yawRadians = (PI * 0.5).toFloat(),
+        pitchRadians = 0.2f,
+        distanceMultiplier = 2.7
+    ),
+    ViewerCameraPreset(
+        label = "Top",
+        yawRadians = 0.0f,
+        pitchRadians = 1.12f,
+        distanceMultiplier = 3.2,
+        targetHeightMultiplier = 0.16
+    )
 )
 
 fun defaultViewerModelPresets(): List<ViewerModelPreset> {

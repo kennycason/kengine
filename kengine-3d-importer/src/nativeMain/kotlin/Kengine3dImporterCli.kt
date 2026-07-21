@@ -1,6 +1,9 @@
-import com.kengine.three.importer.ModelImportAction3D
-import com.kengine.three.importer.ModelImportPlan3D
-import com.kengine.three.importer.ModelImportPlanner3D
+package com.kengine.three.importer.cli
+
+import com.kengine.three.ModelInfo3D
+import com.kengine.three.importer.ModelAssetPreflight3D
+import com.kengine.three.importer.ModelAssetPreflightResult3D
+import com.kengine.three.importer.ModelAssetPreflightStatus3D
 
 fun main(args: Array<String>) {
     val config = try {
@@ -23,18 +26,18 @@ fun main(args: Array<String>) {
         return
     }
 
-    val plan = try {
-        ModelImportPlanner3D.plan(inputPath, config.outputPath)
+    val result = try {
+        ModelAssetPreflight3D.inspect(inputPath, config.suggestedRuntimePath)
     } catch (error: IllegalArgumentException) {
         println(error.message)
         return
     }
-    println(plan.toCliText())
+    println(result.toCliText())
 }
 
 private data class ImporterCliConfig(
     val inputPath: String? = null,
-    val outputPath: String? = null,
+    val suggestedRuntimePath: String? = null,
     val printHelp: Boolean = false
 ) {
     companion object {
@@ -44,8 +47,8 @@ private data class ImporterCliConfig(
             while (index < args.size) {
                 when (val arg = args[index]) {
                     "--help", "-h" -> return config.copy(printHelp = true)
-                    "--output", "-o" -> {
-                        config = config.copy(outputPath = args.valueAfter(index, arg))
+                    "--suggested-output", "--output", "-o" -> {
+                        config = config.copy(suggestedRuntimePath = args.valueAfter(index, arg))
                         index += 1
                     }
                     else -> {
@@ -69,12 +72,12 @@ private data class ImporterCliConfig(
                 Kengine 3D Importer
 
                 Usage:
-                  kengine-3d-importer <model-path> [--output <model.glb>]
+                  kengine-3d-importer <model-path> [--suggested-output <model.glb>]
 
                 Runtime-ready formats:
                   glb, gltf, obj
 
-                Conversion-planned formats:
+                Source formats requiring external GLB export:
                   fbx, usdz, usd, usda, usdc
                 """.trimIndent()
             )
@@ -90,16 +93,32 @@ private data class ImporterCliConfig(
     }
 }
 
-private fun ModelImportPlan3D.toCliText(): String {
+private fun ModelAssetPreflightResult3D.toCliText(): String {
+    val importPlan = plan
     val builder = StringBuilder()
-    builder.appendLine("Kengine 3D import plan")
-    builder.appendLine("  input=$inputPath")
-    builder.appendLine("  format=${inputFormat?.label ?: "unknown"}")
-    builder.appendLine("  action=${action.name.lowercase()}")
-    outputPath?.let { builder.appendLine("  output=$it") }
+    builder.appendLine("Kengine 3D asset preflight")
+    builder.appendLine("  input=${importPlan.inputPath}")
+    builder.appendLine("  format=${importPlan.inputFormat?.label ?: "unknown"}")
+    builder.appendLine("  action=${importPlan.action.name.lowercase()}")
+    builder.appendLine("  status=${status.name.lowercase()}")
+    importPlan.suggestedRuntimePath?.let { builder.appendLine("  suggestedRuntime=$it") }
     builder.appendLine("  message=$message")
-    if (action == ModelImportAction3D.CONVERT_TO_GLB) {
-        builder.appendLine("  next=wire a converter adapter, then validate the GLB with ModelLoader3D.inspect")
+    modelInfo?.let { builder.appendModelInfo(it) }
+    if (status == ModelAssetPreflightStatus3D.EXTERNAL_EXPORT_REQUIRED) {
+        builder.appendLine("  next=export this source model to GLB from your asset tool, then run preflight on the GLB")
     }
     return builder.toString().trimEnd()
+}
+
+private fun StringBuilder.appendModelInfo(info: ModelInfo3D) {
+    appendLine("  meshes=${info.meshCount} primitives=${info.primitiveCount} vertices=${info.vertexCount}")
+    appendLine("  materials=${info.materialCount} textures=${info.textureCount} images=${info.imageCount}")
+    appendLine("  animations=${info.animationCount} skins=${info.skinCount}")
+    val slots = info.textureSlotUsage
+    if (slots.totalSlotCount > 0) {
+        appendLine(
+            "  textureSlots=base:${slots.baseColor} normal:${slots.normal} " +
+                "metadata:${(slots.secondarySlotCount - slots.normal).coerceAtLeast(0)}"
+        )
+    }
 }

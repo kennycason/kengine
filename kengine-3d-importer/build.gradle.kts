@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
+    id("kengine.sdl-dylib")
 }
 
 group = "kengine.3d-importer"
@@ -31,9 +32,12 @@ kotlin {
     sourceSets.getByName("${nativeTarget.name}Test").dependsOn(sourceSets.getByName("nativeTest"))
 
     nativeTarget.apply {
+        binaries.all {
+            linkerOpts(PlatformConfig.sharedLibLinkerOpts("SDL3", "SDL3_image"))
+        }
         binaries {
             executable {
-                entryPoint = "main"
+                entryPoint = "com.kengine.three.importer.cli.main"
             }
         }
     }
@@ -42,11 +46,17 @@ kotlin {
         val commonMain by getting
         val nativeMain by getting {
             kotlin.srcDir("src/nativeMain/kotlin")
+            dependencies {
+                implementation(project(":kengine-3d"))
+            }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
             }
+        }
+        val nativeTest by getting {
+            kotlin.srcDir("src/nativeTest/kotlin")
         }
     }
 }

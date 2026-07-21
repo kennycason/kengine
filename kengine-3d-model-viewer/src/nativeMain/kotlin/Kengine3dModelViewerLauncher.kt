@@ -28,6 +28,8 @@ import com.kengine.three.Scene3D
 import com.kengine.three.SceneModel3D
 import com.kengine.three.SceneRenderer3D
 import com.kengine.three.createInstance
+import com.kengine.three.importer.ModelAssetPreflightResult3D
+import com.kengine.three.importer.ModelAssetPreflightStatus3D
 import com.kengine.three.setPose
 import com.kengine.three.ui.GpuUiRenderer3D
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -88,10 +90,11 @@ fun main(args: Array<String>) {
         useContext(GpuContext.create(sdl), cleanup = true) {
             val resources = GpuResourceScope3D()
             val textureCache = resources.track(GpuTextureCache3D(this))
+            val assetResolver = ModelAssetPathResolver3D(sourceAssetRoot = config.assetRoot)
             val modelAssets = ModelAssetLoader3D(
                 gpu = this,
                 resources = resources,
-                resolver = ModelAssetPathResolver3D(sourceAssetRoot = config.assetRoot),
+                resolver = assetResolver,
                 textureCache = textureCache,
                 sourceCache = ModelSourceCache3D(),
                 animatedSourceCache = AnimatedModelSourceCache3D()
@@ -103,6 +106,7 @@ fun main(args: Array<String>) {
             val scene = Scene3D(controls.currentLight)
             resources.track(scene)
             val modelCache = mutableMapOf<ViewerModelPreset, ViewerLoadedModel>()
+            val assetHealth = ViewerAssetHealthCache(assetResolver)
 
             fun activateModel(
                 preset: ViewerModelPreset,
@@ -126,11 +130,18 @@ fun main(args: Array<String>) {
                 loadedModel.addTo(scene)
                 controls.resetAnimationClock()
                 printLoadedModel(preset, loadedModel)
+                assetHealth.rememberLoaded(preset, loadedModel.info)
                 return loadedModel
             }
 
             var activeModel = activateModel(controls.currentModelPreset)
-            var cameraController = createCameraController(controls.currentModelPreset.targetSize)
+            fun createCurrentCameraController(): OrbitCameraController3D {
+                return createCameraController(
+                    targetSize = controls.currentModelPreset.targetSize,
+                    preset = controls.currentCameraPreset
+                )
+            }
+            var cameraController = createCurrentCameraController()
             var viewerStatusText = "READY GLB GLTF OBJ"
             var pendingModelLoad: ViewerModelPreset? = null
             fun updateWindowTitle() {
@@ -154,15 +165,47 @@ fun main(args: Array<String>) {
                 setViewerStatus(status)
                 updateWindowTitle()
             }
+            fun activeAssetHealthText(): String {
+                return assetHealth.get(controls.currentModelPreset)?.inspectorLine()
+                    ?: viewerLoadedAssetHealthLine(activeModel.info)
+            }
+            fun printModelPreflight() {
+                val report = assetHealth.inspect(
+                    preset = controls.currentModelPreset,
+                    resolvedPath = activeModel.info.assetPath,
+                    refresh = true
+                )
+                val result = report.result
+                println("Preflight ${report.resolvedPath}")
+                println("  status=${result.status.name.lowercase()} action=${result.plan.action.name.lowercase()}")
+                println("  message=${result.message}")
+                result.modelInfo?.let { info ->
+                    println("  format=${info.format} vertices=${info.vertexCount} meshes=${info.meshCount} primitives=${info.primitiveCount}")
+                    println("  materials=${info.materialCount} textures=${info.textureCount} images=${info.imageCount}")
+                    println("  animations=${info.animationCount} skins=${info.skinCount} slots=${viewerTextureSlotSummary(info)}")
+                }
+                setViewerStatus(viewerPreflightStatus(result))
+                updateWindowTitle()
+            }
+            fun printModelPresetPreflightReport() {
+                val reports = assetHealth.inspectAll(controls.modelPresetsSnapshot(), refresh = true)
+                println("Model preset preflight report:")
+                reports.forEachIndexed { index, report ->
+                    println("  ${report.consoleLine(index)}")
+                    println("     path=${report.resolvedPath}")
+                }
+                printMessage(viewerAssetHealthSummary(reports))
+            }
             updateWindowTitle()
             val inspectorUi = ViewerInspectorUi(
                 controls = controls,
                 activeModel = { activeModel },
                 statusText = { viewerStatusText },
+                assetHealthText = ::activeAssetHealthText,
                 onSelectModel = { step ->
                     val preset = controls.selectModel(step)
                     activeModel = activateModel(preset)
-                    cameraController = createCameraController(preset.targetSize)
+                    cameraController = createCurrentCameraController()
                     updateWindowTitle()
                 },
                 onSelectClip = { step ->
@@ -175,8 +218,14 @@ fun main(args: Array<String>) {
                 },
                 onResetView = {
                     printMessage(controls.resetControls())
-                    cameraController = createCameraController(controls.currentModelPreset.targetSize)
+                    cameraController = createCurrentCameraController()
                 },
+                onSelectCamera = { step ->
+                    printMessage(controls.cycleCameraPreset(step))
+                    cameraController = createCurrentCameraController()
+                },
+                onPreflightModel = ::printModelPreflight,
+                onPreflightAllModels = ::printModelPresetPreflightReport,
                 onLoadModel = {
                     setViewerStatus("Choose GLB GLTF or OBJ")
                     val selectedPath = chooseViewerModelFile()
@@ -225,7 +274,7 @@ fun main(args: Array<String>) {
                                 is ViewerControlAction.SelectModel -> {
                                     val preset = controls.selectModel(controlAction.step)
                                     activeModel = activateModel(preset)
-                                    cameraController = createCameraController(preset.targetSize)
+                                    cameraController = createCurrentCameraController()
                                     updateWindowTitle()
                                 }
                                 is ViewerControlAction.SelectClip -> {
@@ -237,16 +286,25 @@ fun main(args: Array<String>) {
                                     )
                                     updateWindowTitle()
                                 }
+                                is ViewerControlAction.SelectCameraPreset -> {
+                                    printMessage(controls.selectCameraPreset(controlAction.index))
+                                    cameraController = createCurrentCameraController()
+                                }
+                                ViewerControlAction.PreflightModel -> {
+                                    printModelPreflight()
+                                }
+                                ViewerControlAction.PreflightAllModels -> {
+                                    printModelPresetPreflightReport()
+                                }
                                 ViewerControlAction.ResetView -> {
-                                    cameraController = createCameraController(controls.currentModelPreset.targetSize)
-                                    println("Viewer controls reset.")
-                                    updateWindowTitle()
+                                    printMessage("Viewer controls reset.")
+                                    cameraController = createCurrentCameraController()
                                 }
                                 ViewerControlAction.PrintHelp -> {
                                     printViewerControls()
                                 }
                                 ViewerControlAction.PrintStatus -> {
-                                    printViewerStatus(controls, activeModel)
+                                    printViewerStatus(controls, activeModel, activeAssetHealthText())
                                 }
                                 is ViewerControlAction.Message -> {
                                     println(controlAction.text)
@@ -290,13 +348,13 @@ fun main(args: Array<String>) {
                         try {
                             val loadedModel = activateModel(preset, reload = true)
                             controls.selectOrAddModel(preset)
-                        activeModel = loadedModel
-                        cameraController = createCameraController(preset.targetSize)
-                        printMessage("Loaded file: ${preset.label}")
-                    } catch (error: Throwable) {
-                        printModelLoadError(error)
+                            activeModel = loadedModel
+                            cameraController = createCurrentCameraController()
+                            printMessage("Loaded file: ${preset.label}")
+                        } catch (error: Throwable) {
+                            printModelLoadError(error)
+                        }
                     }
-                }
 
                     mouse.mouse.clearFrameState()
                     SDL_Delay(16u)
@@ -385,6 +443,9 @@ private data class ViewerConfig(
                   Mouse drag             Orbit camera.
                   Up/Down arrows         Zoom camera.
                   Left/Right arrows      Pan camera target.
+                  1/2/3/4                Camera presets: front, three-quarter, side, top.
+                  P                      Preflight the active model.
+                  A                      Preflight all model presets.
                   M/N                    Next/previous model preset.
                   C/V                    Next/previous animation clip.
                   Space                  Pause/resume animation.
@@ -611,12 +672,15 @@ private fun printLoadedModel(
     }
 }
 
-private fun createCameraController(targetSize: Double): OrbitCameraController3D {
+private fun createCameraController(
+    targetSize: Double,
+    preset: ViewerCameraPreset
+): OrbitCameraController3D {
     return OrbitCameraController3D(
-        target = Vec3(0.0, targetSize * 0.42, 0.0),
-        distance = targetSize * 2.7,
-        yawRadians = 0.0f,
-        pitchRadians = 0.2f,
+        target = Vec3(0.0, targetSize * preset.targetHeightMultiplier, 0.0),
+        distance = targetSize * preset.distanceMultiplier,
+        yawRadians = preset.yawRadians,
+        pitchRadians = preset.pitchRadians,
         minDistance = (targetSize * 0.12).coerceAtLeast(0.12),
         maxDistance = targetSize * 7.0
     )
@@ -635,7 +699,7 @@ private fun viewerWindowTitle(
 ): String {
     val clip = model.selectedClipName()?.let { " | clip: $it" } ?: ""
     val playback = if (controls.animationPaused) "paused" else "${controls.animationSpeed}x"
-    return "Kengine 3D Model Viewer - ${controls.currentModelPreset.label}$clip | ${controls.currentLightPreset.label} | $playback"
+    return "Kengine 3D Model Viewer - ${controls.currentModelPreset.label}$clip | ${controls.currentCameraPreset.label} | ${controls.currentLightPreset.label} | $playback"
 }
 
 private fun printViewerControls() {
@@ -645,6 +709,9 @@ private fun printViewerControls() {
           Mouse drag             Orbit camera.
           Up/Down arrows         Zoom camera.
           Left/Right arrows      Pan camera target.
+          1/2/3/4                Camera presets: front, three-quarter, side, top.
+          P                      Preflight the active model.
+          A                      Preflight all model presets.
           M/N                    Next/previous model preset.
           C/V                    Next/previous animation clip.
           Space                  Pause/resume animation.
@@ -664,12 +731,15 @@ private fun printViewerControls() {
 
 private fun printViewerStatus(
     controls: ViewerControlState,
-    model: ViewerLoadedModel
+    model: ViewerLoadedModel,
+    assetHealthText: String
 ) {
     val clip = model.selectedClipName() ?: "none"
     println("Viewer status:")
     println("  model=${controls.currentModelPreset.label}")
     println("  mode=${controls.currentModelPreset.mode.name.lowercase()} clip=$clip")
+    println("  assetHealth=$assetHealthText")
+    println("  camera=${controls.currentCameraPreset.label}")
     println("  background=${controls.currentBackground.label} light=${controls.currentLightPreset.label}")
     println("  animationSpeed=${controls.animationSpeed} paused=${controls.animationPaused} axes=${controls.showAxes}")
     println("  ambient=${controls.currentLight.ambientStrength} diffuse=${controls.currentLight.diffuseStrength}")
@@ -697,6 +767,36 @@ private fun viewerTextureSlotSummary(info: ModelInfo3D): String {
         values += "metadataOnly=$pending"
     }
     return values.joinToString(", ")
+}
+
+private fun viewerPreflightStatus(result: ModelAssetPreflightResult3D): String {
+    return when (result.status) {
+        ModelAssetPreflightStatus3D.LOADABLE -> {
+            val info = result.modelInfo
+            if (info == null) {
+                "Preflight OK"
+            } else {
+                "Preflight OK ${info.format.name} ${info.preflightSummary()}"
+            }
+        }
+        ModelAssetPreflightStatus3D.EXTERNAL_EXPORT_REQUIRED ->
+            "Preflight export ${result.plan.inputFormat?.label ?: "source"} to GLB"
+        ModelAssetPreflightStatus3D.UNSUPPORTED ->
+            "Preflight unsupported format"
+        ModelAssetPreflightStatus3D.INVALID_RUNTIME_ASSET ->
+            "Preflight failed"
+    }
+}
+
+private fun ModelInfo3D.preflightSummary(): String {
+    val values = mutableListOf<String>()
+    if (primitiveCount > 0) values += "P$primitiveCount"
+    if (vertexCount > 0) values += "V$vertexCount"
+    if (materialCount > 0) values += "M$materialCount"
+    if (textureCount > 0) values += "T$textureCount"
+    if (animationCount > 0) values += "A$animationCount"
+    if (skinCount > 0) values += "S$skinCount"
+    return values.joinToString(" ").ifBlank { "READY" }
 }
 
 private fun drawAxes(
