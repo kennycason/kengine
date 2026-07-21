@@ -59,6 +59,7 @@ import com.kengine.three.forwardForYaw
 import com.kengine.three.horizontalDistance
 import com.kengine.three.horizontalLength
 import com.kengine.three.horizontalVelocityForMovement
+import com.kengine.three.lerp
 import com.kengine.three.moveAngleToward
 import com.kengine.three.setPose
 import com.kengine.three.shortestAngleDelta
@@ -94,6 +95,8 @@ private const val PLAYER_BACKFLIP_JUMP_VELOCITY = 20.5
 private const val PLAYER_BACKFLIP_BACK_SPEED = 4.6
 private const val PLAYER_LONG_JUMP_VELOCITY = 13.2
 private const val PLAYER_LONG_JUMP_SPEED = 13.8
+private const val PLAYER_GROUND_POUND_VELOCITY = -32.0
+private const val PLAYER_GROUND_POUND_ANIMATION_SECONDS = 0.7
 private const val PLAYER_JUMP_GRAVITY = 42.0
 private const val PLAYER_FALL_GRAVITY = 48.0
 private const val PLAYER_TERMINAL_FALL_SPEED = -28.0
@@ -102,6 +105,8 @@ private const val PLAYER_COLLISION_RADIUS = 0.38
 private const val PLAYER_STOMP_BOUNCE_VELOCITY = 10.8
 private const val PLAYER_HIGH_STOMP_BOUNCE_VELOCITY = 16.2
 private const val PLAYER_BUMP_BACK_DISTANCE = 0.58
+private const val PLAYER_HURT_BOUNCE_VELOCITY = 8.6
+private const val PLAYER_HURT_ANIMATION_SECONDS = 0.42
 private const val PLAYER_HURT_COOLDOWN_SECONDS = 0.75
 private const val MARIO_MAX_HEALTH = 99
 private const val GOOMBA_DAMAGE = 6
@@ -168,6 +173,11 @@ private const val CAMERA_MIN_PITCH = -0.08
 private const val CAMERA_MAX_PITCH = 0.95
 private const val CAMERA_MIN_DISTANCE = 2.8
 private const val CAMERA_MAX_DISTANCE = 7.2
+private const val REWARD_COIN_FLY_SECONDS = 0.85
+private const val REWARD_COIN_HOLD_SECONDS = 1.45
+private const val REWARD_COIN_RETURN_SECONDS = 1.0
+private const val REWARD_COIN_ARC_HEIGHT = 4.2
+private const val REWARD_COIN_CAMERA_Y_OFFSET = 0.85
 private val CAMERA_DISTANCES = listOf(3.5, 4.9, 6.3)
 private val CONTROLLER_AXIS_SETTINGS = ControllerAxisInputSettings(
     axisCount = 6,
@@ -280,6 +290,7 @@ fun main() {
             var playerYaw = 0.0
             val controllerAxes = CalibratedControllerAxes(CONTROLLER_AXIS_SETTINGS)
             var wasJumpPressed = false
+            var wasCrouchPressed = false
             var doubleJumpAvailable = false
             var forcedAirAnimationState: MarioAnimationState? = null
             var forcedAirAnimationUntil = 0.0
@@ -288,6 +299,7 @@ fun main() {
             var lastPlayerHitAt = -PLAYER_HURT_COOLDOWN_SECONDS
             var wasDebugPressed = false
             var debugEnabled = false
+            var rewardCutscene: RewardCoinCutscene? = null
             var previousTicks = SDL_GetTicks()
 
             try {
@@ -310,137 +322,173 @@ fun main() {
                         debugEnabled = !debugEnabled
                     }
                     wasDebugPressed = input.debugPressed
-                    cameraController.updateInput(
-                        input = ThirdPersonCameraInput3D(
-                            lookX = input.lookX,
-                            lookY = input.lookY,
-                            zoom = input.zoom,
-                            cycleDistance = input.cycleCameraDistance
-                        ),
-                        deltaSeconds = deltaSeconds
-                    )
 
-                    val moveDirection = cameraController.movementDirection(input.moveRight, input.moveForward)
-                    val moveLength = horizontalLength(moveDirection)
-                    val isMoving = moveLength > MOVEMENT_INPUT_EPSILON
-                    val isGroundedBeforeStep = playerState.isGrounded
-                    val jumpJustPressed = input.jumpPressed && !wasJumpPressed
-                    val moveSpeed = when {
-                        input.crouchPressed && isGroundedBeforeStep -> PLAYER_CROUCH_WALK_SPEED
-                        input.runPressed -> PLAYER_RUN_SPEED
-                        else -> PLAYER_WALK_SPEED
-                    }
-                    val baseHorizontalVelocity = if (isMoving) {
-                        horizontalVelocityForMovement(moveDirection, moveLength, moveSpeed)
-                    } else {
-                        Vec3(0.0, 0.0, 0.0)
-                    }
-                    if (isMoving) {
-                        playerYaw = atan2(-moveDirection.x, -moveDirection.z)
-                    }
-                    var horizontalVelocity = baseHorizontalVelocity
-                    var controllerJumpRequested = jumpJustPressed
-                    if (jumpJustPressed && input.crouchPressed && isGroundedBeforeStep) {
-                        if (isMoving) {
-                            horizontalVelocity = horizontalVelocityForMovement(
-                                moveDirection = moveDirection,
-                                moveLength = moveLength,
-                                speed = PLAYER_LONG_JUMP_SPEED
-                            )
-                            playerState.velocityY = PLAYER_LONG_JUMP_VELOCITY
-                            forcedAirAnimationState = MarioAnimationState.LONG_JUMP
-                        } else {
-                            val backward = forwardForYaw(playerYaw + MARIO_MODEL_YAW_OFFSET, PLAYER_BACKFLIP_BACK_SPEED)
-                            horizontalVelocity = Vec3(backward.x, 0.0, backward.z)
-                            playerState.velocityY = PLAYER_BACKFLIP_JUMP_VELOCITY
-                            forcedAirAnimationState = MarioAnimationState.BACKFLIP
-                        }
-                        playerState.isGrounded = false
-                        playerState.ground = null
-                        controllerJumpRequested = false
-                        doubleJumpAvailable = true
-                        forcedAirAnimationUntil = elapsedSeconds + 0.5
-                    } else if (jumpJustPressed && !isGroundedBeforeStep && doubleJumpAvailable) {
-                        playerState.velocityY = maxOf(playerState.velocityY, PLAYER_DOUBLE_JUMP_VELOCITY)
-                        playerState.isGrounded = false
-                        playerState.ground = null
-                        controllerJumpRequested = false
-                        doubleJumpAvailable = false
-                        forcedAirAnimationState = MarioAnimationState.DOUBLE_JUMP
-                        forcedAirAnimationUntil = elapsedSeconds + 0.45
-                    }
-
-                    val playerStep = content.playerController.step(
-                        state = playerState,
-                        horizontalVelocity = horizontalVelocity,
-                        deltaSeconds = deltaSeconds,
-                        jumpRequested = controllerJumpRequested,
-                        allowLeaveGround = true
-                    )
-                    if (playerStep.jumped) {
-                        doubleJumpAvailable = true
-                    }
-                    wasJumpPressed = input.jumpPressed
-                    val playerYBeforeGravity = playerStep.positionBeforeVertical.y
+                    rewardCutscene = updateRewardCoinCutscene(content, rewardCutscene, elapsedSeconds)
+                    val gameplayPaused = rewardCutscene != null
                     var player = playerState.position
                     var playerVelocityY = playerState.velocityY
                     var isGroundedAfterGravity = playerState.isGrounded
+                    var isMoving = false
 
-                    updateGoombas(content.goombas, content.enemyController, deltaSeconds)
-                    updateBowser(content.bowser, content.enemyController, player, deltaSeconds)
-                    val goombaCollision = resolvePlayerGoombaCollisions(
-                        player = player,
-                        playerYBeforeGravity = playerYBeforeGravity,
-                        playerVelocityY = playerVelocityY,
-                        isGrounded = isGroundedAfterGravity,
-                        goombas = content.goombas,
-                        playerController = content.playerController,
-                        elapsedSeconds = elapsedSeconds,
-                        lastPlayerHitAt = lastPlayerHitAt,
-                        highBounceRequested = input.jumpPressed
-                    )
-                    goombaCollision.applyTo(playerState)
-                    updateProgressFromCollision(content.progress, goombaCollision)
-                    player = playerState.position
-                    playerVelocityY = playerState.velocityY
-                    isGroundedAfterGravity = playerState.isGrounded
-                    lastPlayerHitAt = goombaCollision.lastPlayerHitAt
-                    val bowserCollision = resolvePlayerBowserCollision(
-                        player = player,
-                        playerYBeforeGravity = playerYBeforeGravity,
-                        playerVelocityY = playerVelocityY,
-                        isGrounded = isGroundedAfterGravity,
-                        bowser = content.bowser,
-                        playerController = content.playerController,
-                        elapsedSeconds = elapsedSeconds,
-                        lastPlayerHitAt = lastPlayerHitAt,
-                        highBounceRequested = input.jumpPressed
-                    )
-                    bowserCollision.applyTo(playerState)
-                    updateProgressFromCollision(content.progress, bowserCollision)
-                    player = playerState.position
-                    playerVelocityY = playerState.velocityY
-                    isGroundedAfterGravity = playerState.isGrounded
-                    lastPlayerHitAt = bowserCollision.lastPlayerHitAt
-                    if (!content.bowser.isActive && !content.summitStar.isCollected) {
-                        content.summitStar.isActive = true
-                    }
-                    resolveSummitStarCollection(content.summitStar, content.playerController, player)
-                    collectRegularCoins(content, player)
-                    collectGoldenCoins(content, player)
-                    updateGoldenCoinChallenges(
-                        content = content,
-                        bowserDefeatedThisFrame = bowserCollision.bowserDefeated
-                    )
+                    if (!gameplayPaused) {
+                        cameraController.updateInput(
+                            input = ThirdPersonCameraInput3D(
+                                lookX = input.lookX,
+                                lookY = input.lookY,
+                                zoom = input.zoom,
+                                cycleDistance = input.cycleCameraDistance
+                            ),
+                            deltaSeconds = deltaSeconds
+                        )
 
-                    if (!wasGrounded && isGroundedAfterGravity) {
-                        landingAnimationUntil = elapsedSeconds + 0.22
+                        val moveDirection = cameraController.movementDirection(input.moveRight, input.moveForward)
+                        val moveLength = horizontalLength(moveDirection)
+                        isMoving = moveLength > MOVEMENT_INPUT_EPSILON
+                        val isGroundedBeforeStep = playerState.isGrounded
+                        val jumpJustPressed = input.jumpPressed && !wasJumpPressed
+                        val crouchJustPressed = input.crouchPressed && !wasCrouchPressed
+                        val moveSpeed = when {
+                            input.crouchPressed && isGroundedBeforeStep -> PLAYER_CROUCH_WALK_SPEED
+                            input.runPressed -> PLAYER_RUN_SPEED
+                            else -> PLAYER_WALK_SPEED
+                        }
+                        val baseHorizontalVelocity = if (isMoving) {
+                            horizontalVelocityForMovement(moveDirection, moveLength, moveSpeed)
+                        } else {
+                            Vec3(0.0, 0.0, 0.0)
+                        }
+                        if (isMoving) {
+                            playerYaw = atan2(-moveDirection.x, -moveDirection.z)
+                        }
+                        var horizontalVelocity = baseHorizontalVelocity
+                        var controllerJumpRequested = jumpJustPressed
+                        if (crouchJustPressed && !isGroundedBeforeStep) {
+                            horizontalVelocity = Vec3(0.0, 0.0, 0.0)
+                            playerState.velocityY = minOf(playerState.velocityY, PLAYER_GROUND_POUND_VELOCITY)
+                            playerState.isGrounded = false
+                            playerState.ground = null
+                            controllerJumpRequested = false
+                            doubleJumpAvailable = false
+                            forcedAirAnimationState = MarioAnimationState.GROUND_POUND
+                            forcedAirAnimationUntil = elapsedSeconds + PLAYER_GROUND_POUND_ANIMATION_SECONDS
+                        } else if (jumpJustPressed && input.crouchPressed && isGroundedBeforeStep) {
+                            if (isMoving && input.runPressed) {
+                                horizontalVelocity = horizontalVelocityForMovement(
+                                    moveDirection = moveDirection,
+                                    moveLength = moveLength,
+                                    speed = PLAYER_LONG_JUMP_SPEED
+                                )
+                                playerState.velocityY = PLAYER_LONG_JUMP_VELOCITY
+                                forcedAirAnimationState = MarioAnimationState.LONG_JUMP
+                            } else {
+                                val backward = forwardForYaw(playerYaw + MARIO_MODEL_YAW_OFFSET, PLAYER_BACKFLIP_BACK_SPEED)
+                                horizontalVelocity = Vec3(backward.x, 0.0, backward.z)
+                                playerState.velocityY = PLAYER_BACKFLIP_JUMP_VELOCITY
+                                forcedAirAnimationState = MarioAnimationState.BACKFLIP
+                            }
+                            playerState.isGrounded = false
+                            playerState.ground = null
+                            controllerJumpRequested = false
+                            doubleJumpAvailable = true
+                            forcedAirAnimationUntil = elapsedSeconds + 0.5
+                        } else if (jumpJustPressed && !isGroundedBeforeStep && doubleJumpAvailable) {
+                            playerState.velocityY = maxOf(playerState.velocityY, PLAYER_DOUBLE_JUMP_VELOCITY)
+                            playerState.isGrounded = false
+                            playerState.ground = null
+                            controllerJumpRequested = false
+                            doubleJumpAvailable = false
+                            forcedAirAnimationState = MarioAnimationState.DOUBLE_JUMP
+                            forcedAirAnimationUntil = elapsedSeconds + 0.45
+                        }
+
+                        val playerStep = content.playerController.step(
+                            state = playerState,
+                            horizontalVelocity = horizontalVelocity,
+                            deltaSeconds = deltaSeconds,
+                            jumpRequested = controllerJumpRequested,
+                            allowLeaveGround = true
+                        )
+                        if (playerStep.jumped) {
+                            doubleJumpAvailable = true
+                        }
+                        val playerYBeforeGravity = playerStep.positionBeforeVertical.y
+                        player = playerState.position
+                        playerVelocityY = playerState.velocityY
+                        isGroundedAfterGravity = playerState.isGrounded
+
+                        updateGoombas(content.goombas, content.enemyController, deltaSeconds)
+                        updateBowser(content.bowser, content.enemyController, player, deltaSeconds)
+                        val goombaCollision = resolvePlayerGoombaCollisions(
+                            player = player,
+                            playerYBeforeGravity = playerYBeforeGravity,
+                            playerVelocityY = playerVelocityY,
+                            isGrounded = isGroundedAfterGravity,
+                            goombas = content.goombas,
+                            playerController = content.playerController,
+                            elapsedSeconds = elapsedSeconds,
+                            lastPlayerHitAt = lastPlayerHitAt,
+                            highBounceRequested = input.jumpPressed
+                        )
+                        goombaCollision.applyTo(playerState)
+                        updateProgressFromCollision(content.progress, goombaCollision)
+                        if (goombaCollision.playerDamage > 0) {
+                            forcedAirAnimationState = MarioAnimationState.HURT
+                            forcedAirAnimationUntil = elapsedSeconds + PLAYER_HURT_ANIMATION_SECONDS
+                            doubleJumpAvailable = false
+                        }
+                        player = playerState.position
+                        playerVelocityY = playerState.velocityY
+                        isGroundedAfterGravity = playerState.isGrounded
+                        lastPlayerHitAt = goombaCollision.lastPlayerHitAt
+                        val bowserCollision = resolvePlayerBowserCollision(
+                            player = player,
+                            playerYBeforeGravity = playerYBeforeGravity,
+                            playerVelocityY = playerVelocityY,
+                            isGrounded = isGroundedAfterGravity,
+                            bowser = content.bowser,
+                            playerController = content.playerController,
+                            elapsedSeconds = elapsedSeconds,
+                            lastPlayerHitAt = lastPlayerHitAt,
+                            highBounceRequested = input.jumpPressed
+                        )
+                        bowserCollision.applyTo(playerState)
+                        updateProgressFromCollision(content.progress, bowserCollision)
+                        if (bowserCollision.playerDamage > 0) {
+                            forcedAirAnimationState = MarioAnimationState.HURT
+                            forcedAirAnimationUntil = elapsedSeconds + PLAYER_HURT_ANIMATION_SECONDS
+                            doubleJumpAvailable = false
+                        }
+                        player = playerState.position
+                        playerVelocityY = playerState.velocityY
+                        isGroundedAfterGravity = playerState.isGrounded
+                        lastPlayerHitAt = bowserCollision.lastPlayerHitAt
+                        if (!content.bowser.isActive && !content.summitStar.isCollected) {
+                            content.summitStar.isActive = true
+                        }
+                        resolveSummitStarCollection(content.summitStar, content.playerController, player)
+                        collectRegularCoins(content, player)
+                        collectGoldenCoins(content, player)
+                        rewardCutscene = updateGoldenCoinChallenges(
+                            content = content,
+                            player = player,
+                            elapsedSeconds = elapsedSeconds,
+                            activeRewardCutscene = rewardCutscene,
+                            bowserDefeatedThisFrame = bowserCollision.bowserDefeated
+                        )
+                        rewardCutscene = updateRewardCoinCutscene(content, rewardCutscene, elapsedSeconds)
+
+                        if (!wasGrounded && isGroundedAfterGravity) {
+                            landingAnimationUntil = elapsedSeconds + 0.22
+                        }
+                        if (isGroundedAfterGravity) {
+                            doubleJumpAvailable = false
+                            forcedAirAnimationState = null
+                        }
+                        wasGrounded = isGroundedAfterGravity
                     }
-                    if (isGroundedAfterGravity) {
-                        doubleJumpAvailable = false
-                        forcedAirAnimationState = null
-                    }
-                    wasGrounded = isGroundedAfterGravity
+
+                    wasJumpPressed = input.jumpPressed
+                    wasCrouchPressed = input.crouchPressed
 
                     val activeForcedAirAnimation = forcedAirAnimationState
                         ?.takeIf { !isGroundedAfterGravity && elapsedSeconds < forcedAirAnimationUntil }
@@ -457,7 +505,9 @@ fun main() {
                     }
                     val marioPose = content.marioAnimation.pose(nextMarioAnimationState, deltaSeconds)
 
-                    cameraController.follow(playerState.position, deltaSeconds)
+                    val cameraTarget = rewardCutscene?.cameraTarget(elapsedSeconds, playerState.position)
+                        ?: playerState.position
+                    cameraController.follow(cameraTarget, deltaSeconds)
                     val camera = cameraController.camera()
 
                     content.syncSceneNodes(
@@ -1024,9 +1074,9 @@ private fun MarioSceneContent.syncSceneNodes(
             node.setTransform(
                 Transform3D(
                     position = Vec3(
-                        coin.position.x,
-                        coin.position.y + sin(elapsedSeconds * 2.4 + index) * 0.14,
-                        coin.position.z
+                        coin.renderPosition.x,
+                        coin.renderPosition.y + sin(elapsedSeconds * 2.4 + index) * 0.14,
+                        coin.renderPosition.z
                     ),
                     rotation = Vec3(0.0, elapsedSeconds * 3.1 + index, 0.0),
                     scale = Vec3(size, size * 1.25, size * 0.14)
@@ -1104,7 +1154,8 @@ private data class GoldenCoin(
     val position: Vec3,
     val isBig: Boolean = false,
     var isAvailable: Boolean = true,
-    var isCollected: Boolean = false
+    var isCollected: Boolean = false,
+    var renderPosition: Vec3 = position
 )
 
 private enum class GoldenCoinChallenge {
@@ -1113,6 +1164,39 @@ private enum class GoldenCoinChallenge {
     BOWSER,
     HILLTOP,
     RIDGE
+}
+
+private data class RewardCoinCutscene(
+    val challenge: GoldenCoinChallenge,
+    val startPosition: Vec3,
+    val targetPosition: Vec3,
+    val startedAt: Double
+) {
+    private val flyEndsAt = startedAt + REWARD_COIN_FLY_SECONDS
+    private val holdEndsAt = flyEndsAt + REWARD_COIN_HOLD_SECONDS
+    private val returnEndsAt = holdEndsAt + REWARD_COIN_RETURN_SECONDS
+
+    fun isActive(elapsedSeconds: Double): Boolean = elapsedSeconds < returnEndsAt
+
+    fun coinPosition(elapsedSeconds: Double): Vec3 {
+        val t = ((elapsedSeconds - startedAt) / REWARD_COIN_FLY_SECONDS).coerceIn(0.0, 1.0)
+        val eased = smoothStep(t)
+        val arcY = sin(eased * 3.141592653589793) * REWARD_COIN_ARC_HEIGHT
+        val base = lerp(startPosition, targetPosition, eased)
+        return Vec3(base.x, base.y + arcY, base.z)
+    }
+
+    fun cameraTarget(elapsedSeconds: Double, player: Vec3): Vec3 {
+        val coinFocus = coinPosition(elapsedSeconds).let {
+            Vec3(it.x, it.y + REWARD_COIN_CAMERA_Y_OFFSET, it.z)
+        }
+        if (elapsedSeconds < holdEndsAt) {
+            return coinFocus
+        }
+
+        val t = ((elapsedSeconds - holdEndsAt) / REWARD_COIN_RETURN_SECONDS).coerceIn(0.0, 1.0)
+        return lerp(coinFocus, player, smoothStep(t))
+    }
 }
 
 private data class PlayerEnemyCollisionResult(
@@ -1141,6 +1225,8 @@ private enum class MarioAnimationState {
     DOUBLE_JUMP,
     BACKFLIP,
     LONG_JUMP,
+    GROUND_POUND,
+    HURT,
     FALL,
     LAND
 }
@@ -1203,6 +1289,28 @@ private fun marioAnimationClips(clips: AnimationClipSet3D): AnimationClipMap3D<M
                 ),
                 fallback = "Armature|Jump",
                 playbackSpeed = 0.95
+            ),
+            marioClipReference(
+                clips = clips,
+                state = MarioAnimationState.GROUND_POUND,
+                candidates = listOf(
+                    "Armature|GroundPound",
+                    "Armature|HipDrop",
+                    "Armature|Fall"
+                ),
+                fallback = "Armature|Fall",
+                playbackSpeed = 1.18
+            ),
+            marioClipReference(
+                clips = clips,
+                state = MarioAnimationState.HURT,
+                candidates = listOf(
+                    "Armature|Damage",
+                    "Armature|Damaged",
+                    "Armature|Hurt"
+                ),
+                fallback = "Armature|Fall",
+                playbackSpeed = 1.05
             ),
             marioClipReference(clips, MarioAnimationState.FALL, listOf("Armature|Fall"), "Armature|Fall"),
             marioClipReference(clips, MarioAnimationState.LAND, listOf("Armature|Land"), "Armature|Land")
@@ -1274,12 +1382,8 @@ private fun resolvePlayerGoombaCollisions(
             allowLeaveGround = false
         )
         resolvedPlayer = bumpMove.position
-        resolvedGrounded = bumpMove.isGrounded
-        resolvedVelocityY = if (resolvedGrounded) {
-            0.0
-        } else {
-            maxOf(resolvedVelocityY, 0.0)
-        }
+        resolvedGrounded = false
+        resolvedVelocityY = PLAYER_HURT_BOUNCE_VELOCITY
         resolvedLastHitAt = elapsedSeconds
         playerDamage += GOOMBA_DAMAGE
     }
@@ -1540,12 +1644,14 @@ private fun createGoldenCoins(
             challenge = GoldenCoinChallenge.FIVE_GOOMBAS,
             label = "GOOMBA FIVE",
             position = collectiblePosition(terrain, -8.0, -9.0, yOffset = 1.35),
+            isBig = true,
             isAvailable = false
         ),
         GoldenCoin(
             challenge = GoldenCoinChallenge.FIFTY_COINS,
             label = "FIFTY COINS",
             position = collectiblePosition(terrain, 0.0, 0.0, yOffset = 1.35),
+            isBig = true,
             isAvailable = false
         ),
         GoldenCoin(
@@ -1628,7 +1734,7 @@ private fun collectGoldenCoins(
     content.goldenCoins.forEach { coin ->
         if (coin.isAvailable &&
             !coin.isCollected &&
-            playerTouchesCollectible(player, coin.position, GOLDEN_COIN_PICKUP_RADIUS)
+            playerTouchesCollectible(player, coin.renderPosition, GOLDEN_COIN_PICKUP_RADIUS)
         ) {
             coin.isCollected = true
             coin.isAvailable = false
@@ -1638,28 +1744,77 @@ private fun collectGoldenCoins(
 
 private fun updateGoldenCoinChallenges(
     content: MarioSceneContent,
+    player: Vec3,
+    elapsedSeconds: Double,
+    activeRewardCutscene: RewardCoinCutscene?,
     bowserDefeatedThisFrame: Boolean
-) {
-    if (content.progress.goombasDefeated >= 5) {
-        awardGoldenCoin(content, GoldenCoinChallenge.FIVE_GOOMBAS)
+): RewardCoinCutscene? {
+    if (activeRewardCutscene != null) {
+        return activeRewardCutscene
     }
-    if (content.progress.regularCoinsCollected >= 50) {
-        awardGoldenCoin(content, GoldenCoinChallenge.FIFTY_COINS)
+
+    val challenge = when {
+        content.progress.goombasDefeated >= 5 &&
+            content.canRevealGoldenCoin(GoldenCoinChallenge.FIVE_GOOMBAS) -> GoldenCoinChallenge.FIVE_GOOMBAS
+        content.progress.regularCoinsCollected >= 50 &&
+            content.canRevealGoldenCoin(GoldenCoinChallenge.FIFTY_COINS) -> GoldenCoinChallenge.FIFTY_COINS
+        (bowserDefeatedThisFrame || !content.bowser.isActive) &&
+            content.canRevealGoldenCoin(GoldenCoinChallenge.BOWSER) -> GoldenCoinChallenge.BOWSER
+        else -> null
     }
-    if (bowserDefeatedThisFrame) {
-        awardGoldenCoin(content, GoldenCoinChallenge.BOWSER)
-    }
+
+    return challenge?.let { revealGoldenCoin(content, it, player, elapsedSeconds) }
 }
 
-private fun awardGoldenCoin(
+private fun MarioSceneContent.canRevealGoldenCoin(challenge: GoldenCoinChallenge): Boolean {
+    val coin = goldenCoins.firstOrNull { it.challenge == challenge } ?: return false
+    return !coin.isAvailable && !coin.isCollected
+}
+
+private fun revealGoldenCoin(
     content: MarioSceneContent,
-    challenge: GoldenCoinChallenge
-) {
-    val coin = content.goldenCoins.firstOrNull { it.challenge == challenge } ?: return
-    if (!coin.isCollected) {
-        coin.isCollected = true
-        coin.isAvailable = false
+    challenge: GoldenCoinChallenge,
+    player: Vec3,
+    elapsedSeconds: Double
+): RewardCoinCutscene? {
+    val coin = content.goldenCoins.firstOrNull { it.challenge == challenge } ?: return null
+    if (coin.isCollected || coin.isAvailable) {
+        return null
     }
+
+    val startPosition = Vec3(player.x, player.y + 1.3, player.z)
+    coin.isAvailable = true
+    coin.renderPosition = startPosition
+    return RewardCoinCutscene(
+        challenge = challenge,
+        startPosition = startPosition,
+        targetPosition = coin.position,
+        startedAt = elapsedSeconds
+    )
+}
+
+private fun updateRewardCoinCutscene(
+    content: MarioSceneContent,
+    cutscene: RewardCoinCutscene?,
+    elapsedSeconds: Double
+): RewardCoinCutscene? {
+    if (cutscene == null) {
+        return null
+    }
+
+    val coin = content.goldenCoins.firstOrNull { it.challenge == cutscene.challenge } ?: return null
+    if (!cutscene.isActive(elapsedSeconds)) {
+        coin.renderPosition = coin.position
+        return null
+    }
+
+    coin.renderPosition = cutscene.coinPosition(elapsedSeconds)
+    return cutscene
+}
+
+private fun smoothStep(value: Double): Double {
+    val t = value.coerceIn(0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
 }
 
 private fun playerTouchesCollectible(
@@ -1729,8 +1884,8 @@ private fun resolvePlayerBowserCollision(
     )
     return PlayerEnemyCollisionResult(
         player = bumpMove.position,
-        playerVelocityY = if (bumpMove.isGrounded) 0.0 else maxOf(playerVelocityY, 0.0),
-        isGrounded = bumpMove.isGrounded,
+        playerVelocityY = PLAYER_HURT_BOUNCE_VELOCITY,
+        isGrounded = false,
         lastPlayerHitAt = elapsedSeconds,
         playerDamage = BOWSER_DAMAGE
     )

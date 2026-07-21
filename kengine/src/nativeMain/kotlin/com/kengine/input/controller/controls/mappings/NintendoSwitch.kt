@@ -47,6 +47,7 @@ object NintendoSwitch : ControllerMapping {
     const val R_STICK_VERTICAL_AXIS = 3
     const val ZL_TRIGGER_AXIS: Int = 4
     const val ZR_TRIGGER_AXIS: Int = 5
+    const val ZL_BUTTON: Int = 7
 
     override val buttonMappings = mapOf(
         B to ButtonType.REGULAR,
@@ -89,6 +90,15 @@ object NintendoSwitch : ControllerMapping {
         Buttons.DPAD_DOWN to DPAD_DOWN,
         Buttons.DPAD_LEFT to DPAD_LEFT,
         Buttons.DPAD_RIGHT to DPAD_RIGHT
+    )
+
+    override val alternateGamepadMappings = mapOf(
+        Buttons.L2 to listOf(ZL_BUTTON)
+    )
+
+    override val buttonAxisMappings = mapOf(
+        Buttons.L2 to listOf(ZL_TRIGGER_AXIS),
+        Buttons.R2 to listOf(ZR_TRIGGER_AXIS)
     )
 
     override val axisMappings = mapOf(

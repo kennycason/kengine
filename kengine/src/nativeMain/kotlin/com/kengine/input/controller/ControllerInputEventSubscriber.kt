@@ -1,5 +1,6 @@
 package com.kengine.input.controller
 
+import com.kengine.input.controller.controls.AxisType
 import com.kengine.input.controller.controls.ButtonType
 import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.controls.ControllerMapper
@@ -18,6 +19,51 @@ import kotlinx.cinterop.toKString
 import kotlinx.cinterop.value
 import sdl3.*
 import kotlin.math.abs
+
+private const val TRIGGER_BUTTON_PRESS_THRESHOLD = 0.45f
+
+internal fun isMappedButtonPressed(
+    button: Buttons,
+    state: ControllerInputEventSubscriber.ControllerState,
+    mapping: ControllerMapping
+): Boolean {
+    val primaryButtonIndex = mapping.gamepadMappings[button]
+    if (primaryButtonIndex != null && isPhysicalButtonPressed(primaryButtonIndex, state, mapping)) {
+        return true
+    }
+
+    return mapping.alternateGamepadMappings[button].orEmpty().any { buttonIndex ->
+        isPhysicalButtonPressed(buttonIndex, state, mapping)
+    } || mapping.buttonAxisMappings[button].orEmpty().any { axisIndex ->
+        isTriggerAxisPressed(axisIndex, state, mapping)
+    }
+}
+
+private fun isPhysicalButtonPressed(
+    buttonIndex: Int,
+    state: ControllerInputEventSubscriber.ControllerState,
+    mapping: ControllerMapping
+): Boolean {
+    return when (mapping.buttonMappings[buttonIndex]) {
+        ButtonType.REGULAR -> state.buttons.getOrNull(buttonIndex) == true
+        ButtonType.HAT_UP -> state.isHatDirectionPressed(0, HatDirection.UP)
+        ButtonType.HAT_DOWN -> state.isHatDirectionPressed(0, HatDirection.DOWN)
+        ButtonType.HAT_LEFT -> state.isHatDirectionPressed(0, HatDirection.LEFT)
+        ButtonType.HAT_RIGHT -> state.isHatDirectionPressed(0, HatDirection.RIGHT)
+        null -> state.buttons.getOrNull(buttonIndex) == true
+    }
+}
+
+private fun isTriggerAxisPressed(
+    axisIndex: Int,
+    state: ControllerInputEventSubscriber.ControllerState,
+    mapping: ControllerMapping
+): Boolean {
+    if (mapping.axisMappings[axisIndex] != AxisType.TRIGGER) {
+        return false
+    }
+    return (state.axes.getOrNull(axisIndex) ?: 0.0f) >= TRIGGER_BUTTON_PRESS_THRESHOLD
+}
 
 /**
  * Handles controller input events and maintains state for all connected controllers.
@@ -518,18 +564,7 @@ class ControllerInputEventSubscriber(
     fun isButtonPressed(button: Buttons): Boolean {
         for ((id, state) in controllerStates) {
             val mapping = controllerMappings[id] ?: continue
-            val buttonIndex = mapping.gamepadMappings[button] ?: continue
-            val buttonType = mapping.buttonMappings[buttonIndex]
-
-            val pressed = when (buttonType) {
-                ButtonType.REGULAR -> state.buttons.getOrNull(buttonIndex) == true
-                ButtonType.HAT_UP -> state.isHatDirectionPressed(0, HatDirection.UP)
-                ButtonType.HAT_DOWN -> state.isHatDirectionPressed(0, HatDirection.DOWN)
-                ButtonType.HAT_LEFT -> state.isHatDirectionPressed(0, HatDirection.LEFT)
-                ButtonType.HAT_RIGHT -> state.isHatDirectionPressed(0, HatDirection.RIGHT)
-                null -> state.buttons.getOrNull(buttonIndex) == true
-            }
-            if (pressed) return true
+            if (isMappedButtonPressed(button, state, mapping)) return true
         }
         return false
     }
