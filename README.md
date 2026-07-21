@@ -816,26 +816,30 @@ logger.info { "New Position: $newPosition" }
 
 ## 3D / SDL GPU
 
-Kengine is starting to grow an experimental native 3D layer in `kengine-3d`, built on SDL3's `SDL_GPU` API. The goal is to keep SDL3 as the windowing, input, audio, timing, and platform layer while adding Kengine-owned 3D concepts on top: GPU contexts, meshes, transforms, cameras, depth buffers, textures, model loading, animated model playback, and lightweight scene submission.
+Kengine has an experimental native 3D layer in `kengine-3d`, built on SDL3's `SDL_GPU` API. SDL3 still handles windowing, input, audio, timing, and platform concerns; Kengine adds the game-facing 3D pieces on top.
 
-The current proof-of-concept includes:
+Current 3D support includes:
 
-- `RenderBackend.SDL_GPU_3D` for GPU-backed windows.
-- `GpuContext` for SDL GPU device/window ownership.
-- `GpuMesh`, `MeshRenderer3D`, `DebugRenderer3D`, `Mat4`, `Transform3D`, `PerspectiveCamera`, `ThirdPersonCameraController3D`, `AnimationPlayer3D`, `AnimationStateController3D`, `AnimationPose3D`, `Node3D`, and `Scene3D`.
-- `ModelLoader3D`, `ModelAsset3D`, `ModelAssetLoader3D`, `ModelAssetPathResolver3D`, `ModelSourceCache3D`, `ParsedModel3D`, `ModelPartSource3D`, `Model3D`, `ModelInfo3D`, `MaterialDescriptor3D`, `Material3D`, and `ModelRenderer3D` for reusable static model source parsing, collision-source reuse, explicit CPU source caching, GPU upload, shared texture-cache loading, material upload descriptors, and asset inspection across OBJ and GLB-backed assets.
-- `AnimatedModel3D`, `AnimatedModelSource3D`, `AnimatedModelSourceCache3D`, `AnimatedModelAsset3D`, `AnimatedModelLoader3D`, `AnimatedModelInstanceRenderState3D`, and `AnimatedModelInstance3D` for reusable animated model source parsing, engine-owned source descriptors, explicit CPU source caching, GPU upload, playback, and per-instance pose/render state over current GLB-backed assets.
-- `SkinnedTexturedLitVertex3D`, `SkinnedTexturedLitGpuMesh`, `SkinnedTexturedLitMeshRenderer3D`, and `AnimatedModelSkinningMode3D` as the first shader-skinning path, with `AUTO` preferring GPU joint-palette skinning when the asset fits the renderer's joint limit, CPU-skinned GLB buffers as the fallback, and skinned-asset support reporting through model inspection.
-- `GpuShader3D` helpers plus generated `Kengine3DShaderSources`, `Kengine3DShaderArtifacts`, and `Kengine3DShaderPrograms` for backend-aware SDL GPU shader artifact selection, generated Metal libraries with MSL fallback, prepared SPIR-V/DXIL artifact slots, stage-aware error messages, renderer init cleanup, generated shader resource declarations, and engine-owned shader source files under `kengine-3d/src/nativeMain/shaders`.
-- `GpuPipeline3D` helpers for shared graphics pipeline descriptors, vertex input layouts, depth settings, and centralized SDL GPU pipeline creation across primitive, mesh, textured, lit, debug, and skinned renderers.
-- `GpuDraw3D` and `GpuUniforms3D` helpers for shared uniform packing, vertex-buffer binding, texture-sampler binding, and primitive draw submission.
-- `GpuRendererPreset3D`, `Kengine3DVertexLayouts`, and `Kengine3DRendererPresets` for engine-owned built-in renderer/material presets that pair shader programs with matching pipeline layouts.
-- `GpuTextureAsset3D`, `GpuTextureCache3D`, `GpuTextureDescriptor3D`, `GpuSamplerDescriptor3D`, `GpuTextureUploadDescriptor3D`, `GpuResourceOwnership3D`, `GpuUpload3D`, and `GpuVertexBuffer3D` helpers for shared texture assets, long-lived texture reuse, sampler defaults, upload layout metadata, owned/borrowed GPU resource cleanup, upload transfer buffers, copy-pass submission, vertex packing, GPU vertex-buffer creation, texture uploads, and mutable vertex-buffer updates.
-- `SceneRenderer3D` for ordered per-frame static model, animated model, and mesh submission through a reusable renderer bundle.
-- `games:kengine-3d-demos` for primitive/cube rendering.
-- `games:kengine-3d-space-shooter` for an evolving 3D space shooter test bed with terrain, weapons, pickups, turrets, and bosses.
-- `games:rubiks-cube-3d` for a 27-cubie Rubik's cube demo with mouse orbit, face picking, animated slice turns, scramble, and reset.
-- [`games:mario-3d`](games/mario-3d/) for a Mario 64-style textured GLB platformer demo with third-person camera controls and imported world/character models.
+- GPU-backed windows via `RenderBackend.SDL_GPU_3D`.
+- Meshes, transforms, perspective/orbit/third-person cameras, depth rendering, lighting, textures, debug drawing, scene nodes, and ordered scene submission.
+- Static and animated model loading with reusable asset descriptors, path resolution, source caching, GPU upload, texture caching, and model inspection.
+- Animation clip playback, enum-driven animation state controllers, node animation, CPU-skinned animation, and GPU joint-palette skinning when an asset fits the renderer limits.
+- Gameplay helpers for terrain/static mesh collision, sphere/capsule overlap tests, and kinematic character movement.
+
+Supported runtime model formats:
+
+- `.glb` / `.gltf`: primary runtime format for static, node-animated, and skinned animated models.
+- `.obj`: lightweight static mesh path with MTL colors, base-color textures, normal maps, and material texture metadata.
+- Source formats like `.fbx`, `.usd`, and `.usdz` should be exported to GLB from an asset tool before runtime use. `kengine-3d-importer` provides preflight checks and clear guidance for these files.
+
+3D tools and demos:
+
+- [`kengine-3d-model-viewer`](kengine-3d-model-viewer/) loads, previews, inspects, and preflights `.glb`, `.gltf`, and `.obj` models.
+- [`kengine-3d-importer`](kengine-3d-importer/) identifies runtime-ready assets versus source formats that need external GLB export.
+- `games:kengine-3d-demos` exercises primitive, cube, OBJ, texture, lighting, and orbit-camera rendering.
+- `games:kengine-3d-space-shooter` is an evolving 3D gameplay test bed with terrain, weapons, pickups, turrets, and bosses.
+- `games:rubiks-cube-3d` is a 27-cubie Rubik's cube demo with orbit camera, picking, animated slice turns, scramble, and reset.
+- [`games:mario-3d`](games/mario-3d/) is a Mario 64-style textured GLB platformer demo with third-person camera controls, imported world/character models, animation, terrain collision, enemy stomps, collectibles, and a 3D UI HUD.
 
 <a href="games/mario-3d/"><img src="images/mario3d-bowser-demo.png" width="65%" /></a>
 

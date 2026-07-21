@@ -339,6 +339,26 @@ open class GpuUiView3D(
         return slider
     }
 
+    fun coin(
+        id: String,
+        width: Double,
+        height: Double,
+        x: Double = 0.0,
+        y: Double = 0.0,
+        color: Color = Color.fromHex("ffd447")
+    ): GpuUiCoin3D {
+        val coin = GpuUiCoin3D(
+            id = id,
+            desiredX = x,
+            desiredY = y,
+            desiredWidth = width,
+            desiredHeight = height,
+            color = color
+        )
+        addChild(coin)
+        return coin
+    }
+
     private fun computeFlexibleChildren() {
         var fixedWidth = 0.0
         var flexibleWidthCount = 0
@@ -595,6 +615,38 @@ class GpuUiSlider3D(
             return 0.0
         }
         return ((currentValue - min) / (max - min)).coerceIn(0.0, 1.0)
+    }
+}
+
+class GpuUiCoin3D(
+    id: String,
+    desiredX: Double = 0.0,
+    desiredY: Double = 0.0,
+    desiredWidth: Double,
+    desiredHeight: Double,
+    var color: Color = Color.fromHex("ffd447")
+) : GpuUiView3D(
+    id = id,
+    desiredX = desiredX,
+    desiredY = desiredY,
+    desiredWidth = desiredWidth,
+    desiredHeight = desiredHeight
+) {
+    override fun draw(
+        renderer: GpuUiRenderer3D,
+        frameWidth: UInt,
+        frameHeight: UInt
+    ) {
+        if (!visible) {
+            return
+        }
+        renderer.coin(
+            rect = bounds,
+            color = color,
+            frameWidth = frameWidth,
+            frameHeight = frameHeight
+        )
+        children.forEach { it.draw(renderer, frameWidth, frameHeight) }
     }
 }
 

@@ -63,6 +63,10 @@ import com.kengine.three.moveAngleToward
 import com.kengine.three.setPose
 import com.kengine.three.shortestAngleDelta
 import com.kengine.three.squaredHorizontalDistance
+import com.kengine.three.ui.GpuUiAlign3D
+import com.kengine.three.ui.GpuUiContext3D
+import com.kengine.three.ui.GpuUiRenderer3D
+import com.kengine.three.ui.GpuUiView3D
 import kotlinx.cinterop.ExperimentalForeignApi
 import sdl3.SDL_Delay
 import sdl3.SDL_GetTicks
@@ -71,6 +75,7 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.random.Random
 
 private const val WINDOW_WIDTH = 960
 private const val WINDOW_HEIGHT = 540
@@ -82,25 +87,36 @@ private const val WORLD_TARGET_SIZE = 105.0
 private const val PLAYER_HALF_HEIGHT = 0.82
 private const val PLAYER_WALK_SPEED = 5.4
 private const val PLAYER_RUN_SPEED = 8.2
+private const val PLAYER_CROUCH_WALK_SPEED = 2.8
 private const val PLAYER_JUMP_VELOCITY = 15.4
+private const val PLAYER_DOUBLE_JUMP_VELOCITY = 17.6
+private const val PLAYER_BACKFLIP_JUMP_VELOCITY = 20.5
+private const val PLAYER_BACKFLIP_BACK_SPEED = 4.6
+private const val PLAYER_LONG_JUMP_VELOCITY = 13.2
+private const val PLAYER_LONG_JUMP_SPEED = 13.8
 private const val PLAYER_JUMP_GRAVITY = 42.0
 private const val PLAYER_FALL_GRAVITY = 48.0
 private const val PLAYER_TERMINAL_FALL_SPEED = -28.0
 private const val PLAYER_MAX_STEP_DOWN = 1.4
 private const val PLAYER_COLLISION_RADIUS = 0.38
 private const val PLAYER_STOMP_BOUNCE_VELOCITY = 10.8
+private const val PLAYER_HIGH_STOMP_BOUNCE_VELOCITY = 16.2
 private const val PLAYER_BUMP_BACK_DISTANCE = 0.58
 private const val PLAYER_HURT_COOLDOWN_SECONDS = 0.75
+private const val MARIO_MAX_HEALTH = 99
+private const val GOOMBA_DAMAGE = 6
+private const val BOWSER_DAMAGE = 18
 private const val ENEMY_MAX_STEP_UP = 0.48
 private const val ENEMY_MAX_STEP_DOWN = 0.58
 private const val GOOMBA_COLLISION_RADIUS = 0.48
 private const val GOOMBA_COLLISION_CENTER_Y = 0.42
 private const val GOOMBA_STOMP_MIN_HEIGHT = 0.28
-private const val BOWSER_HEALTH = 3
+private const val BOWSER_HEALTH = 10
 private const val BOWSER_COLLISION_RADIUS = 1.48
 private const val BOWSER_COLLISION_CENTER_Y = 1.5
 private const val BOWSER_STOMP_MIN_HEIGHT = 1.35
 private const val BOWSER_STOMP_BOUNCE_VELOCITY = 13.4
+private const val BOWSER_HIGH_STOMP_BOUNCE_VELOCITY = 18.0
 private const val BOWSER_BODY_BUMP_DISTANCE = 1.1
 private const val BOWSER_AGGRO_RADIUS = 16.0
 private const val BOWSER_LEASH_RADIUS = 8.5
@@ -117,8 +133,24 @@ private const val BOWSER_GRAVITY = 28.0
 private const val BOWSER_TERMINAL_FALL_SPEED = -18.0
 private const val BOWSER_ATTACK_COOLDOWN_SECONDS = 2.35
 private const val BOWSER_HIT_FLASH_SECONDS = 0.32
+private const val REGULAR_COIN_COUNT = 100
+private const val REGULAR_COIN_PICKUP_RADIUS = 0.82
+private const val GOLDEN_COIN_PICKUP_RADIUS = 1.25
+private const val COIN_PICKUP_VERTICAL_PADDING = 1.2
+private const val REGULAR_COIN_SCATTER_RANGE = 42.0
+private const val REGULAR_COIN_SCATTER_GRID_SIZE = 10
+private const val REGULAR_COIN_MIN_SPACING = 2.35
+private const val REGULAR_COIN_SCATTER_ATTEMPTS = 6000
+private const val REGULAR_COIN_SCATTER_SEED = 64
+private const val GOLDEN_COIN_COUNT = 5
 private const val STAR_FLOAT_HEIGHT = 1.65
 private const val STAR_PICKUP_RADIUS = 0.72
+private const val MARIO_HUD_FONT_PATH = "assets/fonts/arcade_classic.ttf"
+private const val MARIO_HUD_FONT_SIZE = 36f
+private const val MARIO_HUD_SHADOW_OFFSET = 3.0
+private const val MARIO_HUD_COIN_ICON_BOX_SIZE = 36.0
+private const val MARIO_HUD_GOLD_COIN_ICON_SIZE = 36.0
+private const val MARIO_HUD_REGULAR_COIN_ICON_SIZE = 18.0
 private const val MARIO_MODEL_YAW_OFFSET = 3.141592653589793
 private const val GOOMBA_MODEL_YAW_OFFSET = 3.141592653589793
 private const val BOWSER_MODEL_YAW_OFFSET = 1.5707963267948966
@@ -204,6 +236,8 @@ fun main() {
             val loadedAssets = modelAssets.loadBundle(MarioModelAssets.Bundle)
             val sceneRenderer = resources.track(SceneRenderer3D(this))
             val debugRenderer = resources.track(DebugRenderer3D(this)) { it.cleanup() }
+            val hudFont = font.addFont("mario-hud", MARIO_HUD_FONT_PATH, fontSize = MARIO_HUD_FONT_SIZE)
+            val hudRenderer = resources.track(GpuUiRenderer3D(this, hudFont))
             val light = DirectionalLight3D(
                 direction = Vec3(-0.45, -0.85, -0.32),
                 color = Color.fromHex("fff8e6"),
@@ -217,6 +251,7 @@ fun main() {
                 loadedAssets = loadedAssets,
                 scene = scene
             )
+            val hud = MarioHudUi(content)
             resources.track(scene)
 
             val playerState = KinematicCharacterState3D(
@@ -245,6 +280,9 @@ fun main() {
             var playerYaw = 0.0
             val controllerAxes = CalibratedControllerAxes(CONTROLLER_AXIS_SETTINGS)
             var wasJumpPressed = false
+            var doubleJumpAvailable = false
+            var forcedAirAnimationState: MarioAnimationState? = null
+            var forcedAirAnimationUntil = 0.0
             var wasGrounded = true
             var landingAnimationUntil = 0.0
             var lastPlayerHitAt = -PLAYER_HURT_COOLDOWN_SECONDS
@@ -285,8 +323,14 @@ fun main() {
                     val moveDirection = cameraController.movementDirection(input.moveRight, input.moveForward)
                     val moveLength = horizontalLength(moveDirection)
                     val isMoving = moveLength > MOVEMENT_INPUT_EPSILON
-                    val moveSpeed = if (input.runPressed) PLAYER_RUN_SPEED else PLAYER_WALK_SPEED
-                    val horizontalVelocity = if (isMoving) {
+                    val isGroundedBeforeStep = playerState.isGrounded
+                    val jumpJustPressed = input.jumpPressed && !wasJumpPressed
+                    val moveSpeed = when {
+                        input.crouchPressed && isGroundedBeforeStep -> PLAYER_CROUCH_WALK_SPEED
+                        input.runPressed -> PLAYER_RUN_SPEED
+                        else -> PLAYER_WALK_SPEED
+                    }
+                    val baseHorizontalVelocity = if (isMoving) {
                         horizontalVelocityForMovement(moveDirection, moveLength, moveSpeed)
                     } else {
                         Vec3(0.0, 0.0, 0.0)
@@ -294,14 +338,48 @@ fun main() {
                     if (isMoving) {
                         playerYaw = atan2(-moveDirection.x, -moveDirection.z)
                     }
+                    var horizontalVelocity = baseHorizontalVelocity
+                    var controllerJumpRequested = jumpJustPressed
+                    if (jumpJustPressed && input.crouchPressed && isGroundedBeforeStep) {
+                        if (isMoving) {
+                            horizontalVelocity = horizontalVelocityForMovement(
+                                moveDirection = moveDirection,
+                                moveLength = moveLength,
+                                speed = PLAYER_LONG_JUMP_SPEED
+                            )
+                            playerState.velocityY = PLAYER_LONG_JUMP_VELOCITY
+                            forcedAirAnimationState = MarioAnimationState.LONG_JUMP
+                        } else {
+                            val backward = forwardForYaw(playerYaw + MARIO_MODEL_YAW_OFFSET, PLAYER_BACKFLIP_BACK_SPEED)
+                            horizontalVelocity = Vec3(backward.x, 0.0, backward.z)
+                            playerState.velocityY = PLAYER_BACKFLIP_JUMP_VELOCITY
+                            forcedAirAnimationState = MarioAnimationState.BACKFLIP
+                        }
+                        playerState.isGrounded = false
+                        playerState.ground = null
+                        controllerJumpRequested = false
+                        doubleJumpAvailable = true
+                        forcedAirAnimationUntil = elapsedSeconds + 0.5
+                    } else if (jumpJustPressed && !isGroundedBeforeStep && doubleJumpAvailable) {
+                        playerState.velocityY = maxOf(playerState.velocityY, PLAYER_DOUBLE_JUMP_VELOCITY)
+                        playerState.isGrounded = false
+                        playerState.ground = null
+                        controllerJumpRequested = false
+                        doubleJumpAvailable = false
+                        forcedAirAnimationState = MarioAnimationState.DOUBLE_JUMP
+                        forcedAirAnimationUntil = elapsedSeconds + 0.45
+                    }
 
                     val playerStep = content.playerController.step(
                         state = playerState,
                         horizontalVelocity = horizontalVelocity,
                         deltaSeconds = deltaSeconds,
-                        jumpRequested = input.jumpPressed && !wasJumpPressed,
+                        jumpRequested = controllerJumpRequested,
                         allowLeaveGround = true
                     )
+                    if (playerStep.jumped) {
+                        doubleJumpAvailable = true
+                    }
                     wasJumpPressed = input.jumpPressed
                     val playerYBeforeGravity = playerStep.positionBeforeVertical.y
                     var player = playerState.position
@@ -318,9 +396,11 @@ fun main() {
                         goombas = content.goombas,
                         playerController = content.playerController,
                         elapsedSeconds = elapsedSeconds,
-                        lastPlayerHitAt = lastPlayerHitAt
+                        lastPlayerHitAt = lastPlayerHitAt,
+                        highBounceRequested = input.jumpPressed
                     )
                     goombaCollision.applyTo(playerState)
+                    updateProgressFromCollision(content.progress, goombaCollision)
                     player = playerState.position
                     playerVelocityY = playerState.velocityY
                     isGroundedAfterGravity = playerState.isGrounded
@@ -333,9 +413,11 @@ fun main() {
                         bowser = content.bowser,
                         playerController = content.playerController,
                         elapsedSeconds = elapsedSeconds,
-                        lastPlayerHitAt = lastPlayerHitAt
+                        lastPlayerHitAt = lastPlayerHitAt,
+                        highBounceRequested = input.jumpPressed
                     )
                     bowserCollision.applyTo(playerState)
+                    updateProgressFromCollision(content.progress, bowserCollision)
                     player = playerState.position
                     playerVelocityY = playerState.velocityY
                     isGroundedAfterGravity = playerState.isGrounded
@@ -344,16 +426,31 @@ fun main() {
                         content.summitStar.isActive = true
                     }
                     resolveSummitStarCollection(content.summitStar, content.playerController, player)
+                    collectRegularCoins(content, player)
+                    collectGoldenCoins(content, player)
+                    updateGoldenCoinChallenges(
+                        content = content,
+                        bowserDefeatedThisFrame = bowserCollision.bowserDefeated
+                    )
 
                     if (!wasGrounded && isGroundedAfterGravity) {
                         landingAnimationUntil = elapsedSeconds + 0.22
                     }
+                    if (isGroundedAfterGravity) {
+                        doubleJumpAvailable = false
+                        forcedAirAnimationState = null
+                    }
                     wasGrounded = isGroundedAfterGravity
 
+                    val activeForcedAirAnimation = forcedAirAnimationState
+                        ?.takeIf { !isGroundedAfterGravity && elapsedSeconds < forcedAirAnimationUntil }
                     val nextMarioAnimationState = when {
+                        activeForcedAirAnimation != null -> activeForcedAirAnimation
                         !isGroundedAfterGravity && playerVelocityY > 0.0 -> MarioAnimationState.JUMP
                         !isGroundedAfterGravity -> MarioAnimationState.FALL
                         elapsedSeconds < landingAnimationUntil -> MarioAnimationState.LAND
+                        input.crouchPressed && isMoving -> MarioAnimationState.CROUCH_WALK
+                        input.crouchPressed -> MarioAnimationState.CROUCH
                         isMoving && input.runPressed -> MarioAnimationState.RUN
                         isMoving -> MarioAnimationState.WALK
                         else -> MarioAnimationState.IDLE
@@ -370,6 +467,7 @@ fun main() {
                         elapsedSeconds = elapsedSeconds
                     )
                     scene.prepareForDraw()
+                    hud.prepare(hudRenderer)
 
                     render(0.47f, 0.67f, 0.94f, 1f, enableDepth = true) { frame ->
                         sceneRenderer.draw(scene, frame, camera)
@@ -384,6 +482,7 @@ fun main() {
                                 playerYaw = playerYaw
                             )
                         }
+                        hud.render(hudRenderer, frame)
                     }
 
                     mouse.mouse.clearFrameState()
@@ -403,8 +502,13 @@ private data class MarioSceneContent(
     val goombas: List<RoamingEnemy>,
     val bowser: BossEnemy,
     val summitStar: SummitStar,
+    val progress: MarioGameProgress,
+    val regularCoins: MutableList<RegularCoin>,
+    val goldenCoins: MutableList<GoldenCoin>,
     val bowserNode: Node3D<SceneModel3D>,
     val starNode: Node3D<SceneMesh3D>,
+    val regularCoinNodes: List<Node3D<SceneMesh3D>>,
+    val goldenCoinNodes: List<Node3D<SceneMesh3D>>,
     val goombaNodes: List<Node3D<AnimatedModelInstance3D>>,
     val marioNode: Node3D<AnimatedModelInstance3D>
 )
@@ -418,6 +522,7 @@ private data class MarioFrameInput(
     val cycleCameraDistance: Boolean,
     val runPressed: Boolean,
     val jumpPressed: Boolean,
+    val crouchPressed: Boolean,
     val debugPressed: Boolean
 )
 
@@ -463,8 +568,217 @@ private fun sampleMarioFrameInput(
         jumpPressed = keyboard.isSpacePressed() ||
             keyboard.isXPressed() ||
             controller.isButtonPressed(Buttons.B),
+        crouchPressed = keyboard.isLCtrlPressed() ||
+            keyboard.isRCtrlPressed() ||
+            controller.isButtonPressed(Buttons.L2),
         debugPressed = keyboard.isF1Pressed() || controller.isButtonPressed(Buttons.START)
     )
+}
+
+private class MarioHudUi(
+    private val content: MarioSceneContent
+) {
+    private val ui = GpuUiContext3D()
+
+    init {
+        addTextWithShadow(
+            id = "mario-health",
+            x = 20.0,
+            y = 14.0,
+            width = 112.0,
+            height = 42.0,
+            color = Color.fromHex("fff6e2"),
+            align = GpuUiAlign3D.LEFT,
+            text = { lifeText() }
+        )
+        addCoinCounter(
+            id = "gold-coins",
+            y = 14.0,
+            coinColor = Color.fromHex("f4c63d"),
+            coinSize = MARIO_HUD_GOLD_COIN_ICON_SIZE,
+            countText = { goldenCoinCountText() }
+        )
+        addCoinCounter(
+            id = "regular-coins",
+            y = 60.0,
+            coinColor = Color.fromHex("ffd447"),
+            coinSize = MARIO_HUD_REGULAR_COIN_ICON_SIZE,
+            countText = { regularCoinCountText() }
+        )
+        ui.performLayout()
+    }
+
+    fun prepare(renderer: GpuUiRenderer3D) {
+        currentTexts().forEach(renderer::preloadText)
+    }
+
+    fun render(
+        renderer: GpuUiRenderer3D,
+        frame: GpuFrame
+    ) {
+        renderer.render(ui, frame)
+    }
+
+    private fun currentTexts(): List<String> {
+        return listOf(
+            lifeText(),
+            goldenCoinCountText(),
+            regularCoinCountText()
+        )
+    }
+
+    private fun addCoinCounter(
+        id: String,
+        y: Double,
+        coinColor: Color,
+        coinSize: Double,
+        countText: () -> String
+    ) {
+        val coinInset = (MARIO_HUD_COIN_ICON_BOX_SIZE - coinSize) * 0.5
+        addCoinWithShadow(
+            id = "$id-icon",
+            x = WINDOW_WIDTH - 122.0 + coinInset,
+            y = y + coinInset,
+            size = coinSize,
+            color = coinColor,
+        )
+        addTextWithShadow(
+            id = "$id-count",
+            x = WINDOW_WIDTH - 78.0,
+            y = y,
+            width = 64.0,
+            height = 42.0,
+            color = Color.fromHex("fff6e2"),
+            align = GpuUiAlign3D.LEFT,
+            text = countText
+        )
+    }
+
+    private fun addCoinWithShadow(
+        id: String,
+        x: Double,
+        y: Double,
+        size: Double,
+        color: Color
+    ) {
+        ui.addView(
+            hudCoinView(
+                id = "$id-shadow",
+                x = x + MARIO_HUD_SHADOW_OFFSET,
+                y = y + MARIO_HUD_SHADOW_OFFSET,
+                size = size,
+                color = Color.fromHex("000000c8")
+            )
+        )
+        ui.addView(
+            hudCoinView(
+                id = id,
+                x = x,
+                y = y,
+                size = size,
+                color = color
+            )
+        )
+    }
+
+    private fun hudCoinView(
+        id: String,
+        x: Double,
+        y: Double,
+        size: Double,
+        color: Color
+    ): GpuUiView3D {
+        return GpuUiView3D(
+            id = id,
+            desiredX = x,
+            desiredY = y,
+            desiredWidth = size,
+            desiredHeight = size
+        ).apply {
+            coin(
+                id = "$id-coin",
+                width = size,
+                height = size,
+                color = color
+            )
+        }
+    }
+
+    private fun addTextWithShadow(
+        id: String,
+        x: Double,
+        y: Double,
+        width: Double,
+        height: Double,
+        color: Color,
+        align: GpuUiAlign3D,
+        text: () -> String
+    ) {
+        ui.addView(
+            hudTextView(
+                id = "$id-shadow",
+                x = x + MARIO_HUD_SHADOW_OFFSET,
+                y = y + MARIO_HUD_SHADOW_OFFSET,
+                width = width,
+                height = height,
+                color = Color.fromHex("000000c8"),
+                align = align,
+                text = text
+            )
+        )
+        ui.addView(
+            hudTextView(
+                id = id,
+                x = x,
+                y = y,
+                width = width,
+                height = height,
+                color = color,
+                align = align,
+                text = text
+            )
+        )
+    }
+
+    private fun hudTextView(
+        id: String,
+        x: Double,
+        y: Double,
+        width: Double,
+        height: Double,
+        color: Color,
+        align: GpuUiAlign3D,
+        text: () -> String
+    ): GpuUiView3D {
+        return GpuUiView3D(
+            id = id,
+            desiredX = x,
+            desiredY = y,
+            desiredWidth = width,
+            desiredHeight = height
+        ).apply {
+            label(
+                id = "$id-label",
+                text = text,
+                width = width,
+                height = height,
+                color = color,
+                align = align
+            )
+        }
+    }
+
+    private fun lifeText(): String {
+        return content.progress.marioHealth.coerceIn(0, MARIO_MAX_HEALTH).toString()
+    }
+
+    private fun goldenCoinCountText(): String {
+        return content.goldenCoins.count { it.isCollected }.toString()
+    }
+
+    private fun regularCoinCountText(): String {
+        return content.progress.regularCoinsCollected.coerceIn(0, REGULAR_COIN_COUNT).toString()
+    }
 }
 
 private fun createMarioSceneContent(
@@ -512,13 +826,40 @@ private fun createMarioSceneContent(
             segments = 16
         )
     ) { it.cleanup() }
+    val regularCoinMesh = resources.track(
+        GpuMesh.sphere(
+            gpu = gpu,
+            radius = 0.16,
+            color = Color.fromHex("ffd447"),
+            rings = 8,
+            segments = 12
+        )
+    ) { it.cleanup() }
+    val goldenCoinMesh = resources.track(
+        GpuMesh.sphere(
+            gpu = gpu,
+            radius = 0.35,
+            color = Color.fromHex("f4c63d"),
+            rings = 12,
+            segments = 18
+        )
+    ) { it.cleanup() }
     val goombas = createGoombas(enemyController)
     val bowser = createBowser(findHighestGroundRegionCenter(terrain))
     val summitStar = createSummitStar(bowser.home)
+    val progress = MarioGameProgress()
+    val regularCoins = createRegularCoins(terrain)
+    val goldenCoins = createGoldenCoins(terrain, bowser.home)
 
     scene.addModelAssetNode(loadedAssets, MarioModelAssets.World)
     val bowserNode = scene.addModelAssetNode(loadedAssets, MarioModelAssets.Bowser, isVisible = false)
     val starNode = scene.addMeshNode(starMesh, isVisible = false)
+    val regularCoinNodes = regularCoins.map {
+        scene.addMeshNode(regularCoinMesh, isVisible = false)
+    }
+    val goldenCoinNodes = goldenCoins.map {
+        scene.addMeshNode(goldenCoinMesh, isVisible = false)
+    }
     val goombaNodes = goombas.map {
         scene.addAnimatedModelAssetNode(loadedAssets, MarioModelAssets.Goomba, isVisible = false)
     }
@@ -531,8 +872,13 @@ private fun createMarioSceneContent(
         goombas = goombas,
         bowser = bowser,
         summitStar = summitStar,
+        progress = progress,
+        regularCoins = regularCoins,
+        goldenCoins = goldenCoins,
         bowserNode = bowserNode,
         starNode = starNode,
+        regularCoinNodes = regularCoinNodes,
+        goldenCoinNodes = goldenCoinNodes,
         goombaNodes = goombaNodes,
         marioNode = marioNode
     )
@@ -652,6 +998,43 @@ private fun MarioSceneContent.syncSceneNodes(
         )
     }
 
+    regularCoinNodes.forEachIndexed { index, node ->
+        val coin = regularCoins[index]
+        node.setVisible(!coin.isCollected)
+        if (node.isVisible) {
+            node.setTransform(
+                Transform3D(
+                    position = Vec3(
+                        coin.position.x,
+                        coin.position.y + sin(elapsedSeconds * 3.2 + index * 0.21) * 0.08,
+                        coin.position.z
+                    ),
+                    rotation = Vec3(0.0, elapsedSeconds * 4.2 + index * 0.12, 0.0),
+                    scale = Vec3(1.0, 1.28, 0.16)
+                )
+            )
+        }
+    }
+
+    goldenCoinNodes.forEachIndexed { index, node ->
+        val coin = goldenCoins[index]
+        node.setVisible(coin.isAvailable && !coin.isCollected)
+        if (node.isVisible) {
+            val size = if (coin.isBig) 1.45 else 1.0
+            node.setTransform(
+                Transform3D(
+                    position = Vec3(
+                        coin.position.x,
+                        coin.position.y + sin(elapsedSeconds * 2.4 + index) * 0.14,
+                        coin.position.z
+                    ),
+                    rotation = Vec3(0.0, elapsedSeconds * 3.1 + index, 0.0),
+                    scale = Vec3(size, size * 1.25, size * 0.14)
+                )
+            )
+        }
+    }
+
     goombaNodes.forEachIndexed { index, node ->
         val enemy = goombas[index]
         node.setVisible(enemy.isActive)
@@ -704,11 +1087,42 @@ private data class SummitStar(
     var isCollected: Boolean = false
 )
 
+private data class MarioGameProgress(
+    var marioHealth: Int = MARIO_MAX_HEALTH,
+    var regularCoinsCollected: Int = 0,
+    var goombasDefeated: Int = 0
+)
+
+private data class RegularCoin(
+    val position: Vec3,
+    var isCollected: Boolean = false
+)
+
+private data class GoldenCoin(
+    val challenge: GoldenCoinChallenge,
+    val label: String,
+    val position: Vec3,
+    val isBig: Boolean = false,
+    var isAvailable: Boolean = true,
+    var isCollected: Boolean = false
+)
+
+private enum class GoldenCoinChallenge {
+    FIVE_GOOMBAS,
+    FIFTY_COINS,
+    BOWSER,
+    HILLTOP,
+    RIDGE
+}
+
 private data class PlayerEnemyCollisionResult(
     val player: Vec3,
     val playerVelocityY: Double,
     val isGrounded: Boolean,
-    val lastPlayerHitAt: Double
+    val lastPlayerHitAt: Double,
+    val defeatedGoombas: Int = 0,
+    val bowserDefeated: Boolean = false,
+    val playerDamage: Int = 0
 ) {
     fun applyTo(state: KinematicCharacterState3D) {
         state.position = player
@@ -721,7 +1135,12 @@ private enum class MarioAnimationState {
     IDLE,
     WALK,
     RUN,
+    CROUCH,
+    CROUCH_WALK,
     JUMP,
+    DOUBLE_JUMP,
+    BACKFLIP,
+    LONG_JUMP,
     FALL,
     LAND
 }
@@ -730,14 +1149,77 @@ private fun marioAnimationClips(clips: AnimationClipSet3D): AnimationClipMap3D<M
     return AnimationClipMap3D.fromClipNames(
         clips = clips,
         references = listOf(
-            AnimationClipReference3D(MarioAnimationState.IDLE, "Armature|AreaWait64"),
-            AnimationClipReference3D(MarioAnimationState.WALK, "Armature|Walk", playbackSpeed = 1.42),
-            AnimationClipReference3D(MarioAnimationState.RUN, "Armature|Run", playbackSpeed = 2.05),
-            AnimationClipReference3D(MarioAnimationState.JUMP, "Armature|Jump"),
-            AnimationClipReference3D(MarioAnimationState.FALL, "Armature|Fall"),
-            AnimationClipReference3D(MarioAnimationState.LAND, "Armature|Land")
+            marioClipReference(clips, MarioAnimationState.IDLE, listOf("Armature|AreaWait64"), "Armature|AreaWait64"),
+            marioClipReference(clips, MarioAnimationState.WALK, listOf("Armature|Walk"), "Armature|Walk", 1.42),
+            marioClipReference(clips, MarioAnimationState.RUN, listOf("Armature|Run"), "Armature|Run", 2.05),
+            marioClipReference(
+                clips = clips,
+                state = MarioAnimationState.CROUCH,
+                candidates = listOf(
+                    "Armature|Crouch",
+                    "Armature|WaitToCrouch",
+                    "Armature|Crouching"
+                ),
+                fallback = "Armature|AreaWait64"
+            ),
+            marioClipReference(
+                clips = clips,
+                state = MarioAnimationState.CROUCH_WALK,
+                candidates = listOf(
+                    "Armature|CrouchWalk",
+                    "Armature|WalkCrouching"
+                ),
+                fallback = "Armature|Walk",
+                playbackSpeed = 0.82
+            ),
+            marioClipReference(clips, MarioAnimationState.JUMP, listOf("Armature|Jump"), "Armature|Jump"),
+            marioClipReference(
+                clips = clips,
+                state = MarioAnimationState.DOUBLE_JUMP,
+                candidates = listOf(
+                    "Armature|DoubleJump",
+                    "Armature|JumpDouble"
+                ),
+                fallback = "Armature|Jump",
+                playbackSpeed = 1.08
+            ),
+            marioClipReference(
+                clips = clips,
+                state = MarioAnimationState.BACKFLIP,
+                candidates = listOf(
+                    "Armature|BackFlip",
+                    "Armature|Backflip",
+                    "Armature|JumpBack"
+                ),
+                fallback = "Armature|Jump",
+                playbackSpeed = 1.12
+            ),
+            marioClipReference(
+                clips = clips,
+                state = MarioAnimationState.LONG_JUMP,
+                candidates = listOf(
+                    "Armature|LongJump",
+                    "Armature|JumpLong"
+                ),
+                fallback = "Armature|Jump",
+                playbackSpeed = 0.95
+            ),
+            marioClipReference(clips, MarioAnimationState.FALL, listOf("Armature|Fall"), "Armature|Fall"),
+            marioClipReference(clips, MarioAnimationState.LAND, listOf("Armature|Land"), "Armature|Land")
         )
     )
+}
+
+private fun marioClipReference(
+    clips: AnimationClipSet3D,
+    state: MarioAnimationState,
+    candidates: List<String>,
+    fallback: String,
+    playbackSpeed: Double = 1.0
+): AnimationClipReference3D<MarioAnimationState> {
+    val clipName = (candidates + fallback).firstOrNull { clips.indexOf(it) != null }
+        ?: clips.names.first()
+    return AnimationClipReference3D(state, clipName, playbackSpeed = playbackSpeed)
 }
 
 private fun resolvePlayerGoombaCollisions(
@@ -748,12 +1230,15 @@ private fun resolvePlayerGoombaCollisions(
     goombas: List<RoamingEnemy>,
     playerController: KinematicCharacterController3D,
     elapsedSeconds: Double,
-    lastPlayerHitAt: Double
+    lastPlayerHitAt: Double,
+    highBounceRequested: Boolean
 ): PlayerEnemyCollisionResult {
     var resolvedPlayer = player
     var resolvedVelocityY = playerVelocityY
     var resolvedGrounded = isGrounded
     var resolvedLastHitAt = lastPlayerHitAt
+    var defeatedGoombas = 0
+    var playerDamage = 0
 
     goombas.filter { it.isActive }.forEach { enemy ->
         val contact = Collision3D.overlap(
@@ -766,7 +1251,12 @@ private fun resolvePlayerGoombaCollisions(
         val isStomp = resolvedVelocityY <= 0.0 && feetWereAboveStompLine && feetAreAboveGround
         if (isStomp) {
             enemy.isActive = false
-            resolvedVelocityY = PLAYER_STOMP_BOUNCE_VELOCITY
+            defeatedGoombas += 1
+            resolvedVelocityY = if (highBounceRequested) {
+                PLAYER_HIGH_STOMP_BOUNCE_VELOCITY
+            } else {
+                PLAYER_STOMP_BOUNCE_VELOCITY
+            }
             resolvedGrounded = false
             return@forEach
         }
@@ -791,13 +1281,16 @@ private fun resolvePlayerGoombaCollisions(
             maxOf(resolvedVelocityY, 0.0)
         }
         resolvedLastHitAt = elapsedSeconds
+        playerDamage += GOOMBA_DAMAGE
     }
 
     return PlayerEnemyCollisionResult(
         player = resolvedPlayer,
         playerVelocityY = resolvedVelocityY,
         isGrounded = resolvedGrounded,
-        lastPlayerHitAt = resolvedLastHitAt
+        lastPlayerHitAt = resolvedLastHitAt,
+        defeatedGoombas = defeatedGoombas,
+        playerDamage = playerDamage
     )
 }
 
@@ -961,6 +1454,130 @@ private fun createSummitStar(anchor: Vec3): SummitStar {
     )
 }
 
+private fun createRegularCoins(terrain: TerrainMeshCollider3D): MutableList<RegularCoin> {
+    val random = Random(REGULAR_COIN_SCATTER_SEED)
+    val coins = mutableListOf<RegularCoin>()
+    val cellSize = (REGULAR_COIN_SCATTER_RANGE * 2.0) / REGULAR_COIN_SCATTER_GRID_SIZE.toDouble()
+    val cells = (0 until REGULAR_COIN_SCATTER_GRID_SIZE).flatMap { cellX ->
+        (0 until REGULAR_COIN_SCATTER_GRID_SIZE).map { cellZ ->
+            cellX to cellZ
+        }
+    }.shuffled(random)
+
+    cells.forEach { (cellX, cellZ) ->
+        if (coins.size >= REGULAR_COIN_COUNT) {
+            return@forEach
+        }
+
+        val minX = -REGULAR_COIN_SCATTER_RANGE + cellX * cellSize
+        val minZ = -REGULAR_COIN_SCATTER_RANGE + cellZ * cellSize
+        var placedInCell = false
+        repeat(4) {
+            if (!placedInCell && tryAddRegularCoin(
+                    terrain = terrain,
+                    coins = coins,
+                    x = minX + random.nextDouble(0.12, 0.88) * cellSize,
+                    z = minZ + random.nextDouble(0.12, 0.88) * cellSize,
+                    minSpacing = REGULAR_COIN_MIN_SPACING
+                )
+            ) {
+                placedInCell = true
+            }
+        }
+    }
+
+    val spacingPasses = listOf(
+        REGULAR_COIN_MIN_SPACING,
+        REGULAR_COIN_MIN_SPACING * 0.75,
+        REGULAR_COIN_MIN_SPACING * 0.5,
+        0.0
+    )
+    spacingPasses.forEach { minSpacing ->
+        var attempts = 0
+        while (coins.size < REGULAR_COIN_COUNT && attempts < REGULAR_COIN_SCATTER_ATTEMPTS) {
+            attempts += 1
+            tryAddRegularCoin(
+                terrain = terrain,
+                coins = coins,
+                x = random.nextDouble(-REGULAR_COIN_SCATTER_RANGE, REGULAR_COIN_SCATTER_RANGE),
+                z = random.nextDouble(-REGULAR_COIN_SCATTER_RANGE, REGULAR_COIN_SCATTER_RANGE),
+                minSpacing = minSpacing
+            )
+        }
+    }
+
+    check(coins.size == REGULAR_COIN_COUNT) {
+        "Mario regular coin layout must place $REGULAR_COIN_COUNT coins."
+    }
+    return coins
+}
+
+private fun tryAddRegularCoin(
+    terrain: TerrainMeshCollider3D,
+    coins: MutableList<RegularCoin>,
+    x: Double,
+    z: Double,
+    minSpacing: Double
+): Boolean {
+    val groundY = terrain.groundYAt(x, z) ?: return false
+    val position = Vec3(x, groundY + 0.62, z)
+    val minSpacingSquared = minSpacing * minSpacing
+    if (minSpacingSquared > 0.0 &&
+        coins.any { squaredHorizontalDistance(it.position, position) < minSpacingSquared }
+    ) {
+        return false
+    }
+    coins += RegularCoin(position)
+    return true
+}
+
+private fun createGoldenCoins(
+    terrain: TerrainMeshCollider3D,
+    bowserHome: Vec3
+): MutableList<GoldenCoin> {
+    return mutableListOf(
+        GoldenCoin(
+            challenge = GoldenCoinChallenge.FIVE_GOOMBAS,
+            label = "GOOMBA FIVE",
+            position = collectiblePosition(terrain, -8.0, -9.0, yOffset = 1.35),
+            isAvailable = false
+        ),
+        GoldenCoin(
+            challenge = GoldenCoinChallenge.FIFTY_COINS,
+            label = "FIFTY COINS",
+            position = collectiblePosition(terrain, 0.0, 0.0, yOffset = 1.35),
+            isAvailable = false
+        ),
+        GoldenCoin(
+            challenge = GoldenCoinChallenge.BOWSER,
+            label = "BOWSER",
+            position = Vec3(bowserHome.x, bowserHome.y + 1.55, bowserHome.z),
+            isBig = true,
+            isAvailable = false
+        ),
+        GoldenCoin(
+            challenge = GoldenCoinChallenge.HILLTOP,
+            label = "HILLTOP",
+            position = collectiblePosition(terrain, -21.0, 17.0, yOffset = 1.1)
+        ),
+        GoldenCoin(
+            challenge = GoldenCoinChallenge.RIDGE,
+            label = "RIDGE",
+            position = collectiblePosition(terrain, 24.0, -18.0, yOffset = 1.1)
+        )
+    )
+}
+
+private fun collectiblePosition(
+    terrain: TerrainMeshCollider3D,
+    x: Double,
+    z: Double,
+    yOffset: Double
+): Vec3 {
+    val ground = groundPosition(terrain, x, z)
+    return Vec3(ground.x, ground.y + yOffset, ground.z)
+}
+
 private fun resolveSummitStarCollection(
     star: SummitStar,
     playerController: KinematicCharacterController3D,
@@ -980,6 +1597,80 @@ private fun resolveSummitStarCollection(
     }
 }
 
+private fun updateProgressFromCollision(
+    progress: MarioGameProgress,
+    result: PlayerEnemyCollisionResult
+) {
+    if (result.playerDamage > 0) {
+        progress.marioHealth = (progress.marioHealth - result.playerDamage).coerceAtLeast(0)
+    }
+    progress.goombasDefeated += result.defeatedGoombas
+}
+
+private fun collectRegularCoins(
+    content: MarioSceneContent,
+    player: Vec3
+) {
+    var collected = 0
+    content.regularCoins.forEach { coin ->
+        if (!coin.isCollected && playerTouchesCollectible(player, coin.position, REGULAR_COIN_PICKUP_RADIUS)) {
+            coin.isCollected = true
+            collected += 1
+        }
+    }
+    content.progress.regularCoinsCollected += collected
+}
+
+private fun collectGoldenCoins(
+    content: MarioSceneContent,
+    player: Vec3
+) {
+    content.goldenCoins.forEach { coin ->
+        if (coin.isAvailable &&
+            !coin.isCollected &&
+            playerTouchesCollectible(player, coin.position, GOLDEN_COIN_PICKUP_RADIUS)
+        ) {
+            coin.isCollected = true
+            coin.isAvailable = false
+        }
+    }
+}
+
+private fun updateGoldenCoinChallenges(
+    content: MarioSceneContent,
+    bowserDefeatedThisFrame: Boolean
+) {
+    if (content.progress.goombasDefeated >= 5) {
+        awardGoldenCoin(content, GoldenCoinChallenge.FIVE_GOOMBAS)
+    }
+    if (content.progress.regularCoinsCollected >= 50) {
+        awardGoldenCoin(content, GoldenCoinChallenge.FIFTY_COINS)
+    }
+    if (bowserDefeatedThisFrame) {
+        awardGoldenCoin(content, GoldenCoinChallenge.BOWSER)
+    }
+}
+
+private fun awardGoldenCoin(
+    content: MarioSceneContent,
+    challenge: GoldenCoinChallenge
+) {
+    val coin = content.goldenCoins.firstOrNull { it.challenge == challenge } ?: return
+    if (!coin.isCollected) {
+        coin.isCollected = true
+        coin.isAvailable = false
+    }
+}
+
+private fun playerTouchesCollectible(
+    player: Vec3,
+    collectible: Vec3,
+    radius: Double
+): Boolean {
+    return horizontalDistance(player, collectible) <= radius &&
+        abs(player.y - collectible.y) <= PLAYER_HALF_HEIGHT + COIN_PICKUP_VERTICAL_PADDING
+}
+
 private fun resolvePlayerBowserCollision(
     player: Vec3,
     playerYBeforeGravity: Double,
@@ -988,7 +1679,8 @@ private fun resolvePlayerBowserCollision(
     bowser: BossEnemy,
     playerController: KinematicCharacterController3D,
     elapsedSeconds: Double,
-    lastPlayerHitAt: Double
+    lastPlayerHitAt: Double,
+    highBounceRequested: Boolean
 ): PlayerEnemyCollisionResult {
     if (!bowser.isActive) {
         return PlayerEnemyCollisionResult(player, playerVelocityY, isGrounded, lastPlayerHitAt)
@@ -1006,14 +1698,20 @@ private fun resolvePlayerBowserCollision(
     if (isStomp) {
         bowser.health -= 1
         bowser.hitFlashUntil = elapsedSeconds + BOWSER_HIT_FLASH_SECONDS
+        val bowserDefeated = bowser.health <= 0
         if (bowser.health <= 0) {
             bowser.isActive = false
         }
         return PlayerEnemyCollisionResult(
             player = player,
-            playerVelocityY = BOWSER_STOMP_BOUNCE_VELOCITY,
+            playerVelocityY = if (highBounceRequested) {
+                BOWSER_HIGH_STOMP_BOUNCE_VELOCITY
+            } else {
+                BOWSER_STOMP_BOUNCE_VELOCITY
+            },
             isGrounded = false,
-            lastPlayerHitAt = lastPlayerHitAt
+            lastPlayerHitAt = lastPlayerHitAt,
+            bowserDefeated = bowserDefeated
         )
     }
 
@@ -1033,7 +1731,8 @@ private fun resolvePlayerBowserCollision(
         player = bumpMove.position,
         playerVelocityY = if (bumpMove.isGrounded) 0.0 else maxOf(playerVelocityY, 0.0),
         isGrounded = bumpMove.isGrounded,
-        lastPlayerHitAt = elapsedSeconds
+        lastPlayerHitAt = elapsedSeconds,
+        playerDamage = BOWSER_DAMAGE
     )
 }
 

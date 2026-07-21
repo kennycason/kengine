@@ -7,9 +7,9 @@ GPU-backed UI primitives for `SDL_GPU_3D` applications.
 ## Current Scope
 
 - Retained `GpuUiView3D` trees with row/column layout.
-- Labels, buttons, and sliders.
+- Labels, buttons, sliders, and generated coin/icon primitives.
 - Hover, click, release, and drag-focus handling.
-- `GpuUiRenderer3D` for solid rectangles and SDL_ttf-backed text textures.
+- `GpuUiRenderer3D` for solid rectangles, generated icon textures, and SDL_ttf-backed text textures.
 
 ## Integration
 

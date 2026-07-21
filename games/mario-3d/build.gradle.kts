@@ -57,6 +57,7 @@ kotlin {
             dependencies {
                 implementation(project(":kengine"))
                 implementation(project(":kengine-3d"))
+                implementation(project(":kengine-3d-ui"))
             }
         }
         val commonTest by getting {
@@ -65,4 +66,14 @@ kotlin {
             }
         }
     }
+}
+
+tasks.matching { it.name == "linkDebugExecutable${KengineHostTarget.taskSuffix}" }.configureEach {
+    finalizedBy("copyDebugAssets")
+}
+tasks.matching { it.name == "runDebugExecutable${KengineHostTarget.taskSuffix}" }.configureEach {
+    dependsOn("copyDebugAssets")
+}
+tasks.matching { it.name == "linkReleaseExecutable${KengineHostTarget.taskSuffix}" }.configureEach {
+    finalizedBy("copyReleaseAssets")
 }

@@ -52,6 +52,8 @@ import sdl3.ttf.SDL_DestroySurface
 import sdl3.ttf.SDL_PIXELFORMAT_RGBA32
 import sdl3.ttf.SDL_Surface
 import sdl3.ttf.TTF_RenderText_Blended
+import kotlin.math.abs
+import kotlin.math.sqrt
 
 @OptIn(ExperimentalForeignApi::class)
 class GpuUiRenderer3D(
@@ -64,6 +66,12 @@ class GpuUiRenderer3D(
         width = 1u,
         height = 1u,
         pixels = byteArrayOf(255.toByte(), 255.toByte(), 255.toByte(), 255.toByte())
+    )
+    private val coinTexture = GpuTexture.createRgba8(
+        gpu = gpu,
+        width = COIN_TEXTURE_SIZE.toUInt(),
+        height = COIN_TEXTURE_SIZE.toUInt(),
+        pixels = coinTexturePixels(COIN_TEXTURE_SIZE)
     )
     private val textTextures = mutableMapOf<TextKey, TextTexture>()
     private var cleanedUp = false
@@ -91,6 +99,21 @@ class GpuUiRenderer3D(
     ) {
         drawTexture(
             texture = whiteTexture,
+            rect = rect,
+            color = color,
+            frameWidth = frameWidth,
+            frameHeight = frameHeight
+        )
+    }
+
+    fun coin(
+        rect: GpuUiRect3D,
+        color: Color,
+        frameWidth: UInt,
+        frameHeight: UInt
+    ) {
+        drawTexture(
+            texture = coinTexture,
             rect = rect,
             color = color,
             frameWidth = frameWidth,
@@ -137,6 +160,7 @@ class GpuUiRenderer3D(
         textTextures.values.forEach { it.texture.cleanup() }
         textTextures.clear()
         whiteTexture.cleanup()
+        coinTexture.cleanup()
         SDL_ReleaseGPUGraphicsPipeline(gpu.device, pipeline)
     }
 
@@ -454,6 +478,48 @@ class GpuUiRenderer3D(
     )
 
     companion object {
+        private const val COIN_TEXTURE_SIZE = 64
+
+        private fun coinTexturePixels(size: Int): ByteArray {
+            val bytes = ByteArray(size * size * 4)
+            for (y in 0 until size) {
+                for (x in 0 until size) {
+                    val normalizedX = ((x + 0.5) / size.toDouble()) * 2.0 - 1.0
+                    val normalizedY = ((y + 0.5) / size.toDouble()) * 2.0 - 1.0
+                    val distance = sqrt(normalizedX * normalizedX + normalizedY * normalizedY)
+                    val index = (y * size + x) * 4
+                    if (distance >= 1.0) {
+                        bytes[index + 3] = 0
+                        continue
+                    }
+
+                    val alpha = if (distance > 0.92) {
+                        ((1.0 - distance) / 0.08).coerceIn(0.0, 1.0)
+                    } else {
+                        1.0
+                    }
+                    val rim = if (distance > 0.72) 0.22 else 0.0
+                    val innerGroove = if (abs(distance - 0.48) < 0.035) -0.16 else 0.0
+                    val diagonalHighlight = ((-normalizedX - normalizedY) * 0.12).coerceIn(-0.08, 0.14)
+                    val brightness = (0.74 + rim + innerGroove + diagonalHighlight).coerceIn(0.0, 1.0)
+
+                    bytes[index] = byteColor(brightness)
+                    bytes[index + 1] = byteColor(brightness)
+                    bytes[index + 2] = byteColor(brightness)
+                    bytes[index + 3] = byteAlpha(alpha)
+                }
+            }
+            return bytes
+        }
+
+        private fun byteColor(value: Double): Byte {
+            return (value * 255.0).toInt().coerceIn(0, 255).toByte()
+        }
+
+        private fun byteAlpha(value: Double): Byte {
+            return (value * 255.0).toInt().coerceIn(0, 255).toByte()
+        }
+
         private val vertexShaderSource = """
             #include <metal_stdlib>
             using namespace metal;

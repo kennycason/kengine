@@ -6,6 +6,7 @@ data class ControllerAxisInputSettings(
     val axisCount: Int = 6,
     val deadzone: Double = 0.14,
     val rawReleaseDeadzone: Float = 0.08f,
+    val neutralCaptureMaxMagnitude: Float = 0.25f,
     val calibrationSeconds: Double = 0.2
 ) {
     init {
@@ -17,6 +18,9 @@ data class ControllerAxisInputSettings(
         }
         require(rawReleaseDeadzone >= 0f && rawReleaseDeadzone < 1f) {
             "Controller raw release deadzone must be in [0, 1)."
+        }
+        require(neutralCaptureMaxMagnitude >= rawReleaseDeadzone && neutralCaptureMaxMagnitude <= 1f) {
+            "Controller neutral capture magnitude must be in [rawReleaseDeadzone, 1]."
         }
         require(calibrationSeconds >= 0.0) {
             "Controller calibration seconds must be non-negative."
@@ -79,8 +83,8 @@ class CalibratedControllerAxes(
         return sample(
             controllerId = controller.getFirstControllerIdWithAxes(),
             elapsedSeconds = elapsedSeconds
-        ) { _, axisIndex ->
-            controller.getAxisValue(axisIndex)
+        ) { controllerId, axisIndex ->
+            controller.getAxisValue(controllerId, axisIndex)
         }
     }
 
@@ -136,7 +140,9 @@ class CalibratedControllerAxes(
         axisValue: (UInt, Int) -> Float
     ): FloatArray {
         return FloatArray(settings.axisCount) { axisIndex ->
-            axisValue(controllerId, axisIndex)
+            axisValue(controllerId, axisIndex).takeIf {
+                abs(it) <= settings.neutralCaptureMaxMagnitude
+            } ?: 0f
         }
     }
 }

@@ -9,6 +9,7 @@ Experimental third-person 3D platformer/control demo for Kengine.
 - `assets/models/Mario64Animated.glb`: repo-safe split from the large Odyssey source GLB. It keeps Mario's skinned mesh/skeleton/textures and the idle, walk, run, jump, fall, land, hip-drop, punch, damage, crouch, and brake clips.
 - `assets/models/Animated Goomba Super Mario Bros.glb`: Goomba enemy mesh used for terrain-following patrols and node-transform animation playback.
 - `assets/models/Super Mario 64 Bowser.glb`: small textured Bowser landmark/enemy mesh placed on the mountain summit. This file also has no skins or animation clips.
+- `assets/fonts/arcade_classic.ttf`: HUD font used by the `kengine-3d-ui` overlay.
 
 The larger `Mario 64 Odyssey All Animations 2025.glb` source file remains outside the repo at `~/code/mario64-assets/assets/models/` because it is larger than GitHub's regular file limit. That file is the one that contains a skin and many animation clips.
 
@@ -26,13 +27,15 @@ python3 tools/extract_glb_animations.py "$HOME/code/mario64-assets/assets/models
 
 ## Controls
 
-- Keyboard: `WASD` moves Mario relative to the camera, Shift or `B` runs, arrow keys orbit the camera with non-inverted Y look, `T` cycles camera distance, and `X`/space jumps.
-- Controller: left stick moves Mario relative to the camera, Square runs, right stick smoothly orbits the camera with non-inverted Y look, Triangle cycles camera distance, and Cross jumps.
+- Keyboard: `WASD` moves Mario relative to the camera, Shift or `B` runs, Ctrl crouches, arrow keys orbit the camera with non-inverted Y look, `T` cycles camera distance, and `X`/space jumps.
+- Controller: left stick moves Mario relative to the camera, Square runs, `L2`/ZL crouches, right stick smoothly orbits the camera with non-inverted Y look, Triangle cycles camera distance, and Cross jumps.
+- While crouched, jump from a standstill to backflip or jump while moving to long jump. Press jump again in the air to double jump. Hold jump while bouncing off enemies for a higher rebound.
+- The HUD tracks Mario energy, regular coins, goomba defeats, and golden coins. The demo has 100 scattered regular coins, two exploration golden coins, and golden coin rewards for defeating 5 goombas, collecting 50 regular coins, and beating Bowser.
 
 ## Build Plan
 
 1. Keep the platformer baseline stable: third-person follow camera, camera-relative movement, jump physics, and height-aware terrain collision.
 2. Continue moving validated helpers into reusable Kengine modules; controller axis calibration/deadzone shaping, model asset descriptors/path resolution, cached parse-once static and animated source upload, collision reuse, static Bowser model loading, debug collider/contact drawing, third-person camera controls, animation state playback, ordered scene submission, animated model facades, per-instance skinned render state, and actor-to-node render sync now use reusable engine APIs.
 3. Keep Mario on the default `AUTO` animated skinning path, which now uses GPU joint-palette skinning for this asset and keeps CPU skinning as the engine fallback for larger skeletons.
-4. Add action-state controls for the already extracted hip-drop, punch, damage, crouch, and brake clips.
+4. Keep extracting game-specific state into reusable 3D gameplay helpers; Mario now exercises crouch-walk, backflip, long jump, double jump, high enemy bounces, collectible tracking, and `kengine-3d-ui` HUD rendering.
 5. Add richer collision volumes, slope limits, ledges, world bounds, and debug overlays.

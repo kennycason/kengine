@@ -129,16 +129,52 @@ class CalibratedControllerAxesTest {
         assertEquals(0.0, releasedAdjusted.axis(0))
     }
 
+    @Test
+    fun doesNotCaptureHeldStickAsNeutralCenter() {
+        val axes = CalibratedControllerAxes(settings = testSettings(calibrationSeconds = 0.2))
+        var value = 0.9f
+
+        val calibrating = axes.sample(
+            controllerId = 1u,
+            elapsedSeconds = 1.0
+        ) { _, _ ->
+            value
+        }
+
+        assertTrue(calibrating.isCalibrating)
+        assertEquals(0.0, calibrating.axis(0))
+
+        value = 0f
+        val released = axes.sample(
+            controllerId = 1u,
+            elapsedSeconds = 1.31
+        ) { _, _ ->
+            value
+        }
+        assertEquals(0.0, released.axis(0))
+
+        value = 0.57f
+        val active = axes.sample(
+            controllerId = 1u,
+            elapsedSeconds = 1.32
+        ) { _, _ ->
+            value
+        }
+        assertEquals(0.5, active.axis(0), absoluteTolerance = 0.000001)
+    }
+
     private fun testSettings(
         axisCount: Int = 2,
         deadzone: Double = 0.14,
         rawReleaseDeadzone: Float = 0.08f,
+        neutralCaptureMaxMagnitude: Float = 0.25f,
         calibrationSeconds: Double = 0.2
     ): ControllerAxisInputSettings {
         return ControllerAxisInputSettings(
             axisCount = axisCount,
             deadzone = deadzone,
             rawReleaseDeadzone = rawReleaseDeadzone,
+            neutralCaptureMaxMagnitude = neutralCaptureMaxMagnitude,
             calibrationSeconds = calibrationSeconds
         )
     }

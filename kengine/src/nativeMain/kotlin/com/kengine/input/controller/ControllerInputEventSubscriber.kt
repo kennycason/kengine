@@ -40,6 +40,7 @@ class ControllerInputEventSubscriber(
     // Track opened SDL resources so we can close them properly
     private val openedJoysticks = mutableMapOf<UInt, CPointer<cnames.structs.SDL_Joystick>>()
     private val openedGamepads = mutableMapOf<UInt, CPointer<cnames.structs.SDL_Gamepad>>()
+    private var lastActiveControllerId: UInt? = null
 
     /**
      * Gets the ID of the first connected controller, if any exist.
@@ -52,9 +53,16 @@ class ControllerInputEventSubscriber(
     }
 
     /**
-     * Gets the ID of the first connected controller that can report analog axes.
+     * Gets the preferred connected controller that can report analog axes.
+     * The most recently active axis-capable controller wins, then SDL's first
+     * reported axis-capable controller is used as a fallback.
      */
     fun getFirstControllerIdWithAxes(): UInt? {
+        lastActiveControllerId?.let { controllerId ->
+            if (controllerStates[controllerId]?.axes?.isNotEmpty() == true) {
+                return controllerId
+            }
+        }
         return controllerStates.entries.firstOrNull { (_, state) ->
             state.axes.isNotEmpty()
         }?.key
@@ -116,6 +124,9 @@ class ControllerInputEventSubscriber(
         controllerStates[joystickID]?.buttons?.getOrNull(button)?.let {
             controllerStates[joystickID]?.buttons?.set(button, isPressed)
         }
+        if (isPressed) {
+            markControllerActive(joystickID)
+        }
     }
 
     private fun handleJoystickAxisEvent(event: SDL_Event) {
@@ -132,6 +143,9 @@ class ControllerInputEventSubscriber(
 
         controllerStates[joystickID]?.axes?.getOrNull(axis)?.let {
             controllerStates[joystickID]?.axes?.set(axis, adjustedValue)
+        }
+        if (adjustedValue != 0f) {
+            markControllerActive(joystickID)
         }
     }
 
@@ -151,6 +165,9 @@ class ControllerInputEventSubscriber(
                             "DOWN=${HatDirection.DOWN.isPressed(hatValue)}, " +
                             "LEFT=${HatDirection.LEFT.isPressed(hatValue)}"
                     }
+                }
+                if (hatValue != SDL_HAT_CENTERED.toInt()) {
+                    markControllerActive(joystickID)
                 }
             }
         }
@@ -226,6 +243,9 @@ class ControllerInputEventSubscriber(
         controllerMappings.remove(instanceId)
         openedJoysticks.remove(instanceId)
         instanceToDeviceKey.remove(instanceId)?.let { seenDeviceKeys.remove(it) }
+        if (lastActiveControllerId == instanceId) {
+            lastActiveControllerId = null
+        }
     }
 
     // ========== GAMEPAD MODE HANDLERS ==========
@@ -258,6 +278,9 @@ class ControllerInputEventSubscriber(
         controllerStates[gamepadID]?.buttons?.getOrNull(button)?.let {
             controllerStates[gamepadID]?.buttons?.set(button, isPressed)
         }
+        if (isPressed) {
+            markControllerActive(gamepadID)
+        }
     }
 
     private fun handleGamepadAxisEvent(event: SDL_Event) {
@@ -280,6 +303,9 @@ class ControllerInputEventSubscriber(
 
         controllerStates[gamepadID]?.axes?.getOrNull(axis)?.let {
             controllerStates[gamepadID]?.axes?.set(axis, adjustedValue)
+        }
+        if (adjustedValue != 0f) {
+            markControllerActive(gamepadID)
         }
     }
 
@@ -351,6 +377,9 @@ class ControllerInputEventSubscriber(
         controllerMappings.remove(instanceId)
         openedGamepads.remove(instanceId)
         instanceToDeviceKey.remove(instanceId)?.let { seenDeviceKeys.remove(it) }
+        if (lastActiveControllerId == instanceId) {
+            lastActiveControllerId = null
+        }
     }
 
     // ========== INITIALIZATION ==========
@@ -546,6 +575,13 @@ class ControllerInputEventSubscriber(
         seenDeviceKeys.clear()
         openedJoysticks.clear()
         openedGamepads.clear()
+        lastActiveControllerId = null
         initialized = false
+    }
+
+    private fun markControllerActive(controllerId: UInt) {
+        if (controllerStates[controllerId]?.axes?.isNotEmpty() == true) {
+            lastActiveControllerId = controllerId
+        }
     }
 }
