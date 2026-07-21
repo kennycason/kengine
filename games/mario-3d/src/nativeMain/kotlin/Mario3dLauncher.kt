@@ -89,12 +89,16 @@ private const val PLAYER_HALF_HEIGHT = 0.82
 private const val PLAYER_WALK_SPEED = 5.4
 private const val PLAYER_RUN_SPEED = 8.2
 private const val PLAYER_CROUCH_WALK_SPEED = 2.8
+private const val PLAYER_GROUND_ACCELERATION = 42.0
+private const val PLAYER_GROUND_DECELERATION = 12.0
+private const val PLAYER_AIR_ACCELERATION = 9.5
+private const val PLAYER_AIR_DECELERATION = 2.4
 private const val PLAYER_JUMP_VELOCITY = 15.4
 private const val PLAYER_DOUBLE_JUMP_VELOCITY = 17.6
 private const val PLAYER_BACKFLIP_JUMP_VELOCITY = 20.5
 private const val PLAYER_BACKFLIP_BACK_SPEED = 4.6
 private const val PLAYER_LONG_JUMP_VELOCITY = 13.2
-private const val PLAYER_LONG_JUMP_SPEED = 13.8
+private const val PLAYER_LONG_JUMP_SPEED = 16.4
 private const val PLAYER_GROUND_POUND_VELOCITY = -32.0
 private const val PLAYER_GROUND_POUND_ANIMATION_SECONDS = 0.7
 private const val PLAYER_JUMP_GRAVITY = 42.0
@@ -157,6 +161,8 @@ private const val MARIO_HUD_COIN_ICON_BOX_SIZE = 36.0
 private const val MARIO_HUD_GOLD_COIN_ICON_SIZE = 36.0
 private const val MARIO_HUD_REGULAR_COIN_ICON_SIZE = 18.0
 private const val MARIO_MODEL_YAW_OFFSET = 3.141592653589793
+private const val MARIO_LONG_JUMP_VISUAL_PITCH = 0.58
+private const val MARIO_BACKFLIP_VISUAL_ROTATION_SPEED = 12.0
 private const val GOOMBA_MODEL_YAW_OFFSET = 3.141592653589793
 private const val BOWSER_MODEL_YAW_OFFSET = 1.5707963267948966
 private const val GROUND_CONTACT_EPSILON = 0.05
@@ -288,11 +294,13 @@ fun main() {
                 )
             )
             var playerYaw = 0.0
+            var playerHorizontalVelocity = Vec3(0.0, 0.0, 0.0)
             val controllerAxes = CalibratedControllerAxes(CONTROLLER_AXIS_SETTINGS)
             var wasJumpPressed = false
             var wasCrouchPressed = false
             var doubleJumpAvailable = false
             var forcedAirAnimationState: MarioAnimationState? = null
+            var forcedAirAnimationStartedAt = 0.0
             var forcedAirAnimationUntil = 0.0
             var wasGrounded = true
             var landingAnimationUntil = 0.0
@@ -343,7 +351,8 @@ fun main() {
 
                         val moveDirection = cameraController.movementDirection(input.moveRight, input.moveForward)
                         val moveLength = horizontalLength(moveDirection)
-                        isMoving = moveLength > MOVEMENT_INPUT_EPSILON
+                        val hasMoveInput = moveLength > MOVEMENT_INPUT_EPSILON
+                        isMoving = hasMoveInput
                         val isGroundedBeforeStep = playerState.isGrounded
                         val jumpJustPressed = input.jumpPressed && !wasJumpPressed
                         val crouchJustPressed = input.crouchPressed && !wasCrouchPressed
@@ -352,15 +361,22 @@ fun main() {
                             input.runPressed -> PLAYER_RUN_SPEED
                             else -> PLAYER_WALK_SPEED
                         }
-                        val baseHorizontalVelocity = if (isMoving) {
+                        val targetHorizontalVelocity = if (hasMoveInput) {
                             horizontalVelocityForMovement(moveDirection, moveLength, moveSpeed)
                         } else {
                             Vec3(0.0, 0.0, 0.0)
                         }
-                        if (isMoving) {
+                        if (hasMoveInput) {
                             playerYaw = atan2(-moveDirection.x, -moveDirection.z)
                         }
-                        var horizontalVelocity = baseHorizontalVelocity
+                        var horizontalVelocity = approachHorizontalVelocity(
+                            current = playerHorizontalVelocity,
+                            target = targetHorizontalVelocity,
+                            maxDelta = playerHorizontalVelocityChangePerSecond(
+                                hasMoveInput = hasMoveInput,
+                                isGrounded = isGroundedBeforeStep
+                            ) * deltaSeconds
+                        )
                         var controllerJumpRequested = jumpJustPressed
                         if (crouchJustPressed && !isGroundedBeforeStep) {
                             horizontalVelocity = Vec3(0.0, 0.0, 0.0)
@@ -370,9 +386,10 @@ fun main() {
                             controllerJumpRequested = false
                             doubleJumpAvailable = false
                             forcedAirAnimationState = MarioAnimationState.GROUND_POUND
+                            forcedAirAnimationStartedAt = elapsedSeconds
                             forcedAirAnimationUntil = elapsedSeconds + PLAYER_GROUND_POUND_ANIMATION_SECONDS
                         } else if (jumpJustPressed && input.crouchPressed && isGroundedBeforeStep) {
-                            if (isMoving && input.runPressed) {
+                            if (hasMoveInput && input.runPressed) {
                                 horizontalVelocity = horizontalVelocityForMovement(
                                     moveDirection = moveDirection,
                                     moveLength = moveLength,
@@ -380,11 +397,13 @@ fun main() {
                                 )
                                 playerState.velocityY = PLAYER_LONG_JUMP_VELOCITY
                                 forcedAirAnimationState = MarioAnimationState.LONG_JUMP
+                                forcedAirAnimationStartedAt = elapsedSeconds
                             } else {
                                 val backward = forwardForYaw(playerYaw + MARIO_MODEL_YAW_OFFSET, PLAYER_BACKFLIP_BACK_SPEED)
                                 horizontalVelocity = Vec3(backward.x, 0.0, backward.z)
                                 playerState.velocityY = PLAYER_BACKFLIP_JUMP_VELOCITY
                                 forcedAirAnimationState = MarioAnimationState.BACKFLIP
+                                forcedAirAnimationStartedAt = elapsedSeconds
                             }
                             playerState.isGrounded = false
                             playerState.ground = null
@@ -398,8 +417,11 @@ fun main() {
                             controllerJumpRequested = false
                             doubleJumpAvailable = false
                             forcedAirAnimationState = MarioAnimationState.DOUBLE_JUMP
+                            forcedAirAnimationStartedAt = elapsedSeconds
                             forcedAirAnimationUntil = elapsedSeconds + 0.45
                         }
+                        playerHorizontalVelocity = horizontalVelocity
+                        isMoving = horizontalLength(playerHorizontalVelocity) > MOVEMENT_INPUT_EPSILON
 
                         val playerStep = content.playerController.step(
                             state = playerState,
@@ -433,6 +455,7 @@ fun main() {
                         updateProgressFromCollision(content.progress, goombaCollision)
                         if (goombaCollision.playerDamage > 0) {
                             forcedAirAnimationState = MarioAnimationState.HURT
+                            forcedAirAnimationStartedAt = elapsedSeconds
                             forcedAirAnimationUntil = elapsedSeconds + PLAYER_HURT_ANIMATION_SECONDS
                             doubleJumpAvailable = false
                         }
@@ -455,6 +478,7 @@ fun main() {
                         updateProgressFromCollision(content.progress, bowserCollision)
                         if (bowserCollision.playerDamage > 0) {
                             forcedAirAnimationState = MarioAnimationState.HURT
+                            forcedAirAnimationStartedAt = elapsedSeconds
                             forcedAirAnimationUntil = elapsedSeconds + PLAYER_HURT_ANIMATION_SECONDS
                             doubleJumpAvailable = false
                         }
@@ -504,6 +528,11 @@ fun main() {
                         else -> MarioAnimationState.IDLE
                     }
                     val marioPose = content.marioAnimation.pose(nextMarioAnimationState, deltaSeconds)
+                    val marioAnimationStateAgeSeconds = if (nextMarioAnimationState == forcedAirAnimationState) {
+                        elapsedSeconds - forcedAirAnimationStartedAt
+                    } else {
+                        0.0
+                    }
 
                     val cameraTarget = rewardCutscene?.cameraTarget(elapsedSeconds, playerState.position)
                         ?: playerState.position
@@ -513,6 +542,8 @@ fun main() {
                     content.syncSceneNodes(
                         player = player,
                         playerYaw = playerYaw,
+                        marioAnimationState = nextMarioAnimationState,
+                        marioAnimationStateAgeSeconds = marioAnimationStateAgeSeconds,
                         marioPose = marioPose,
                         elapsedSeconds = elapsedSeconds
                     )
@@ -1015,6 +1046,8 @@ private fun drawMarioDebugOverlay(
 private fun MarioSceneContent.syncSceneNodes(
     player: Vec3,
     playerYaw: Double,
+    marioAnimationState: MarioAnimationState,
+    marioAnimationStateAgeSeconds: Double,
     marioPose: AnimationPose3D,
     elapsedSeconds: Double
 ) {
@@ -1104,7 +1137,23 @@ private fun MarioSceneContent.syncSceneNodes(
             yOffset = -PLAYER_HALF_HEIGHT,
             yawOffsetRadians = MARIO_MODEL_YAW_OFFSET
         )
+        .setItemTransform(marioVisualTransform(marioAnimationState, marioAnimationStateAgeSeconds))
         .setPose(marioPose)
+}
+
+private fun marioVisualTransform(
+    animationState: MarioAnimationState,
+    animationStateAgeSeconds: Double
+): Transform3D {
+    return when (animationState) {
+        MarioAnimationState.LONG_JUMP -> Transform3D(
+            rotation = Vec3(MARIO_LONG_JUMP_VISUAL_PITCH, 0.0, 0.0)
+        )
+        MarioAnimationState.BACKFLIP -> Transform3D(
+            rotation = Vec3(-animationStateAgeSeconds * MARIO_BACKFLIP_VISUAL_ROTATION_SPEED, 0.0, 0.0)
+        )
+        else -> Transform3D()
+    }
 }
 
 private data class RoamingEnemy(
@@ -1242,6 +1291,8 @@ private fun marioAnimationClips(clips: AnimationClipSet3D): AnimationClipMap3D<M
                 clips = clips,
                 state = MarioAnimationState.CROUCH,
                 candidates = listOf(
+                    "Armature|SquatWait",
+                    "Armature|SquatStart",
                     "Armature|Crouch",
                     "Armature|WaitToCrouch",
                     "Armature|Crouching"
@@ -1253,7 +1304,8 @@ private fun marioAnimationClips(clips: AnimationClipSet3D): AnimationClipMap3D<M
                 state = MarioAnimationState.CROUCH_WALK,
                 candidates = listOf(
                     "Armature|CrouchWalk",
-                    "Armature|WalkCrouching"
+                    "Armature|WalkCrouching",
+                    "Armature|SquatWait"
                 ),
                 fallback = "Armature|Walk",
                 playbackSpeed = 0.82
@@ -1275,25 +1327,28 @@ private fun marioAnimationClips(clips: AnimationClipSet3D): AnimationClipMap3D<M
                 candidates = listOf(
                     "Armature|BackFlip",
                     "Armature|Backflip",
-                    "Armature|JumpBack"
+                    "Armature|JumpBack",
+                    "Armature|Jump"
                 ),
                 fallback = "Armature|Jump",
-                playbackSpeed = 1.12
+                playbackSpeed = 1.28
             ),
             marioClipReference(
                 clips = clips,
                 state = MarioAnimationState.LONG_JUMP,
                 candidates = listOf(
                     "Armature|LongJump",
-                    "Armature|JumpLong"
+                    "Armature|JumpLong",
+                    "Armature|Jump"
                 ),
                 fallback = "Armature|Jump",
-                playbackSpeed = 0.95
+                playbackSpeed = 0.92
             ),
             marioClipReference(
                 clips = clips,
                 state = MarioAnimationState.GROUND_POUND,
                 candidates = listOf(
+                    "Armature|HipDropStart",
                     "Armature|GroundPound",
                     "Armature|HipDrop",
                     "Armature|Fall"
@@ -1815,6 +1870,42 @@ private fun updateRewardCoinCutscene(
 private fun smoothStep(value: Double): Double {
     val t = value.coerceIn(0.0, 1.0)
     return t * t * (3.0 - 2.0 * t)
+}
+
+private fun playerHorizontalVelocityChangePerSecond(
+    hasMoveInput: Boolean,
+    isGrounded: Boolean
+): Double {
+    return when {
+        hasMoveInput && isGrounded -> PLAYER_GROUND_ACCELERATION
+        hasMoveInput -> PLAYER_AIR_ACCELERATION
+        isGrounded -> PLAYER_GROUND_DECELERATION
+        else -> PLAYER_AIR_DECELERATION
+    }
+}
+
+private fun approachHorizontalVelocity(
+    current: Vec3,
+    target: Vec3,
+    maxDelta: Double
+): Vec3 {
+    if (maxDelta <= 0.0) {
+        return current
+    }
+
+    val deltaX = target.x - current.x
+    val deltaZ = target.z - current.z
+    val distance = sqrt(deltaX * deltaX + deltaZ * deltaZ)
+    if (distance <= maxDelta || distance <= 0.000001) {
+        return target
+    }
+
+    val amount = maxDelta / distance
+    return Vec3(
+        x = current.x + deltaX * amount,
+        y = 0.0,
+        z = current.z + deltaZ * amount
+    )
 }
 
 private fun playerTouchesCollectible(
