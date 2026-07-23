@@ -256,7 +256,6 @@ fun main(args: Array<String>) {
                     val ticks = SDL_GetTicks()
                     val deltaSeconds = ((ticks - previousTicks).toDouble() / 1000.0).coerceIn(0.0, 0.1)
                     previousTicks = ticks
-                    val elapsedSeconds = ticks.toDouble() / 1000.0
                     val keyboardState = keyboard.keyboard
 
                     if (keyboardState.isEscapePressed()) {

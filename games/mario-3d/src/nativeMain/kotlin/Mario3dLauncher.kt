@@ -421,7 +421,6 @@ fun main() {
                             forcedAirAnimationUntil = elapsedSeconds + 0.45
                         }
                         playerHorizontalVelocity = horizontalVelocity
-                        isMoving = horizontalLength(playerHorizontalVelocity) > MOVEMENT_INPUT_EPSILON
 
                         val playerStep = content.playerController.step(
                             state = playerState,
@@ -527,7 +526,13 @@ fun main() {
                         isMoving -> MarioAnimationState.WALK
                         else -> MarioAnimationState.IDLE
                     }
-                    val marioPose = content.marioAnimation.pose(nextMarioAnimationState, deltaSeconds)
+                    // AreaWait64 is a long wait sequence with spins/crouches; idle should hold a stable stand.
+                    val marioAnimationDeltaSeconds = if (nextMarioAnimationState == MarioAnimationState.IDLE) {
+                        0.0
+                    } else {
+                        deltaSeconds
+                    }
+                    val marioPose = content.marioAnimation.pose(nextMarioAnimationState, marioAnimationDeltaSeconds)
                     val marioAnimationStateAgeSeconds = if (nextMarioAnimationState == forcedAirAnimationState) {
                         elapsedSeconds - forcedAirAnimationStartedAt
                     } else {
@@ -1111,7 +1116,11 @@ private fun MarioSceneContent.syncSceneNodes(
                         coin.renderPosition.y + sin(elapsedSeconds * 2.4 + index) * 0.14,
                         coin.renderPosition.z
                     ),
-                    rotation = Vec3(0.0, elapsedSeconds * 3.1 + index, 0.0),
+                    rotation = if (coin.isBig) {
+                        Vec3(0.0, elapsedSeconds * 3.1 + index, 0.0)
+                    } else {
+                        Vec3(0.0, 0.0, 0.0)
+                    },
                     scale = Vec3(size, size * 1.25, size * 0.14)
                 )
             )
