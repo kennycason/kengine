@@ -1,5 +1,6 @@
 package com.kengine.three
 
+import com.kengine.graphics.Color
 import com.kengine.math.Vec3
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.refTo
@@ -99,6 +100,26 @@ class ModelLoader3DTest {
     }
 
     @Test
+    fun usesEmissiveTextureAsRenderableFallbackWhenBaseColorTextureIsMissing() {
+        val fixture = GltfFixture.write(emissiveOnlyMaterial = true)
+
+        val source = ModelLoader3D.loadSource(
+            assetPath = fixture.modelPath,
+            options = ModelLoadOptions3D(normalize = false)
+        )
+
+        assertTrue(source.info.hasTexturedMaterials)
+        assertEquals(0, source.info.textureSlotUsage.baseColor)
+        assertEquals(1, source.info.textureSlotUsage.emissive)
+        val descriptor = source.parts.single().materialDescriptor
+        assertTrue(descriptor.hasTexture)
+        assertEquals(Color.fromRGBA(1.0f, 0.5f, 0.25f), descriptor.baseColor)
+        assertEquals("file:${fixture.texturePath}", descriptor.textureAsset?.key?.id)
+        assertEquals("file:${fixture.texturePath}", descriptor.textures.baseColor?.key?.id)
+        assertEquals("file:${fixture.texturePath}", descriptor.textures.emissive?.key?.id)
+    }
+
+    @Test
     fun missingGltfExternalBufferReportsReferencedPath() {
         val fixture = GltfFixture.write(writeBuffer = false)
 
@@ -141,10 +162,15 @@ private data class GltfFixture(
         @OptIn(ExperimentalForeignApi::class)
         fun write(
             includeMaterialTextureSlots: Boolean = false,
+            emissiveOnlyMaterial: Boolean = false,
             writeBuffer: Boolean = true,
             writeImages: Boolean = true
         ): GltfFixture {
+            require(!includeMaterialTextureSlots || !emissiveOnlyMaterial) {
+                "Material texture slot fixture and emissive-only fixture are mutually exclusive."
+            }
             val suffix = when {
+                emissiveOnlyMaterial -> "emissive-only"
                 includeMaterialTextureSlots -> "material-slots"
                 !writeBuffer -> "missing-buffer"
                 !writeImages -> "missing-image"
@@ -173,8 +199,26 @@ private data class GltfFixture(
             } else {
                 ""
             }
-            val materialTextureProperties = if (includeMaterialTextureSlots) {
+            val pbrProperties = if (emissiveOnlyMaterial) {
                 """
+                          "baseColorFactor": [0.0, 0.0, 0.0, 1.0]
+                """.trimIndent()
+            } else {
+                """
+                          "baseColorFactor": [0.5, 0.75, 1.0, 1.0],
+                          "baseColorTexture": { "index": 0 }
+                          ${pbrTextureProperties.prependCommaIfNotBlank()}
+                """.trimIndent()
+            }
+            val materialTextureProperties = when {
+                emissiveOnlyMaterial -> {
+                    """
+                        "emissiveFactor": [1.0, 0.5, 0.25],
+                        "emissiveTexture": { "index": 0 }
+                    """.trimIndent()
+                }
+                includeMaterialTextureSlots -> {
+                    """
                         "normalTexture": { "index": 1 },
                         "emissiveTexture": { "index": 3 },
                         "occlusionTexture": { "index": 4 },
@@ -183,9 +227,9 @@ private data class GltfFixture(
                             "specularColorTexture": { "index": 5 }
                           }
                         }
-                """.trimIndent()
-            } else {
-                ""
+                    """.trimIndent()
+                }
+                else -> ""
             }
             val texturesJson = if (includeMaterialTextureSlots) {
                 """
@@ -247,9 +291,7 @@ private data class GltfFixture(
                       "materials": [{
                         "name": "Fixture material",
                         "pbrMetallicRoughness": {
-                          "baseColorFactor": [0.5, 0.75, 1.0, 1.0],
-                          "baseColorTexture": { "index": 0 }
-                          ${pbrTextureProperties.prependCommaIfNotBlank()}
+                          $pbrProperties
                         }
                         ${materialTextureProperties.prependCommaIfNotBlank()}
                       }],

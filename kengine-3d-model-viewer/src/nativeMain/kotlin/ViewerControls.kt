@@ -394,7 +394,7 @@ fun defaultViewerModelPresets(): List<ViewerModelPreset> {
         ViewerModelPreset(
             label = "Mario animated",
             modelPath = "models/Mario64Animated.glb",
-            mode = ViewerModelMode.SKINNED,
+            mode = ViewerModelMode.AUTO,
             targetSize = 2.2
         ),
         ViewerModelPreset(

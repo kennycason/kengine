@@ -376,7 +376,7 @@ enum class ViewerModelMode {
 private data class ViewerConfig(
     val modelPath: String = DEFAULT_MODEL_PATH,
     val assetRoot: String = DEFAULT_ASSET_ROOT,
-    val mode: ViewerModelMode = ViewerModelMode.SKINNED,
+    val mode: ViewerModelMode = ViewerModelMode.AUTO,
     val targetSize: Double = DEFAULT_TARGET_SIZE,
     val clipName: String? = null,
     val printHelp: Boolean = false
@@ -434,7 +434,7 @@ private data class ViewerConfig(
                 Options:
                   --model <path>         Model path relative to --asset-root, or an absolute path.
                   --asset-root <path>    Source asset root. Defaults to $DEFAULT_ASSET_ROOT.
-                  --mode <mode>          auto, static, node, or skinned. Defaults to skinned.
+                  --mode <mode>          auto, static, node, or skinned. Defaults to auto.
                   --target-size <size>   Normalized model height/extent target. Defaults to $DEFAULT_TARGET_SIZE.
                   --clip <name>          Animated clip name to preview when mode is auto, node, or skinned.
                   --help                 Print this help.
@@ -577,17 +577,26 @@ private fun loadViewerModelAuto(
         ModelFormat3D.GLB,
         ModelFormat3D.GLTF -> {
             val source = loader.loadSource(ModelAsset3D(preset.modelPath, options))
-            when {
-                source.info.skinCount > 0 -> loadAnimatedViewerModel(loader, preset, options, ViewerModelMode.SKINNED)
-                source.info.animationCount > 0 -> loadAnimatedViewerModel(
+            when (viewerAutoModeForModel(source.info)) {
+                ViewerModelMode.STATIC -> uploadStaticViewerSource(loader, source)
+                ViewerModelMode.SKINNED -> loadAnimatedViewerModel(loader, preset, options, ViewerModelMode.SKINNED)
+                ViewerModelMode.NODE_ANIMATED -> loadAnimatedViewerModel(
                     loader = loader,
                     preset = preset,
                     options = options,
                     mode = ViewerModelMode.NODE_ANIMATED
                 )
-                else -> uploadStaticViewerSource(loader, source)
+                ViewerModelMode.AUTO -> error("AUTO did not resolve to a concrete viewer model mode.")
             }
         }
+    }
+}
+
+fun viewerAutoModeForModel(info: ModelInfo3D): ViewerModelMode {
+    return when {
+        info.animationCount <= 0 -> ViewerModelMode.STATIC
+        info.skinCount > 0 -> ViewerModelMode.SKINNED
+        else -> ViewerModelMode.NODE_ANIMATED
     }
 }
 

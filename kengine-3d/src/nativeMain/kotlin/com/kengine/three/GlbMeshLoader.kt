@@ -675,10 +675,10 @@ object GlbMeshLoader {
                     bufferViews = parsed.bufferViews,
                     binary = parsed.binary,
                     fallbackBaseColor = Color.fromHex("ffffff"),
-                    fallbackName = if (materialKey.baseColorTextureIndex == NO_TEXTURE_KEY) {
+                    fallbackName = if (materialKey.renderTextureIndex == NO_TEXTURE_KEY) {
                         "glb-material:no-texture"
                     } else {
-                        "glb-texture-${materialKey.baseColorTextureIndex}"
+                        "glb-texture-${materialKey.renderTextureIndex}"
                     }
                 )
             )
@@ -1026,7 +1026,7 @@ object GlbMeshLoader {
             textureCount = parsed.document.optionalArray("textures")?.size ?: 0,
             imageCount = parsed.document.optionalArray("images")?.size ?: 0,
             textureSlotUsage = materialTextureSlotUsage3D(materialInfos),
-            hasTexturedMaterials = materialInfos.any { it.textureSlots.baseColor != null },
+            hasTexturedMaterials = materialInfos.any { it.renderTextureIndex != null },
             animations = animations,
             skins = skins,
             skinningSupport = skinningSupport
@@ -1219,11 +1219,11 @@ object GlbMeshLoader {
                 readIndexAccessor(accessors[it], bufferViews, binary)
             } ?: positions.indices.toList()
             val material = materialInfos.getOrNull(primitive.materialIndex ?: -1)
-            val color = material?.color ?: primitiveColor(primitive.materialIndex ?: 0)
-            val uvTransform = material?.uvTransform ?: GlbUvTransform.IDENTITY
+            val color = material?.renderColor ?: primitiveColor(primitive.materialIndex ?: 0)
+            val uvTransform = material?.renderUvTransform ?: GlbUvTransform.IDENTITY
             val materialKey = GlbMaterialPartKey(
                 materialIndex = primitive.materialIndex,
-                baseColorTextureIndex = material?.textureSlots?.baseColor ?: NO_TEXTURE_KEY
+                renderTextureIndex = material?.renderTextureIndex ?: NO_TEXTURE_KEY
             )
             val destination = verticesByMaterial.getOrPut(materialKey) { mutableListOf() }
 
@@ -1283,8 +1283,8 @@ object GlbMeshLoader {
         val indices = primitive.indicesAccessor?.let {
             readIndexAccessor(requireAccessor(accessors, it, "indices", context), bufferViews, binary)
         } ?: positions.indices.toList()
-        val color = material?.color ?: fallbackColor
-        val uvTransform = material?.uvTransform ?: GlbUvTransform.IDENTITY
+        val color = material?.renderColor ?: fallbackColor
+        val uvTransform = material?.renderUvTransform ?: GlbUvTransform.IDENTITY
         val vertices = mutableListOf<SkinnedTexturedLitVertexSource3D>()
 
         require(jointIndices.size >= positions.size) {
@@ -1459,21 +1459,21 @@ object GlbMeshLoader {
         fallbackName: String?
     ): MaterialDescriptor3D {
         val textureSlots = materialInfo?.textureSlots ?: GlbMaterialTextureSlots()
-        val baseColorTextureIndex = textureSlots.baseColor ?: NO_TEXTURE_KEY
+        val renderTextureIndex = materialInfo?.renderTextureIndex ?: NO_TEXTURE_KEY
         return MaterialDescriptor3D.textured(
             textureAsset = createTextureAssetForPart(
-                textureIndex = baseColorTextureIndex,
+                textureIndex = renderTextureIndex,
                 assetPath = assetPath,
                 textureInfos = textureInfos,
                 imageInfos = imageInfos,
                 bufferViews = bufferViews,
                 binary = binary
             ),
-            color = materialInfo?.color ?: fallbackBaseColor,
-            name = materialInfo?.name ?: fallbackName ?: if (baseColorTextureIndex == NO_TEXTURE_KEY) {
+            color = materialInfo?.renderColor ?: fallbackBaseColor,
+            name = materialInfo?.name ?: fallbackName ?: if (renderTextureIndex == NO_TEXTURE_KEY) {
                 "glb-material:no-texture"
             } else {
-                "glb-texture-$baseColorTextureIndex"
+                "glb-texture-$renderTextureIndex"
             },
             textures = createMaterialTextureSetForPart(
                 textureSlots = textureSlots,
@@ -1685,6 +1685,17 @@ object GlbMeshLoader {
             val specularGlossinessExtension = materialExtensions?.optionalObject("KHR_materials_pbrSpecularGlossiness")
             val fallbackDiffuseTexture = specularGlossinessExtension?.optionalObject("diffuseTexture")
             val baseColorTextureInfo = baseColorTexture ?: fallbackDiffuseTexture
+            val emissiveTextureInfo = material.optionalObject("emissiveTexture")
+            val emissiveFactor = material.optionalArray("emissiveFactor")
+            val emissiveColor = if (emissiveFactor != null && emissiveFactor.size >= 3) {
+                Color.fromRGBA(
+                    r = emissiveFactor[0].jsonPrimitive.double.toFloat(),
+                    g = emissiveFactor[1].jsonPrimitive.double.toFloat(),
+                    b = emissiveFactor[2].jsonPrimitive.double.toFloat()
+                )
+            } else {
+                Color.fromHex("ffffff")
+            }
             val specularTexture = specularExtension?.optionalObject("specularColorTexture")
                 ?: specularExtension?.optionalObject("specularTexture")
                 ?: specularGlossinessExtension?.optionalObject("specularGlossinessTexture")
@@ -1696,10 +1707,12 @@ object GlbMeshLoader {
                     normal = material.optionalObject("normalTexture")?.optionalInt("index"),
                     metallicRoughness = pbr?.optionalObject("metallicRoughnessTexture")?.optionalInt("index"),
                     specular = specularTexture?.optionalInt("index"),
-                    emissive = material.optionalObject("emissiveTexture")?.optionalInt("index"),
+                    emissive = emissiveTextureInfo?.optionalInt("index"),
                     occlusion = material.optionalObject("occlusionTexture")?.optionalInt("index")
                 ),
-                uvTransform = parseUvTransform(baseColorTextureInfo)
+                emissiveColor = emissiveColor,
+                uvTransform = parseUvTransform(baseColorTextureInfo),
+                emissiveUvTransform = parseUvTransform(emissiveTextureInfo)
             )
         }.orEmpty()
     }
@@ -2565,8 +2578,27 @@ private data class GlbMaterialInfo(
     val name: String?,
     val color: Color,
     val textureSlots: GlbMaterialTextureSlots,
-    val uvTransform: GlbUvTransform
-)
+    val emissiveColor: Color,
+    val uvTransform: GlbUvTransform,
+    val emissiveUvTransform: GlbUvTransform
+) {
+    val renderTextureIndex: Int?
+        get() = textureSlots.baseColor ?: textureSlots.emissive
+
+    val renderColor: Color
+        get() = if (textureSlots.baseColor == null && textureSlots.emissive != null) {
+            emissiveColor
+        } else {
+            color
+        }
+
+    val renderUvTransform: GlbUvTransform
+        get() = if (textureSlots.baseColor == null && textureSlots.emissive != null) {
+            emissiveUvTransform
+        } else {
+            uvTransform
+        }
+}
 
 private data class GlbMaterialTextureSlots(
     val baseColor: Int? = null,
@@ -2579,7 +2611,7 @@ private data class GlbMaterialTextureSlots(
 
 private data class GlbMaterialPartKey(
     val materialIndex: Int?,
-    val baseColorTextureIndex: Int
+    val renderTextureIndex: Int
 )
 
 private data class GlbTextureInfo(
