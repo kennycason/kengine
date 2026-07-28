@@ -74,6 +74,23 @@ fun devkitTool(name: String): File {
     )
 }
 
+fun Exec.configureSwitchEnvironment() {
+    val devkitProDir = devkitPro().absolutePath
+    val devkitA64Dir = devkitA64().absolutePath
+
+    environment("DEVKITPRO", devkitProDir)
+    environment("DEVKITA64", devkitA64Dir)
+    environment(
+        "PATH",
+        listOf(
+            "$devkitA64Dir/bin",
+            "$devkitProDir/tools/bin",
+            "$devkitProDir/pacman/bin",
+            System.getenv("PATH").orEmpty()
+        ).joinToString(File.pathSeparator)
+    )
+}
+
 fun libnxInclude(): File {
     return tool(devkitPro().resolve("libnx/include"), "Install devkitPro libnx.")
 }
@@ -93,7 +110,14 @@ val switchCFlags = listOf(
     "-ffunction-sections",
     "-fdata-sections",
     "-D__SWITCH__",
-    "-march=armv8-a",
+    "-march=armv8-a+crc+crypto",
+    "-mtune=cortex-a57",
+    "-mtp=soft",
+    "-fPIE"
+)
+
+val switchArchFlags = listOf(
+    "-march=armv8-a+crc+crypto",
     "-mtune=cortex-a57",
     "-mtp=soft",
     "-fPIE"
@@ -154,6 +178,7 @@ tasks.register<Exec>("compileSwitchMainCOnly") {
     outputs.file(cOnlyObject)
 
     doFirst {
+        configureSwitchEnvironment()
         cOnlyObject.get().asFile.parentFile.mkdirs()
         commandLine(
             aarch64Tool("aarch64-none-elf-gcc").absolutePath,
@@ -178,6 +203,7 @@ tasks.register<Exec>("compileSwitchMain") {
     outputs.file(cObject)
 
     doFirst {
+        configureSwitchEnvironment()
         cObject.get().asFile.parentFile.mkdirs()
         commandLine(
             aarch64Tool("aarch64-none-elf-gcc").absolutePath,
@@ -201,13 +227,12 @@ tasks.register<Exec>("linkSwitchCOnlyElf") {
     outputs.file(switchCOnlyElf)
 
     doFirst {
+        configureSwitchEnvironment()
         commandLine(
             aarch64Tool("aarch64-none-elf-gcc").absolutePath,
             "-specs=${switchSpecs().absolutePath}",
             "-g",
-            "-march=armv8-a",
-            "-mtune=cortex-a57",
-            "-mtp=soft",
+            *switchArchFlags.toTypedArray(),
             "-Wl,--gc-sections",
             cOnlyObject.get().asFile.absolutePath,
             "-L${libnxLib().absolutePath}",
@@ -227,13 +252,12 @@ tasks.register<Exec>("linkSwitchElf") {
     outputs.file(switchElf)
 
     doFirst {
+        configureSwitchEnvironment()
         commandLine(
             aarch64Tool("aarch64-none-elf-gcc").absolutePath,
             "-specs=${switchSpecs().absolutePath}",
             "-g",
-            "-march=armv8-a",
-            "-mtune=cortex-a57",
-            "-mtp=soft",
+            *switchArchFlags.toTypedArray(),
             "-Wl,--gc-sections",
             cObject.get().asFile.absolutePath,
             kotlinStaticLib.get().asFile.absolutePath,
@@ -254,6 +278,7 @@ tasks.register<Exec>("createSwitchNacp") {
     outputs.file(switchNacp)
 
     doFirst {
+        configureSwitchEnvironment()
         switchNacp.get().asFile.parentFile.mkdirs()
         commandLine(
             devkitTool("nacptool").absolutePath,
@@ -275,6 +300,7 @@ tasks.register<Exec>("packageSwitchCOnlyNro") {
     outputs.file(switchCOnlyNro)
 
     doFirst {
+        configureSwitchEnvironment()
         commandLine(
             devkitTool("elf2nro").absolutePath,
             switchCOnlyElf.get().asFile.absolutePath,
@@ -293,6 +319,7 @@ tasks.register<Exec>("packageSwitchNro") {
     outputs.file(switchNro)
 
     doFirst {
+        configureSwitchEnvironment()
         commandLine(
             devkitTool("elf2nro").absolutePath,
             switchElf.get().asFile.absolutePath,

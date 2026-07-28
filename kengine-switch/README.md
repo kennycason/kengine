@@ -10,6 +10,18 @@ jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:switchToolchainInfo
 
 ## Toolchain
 
+The macOS setup script installs and verifies the public homebrew toolchain:
+
+```bash
+./kengine-switch/setup-switch-build-macos.sh
+```
+
+For unattended setup:
+
+```bash
+./kengine-switch/setup-switch-build-macos.sh --yes
+```
+
 Install the public homebrew toolchain first:
 
 ```bash
