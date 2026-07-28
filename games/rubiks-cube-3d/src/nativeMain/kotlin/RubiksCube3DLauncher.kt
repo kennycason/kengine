@@ -46,6 +46,8 @@ fun main() {
             val rubiksCube = RubiksCube(this)
             val pointer = CubePointerControls(width, height, fovDegrees)
             val highlight = StickerHighlight(this)
+            val apiServer = RubiksCubeApiServer()
+            apiServer.start()
             val keys = KeyEdges(
                 Keys.S,
                 Keys.C,
@@ -77,6 +79,7 @@ fun main() {
                     val mouseInput = mouse.mouse
                     val keyboardInput = keyboard.keyboard
 
+                    apiServer.drain(rubiksCube)
                     pointer.update(mouseInput, canTurn = rubiksCube.isIdle)?.let { rubiksCube.enqueue(it) }
                     keys.update(keyboardInput)
                     handleKeys(keys, keyboardInput, rubiksCube)
@@ -105,6 +108,7 @@ fun main() {
                     SDL_Delay(16u)
                 }
             } finally {
+                apiServer.stop()
                 rubiksCube.cleanup()
                 highlight.cleanup()
                 primitives.cleanup()
@@ -648,8 +652,7 @@ private class KeyEdges(
 // slightly in front of the cubie face surface.
 private class StickerHighlight(private val gpu: GpuContext) {
     private val borderMesh: GpuMesh = flatQuad(BORDER_COLOR)
-    // One darkened fill mesh per original face color — covers all states after scrambling.
-    private val fillMeshByColor: Map<Color, GpuMesh> = FACE_COLORS.associateWith { flatQuad(darken(it)) }
+    private val fillMeshByColor: MutableMap<Color, GpuMesh> = mutableMapOf()
 
     fun draw(frame: GpuFrame, renderer: MeshRenderer3D, rootModel: Mat4, camera: PerspectiveCamera, hit: CubieFaceHit, rubiksCube: RubiksCube) {
         val cx = hit.gridX * CUBIE_SPACING
@@ -666,7 +669,7 @@ private class StickerHighlight(private val gpu: GpuContext) {
 
         // Fill: look up the actual current sticker color and use its darkened variant.
         val currentColor = rubiksCube.getStickerColor(hit.gridX, hit.gridY, hit.gridZ, hit.faceAxis, hit.faceSign)
-        val fillMesh = fillMeshByColor[currentColor] ?: return
+        val fillMesh = fillMeshFor(currentColor ?: return)
         val fillModel = rootModel * cubieTx * orient *
             Mat4.translation(Vec3(0.0, 0.0, CUBIE_HALF + 0.005)) *
             Mat4.scale(Vec3(CUBIE_SIZE - 0.04, CUBIE_SIZE - 0.04, 1.0))
@@ -688,6 +691,10 @@ private class StickerHighlight(private val gpu: GpuContext) {
         Vertex3D(Vec3( 0.5, -0.5, 0.0), color),
     ))
 
+    private fun fillMeshFor(color: Color): GpuMesh {
+        return fillMeshByColor.getOrPut(color) { flatQuad(darken(color)) }
+    }
+
     // Rotation that aligns the flat quad (facing +Z by default) to the given cubie face.
     private fun faceOrientation(axis: SliceAxis, sign: Int): Mat4 = when (axis) {
         SliceAxis.X -> if (sign > 0) Mat4.rotationY((PI / 2).toFloat())  else Mat4.rotationY((-PI / 2).toFloat())
@@ -707,14 +714,5 @@ private class StickerHighlight(private val gpu: GpuContext) {
         private const val CUBIE_HALF = 0.44
         private const val CUBIE_SIZE = 0.88
         private val BORDER_COLOR = Color.fromHex("ffffff")
-        // Must match the face colors defined in RubiksCube.kt
-        private val FACE_COLORS = listOf(
-            Color.fromHex("2ebf6d"), // front
-            Color.fromHex("2459d6"), // back
-            Color.fromHex("d62839"), // right
-            Color.fromHex("f28c28"), // left
-            Color.fromHex("f4f0df"), // up
-            Color.fromHex("f5d547")  // down
-        )
     }
 }

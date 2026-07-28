@@ -20,14 +20,31 @@ enum class SliceAxis {
     Z
 }
 
+enum class RubiksCubeFace(val apiName: String) {
+    FRONT("front"),
+    BACK("back"),
+    RIGHT("right"),
+    LEFT("left"),
+    UP("up"),
+    DOWN("down");
+
+    companion object {
+        fun fromApiName(name: String): RubiksCubeFace? {
+            return entries.firstOrNull { it.apiName == name.trim().lowercase() }
+        }
+    }
+}
+
 data class SliceMove(
     val axis: SliceAxis,
-    val layer: Int,
+    val layers: Set<Int>,
     val direction: Int
 ) {
+    constructor(axis: SliceAxis, layer: Int, direction: Int) : this(axis, setOf(layer), direction)
+
     init {
-        require(layer in -1..1) {
-            "Rubik's cube layer must be -1, 0, or 1."
+        require(layers.isNotEmpty() && layers.all { it in -1..1 }) {
+            "Rubik's cube layers must be -1, 0, or 1."
         }
         require(direction == -1 || direction == 1) {
             "Rubik's cube turn direction must be -1 or 1."
@@ -42,10 +59,11 @@ private data class GridPosition(
 )
 
 private data class Cubie(
+    val homePosition: GridPosition,
     var position: GridPosition,
     var orientation: Mat4,
-    val mesh: GpuMesh,
-    val colors: CubeFaceColors
+    var mesh: GpuMesh,
+    var colors: CubeFaceColors
 )
 
 private data class ActiveSliceMove(
@@ -73,6 +91,8 @@ class RubiksCube(
 ) {
     private val cubies = mutableListOf<Cubie>()
     private val moveQueue = ArrayDeque<SliceMove>()
+    private val moveHistory = mutableListOf<String>()
+    private var faceColors = DEFAULT_FACE_COLORS
     private var activeMove: ActiveSliceMove? = null
 
     init {
@@ -82,9 +102,13 @@ class RubiksCube(
     val isIdle: Boolean
         get() = activeMove == null && moveQueue.isEmpty()
 
+    val history: List<String>
+        get() = moveHistory.toList()
+
     fun reset() {
         activeMove = null
         moveQueue.clear()
+        moveHistory.clear()
         cubies.forEach { it.mesh.cleanup() }
         cubies.clear()
 
@@ -94,6 +118,7 @@ class RubiksCube(
                     val position = GridPosition(x, y, z)
                     val faceColors = colorsFor(position)
                     cubies += Cubie(
+                        homePosition = position,
                         position = position,
                         orientation = Mat4.identity(),
                         mesh = GpuMesh.cube(gpu, faceColors),
@@ -104,8 +129,11 @@ class RubiksCube(
         }
     }
 
-    fun enqueue(move: SliceMove) {
+    fun enqueue(move: SliceMove, historyToken: String? = null) {
         moveQueue.addLast(move)
+        if (historyToken != null) {
+            moveHistory += historyToken
+        }
     }
 
     fun scramble(turns: Int = 22) {
@@ -114,12 +142,29 @@ class RubiksCube(
             moveQueue.addLast(
                 SliceMove(
                     axis = axes[Random.nextInt(axes.size)],
-                    layer = Random.nextInt(3) - 1,
+                    layers = setOf(Random.nextInt(3) - 1),
                     direction = if (Random.nextBoolean()) 1 else -1
                 )
             )
         }
+        moveHistory += "scramble($turns)"
     }
+
+    fun setFaceColors(updates: Map<RubiksCubeFace, Color>) {
+        if (updates.isEmpty()) {
+            return
+        }
+
+        faceColors = faceColors + updates
+        cubies.forEach { cubie ->
+            val nextColors = colorsFor(cubie.homePosition)
+            cubie.mesh.cleanup()
+            cubie.colors = nextColors
+            cubie.mesh = GpuMesh.cube(gpu, nextColors)
+        }
+    }
+
+    fun getFaceColors(): Map<RubiksCubeFace, Color> = faceColors.toMap()
 
     fun update(deltaSeconds: Float) {
         if (activeMove == null && moveQueue.isNotEmpty()) {
@@ -211,9 +256,9 @@ class RubiksCube(
 
     private fun SliceMove.includes(position: GridPosition): Boolean {
         return when (axis) {
-            SliceAxis.X -> position.x == layer
-            SliceAxis.Y -> position.y == layer
-            SliceAxis.Z -> position.z == layer
+            SliceAxis.X -> position.x in layers
+            SliceAxis.Y -> position.y in layers
+            SliceAxis.Z -> position.z in layers
         }
     }
 
@@ -247,12 +292,12 @@ class RubiksCube(
 
     private fun colorsFor(position: GridPosition): CubeFaceColors {
         return CubeFaceColors(
-            negativeZ = if (position.z == -1) BACK else HIDDEN,
-            positiveZ = if (position.z == 1) FRONT else HIDDEN,
-            negativeX = if (position.x == -1) LEFT else HIDDEN,
-            positiveX = if (position.x == 1) RIGHT else HIDDEN,
-            positiveY = if (position.y == 1) UP else HIDDEN,
-            negativeY = if (position.y == -1) DOWN else HIDDEN
+            negativeZ = if (position.z == -1) faceColors.getValue(RubiksCubeFace.BACK) else HIDDEN,
+            positiveZ = if (position.z == 1) faceColors.getValue(RubiksCubeFace.FRONT) else HIDDEN,
+            negativeX = if (position.x == -1) faceColors.getValue(RubiksCubeFace.LEFT) else HIDDEN,
+            positiveX = if (position.x == 1) faceColors.getValue(RubiksCubeFace.RIGHT) else HIDDEN,
+            positiveY = if (position.y == 1) faceColors.getValue(RubiksCubeFace.UP) else HIDDEN,
+            negativeY = if (position.y == -1) faceColors.getValue(RubiksCubeFace.DOWN) else HIDDEN
         )
     }
 
@@ -261,11 +306,13 @@ class RubiksCube(
         private const val CUBIE_SIZE = 0.88
 
         private val HIDDEN = Color.fromHex("111318")
-        private val FRONT = Color.fromHex("2ebf6d")
-        private val BACK = Color.fromHex("2459d6")
-        private val RIGHT = Color.fromHex("d62839")
-        private val LEFT = Color.fromHex("f28c28")
-        private val UP = Color.fromHex("f4f0df")
-        private val DOWN = Color.fromHex("f5d547")
+        private val DEFAULT_FACE_COLORS = mapOf(
+            RubiksCubeFace.FRONT to Color.fromHex("2ebf6d"),
+            RubiksCubeFace.BACK to Color.fromHex("2459d6"),
+            RubiksCubeFace.RIGHT to Color.fromHex("d62839"),
+            RubiksCubeFace.LEFT to Color.fromHex("f28c28"),
+            RubiksCubeFace.UP to Color.fromHex("f4f0df"),
+            RubiksCubeFace.DOWN to Color.fromHex("f5d547")
+        )
     }
 }

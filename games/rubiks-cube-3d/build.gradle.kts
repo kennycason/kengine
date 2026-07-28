@@ -36,7 +36,7 @@ kotlin {
 
     nativeTarget.apply {
         binaries.all {
-            linkerOpts(PlatformConfig.sharedLibLinkerOpts("SDL3", "SDL3_image", "SDL3_ttf"))
+            linkerOpts(PlatformConfig.sharedLibLinkerOpts("SDL3", "SDL3_image", "SDL3_ttf", "SDL3_net"))
         }
         binaries {
             executable {
@@ -56,6 +56,7 @@ kotlin {
             dependencies {
                 implementation(project(":kengine"))
                 implementation(project(":kengine-3d"))
+                implementation(project(":kengine-network"))
             }
         }
         val commonTest by getting {
