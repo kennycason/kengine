@@ -7,37 +7,49 @@
 - The first Kotlin crash was fixed at the generated C API wrapper layer:
   - Old failure: invalid read at `0x28`.
   - Old bad instruction: wrapper used `mrs ..., tpidr_el0`.
-  - Current wrapper disassembly now uses `mrs ..., tpidrro_el0`.
-- Latest run still crashes, but it moved:
-  - Latest Ryujinx log: `~/Library/Logs/Ryujinx/Ryujinx_1.3.3_2026-07-28_05-05-13.log`.
-  - Latest guest fault: invalid access at `0x109`.
-  - Latest PC: `kengine-nintendo-switch:0x1c7f8`.
+  - Follow-up wrapper disassembly used `mrs ..., tpidrro_el0`.
+- The second Kotlin TLS failure was fixed at the Kotlin runtime bitcode layer:
+  - Last pre-fix Ryujinx log: `~/Library/Logs/Ryujinx/Ryujinx_1.3.3_2026-07-28_05-52-37.log`.
+  - Fault: invalid access at `0x109`.
+  - PC: `kengine-nintendo-switch:0x1c7f8`.
   - Mapped symbol: `kotlin::mm::ThreadSuspensionData::setState(kotlin::ThreadState)`.
-  - Call path includes `ScopedRunnableState`, `_konan_function_0_impl`, then `kotlin_add_probe`.
+  - Cause: Kotlin runtime bitcode in `kotlin-native/dist/konan/targets/switch_arm64/native` was stale and still used `mrs ..., tpidr_el0`.
+- Rebuilt `:kotlin-native:runtime:switch_arm64Runtime`, refreshed the local Kotlin/Native dist with `:kotlin-native:switch_arm64CrossDistRuntime`, then rebuilt the NRO.
+- The latest Ryujinx close-on-launch has been traced to Kotlin runtime TLS slot access:
+  - Last pre-fix Ryujinx log: `~/Library/Logs/Ryujinx/Ryujinx_1.3.3_2026-07-28_12-46-34.log`.
+  - macOS crash report: `~/Library/Logs/DiagnosticReports/Ryujinx-2026-07-28-124653.ips`.
+  - Fault: invalid access at `0x109`.
+  - PC: `kengine-nintendo-switch:0x1c7c4`.
+  - Mapped symbol: `kotlin::mm::ThreadSuspensionData::setState(kotlin::ThreadState)`.
+  - Cause: Kotlin `ThreadRegistry::currentThreadDataNode_` was still being accessed through direct Switch TLS at `tpidrro_el0 + offset`; the slot value read as `1`, producing bad pointer `0x109`.
+- Updated the Kotlin fork to use Clang emulated TLS for the experimental Switch target:
+  - `native/utils/src/org/jetbrains/kotlin/konan/target/ClangArgs.kt`: `switch_arm64` C/C++ runtime compile flags now use `-femulated-tls`.
+  - `kotlin-native/konan/konan.properties`: `clangFlags.switch_arm64` now includes `-femulated-tls` for Kotlin IR object generation.
+  - Attempted `-mtp=soft` first, but Kotlin's bundled Clang rejects that AArch64 mode; emulated TLS is the supported Clang path.
+- Current ELF verification:
+  - Kotlin runtime TLS variables are now emitted as `__emutls_v.*` / `__emutls_t.*`.
+  - `_konan_function_0_impl`, `ScopedRunnableState`, and `getCurrentFrame` call `__emutls_get_address` for Kotlin TLS state.
+  - Narrow disassembly scan through the Kotlin/runtime address range found no `tpidr_el0`, `tpidrro_el0`, or `__aarch64_read_tp` instructions.
+  - Strict disassembly search found no exact `tpidr_el0` instructions in `build/switch/kengine-nintendo-switch.elf`.
 
-Conclusion: we are not stuck in a loop. We fixed the generated API wrapper TLS issue and exposed the next TLS issue inside the Kotlin runtime/native support objects.
+Conclusion: we are not stuck in a loop. The known generated-glue, stale-runtime-bitcode, and direct-Kotlin-TLS failure modes have been addressed in the built ELF. The next signal needs to come from launching the rebuilt NRO in Ryujinx.
 
 ## Next Steps
 
-1. Trace every remaining `tpidr_el0` instruction in `build/switch/kengine-nintendo-switch.elf`.
-2. Split those instructions into:
-   - libnx/devkitPro/system code that is expected or harmless.
-   - Kotlin runtime/generated code that must use `tpidrro_el0`.
-3. Patch the Kotlin fork so Switch TLS flags apply to the Kotlin runtime C/C++/bitcode build, not only exported C API glue:
-   - `-mtp=tpidrro_el0`
-   - `-ftls-model=local-exec`
-   - target feature `+tpidrro-el0`
-4. Rebuild the minimum Kotlin/Native distribution pieces needed for the Switch app.
-5. Rebuild the Kotlin NRO.
-6. Disassemble-check before testing in Ryujinx:
-   - Generated wrapper should keep using `tpidrro_el0`.
-   - Kotlin runtime call path around `ThreadSuspensionData::setState` should no longer depend on `tpidr_el0`.
-7. Re-run `build/switch/kengine-nintendo-switch.nro` in Ryujinx.
+1. Launch the rebuilt `build/switch/kengine-nintendo-switch.nro` in Ryujinx.
+2. If it still crashes, copy the new Ryujinx failure into `kengine-nintendo-switch/error.log`.
+3. Map the new guest PC and stack addresses with `addr2line`.
+4. Decide whether the next failure is:
+   - another Kotlin runtime portability issue,
+   - emulated TLS initialization/destructor behavior,
+   - libnx/devkitPro integration,
+   - or our C/Kotlin boundary code.
+5. Once the hello-world Kotlin call runs, replace the probe with the thinnest kengine loop entry point.
 
 ## Useful Commands
 
 ```bash
-jenv exec ./kengine-kotlin/build-kotlin-native-dist.sh --task :kotlin-native:distCompiler --no-local-properties
+jenv exec ./kengine-kotlin/build-kotlin-native-dist.sh
 jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:clean :kengine-nintendo-switch:buildSwitchNro
 jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
 ```
@@ -45,8 +57,10 @@ jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchCO
 Disassembly checks:
 
 ```bash
-/opt/devkitpro/devkitA64/bin/aarch64-none-elf-objdump -d kengine-nintendo-switch/build/switch/kengine-nintendo-switch.elf | rg -n -C 4 "tpidr|_konan_function_0_impl|ScopedRunnableState|ThreadSuspensionData"
-/opt/devkitpro/devkitA64/bin/aarch64-none-elf-addr2line -e kengine-nintendo-switch/build/switch/kengine-nintendo-switch.elf -f -C 0x1c7f8 0x26b50 0x26a64 0x0914
+/opt/devkitpro/devkitA64/bin/aarch64-none-elf-objdump -d kengine-nintendo-switch/build/switch/kengine-nintendo-switch.elf | rg -n -C 2 "\\btpidr_el0\\b"
+/opt/devkitpro/devkitA64/bin/aarch64-none-elf-objdump -d --start-address=0x0 --stop-address=0x30000 kengine-nintendo-switch/build/switch/kengine-nintendo-switch.elf | rg -n "tpidr_el0|tpidrro_el0|__aarch64_read_tp"
+/opt/devkitpro/devkitA64/bin/aarch64-none-elf-objdump -d --start-address=0x267c0 --stop-address=0x26940 kengine-nintendo-switch/build/switch/kengine-nintendo-switch.elf
+/opt/devkitpro/devkitA64/bin/aarch64-none-elf-addr2line -e kengine-nintendo-switch/build/switch/kengine-nintendo-switch.elf -f -C 0x1c7c4 0x26894 0x267c0 0x0914
 ```
 
 Ryujinx logs:

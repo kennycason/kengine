@@ -63,12 +63,13 @@ jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolcha
 Attempt the Kotlin-linked NRO:
 
 ```bash
+jenv exec ./kengine-kotlin/build-kotlin-native-dist.sh
 jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchNro
 ```
 
 ## Current Shape
 
-The Kotlin probe currently uses `linux_arm64` as a staging target because Kotlin/Native does not provide a first-class Switch target. This is only a linkability experiment; `linux_arm64` is not the final Switch ABI.
+The Kotlin probe uses the local fork's experimental `switch_arm64` Kotlin/Native target. This is still a prototype target, but it now packages through libnx as an `.nro`.
 
 The intended first successful artifact is:
 

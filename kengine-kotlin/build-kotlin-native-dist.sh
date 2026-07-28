@@ -6,9 +6,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEFAULT_CHECKOUT_DIR="$(cd "$REPO_ROOT/.." && pwd)/kengine-kotlin-nintendo-switch"
 CHECKOUT_DIR="${KENGINE_KOTLIN_REPO:-}"
-TASK=":kotlin-native:dist"
+TASK=":kotlin-native:distCompiler"
 GRADLE_ARGS=("--no-configuration-cache" "--dependency-verification=off" "-Pkotlin.native.enabled=true")
 UPDATE_LOCAL_PROPERTIES=1
+REFRESH_SWITCH_RUNTIME=1
+CUSTOM_TASK=0
 
 log() {
     printf '%s\n' "$*"
@@ -27,7 +29,9 @@ Builds a Kotlin/Native compiler distribution from the local Kotlin source fork.
 
 Options:
   --checkout-dir PATH      Kotlin source checkout. Defaults to local.properties or ../kengine-kotlin-nintendo-switch.
-  --task TASK              Gradle task to run. Defaults to :kotlin-native:dist.
+  --task TASK              Gradle task to run. Defaults to :kotlin-native:distCompiler.
+  --refresh-switch-runtime Refresh switch_arm64 runtime bitcode into the local Kotlin/Native dist. Enabled by default.
+  --no-switch-runtime      Skip the switch_arm64 runtime refresh.
   --no-local-properties    Do not update kengine-kotlin/local.properties after a successful build.
   --help                   Show this help.
 EOF
@@ -51,6 +55,13 @@ fork_property_value() {
 
 is_native_utils_jar_task() {
     [ "$TASK" = ":native:kotlin-native-utils:jar" ] || [ "$TASK" = "native:kotlin-native-utils:jar" ]
+}
+
+is_dist_output_task() {
+    [ "$TASK" = ":kotlin-native:dist" ] ||
+        [ "$TASK" = "kotlin-native:dist" ] ||
+        [ "$TASK" = ":kotlin-native:distCompiler" ] ||
+        [ "$TASK" = "kotlin-native:distCompiler" ]
 }
 
 prepare_bootstrap_native_utils_override() {
@@ -152,7 +163,15 @@ while [ "$#" -gt 0 ]; do
         --task)
             [ "$#" -ge 2 ] || fail "--task requires a Gradle task."
             TASK="$2"
+            REFRESH_SWITCH_RUNTIME=0
+            CUSTOM_TASK=1
             shift
+            ;;
+        --refresh-switch-runtime)
+            REFRESH_SWITCH_RUNTIME=1
+            ;;
+        --no-switch-runtime)
+            REFRESH_SWITCH_RUNTIME=0
             ;;
         --no-local-properties)
             UPDATE_LOCAL_PROPERTIES=0
@@ -182,6 +201,11 @@ fi
 log "Building Kotlin/Native distribution:"
 log "Checkout: $CHECKOUT_DIR"
 log "Task: $TASK"
+if [ "$REFRESH_SWITCH_RUNTIME" -eq 1 ]; then
+    log "Switch runtime refresh: enabled"
+else
+    log "Switch runtime refresh: disabled"
+fi
 log "Gradle args: ${GRADLE_ARGS[*]}"
 
 JAVA_HOME="$(resolve_java_home)"
@@ -200,11 +224,15 @@ fi
 
 ./gradlew "${GRADLE_ARGS[@]}" "$TASK"
 
+if [ "$REFRESH_SWITCH_RUNTIME" -eq 1 ] && ! is_native_utils_jar_task; then
+    ./gradlew "${GRADLE_ARGS[@]}" :kotlin-native:switch_arm64CrossDistRuntime
+fi
+
 if is_native_utils_jar_task; then
     prepare_bootstrap_native_utils_override
 fi
 
-if [ "$TASK" != ":kotlin-native:dist" ] && [ "$TASK" != "kotlin-native:dist" ]; then
+if [ "$CUSTOM_TASK" -eq 1 ] && [ "$REFRESH_SWITCH_RUNTIME" -eq 0 ] && ! is_dist_output_task; then
     log "Skipped Kotlin/Native dist output check for custom task: $TASK"
     exit 0
 fi

@@ -38,14 +38,16 @@ Build the local Kotlin/Native distribution from the fork:
 ./kengine-kotlin/build-kotlin-native-dist.sh
 ```
 
-This runs the upstream Kotlin task:
+This runs the upstream Kotlin compiler-dist task and refreshes the Switch runtime bitcode into the local dist:
 
 ```bash
-./gradlew -Pkotlin.native.enabled=true :kotlin-native:dist
+./gradlew -Pkotlin.native.enabled=true :kotlin-native:distCompiler
+./gradlew -Pkotlin.native.enabled=true :kotlin-native:switch_arm64CrossDistRuntime
 ```
 
 Kotlin's root `gradle.properties` disables Native by default, so the `-Pkotlin.native.enabled=true` flag is required; otherwise Gradle will report that project `:kotlin-native` does not exist.
 The helper also builds `:native:kotlin-native-utils:jar` first and publishes a tiny fork-local bootstrap override under `build/kengine-bootstrap-overrides/repo`. That lets Kotlin's included `native-build-tools` build use the forked target registry while generating runtime and stdlib artifacts. Because that local jar intentionally has the upstream bootstrap coordinate with forked contents, the helper disables Gradle dependency verification for these fork-local builds.
+The full upstream `:kotlin-native:dist` task is not required for this prototype and may fail in unrelated host cache generation, so the helper intentionally uses the smaller path above.
 
 After a successful build, `local.properties` points `kengine.kotlin.nativeHome` at the fork's generated Kotlin/Native distribution. If the forked compiler lists `switch_arm64`, the script also writes:
 
