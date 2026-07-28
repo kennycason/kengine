@@ -12,6 +12,9 @@ rootProject.name = "kengine"
 val isPlaydateEnabled = extra.properties["kengine.playdate"]?.toString()?.toBoolean() == true
 println("Playdate enabled: $isPlaydateEnabled")
 
+val isSwitchEnabled = extra.properties["kengine.switch"]?.toString()?.toBoolean() == true
+println("Switch enabled: $isSwitchEnabled")
+
 val modules = mutableListOf(
     "kengine",
     "kengine-test",
@@ -27,6 +30,10 @@ val modules = mutableListOf(
 
 if (isPlaydateEnabled) {
     modules.add("kengine-playdate")
+}
+
+if (isSwitchEnabled) {
+    modules.add("kengine-switch")
 }
 
 modules.addAll(
