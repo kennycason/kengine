@@ -1,6 +1,8 @@
 import org.gradle.api.GradleException
 import org.gradle.api.tasks.Exec
+import org.gradle.api.tasks.PathSensitivity
 import java.io.File
+import java.util.Properties
 
 plugins {
     base
@@ -21,7 +23,27 @@ val switchNacp = switchOutputDir.map { it.file("kengine-switch.nacp") }
 val switchNro = switchOutputDir.map { it.file("kengine-switch.nro") }
 val switchCOnlyNro = switchOutputDir.map { it.file("kengine-switch-c-only.nro") }
 
-val kotlinTarget = providers.gradleProperty("kengine.switch.kotlinTarget").orElse("linux_arm64")
+val kengineKotlinLocalProperties = Properties().apply {
+    val localProperties = rootProject.file("kengine-kotlin/local.properties")
+    if (localProperties.isFile) {
+        localProperties.inputStream().use(::load)
+    }
+}
+
+fun localProperty(name: String): String? {
+    return kengineKotlinLocalProperties.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
+}
+
+fun configuredValue(propertyName: String, environmentName: String, defaultValue: String): String {
+    providers.gradleProperty(propertyName).orNull?.let { return it }
+    providers.environmentVariable(environmentName).orNull?.let { return it }
+    localProperty(propertyName)?.let { return it }
+    return defaultValue
+}
+
+val kotlinTarget = providers.provider {
+    configuredValue("kengine.switch.kotlinTarget", "KENGINE_SWITCH_KOTLIN_TARGET", "linux_arm64")
+}
 
 fun envOrDefault(name: String, defaultValue: String): String {
     return providers.environmentVariable(name).orElse(defaultValue).get()
@@ -30,6 +52,17 @@ fun envOrDefault(name: String, defaultValue: String): String {
 fun kotlincNative(): File {
     providers.gradleProperty("kengine.switch.kotlincNative").orNull?.let { return file(it) }
     providers.environmentVariable("KOTLINC_NATIVE").orNull?.let { return file(it) }
+    localProperty("kengine.switch.kotlincNative")?.let { return file(it) }
+
+    providers.gradleProperty("kengine.kotlin.nativeHome").orNull?.let {
+        return file(it).resolve("bin/kotlinc-native")
+    }
+    providers.environmentVariable("KENGINE_KOTLIN_NATIVE_HOME").orNull?.let {
+        return file(it).resolve("bin/kotlinc-native")
+    }
+    localProperty("kengine.kotlin.nativeHome")?.let {
+        return file(it).resolve("bin/kotlinc-native")
+    }
 
     val osName = System.getProperty("os.name")
     val arch = System.getProperty("os.arch")
@@ -133,6 +166,7 @@ tasks.register("switchToolchainInfo") {
         val devkitA64Dir = devkitA64()
         println("Kotlin/Native compiler: ${compiler.absolutePath} (${compiler.exists()})")
         println("Kotlin/Native target probe: ${kotlinTarget.get()}")
+        println("Kengine Kotlin fork: ${localProperty("kengine.kotlin.repo") ?: "(not configured)"}")
         println("DEVKITPRO: ${devkitProDir.absolutePath} (${devkitProDir.exists()})")
         println("DEVKITA64: ${devkitA64Dir.absolutePath} (${devkitA64Dir.exists()})")
         println("aarch64-none-elf-gcc: ${devkitA64Dir.resolve("bin/aarch64-none-elf-gcc").absolutePath}")
@@ -143,12 +177,27 @@ tasks.register("switchToolchainInfo") {
 
 tasks.register<Exec>("compileSwitchKotlinStatic") {
     group = "switch"
-    description = "Compiles the Kotlin hello-world probe as a static library. This currently uses linux_arm64 as a staging target."
+    description = "Compiles the Kotlin hello-world probe as a static library for the configured Switch Kotlin/Native target."
 
     val kotlinSources = fileTree("src/main/kotlin") {
         include("**/*.kt")
     }
     inputs.files(kotlinSources)
+    inputs.property("kotlinTarget", kotlinTarget)
+    inputs.property("kotlincNative", providers.provider { kotlincNative().absolutePath })
+    inputs.dir(providers.provider {
+        kotlincNative().parentFile.parentFile.resolve("konan/targets/${kotlinTarget.get()}/native")
+    })
+        .optional()
+        .withPathSensitivity(PathSensitivity.ABSOLUTE)
+    inputs.dir(providers.provider {
+        kotlincNative().parentFile.parentFile.resolve("konan/lib")
+    })
+        .optional()
+        .withPathSensitivity(PathSensitivity.ABSOLUTE)
+    inputs.file(rootProject.file("kengine-kotlin/local.properties"))
+        .optional()
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.files(kotlinApiHeader, kotlinStaticLib)
 
     doFirst {

@@ -16,6 +16,7 @@ val isSwitchEnabled = extra.properties["kengine.switch"]?.toString()?.toBoolean(
 println("Switch enabled: $isSwitchEnabled")
 
 val modules = mutableListOf(
+    "kengine-kotlin",
     "kengine",
     "kengine-test",
     "kengine-reactive",

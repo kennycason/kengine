@@ -25,6 +25,9 @@ KenginePlaydate/Source/libkengine_playdate.dylib
 
 *.hprof
 
+/kengine-kotlin/local.properties
+/kengine-kotlin/checkouts/
+/kengine-kotlin/local-maven/
 
 sdl3/*/build/
 sdl3/SDL/*

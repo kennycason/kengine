@@ -52,6 +52,14 @@ Compile the Kotlin/Native static-library probe:
 jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:compileSwitchKotlinStatic
 ```
 
+Use a local Kotlin/Native compiler fork:
+
+```bash
+./kengine-kotlin/setup-kotlin-fork.sh
+./kengine-kotlin/build-kotlin-native-dist.sh
+jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:switchToolchainInfo
+```
+
 Attempt the Kotlin-linked NRO:
 
 ```bash
