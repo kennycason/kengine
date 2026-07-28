@@ -23,12 +23,12 @@ fun localProperty(name: String): String? {
 }
 
 fun defaultCheckoutDir(): File {
-    return rootProject.layout.projectDirectory.asFile.parentFile.resolve("kengine-kotlin-fork")
+    return rootProject.layout.projectDirectory.asFile.parentFile.resolve("kengine-kotlin-nintendo-switch")
 }
 
 tasks.register("kotlinForkInfo") {
     group = "kengine kotlin"
-    description = "Prints the local Kotlin compiler fork configuration used by kengine-switch."
+    description = "Prints the local Kotlin compiler fork configuration used by kengine-nintendo-switch."
 
     doLast {
         val repo = localProperty("kengine.kotlin.repo")?.let(::file) ?: defaultCheckoutDir()

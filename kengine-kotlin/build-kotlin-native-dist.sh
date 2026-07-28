@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-DEFAULT_CHECKOUT_DIR="$(cd "$REPO_ROOT/.." && pwd)/kengine-kotlin-fork"
+DEFAULT_CHECKOUT_DIR="$(cd "$REPO_ROOT/.." && pwd)/kengine-kotlin-nintendo-switch"
 CHECKOUT_DIR="${KENGINE_KOTLIN_REPO:-}"
 TASK=":kotlin-native:dist"
 GRADLE_ARGS=("--no-configuration-cache" "--dependency-verification=off" "-Pkotlin.native.enabled=true")
@@ -26,7 +26,7 @@ Usage: build-kotlin-native-dist.sh [options]
 Builds a Kotlin/Native compiler distribution from the local Kotlin source fork.
 
 Options:
-  --checkout-dir PATH      Kotlin source checkout. Defaults to local.properties or ../kengine-kotlin-fork.
+  --checkout-dir PATH      Kotlin source checkout. Defaults to local.properties or ../kengine-kotlin-nintendo-switch.
   --task TASK              Gradle task to run. Defaults to :kotlin-native:dist.
   --no-local-properties    Do not update kengine-kotlin/local.properties after a successful build.
   --help                   Show this help.

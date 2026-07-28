@@ -5,7 +5,7 @@ Local tooling for experimenting with a kengine-owned Kotlin/Native compiler fork
 The Kotlin source checkout is intentionally not vendored into this repository. Kotlin is large, has its own Gradle lifecycle, and needs to be rebased independently. The default checkout location is a sibling directory:
 
 ```text
-/Users/kenny/code/kengine-kotlin-fork
+/Users/kenny/code/kengine-kotlin-nintendo-switch
 ```
 
 ## Bootstrap the Fork
@@ -53,23 +53,23 @@ After a successful build, `local.properties` points `kengine.kotlin.nativeHome` 
 kengine.switch.kotlinTarget=switch_arm64
 ```
 
-## Use It from kengine-switch
+## Use It from kengine-nintendo-switch
 
 Inspect the configured compiler:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:switchToolchainInfo
+jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
 ```
 
 Compile the current Kotlin static probe with the configured local compiler:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:compileSwitchKotlinStatic
+jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileSwitchKotlinStatic
 ```
 
 Until the compiler fork has a real Switch target, the Switch module keeps using `linux_arm64` as the staging target. Once `switch_arm64` exists in the fork, `build-kotlin-native-dist.sh` configures that target in `kengine-kotlin/local.properties`.
 
-This intentionally swaps only the `kotlinc-native` executable used by `kengine-switch`. Swapping the whole repository to a locally published Kotlin Gradle plugin is a separate step we should do later, after the forked compiler can compile the Switch probe.
+This intentionally swaps only the `kotlinc-native` executable used by `kengine-nintendo-switch`. Swapping the whole repository to a locally published Kotlin Gradle plugin is a separate step we should do later, after the forked compiler can compile the Switch probe.
 
 ## Gradle Helper Tasks
 
@@ -79,8 +79,8 @@ The support module is included in the main Gradle build:
 jenv exec ./gradlew :kengine-kotlin:kotlinForkInfo
 jenv exec ./gradlew :kengine-kotlin:setupKotlinFork
 jenv exec ./gradlew :kengine-kotlin:buildKotlinNativeDist
-jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:switchToolchainInfo
-jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:compileSwitchKotlinStatic
+jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
+jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileSwitchKotlinStatic
 ```
 
 ## Why Not a Submodule?

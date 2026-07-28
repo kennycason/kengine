@@ -8,7 +8,7 @@ plugins {
     base
 }
 
-group = "kengine.switch"
+group = "kengine.nintendo.switch"
 version = "0.1.0"
 
 val switchOutputDir = layout.buildDirectory.dir("switch")
@@ -17,11 +17,11 @@ val kotlinApiHeader = switchOutputDir.map { it.file("kotlin/kengine_switch_kotli
 val kotlinStaticLib = switchOutputDir.map { it.file("kotlin/libkengine_switch_kotlin.a") }
 val cObject = switchOutputDir.map { it.file("obj/main.o") }
 val cOnlyObject = switchOutputDir.map { it.file("obj/main_c_only.o") }
-val switchElf = switchOutputDir.map { it.file("kengine-switch.elf") }
-val switchCOnlyElf = switchOutputDir.map { it.file("kengine-switch-c-only.elf") }
-val switchNacp = switchOutputDir.map { it.file("kengine-switch.nacp") }
-val switchNro = switchOutputDir.map { it.file("kengine-switch.nro") }
-val switchCOnlyNro = switchOutputDir.map { it.file("kengine-switch-c-only.nro") }
+val switchElf = switchOutputDir.map { it.file("kengine-nintendo-switch.elf") }
+val switchCOnlyElf = switchOutputDir.map { it.file("kengine-nintendo-switch-c-only.elf") }
+val switchNacp = switchOutputDir.map { it.file("kengine-nintendo-switch.nacp") }
+val switchNro = switchOutputDir.map { it.file("kengine-nintendo-switch.nro") }
+val switchCOnlyNro = switchOutputDir.map { it.file("kengine-nintendo-switch-c-only.nro") }
 
 val kengineKotlinLocalProperties = Properties().apply {
     val localProperties = rootProject.file("kengine-kotlin/local.properties")
@@ -332,7 +332,7 @@ tasks.register<Exec>("createSwitchNacp") {
         commandLine(
             devkitTool("nacptool").absolutePath,
             "--create",
-            "Kengine Switch",
+            "Kengine Nintendo Switch",
             "kengine",
             version.toString(),
             switchNacp.get().asFile.absolutePath

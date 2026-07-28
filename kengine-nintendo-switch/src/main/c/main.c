@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
     padInitializeDefault(&pad);
 
-    printf("Kengine Switch\n");
+    printf("Kengine Nintendo Switch\n");
     printf("Hello from libnx.\n");
     printf("Kotlin add probe: %d\n", kotlin_add_probe());
 

@@ -1,11 +1,11 @@
-# Kengine Switch Prototype
+# Kengine Nintendo Switch Prototype
 
 Experimental Nintendo Switch homebrew build harness for proving whether Kotlin/Native can participate in a libnx application.
 
 This module is opt-in and is not part of the normal repo build:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:switchToolchainInfo
+jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
 ```
 
 ## Toolchain
@@ -13,13 +13,13 @@ jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:switchToolchainInfo
 The macOS setup script installs and verifies the public homebrew toolchain:
 
 ```bash
-./kengine-switch/setup-switch-build-macos.sh
+./kengine-nintendo-switch/setup-switch-build-macos.sh
 ```
 
 For unattended setup:
 
 ```bash
-./kengine-switch/setup-switch-build-macos.sh --yes
+./kengine-nintendo-switch/setup-switch-build-macos.sh --yes
 ```
 
 Install the public homebrew toolchain first:
@@ -43,13 +43,13 @@ elf2nro
 Validate the libnx shell without Kotlin:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:buildSwitchCOnlyNro
+jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
 ```
 
 Compile the Kotlin/Native static-library probe:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:compileSwitchKotlinStatic
+jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileSwitchKotlinStatic
 ```
 
 Use a local Kotlin/Native compiler fork:
@@ -57,13 +57,13 @@ Use a local Kotlin/Native compiler fork:
 ```bash
 ./kengine-kotlin/setup-kotlin-fork.sh
 ./kengine-kotlin/build-kotlin-native-dist.sh
-jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:switchToolchainInfo
+jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
 ```
 
 Attempt the Kotlin-linked NRO:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:buildSwitchNro
+jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchNro
 ```
 
 ## Current Shape
@@ -75,6 +75,6 @@ The intended first successful artifact is:
 ```text
 libnx C main()
   -> calls generated Kotlin/Native static-library API
-  -> prints "Kengine Switch" and a Kotlin-generated value
+  -> prints "Kengine Nintendo Switch" and a Kotlin-generated value
   -> packages as .nro
 ```

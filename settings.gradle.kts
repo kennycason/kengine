@@ -34,7 +34,7 @@ if (isPlaydateEnabled) {
 }
 
 if (isSwitchEnabled) {
-    modules.add("kengine-switch")
+    modules.add("kengine-nintendo-switch")
 }
 
 modules.addAll(

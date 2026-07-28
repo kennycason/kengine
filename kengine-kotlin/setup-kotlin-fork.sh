@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-DEFAULT_CHECKOUT_DIR="$(cd "$REPO_ROOT/.." && pwd)/kengine-kotlin-fork"
+DEFAULT_CHECKOUT_DIR="$(cd "$REPO_ROOT/.." && pwd)/kengine-kotlin-nintendo-switch"
 
 UPSTREAM_URL="${KENGINE_KOTLIN_UPSTREAM_URL:-https://github.com/JetBrains/kotlin.git}"
 CHECKOUT_DIR="${KENGINE_KOTLIN_REPO:-$DEFAULT_CHECKOUT_DIR}"
@@ -33,7 +33,7 @@ Clones JetBrains/kotlin at this repo's pinned Kotlin version and creates a
 local Switch target branch for Kotlin/Native compiler work.
 
 Options:
-  --checkout-dir PATH      Kotlin source checkout. Defaults to ../kengine-kotlin-fork.
+  --checkout-dir PATH      Kotlin source checkout. Defaults to ../kengine-kotlin-nintendo-switch.
   --upstream-url URL       Kotlin upstream URL. Defaults to https://github.com/JetBrains/kotlin.git.
   --fork-url URL           Optional personal fork remote to add as "fork".
   --branch NAME            Local branch to create/use. Defaults to kengine/switch-arm64.

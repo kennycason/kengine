@@ -27,7 +27,7 @@ usage() {
 Usage: setup-switch-build-macos.sh [options]
 
 Installs and verifies the macOS devkitPro Switch homebrew toolchain used by
-the experimental kengine-switch module.
+the experimental kengine-nintendo-switch module.
 
 Options:
   --yes                Run without confirmation prompts.
@@ -246,8 +246,8 @@ update_shellrc() {
         return
     fi
 
-    local start_marker="# >>> kengine switch build environment >>>"
-    local end_marker="# <<< kengine switch build environment <<<"
+    local start_marker="# >>> kengine nintendo switch build environment >>>"
+    local end_marker="# <<< kengine nintendo switch build environment <<<"
     local tmp_file
 
     mkdir -p "$(dirname "$SHELLRC")"
@@ -300,17 +300,17 @@ run_gradle_checks() {
     cd "$REPO_ROOT"
 
     if command -v jenv >/dev/null 2>&1; then
-        jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:switchToolchainInfo
-        jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:compileSwitchKotlinStatic
-        jenv exec ./gradlew -Pkengine.switch=true :kengine-switch:buildSwitchCOnlyNro
+        jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
+        jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileSwitchKotlinStatic
+        jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
     else
-        ./gradlew -Pkengine.switch=true :kengine-switch:switchToolchainInfo
-        ./gradlew -Pkengine.switch=true :kengine-switch:compileSwitchKotlinStatic
-        ./gradlew -Pkengine.switch=true :kengine-switch:buildSwitchCOnlyNro
+        ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
+        ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileSwitchKotlinStatic
+        ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
     fi
 }
 
-log "This script will configure the devkitPro Switch homebrew toolchain for kengine-switch."
+log "This script will configure the devkitPro Switch homebrew toolchain for kengine-nintendo-switch."
 log "DEVKITPRO=$DEVKITPRO"
 log "DEVKITA64=$DEVKITA64"
 log "Shell startup file: $SHELLRC"
