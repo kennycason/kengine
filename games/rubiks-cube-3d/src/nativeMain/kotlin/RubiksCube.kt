@@ -8,6 +8,7 @@ import com.kengine.three.Mat4
 import com.kengine.three.MeshRenderer3D
 import com.kengine.three.PerspectiveCamera
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.min
 import kotlin.random.Random
 
@@ -43,7 +44,8 @@ private data class GridPosition(
 private data class Cubie(
     var position: GridPosition,
     var orientation: Mat4,
-    val mesh: GpuMesh
+    val mesh: GpuMesh,
+    val colors: CubeFaceColors
 )
 
 private data class ActiveSliceMove(
@@ -77,6 +79,9 @@ class RubiksCube(
         reset()
     }
 
+    val isIdle: Boolean
+        get() = activeMove == null && moveQueue.isEmpty()
+
     fun reset() {
         activeMove = null
         moveQueue.clear()
@@ -87,10 +92,12 @@ class RubiksCube(
             for (y in -1..1) {
                 for (z in -1..1) {
                     val position = GridPosition(x, y, z)
+                    val faceColors = colorsFor(position)
                     cubies += Cubie(
                         position = position,
                         orientation = Mat4.identity(),
-                        mesh = GpuMesh.cube(gpu, colorsFor(position))
+                        mesh = GpuMesh.cube(gpu, faceColors),
+                        colors = faceColors
                     )
                 }
             }
@@ -156,6 +163,32 @@ class RubiksCube(
             }
 
             renderer.draw(frame, cubie.mesh, model, camera)
+        }
+    }
+
+    // Returns the current sticker color at the given grid position and world-space face direction.
+    // Uses the cubie's accumulated orientation (R^T) to map world-space normal → local face → color.
+    fun getStickerColor(gx: Int, gy: Int, gz: Int, faceAxis: SliceAxis, faceSign: Int): Color? {
+        val cubie = cubies.find { it.position.x == gx && it.position.y == gy && it.position.z == gz }
+            ?: return null
+
+        val wx = if (faceAxis == SliceAxis.X) faceSign.toFloat() else 0f
+        val wy = if (faceAxis == SliceAxis.Y) faceSign.toFloat() else 0f
+        val wz = if (faceAxis == SliceAxis.Z) faceSign.toFloat() else 0f
+
+        // Column-major Mat4: values[col*4+row]. R^T*w = dot of each column with w.
+        val v = cubie.orientation.values
+        val lx = v[0] * wx + v[1] * wy + v[2] * wz
+        val ly = v[4] * wx + v[5] * wy + v[6] * wz
+        val lz = v[8] * wx + v[9] * wy + v[10] * wz
+
+        return when {
+            abs(lx) >= abs(ly) && abs(lx) >= abs(lz) ->
+                if (lx > 0) cubie.colors.positiveX else cubie.colors.negativeX
+            abs(ly) >= abs(lx) && abs(ly) >= abs(lz) ->
+                if (ly > 0) cubie.colors.positiveY else cubie.colors.negativeY
+            else ->
+                if (lz > 0) cubie.colors.positiveZ else cubie.colors.negativeZ
         }
     }
 
