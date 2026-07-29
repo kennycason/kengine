@@ -73,7 +73,7 @@ Conclusion: we are not stuck in a loop. The known generated-glue, stale-runtime-
 
 ## Next Steps
 
-1. Launch the rebuilt `games/nintendo-switch-demo/build/switch/nintendo-switch-demo.nro` in Ryujinx and confirm the batched command-transfer build still shows:
+1. Launch the rebuilt `games/nintendo-switch-demo/build/switch/nintendo-switch-demo.nro` in Ryujinx and confirm the current 2D command-transfer build still shows:
    - a moving software-rendered square over a changing background,
    - visible `KENGINE SWITCH` HUD text,
    - responsive movement from the D-pad / left stick,
@@ -87,27 +87,43 @@ Conclusion: we are not stuck in a loop. The known generated-glue, stale-runtime-
    - square software-rendered block sprites,
    - score/level/lines text,
    - D-pad movement, soft drop, hard drop, rotation, pause, and reset.
-3. If it crashes, copy the new Ryujinx failure into `kengine-nintendo-switch/error.log`.
-4. Map the new guest PC and stack addresses with `addr2line`.
-5. Decide whether the next failure is:
+3. Add a portable storage/save-data API in `:kengine-core` before expanding into networking or 3D:
+   - expose named records instead of arbitrary file paths,
+   - validate keys with a conservative namespace,
+   - keep initial values small and bounded,
+   - add load/save/delete/exists tests,
+   - wire a desktop implementation first,
+   - wire the Switch host to a mounted filesystem with atomic replacement and required commit behavior.
+4. Add one visible save/reload behavior to either `:games:hextris-core` or `:games:nintendo-switch-demo`; Hextris high score persistence is the best real-game smoke test.
+5. Add the save/reload case to the Ryujinx checklist:
+   - create or update saved state,
+   - exit cleanly,
+   - relaunch,
+   - verify the state reloads,
+   - verify corrupt/missing storage falls back safely.
+6. After storage works, do a 2D support matrix pass:
+   - sprite transparency, tinting, scaling, frame selection, and clipping,
+   - text glyph coverage and positioning,
+   - audio start/stop/retrigger behavior,
+   - input mapping, pause/reset, and lifecycle cleanup.
+7. If a Switch launch crashes, copy the new Ryujinx failure into `kengine-nintendo-switch/error.log`.
+8. Map the new guest PC and stack addresses with `addr2line`.
+9. Decide whether the next failure is:
    - another Kotlin runtime portability issue,
    - emulated TLS initialization/destructor behavior,
    - libnx/devkitPro integration,
    - or our C/Kotlin boundary code.
-6. Once the Hextris Switch shell holds in Ryujinx, decide whether the next step is:
-   - extracting reusable per-game Switch build registration to a cleaner Gradle helper,
-   - adding image decoding or prepacked sprite pixels for Switch,
-   - moving more existing Kengine graphics primitives behind portable render commands,
-   - or moving from software framebuffer to deko3d/OpenGL.
+10. Keep networking and 3D deferred until the 2D/runtime checklist is stable.
 
 ## Useful Commands
 
 ```bash
-jenv exec ./kengine-kotlin/build-kotlin-native-dist.sh
-jenv exec ./gradlew :games:nintendo-switch-demo:runDebugExecutableMacosArm64
-jenv exec ./gradlew -Pkengine.switch=true :games:nintendo-switch-demo:buildSwitchNro
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:clean :kengine-nintendo-switch:buildSwitchNro
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
+JAVA_HOME="$(jenv prefix 17.0)" ./kengine-kotlin/build-kotlin-native-dist.sh
+JAVA_HOME="$(jenv prefix 17.0)" ./gradlew :games:nintendo-switch-demo:runDebugExecutableMacosArm64
+JAVA_HOME="$(jenv prefix 17.0)" ./gradlew -Pkengine.switch=true :games:nintendo-switch-demo:buildSwitchNro
+JAVA_HOME="$(jenv prefix 17.0)" ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
+JAVA_HOME="$(jenv prefix 17.0)" ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:clean :kengine-nintendo-switch:buildSwitchNro
+JAVA_HOME="$(jenv prefix 17.0)" ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
 ```
 
 Disassembly checks:

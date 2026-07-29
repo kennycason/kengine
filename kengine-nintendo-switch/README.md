@@ -9,6 +9,14 @@ This module is opt-in and is not part of the normal repo build:
 jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
 ```
 
+If local `JAVA_HOME` points at `.jenv/versions/system`, prefer the explicit JDK 17 form:
+
+```bash
+JAVA_HOME="$(jenv prefix 17.0)" ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
+```
+
+The repo `.java-version` selects `17.0`, but a shell with `JENV_FORCEJAVAHOME=true` can still export the invalid `system` path before Gradle starts.
+
 ## Toolchain
 
 The macOS setup script installs and verifies the public homebrew toolchain:
@@ -137,6 +145,8 @@ com.kengine.render.RenderCommandType
 
 `GameLoop` and the SDL contexts still live in `:kengine`; the Switch module is only consuming portable lifecycle, input, audio-command, and render-context contracts for now.
 The desktop path uses `PortableGameAdapter` plus `RenderContextSdlRenderer` in `:kengine` to execute the same render commands through SDL. Portable audio commands are currently captured there as a no-op surface until the SDL audio adapter is wired in.
+
+The current 2D Switch focus is to make this portable surface complete enough for real games before expanding into networking or 3D. The highest-priority missing piece is a small host-owned storage contract for save data; arbitrary file paths should stay out of portable game code.
 
 ## Game Wiring
 
