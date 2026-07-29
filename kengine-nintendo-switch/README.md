@@ -37,6 +37,7 @@ Required tools:
 aarch64-none-elf-gcc
 nacptool
 elf2nro
+ffmpeg
 ```
 
 ## Milestones
@@ -87,6 +88,8 @@ Build the game-facing Hextris Switch artifact:
 ```bash
 jenv exec ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
 ```
+
+This build converts `games/hextris-switch/sound/techno_boss_worm.ogg` to 48 kHz stereo PCM and embeds it in the NRO for looped libnx `audout` playback.
 
 Game artifact:
 

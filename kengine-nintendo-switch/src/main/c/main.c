@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <string.h>
+#include <malloc.h>
 #include <switch.h>
 
 #ifndef KENGINE_SWITCH_C_ONLY
@@ -572,6 +574,157 @@ static void draw_kengine_frame(Framebuffer* framebuffer) {
     framebufferEnd(framebuffer);
 }
 
+#ifdef KENGINE_SWITCH_HEXTRIS_MUSIC
+extern const u8 _binary_music_pcm_start[];
+extern const u8 _binary_music_pcm_end[];
+
+#define KENGINE_AUDIO_BUFFER_COUNT 4
+#define KENGINE_AUDIO_SAMPLE_RATE 48000
+#define KENGINE_AUDIO_CHANNEL_COUNT 2
+#define KENGINE_AUDIO_BYTES_PER_SAMPLE 2
+#define KENGINE_AUDIO_SAMPLES_PER_BUFFER 8192
+#define KENGINE_AUDIO_DATA_SIZE (KENGINE_AUDIO_SAMPLES_PER_BUFFER * KENGINE_AUDIO_CHANNEL_COUNT * KENGINE_AUDIO_BYTES_PER_SAMPLE)
+#define KENGINE_AUDIO_BUFFER_SIZE ((KENGINE_AUDIO_DATA_SIZE + 0xfff) & ~0xfff)
+
+typedef struct {
+    AudioOutBuffer buffers[KENGINE_AUDIO_BUFFER_COUNT];
+    u8* buffer_data;
+    size_t music_offset;
+    bool audout_initialized;
+    bool audout_started;
+    bool playing;
+} KengineSwitchAudioState;
+
+static KengineSwitchAudioState g_audio_state;
+
+static size_t kengine_switch_music_size(void) {
+    return (size_t)(_binary_music_pcm_end - _binary_music_pcm_start);
+}
+
+static void kengine_switch_audio_fill(void* destination, size_t destination_size) {
+    size_t music_size = kengine_switch_music_size();
+    if (destination == NULL || destination_size == 0 || music_size == 0) {
+        return;
+    }
+
+    u8* output = (u8*)destination;
+    size_t written = 0;
+    while (written < destination_size) {
+        size_t remaining_music = music_size - g_audio_state.music_offset;
+        size_t remaining_output = destination_size - written;
+        size_t chunk_size = remaining_music < remaining_output ? remaining_music : remaining_output;
+
+        memcpy(output + written, _binary_music_pcm_start + g_audio_state.music_offset, chunk_size);
+        written += chunk_size;
+        g_audio_state.music_offset += chunk_size;
+        if (g_audio_state.music_offset >= music_size) {
+            g_audio_state.music_offset = 0;
+        }
+    }
+
+    armDCacheFlush(destination, destination_size);
+}
+
+static bool kengine_switch_audio_queue_buffer(AudioOutBuffer* buffer) {
+    kengine_switch_audio_fill(buffer->buffer, buffer->data_size);
+    return R_SUCCEEDED(audoutAppendAudioOutBuffer(buffer));
+}
+
+static void kengine_switch_audio_stop(void) {
+    if (g_audio_state.audout_started) {
+        audoutStopAudioOut();
+    }
+    if (g_audio_state.audout_initialized) {
+        audoutExit();
+    }
+    if (g_audio_state.buffer_data != NULL) {
+        free(g_audio_state.buffer_data);
+    }
+
+    memset(&g_audio_state, 0, sizeof(g_audio_state));
+}
+
+static void kengine_switch_audio_start(void) {
+    memset(&g_audio_state, 0, sizeof(g_audio_state));
+
+    size_t music_size = kengine_switch_music_size();
+    if (music_size == 0) {
+        return;
+    }
+
+    Result result = audoutInitialize();
+    if (R_FAILED(result)) {
+        return;
+    }
+    g_audio_state.audout_initialized = true;
+
+    if (audoutGetSampleRate() != KENGINE_AUDIO_SAMPLE_RATE ||
+        audoutGetChannelCount() != KENGINE_AUDIO_CHANNEL_COUNT ||
+        audoutGetPcmFormat() != PcmFormat_Int16) {
+        kengine_switch_audio_stop();
+        return;
+    }
+
+    g_audio_state.buffer_data = (u8*)memalign(0x1000, KENGINE_AUDIO_BUFFER_SIZE * KENGINE_AUDIO_BUFFER_COUNT);
+    if (g_audio_state.buffer_data == NULL) {
+        kengine_switch_audio_stop();
+        return;
+    }
+    memset(g_audio_state.buffer_data, 0, KENGINE_AUDIO_BUFFER_SIZE * KENGINE_AUDIO_BUFFER_COUNT);
+
+    result = audoutStartAudioOut();
+    if (R_FAILED(result)) {
+        kengine_switch_audio_stop();
+        return;
+    }
+    g_audio_state.audout_started = true;
+    g_audio_state.playing = true;
+
+    for (int index = 0; index < KENGINE_AUDIO_BUFFER_COUNT; ++index) {
+        AudioOutBuffer* buffer = &g_audio_state.buffers[index];
+        buffer->next = NULL;
+        buffer->buffer = g_audio_state.buffer_data + (KENGINE_AUDIO_BUFFER_SIZE * index);
+        buffer->buffer_size = KENGINE_AUDIO_BUFFER_SIZE;
+        buffer->data_size = KENGINE_AUDIO_DATA_SIZE;
+        buffer->data_offset = 0;
+
+        if (!kengine_switch_audio_queue_buffer(buffer)) {
+            kengine_switch_audio_stop();
+            return;
+        }
+    }
+}
+
+static void kengine_switch_audio_update(void) {
+    if (!g_audio_state.playing) {
+        return;
+    }
+
+    for (int attempt = 0; attempt < KENGINE_AUDIO_BUFFER_COUNT; ++attempt) {
+        AudioOutBuffer* released_buffer = NULL;
+        u32 released_count = 0;
+        Result result = audoutGetReleasedAudioOutBuffer(&released_buffer, &released_count);
+        if (R_FAILED(result) || released_buffer == NULL || released_count == 0) {
+            return;
+        }
+
+        if (!kengine_switch_audio_queue_buffer(released_buffer)) {
+            g_audio_state.playing = false;
+            return;
+        }
+    }
+}
+#else
+static void kengine_switch_audio_start(void) {
+}
+
+static void kengine_switch_audio_update(void) {
+}
+
+static void kengine_switch_audio_stop(void) {
+}
+#endif
+
 static int run_kotlin_framebuffer_demo(void) {
     NWindow* window = nwindowGetDefault();
 
@@ -593,6 +746,7 @@ static int run_kotlin_framebuffer_demo(void) {
 
     int diagnostic_checksum = kotlin_add_probe() ^ kotlin_message_code_probe() ^ kotlin_startup_probe();
     kotlin_runtime_start();
+    kengine_switch_audio_start();
 
     int frame_count = 0;
     while (appletMainLoop()) {
@@ -614,10 +768,12 @@ static int run_kotlin_framebuffer_demo(void) {
         }
 
         draw_kengine_frame(&framebuffer);
+        kengine_switch_audio_update();
         frame_count += 1;
     }
 
     (void)diagnostic_checksum;
+    kengine_switch_audio_stop();
     kotlin_runtime_cleanup();
     framebufferClose(&framebuffer);
     return 0;
