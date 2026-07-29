@@ -14,7 +14,17 @@ repositories {
 kengineNintendoSwitch {
     displayName.set("Kengine Switch Demo")
     mainClass.set("nintendoswitchdemo.NintendoSwitchDemoGame")
-    blockSpriteSheetSource.set(layout.projectDirectory.file("assets/sprites/block_sprites.png"))
+    sprite("pokeball") {
+        id.set("demo/pokeball")
+        source.set(layout.projectDirectory.file("assets/sprites/pokeball.bmp"))
+    }
+    spriteSheet("blocks") {
+        id.set("demo/block-sprites")
+        source.set(layout.projectDirectory.file("assets/sprites/block_sprites.png"))
+        tileWidth.set(24)
+        tileHeight.set(24)
+        columns.set(6)
+    }
 }
 
 tasks.matching { task ->

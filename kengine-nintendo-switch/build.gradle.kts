@@ -6,6 +6,7 @@ import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.PathSensitivity
 import java.io.File
 import java.util.Properties
+import javax.imageio.ImageIO
 
 plugins {
     base
@@ -182,8 +183,63 @@ data class SwitchGameRegistration(
     val buildTaskName: String
 )
 
+data class SwitchSpriteAssetBuild(
+    val asset: KengineNintendoSwitchSpriteAsset,
+    val symbolName: String,
+    val rawFile: Provider<RegularFile>,
+    val objectFile: Provider<RegularFile>,
+    val objectTaskName: String
+)
+
+data class SwitchImageDimensions(
+    val width: Int,
+    val height: Int
+)
+
 fun switchGameExtension(project: Project): KengineNintendoSwitchGameExtension? {
     return project.extensions.findByName("kengineNintendoSwitch") as? KengineNintendoSwitchGameExtension
+}
+
+fun stableSpriteId(name: String): Int {
+    var hash = -0x7ee3623b
+    for (char in "sprite:$name") {
+        hash = hash xor char.code
+        hash *= 0x01000193
+    }
+    return if (hash == 0) 1 else hash
+}
+
+fun cIdentifier(value: String): String {
+    return value.map { char ->
+        if ((char in 'a'..'z') || (char in 'A'..'Z') || (char in '0'..'9')) char else '_'
+    }.joinToString("").trim('_').ifEmpty { "asset" }
+}
+
+fun switchImageDimensions(imageFile: File): SwitchImageDimensions {
+    ImageIO.read(imageFile)?.let { image ->
+        return SwitchImageDimensions(image.width, image.height)
+    }
+
+    if (imageFile.extension.equals("bmp", ignoreCase = true)) {
+        val bytes = imageFile.readBytes()
+        fun littleEndianInt(offset: Int): Int {
+            return (bytes[offset].toInt() and 0xff) or
+                ((bytes[offset + 1].toInt() and 0xff) shl 8) or
+                ((bytes[offset + 2].toInt() and 0xff) shl 16) or
+                ((bytes[offset + 3].toInt() and 0xff) shl 24)
+        }
+
+        if (bytes.size >= 26 && bytes[0] == 'B'.code.toByte() && bytes[1] == 'M'.code.toByte()) {
+            val width = littleEndianInt(18)
+            val rawHeight = littleEndianInt(22)
+            val height = if (rawHeight < 0) -rawHeight else rawHeight
+            if (width > 0 && height > 0) {
+                return SwitchImageDimensions(width, height)
+            }
+        }
+    }
+
+    throw GradleException("Unable to read sprite asset dimensions: ${imageFile.absolutePath}")
 }
 
 fun registerSwitchGameBuild(
@@ -211,6 +267,9 @@ fun registerSwitchGameBuild(
     val switchElf = gameOutputDir.map { it.file("$artifactBaseName.elf") }
     val switchNacp = gameOutputDir.map { it.file("$artifactBaseName.nacp") }
     val switchNro = gameOutputDir.map { it.file("$artifactBaseName.nro") }
+    val spriteManifestHeader = gameOutputDir.map { it.file("generated/c/kengine_switch_sprite_assets.h") }
+    val spriteManifestSource = gameOutputDir.map { it.file("generated/c/kengine_switch_sprite_assets.c") }
+    val spriteManifestObject = gameOutputDir.map { it.file("obj/kengine_switch_sprite_assets.o") }
 
     val switchKotlinSources = project.fileTree("src/main/kotlin") {
         include("**/*.kt")
@@ -306,31 +365,34 @@ fun registerSwitchGameBuild(
 
     val assetObjectFiles = mutableListOf<Provider<RegularFile>>()
     val assetObjectTaskNames = mutableListOf<String>()
+    val mainGeneratedHeaderFiles = mutableListOf<Provider<RegularFile>>()
+    val mainGeneratedHeaderTaskNames = mutableListOf<String>()
 
-    extension.blockSpriteSheetSource.orNull?.asFile?.let { spriteSheetSource ->
-        val rawSpriteSheet = gameOutputDir.map { it.file("sprites/block_sprites.rgba") }
-        val spriteSheetObject = gameOutputDir.map { it.file("obj/block_sprites_rgba.o") }
-        val convertTaskName = "convert${taskPrefix}BlockSprites"
-        val objectTaskName = "compile${taskPrefix}BlockSpritesObject"
-
-        cDefineArgs += "-DKENGINE_SWITCH_BLOCK_SPRITES=1"
-        assetObjectFiles += spriteSheetObject
-        assetObjectTaskNames += objectTaskName
+    val spriteAssetBuilds = extension.spriteAssets.mapIndexed { index, asset ->
+        val symbolName = "${index}_${cIdentifier(asset.name)}"
+        val assetTaskPrefix = "$taskPrefix${kengineNintendoSwitchTaskPrefix("${index}_${asset.name}")}"
+        val rawSprite = gameOutputDir.map { it.file("sprites/$symbolName.rgba") }
+        val spriteObject = gameOutputDir.map { it.file("obj/${symbolName}_rgba.o") }
+        val convertTaskName = "convert${assetTaskPrefix}SpriteRgba"
+        val objectTaskName = "compile${assetTaskPrefix}SpriteObject"
+        val spriteSource = asset.source.orNull?.asFile
+            ?: throw GradleException("${gameProject.path} sprite asset '${asset.name}' must configure source.")
 
         tasks.register<Exec>(convertTaskName) {
             group = "switch"
-            description = "Converts the block sprite sheet for $displayName to raw RGBA pixels."
+            description = "Converts sprite asset '${asset.name}' for $displayName to raw RGBA pixels."
 
-            inputs.file(spriteSheetSource)
+            inputs.file(spriteSource)
                 .withPathSensitivity(PathSensitivity.RELATIVE)
-            outputs.file(rawSpriteSheet)
+            inputs.files(asset.extraInputs)
+            outputs.file(rawSprite)
 
             doFirst {
-                if (!spriteSheetSource.isFile) {
-                    throw GradleException("Missing block sprite sheet for $displayName: ${spriteSheetSource.absolutePath}")
+                if (!spriteSource.isFile) {
+                    throw GradleException("Missing sprite asset '${asset.name}' for $displayName: ${spriteSource.absolutePath}")
                 }
 
-                val rawFile = rawSpriteSheet.get().asFile
+                val rawFile = rawSprite.get().asFile
                 rawFile.parentFile.mkdirs()
                 commandLine(
                     ffmpegExecutable.get(),
@@ -339,7 +401,7 @@ fun registerSwitchGameBuild(
                     "error",
                     "-y",
                     "-i",
-                    spriteSheetSource.absolutePath,
+                    spriteSource.absolutePath,
                     "-f",
                     "rawvideo",
                     "-pix_fmt",
@@ -351,17 +413,17 @@ fun registerSwitchGameBuild(
 
         tasks.register<Exec>(objectTaskName) {
             group = "switch"
-            description = "Embeds the block sprite sheet for $displayName as a linkable object."
+            description = "Embeds sprite asset '${asset.name}' for $displayName as a linkable object."
             dependsOn(convertTaskName)
 
-            inputs.file(rawSpriteSheet)
-            outputs.file(spriteSheetObject)
+            inputs.file(rawSprite)
+            outputs.file(spriteObject)
 
             doFirst {
                 configureSwitchEnvironment()
 
-                val rawFile = rawSpriteSheet.get().asFile
-                val objectFile = spriteSheetObject.get().asFile
+                val rawFile = rawSprite.get().asFile
+                val objectFile = spriteObject.get().asFile
                 objectFile.parentFile.mkdirs()
                 workingDir(rawFile.parentFile)
                 commandLine(
@@ -374,6 +436,164 @@ fun registerSwitchGameBuild(
                     "aarch64",
                     rawFile.name,
                     objectFile.absolutePath
+                )
+            }
+        }
+
+        SwitchSpriteAssetBuild(
+            asset = asset,
+            symbolName = symbolName,
+            rawFile = rawSprite,
+            objectFile = spriteObject,
+            objectTaskName = objectTaskName
+        )
+    }
+
+    if (spriteAssetBuilds.isNotEmpty()) {
+        val generateSpriteManifestTaskName = "generate${taskPrefix}SpriteAssetManifest"
+        val compileSpriteManifestTaskName = "compile${taskPrefix}SpriteAssetManifestObject"
+
+        cDefineArgs += "-DKENGINE_SWITCH_SPRITE_ASSETS=1"
+        assetObjectFiles += spriteManifestObject
+        assetObjectFiles += spriteAssetBuilds.map { it.objectFile }
+        assetObjectTaskNames += compileSpriteManifestTaskName
+        assetObjectTaskNames += spriteAssetBuilds.map { it.objectTaskName }
+        mainGeneratedHeaderFiles += spriteManifestHeader
+        mainGeneratedHeaderTaskNames += generateSpriteManifestTaskName
+
+        tasks.register(generateSpriteManifestTaskName) {
+            group = "switch"
+            description = "Generates the C sprite asset manifest for $displayName."
+
+            inputs.files(spriteAssetBuilds.map { it.asset.source })
+            inputs.property(
+                "spriteAssets",
+                spriteAssetBuilds.map { build ->
+                    val asset = build.asset
+                    listOf(
+                        asset.name,
+                        asset.id.get(),
+                        asset is KengineNintendoSwitchSpriteSheetAsset,
+                        (asset as? KengineNintendoSwitchSpriteSheetAsset)?.tileWidth?.orNull ?: 0,
+                        (asset as? KengineNintendoSwitchSpriteSheetAsset)?.tileHeight?.orNull ?: 0,
+                        (asset as? KengineNintendoSwitchSpriteSheetAsset)?.columns?.orNull ?: 0
+                    ).joinToString(":")
+                }
+            )
+            outputs.files(spriteManifestHeader, spriteManifestSource)
+
+            doLast {
+                val headerFile = spriteManifestHeader.get().asFile
+                val sourceFile = spriteManifestSource.get().asFile
+                headerFile.parentFile.mkdirs()
+                sourceFile.parentFile.mkdirs()
+
+                headerFile.writeText(
+                    """
+                    #pragma once
+                    #include <stddef.h>
+
+                    typedef struct {
+                        int sprite_id;
+                        int width;
+                        int height;
+                        int tile_width;
+                        int tile_height;
+                        int columns;
+                        const unsigned char* data_start;
+                        const unsigned char* data_end;
+                    } KengineSwitchSpriteAsset;
+
+                    const KengineSwitchSpriteAsset* kengine_switch_find_sprite_asset(int sprite_id);
+                    int kengine_switch_sprite_asset_count(void);
+                    """.trimIndent() + "\n"
+                )
+
+                val declarations = StringBuilder()
+                val entries = StringBuilder()
+                spriteAssetBuilds.forEach { build ->
+                    val asset = build.asset
+                    val imageFile = asset.source.get().asFile
+                    val dimensions = switchImageDimensions(imageFile)
+                    val tileWidth: Int
+                    val tileHeight: Int
+                    val columns: Int
+                    if (asset is KengineNintendoSwitchSpriteSheetAsset) {
+                        tileWidth = asset.tileWidth.orNull
+                            ?: throw GradleException("Sprite sheet '${asset.name}' must configure tileWidth.")
+                        tileHeight = asset.tileHeight.orNull
+                            ?: throw GradleException("Sprite sheet '${asset.name}' must configure tileHeight.")
+                        if (tileWidth <= 0 || tileHeight <= 0) {
+                            throw GradleException("Sprite sheet '${asset.name}' tile dimensions must be positive.")
+                        }
+                        if (tileWidth > dimensions.width || tileHeight > dimensions.height) {
+                            throw GradleException("Sprite sheet '${asset.name}' tile dimensions exceed image size ${dimensions.width}x${dimensions.height}.")
+                        }
+                        columns = asset.columns.orNull ?: (dimensions.width / tileWidth).coerceAtLeast(1)
+                        if (columns <= 0 || columns * tileWidth > dimensions.width) {
+                            throw GradleException("Sprite sheet '${asset.name}' columns must fit within image width ${dimensions.width}.")
+                        }
+                    } else {
+                        tileWidth = 0
+                        tileHeight = 0
+                        columns = 0
+                    }
+
+                    declarations.appendLine("extern const unsigned char _binary_${build.symbolName}_rgba_start[];")
+                    declarations.appendLine("extern const unsigned char _binary_${build.symbolName}_rgba_end[];")
+                    entries.appendLine(
+                        "    { ${stableSpriteId(asset.id.get())}, ${dimensions.width}, ${dimensions.height}, $tileWidth, $tileHeight, $columns, " +
+                            "_binary_${build.symbolName}_rgba_start, _binary_${build.symbolName}_rgba_end },"
+                    )
+                }
+
+                sourceFile.writeText(
+                    buildString {
+                        appendLine("#include \"kengine_switch_sprite_assets.h\"")
+                        appendLine()
+                        append(declarations)
+                        appendLine()
+                        appendLine("static const KengineSwitchSpriteAsset kengine_switch_sprite_assets[] = {")
+                        append(entries)
+                        appendLine("};")
+                        appendLine()
+                        appendLine("const KengineSwitchSpriteAsset* kengine_switch_find_sprite_asset(int sprite_id) {")
+                        appendLine("    int count = kengine_switch_sprite_asset_count();")
+                        appendLine("    for (int index = 0; index < count; ++index) {")
+                        appendLine("        if (kengine_switch_sprite_assets[index].sprite_id == sprite_id) {")
+                        appendLine("            return &kengine_switch_sprite_assets[index];")
+                        appendLine("        }")
+                        appendLine("    }")
+                        appendLine("    return 0;")
+                        appendLine("}")
+                        appendLine()
+                        appendLine("int kengine_switch_sprite_asset_count(void) {")
+                        appendLine("    return (int)(sizeof(kengine_switch_sprite_assets) / sizeof(kengine_switch_sprite_assets[0]));")
+                        appendLine("}")
+                    }
+                )
+            }
+        }
+
+        tasks.register<Exec>(compileSpriteManifestTaskName) {
+            group = "switch"
+            description = "Compiles the C sprite asset manifest for $displayName."
+            dependsOn(generateSpriteManifestTaskName)
+
+            inputs.files(spriteManifestHeader, spriteManifestSource)
+            outputs.file(spriteManifestObject)
+
+            doFirst {
+                configureSwitchEnvironment()
+                spriteManifestObject.get().asFile.parentFile.mkdirs()
+                commandLine(
+                    aarch64Tool("aarch64-none-elf-gcc").absolutePath,
+                    *switchCFlags.toTypedArray(),
+                    "-I${spriteManifestHeader.get().asFile.parentFile.absolutePath}",
+                    "-c",
+                    spriteManifestSource.get().asFile.absolutePath,
+                    "-o",
+                    spriteManifestObject.get().asFile.absolutePath
                 )
             }
         }
@@ -457,21 +677,26 @@ fun registerSwitchGameBuild(
     tasks.register<Exec>(compileMainTaskName) {
         group = "switch"
         description = "Compiles the libnx C shell that calls the generated $displayName Kotlin/Native API."
-        dependsOn(compileKotlinTaskName)
+        dependsOn(listOf(compileKotlinTaskName) + mainGeneratedHeaderTaskNames)
 
         inputs.file("src/main/c/main.c")
         inputs.file(kotlinApiHeader)
+        inputs.files(mainGeneratedHeaderFiles)
         outputs.file(cObject)
 
         doFirst {
             configureSwitchEnvironment()
             cObject.get().asFile.parentFile.mkdirs()
+            val generatedIncludeArgs = mainGeneratedHeaderFiles.map {
+                "-I${it.get().asFile.parentFile.absolutePath}"
+            }
             commandLine(
                 aarch64Tool("aarch64-none-elf-gcc").absolutePath,
                 *switchCFlags.toTypedArray(),
                 *cDefineArgs.toTypedArray(),
                 "-I${libnxInclude().absolutePath}",
                 "-I${kotlinApiHeader.get().asFile.parentFile.absolutePath}",
+                *generatedIncludeArgs.toTypedArray(),
                 "-c",
                 file("src/main/c/main.c").absolutePath,
                 "-o",

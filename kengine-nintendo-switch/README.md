@@ -101,7 +101,7 @@ Build the game-facing Hextris Switch artifact:
 jenv exec ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
 ```
 
-This build converts `games/hextris-switch/sound/techno_boss_worm.ogg` to 48 kHz stereo PCM and `games/hextris-switch/assets/sprites/block_sprites.png` to raw RGBA, then embeds both in the NRO. Hextris SFX are currently short procedural voices mixed into the same audio stream from portable `playSound` commands.
+This build converts `games/hextris-switch/sound/techno_boss_worm.ogg` to 48 kHz stereo PCM and declared sprite assets to raw RGBA, then embeds them in the NRO. Hextris SFX are currently short procedural voices mixed into the same audio stream from portable `playSound` commands.
 
 Game artifact:
 
@@ -151,7 +151,24 @@ kengineNintendoSwitch {
     displayName.set("Hextris Switch")
     mainClass.set("hextrisswitch.HextrisSwitchGame")
     musicSource.set(layout.projectDirectory.file("sound/techno_boss_worm.ogg"))
-    blockSpriteSheetSource.set(layout.projectDirectory.file("assets/sprites/block_sprites.png"))
+    spriteSheet("blocks") {
+        id.set("hextris/block-sprites")
+        source.set(layout.projectDirectory.file("assets/sprites/block_sprites.png"))
+        tileWidth.set(24)
+        tileHeight.set(24)
+        columns.set(6)
+    }
+}
+```
+
+Plain image sprites use the same asset path without tile metadata:
+
+```kotlin
+kengineNintendoSwitch {
+    sprite("title_screen_bg") {
+        id.set("title-screen-bg")
+        source.set(layout.projectDirectory.file("assets/sprites/title_screen_bg.png"))
+    }
 }
 ```
 

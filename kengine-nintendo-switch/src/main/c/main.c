@@ -6,6 +6,9 @@
 #ifndef KENGINE_SWITCH_C_ONLY
 #include "kengine_switch_kotlin_api.h"
 #endif
+#ifdef KENGINE_SWITCH_SPRITE_ASSETS
+#include "kengine_switch_sprite_assets.h"
+#endif
 
 #define FB_WIDTH 1280
 #define FB_HEIGHT 720
@@ -344,36 +347,11 @@ static void draw_line(u32* framebuf, u32 stride_pixels, int start_x, int start_y
     }
 }
 
-#ifndef KENGINE_SWITCH_BLOCK_SPRITES
-static u32 block_sprite_color(int frame) {
-    int safe_frame = frame < 0 ? -frame : frame;
-    int column = safe_frame % 6;
-    int row = (safe_frame / 6) % 5;
-    u32 palette[6] = {
-        RGBA8_MAXALPHA(231, 64, 60),
-        RGBA8_MAXALPHA(245, 138, 42),
-        RGBA8_MAXALPHA(248, 209, 72),
-        RGBA8_MAXALPHA(70, 191, 106),
-        RGBA8_MAXALPHA(62, 140, 223),
-        RGBA8_MAXALPHA(156, 91, 216)
-    };
-
-    return color_add(palette[column], row * 12);
-}
-#endif
-
-#ifdef KENGINE_SWITCH_BLOCK_SPRITES
-extern const u8 _binary_block_sprites_rgba_start[];
-extern const u8 _binary_block_sprites_rgba_end[];
-
-#define KENGINE_BLOCK_SPRITE_SHEET_WIDTH 144
-#define KENGINE_BLOCK_SPRITE_SHEET_HEIGHT 144
-#define KENGINE_BLOCK_SPRITE_TILE_SIZE 24
-#define KENGINE_BLOCK_SPRITE_COLUMNS 6
-
-static void draw_block_sprite_sheet(
+#ifdef KENGINE_SWITCH_SPRITE_ASSETS
+static void draw_sprite_asset(
     u32* framebuf,
     u32 stride_pixels,
+    const KengineSwitchSpriteAsset* asset,
     int x,
     int y,
     int width,
@@ -385,15 +363,31 @@ static void draw_block_sprite_sheet(
     int right,
     int bottom
 ) {
-    size_t expected_size = KENGINE_BLOCK_SPRITE_SHEET_WIDTH * KENGINE_BLOCK_SPRITE_SHEET_HEIGHT * 4;
-    size_t actual_size = (size_t)(_binary_block_sprites_rgba_end - _binary_block_sprites_rgba_start);
+    if (asset == NULL || asset->width <= 0 || asset->height <= 0) {
+        return;
+    }
+
+    int frame_width = asset->tile_width > 0 ? asset->tile_width : asset->width;
+    int frame_height = asset->tile_height > 0 ? asset->tile_height : asset->height;
+    int columns = asset->columns > 0 ? asset->columns : asset->width / frame_width;
+    columns = columns < 1 ? 1 : columns;
+
+    if (frame_width <= 0 || frame_height <= 0) {
+        return;
+    }
+
+    size_t expected_size = (size_t)asset->width * (size_t)asset->height * 4;
+    size_t actual_size = (size_t)(asset->data_end - asset->data_start);
     if (actual_size < expected_size) {
         return;
     }
 
     int safe_frame = frame < 0 ? -frame : frame;
-    int tile_x = (safe_frame % KENGINE_BLOCK_SPRITE_COLUMNS) * KENGINE_BLOCK_SPRITE_TILE_SIZE;
-    int tile_y = ((safe_frame / KENGINE_BLOCK_SPRITE_COLUMNS) % KENGINE_BLOCK_SPRITE_COLUMNS) * KENGINE_BLOCK_SPRITE_TILE_SIZE;
+    int frame_x = (safe_frame % columns) * frame_width;
+    int frame_y = (safe_frame / columns) * frame_height;
+    frame_x = clamp_int(frame_x, 0, asset->width - frame_width);
+    frame_y = clamp_int(frame_y, 0, asset->height - frame_height);
+
     int tint_r = (int)((tint >> 0) & 0xff);
     int tint_g = (int)((tint >> 8) & 0xff);
     int tint_b = (int)((tint >> 16) & 0xff);
@@ -401,14 +395,14 @@ static void draw_block_sprite_sheet(
 
     for (int py = top; py < bottom; ++py) {
         u32* row = framebuf + py * stride_pixels;
-        int source_y = tile_y + ((py - y) * KENGINE_BLOCK_SPRITE_TILE_SIZE) / height;
-        source_y = clamp_int(source_y, 0, KENGINE_BLOCK_SPRITE_SHEET_HEIGHT - 1);
+        int source_y = frame_y + ((py - y) * frame_height) / height;
+        source_y = clamp_int(source_y, 0, asset->height - 1);
 
         for (int px = left; px < right; ++px) {
-            int source_x = tile_x + ((px - x) * KENGINE_BLOCK_SPRITE_TILE_SIZE) / width;
-            source_x = clamp_int(source_x, 0, KENGINE_BLOCK_SPRITE_SHEET_WIDTH - 1);
-            size_t source_offset = ((source_y * KENGINE_BLOCK_SPRITE_SHEET_WIDTH) + source_x) * 4;
-            const u8* source = _binary_block_sprites_rgba_start + source_offset;
+            int source_x = frame_x + ((px - x) * frame_width) / width;
+            source_x = clamp_int(source_x, 0, asset->width - 1);
+            size_t source_offset = (((size_t)source_y * (size_t)asset->width) + (size_t)source_x) * 4;
+            const unsigned char* source = asset->data_start + source_offset;
 
             int alpha = ((int)source[3] * tint_a) / 255;
             if (alpha <= 0) {
@@ -426,6 +420,52 @@ static void draw_block_sprite_sheet(
 }
 #endif
 
+static void draw_fallback_sprite(
+    u32* framebuf,
+    u32 stride_pixels,
+    int x,
+    int y,
+    int width,
+    int height,
+    u32 tint,
+    int sprite_id,
+    int frame,
+    int left,
+    int top,
+    int right,
+    int bottom
+) {
+    int safe_frame = frame < 0 ? -frame : frame;
+    int palette_index = ((sprite_id ^ safe_frame) & 0x7fffffff) % 6;
+    u32 palette[6] = {
+        RGBA8_MAXALPHA(231, 64, 60),
+        RGBA8_MAXALPHA(245, 138, 42),
+        RGBA8_MAXALPHA(248, 209, 72),
+        RGBA8_MAXALPHA(70, 191, 106),
+        RGBA8_MAXALPHA(62, 140, 223),
+        RGBA8_MAXALPHA(156, 91, 216)
+    };
+    u32 base = palette[palette_index];
+    u32 alternate = palette[(palette_index + 3) % 6];
+    u32 highlight = color_add(base, 40);
+    u32 shadow = color_add(base, -44);
+    u32 border = RGBA8_MAXALPHA(18, 22, 30);
+
+    for (int py = top; py < bottom; ++py) {
+        u32* row = framebuf + py * stride_pixels;
+        for (int px = left; px < right; ++px) {
+            int local_x = px - x;
+            int local_y = py - y;
+            int border_pixel = local_x <= 1 || local_y <= 1 || local_x >= width - 2 || local_y >= height - 2;
+            int highlight_pixel = local_x < width / 3 && local_y < height / 3;
+            int shadow_pixel = local_x > (width * 2) / 3 || local_y > (height * 2) / 3;
+            int stripe = ((local_x + local_y + safe_frame * 5) / 10) & 1;
+            u32 color = border_pixel ? border : shadow_pixel ? shadow : highlight_pixel ? highlight : stripe == 0 ? base : alternate;
+            row[px] = color_over(row[px], color_tint(color, tint));
+        }
+    }
+}
+
 static void draw_sprite(u32* framebuf, u32 stride_pixels, int x, int y, int width, int height, u32 tint, int sprite_id, int frame) {
     if (width <= 0 || height <= 0) {
         return;
@@ -435,90 +475,16 @@ static void draw_sprite(u32* framebuf, u32 stride_pixels, int x, int y, int widt
     int top = clamp_int(y, 0, FB_HEIGHT);
     int right = clamp_int(x + width, 0, FB_WIDTH);
     int bottom = clamp_int(y + height, 0, FB_HEIGHT);
-    int is_block_sheet = sprite_id == 394425416 || sprite_id == -1106270640;
 
-    if (is_block_sheet) {
-#ifdef KENGINE_SWITCH_BLOCK_SPRITES
-        draw_block_sprite_sheet(framebuf, stride_pixels, x, y, width, height, tint, frame, left, top, right, bottom);
-#else
-        u32 base = block_sprite_color(frame);
-        u32 highlight = color_add(base, 36);
-        u32 shadow = color_add(base, -42);
-        u32 border = RGBA8_MAXALPHA(18, 22, 30);
-
-        for (int py = top; py < bottom; ++py) {
-            u32* row = framebuf + py * stride_pixels;
-            for (int px = left; px < right; ++px) {
-                int local_x = px - x;
-                int local_y = py - y;
-                int border_pixel = local_x <= 1 || local_y <= 1 || local_x >= width - 2 || local_y >= height - 2;
-                int highlight_pixel = local_x < width / 3 && local_y < height / 3;
-                int shadow_pixel = local_x > (width * 2) / 3 || local_y > (height * 2) / 3;
-                u32 color = border_pixel ? border : shadow_pixel ? shadow : highlight_pixel ? highlight : base;
-                row[px] = color_over(row[px], color_tint(color, tint));
-            }
-        }
-#endif
+#ifdef KENGINE_SWITCH_SPRITE_ASSETS
+    const KengineSwitchSpriteAsset* asset = kengine_switch_find_sprite_asset(sprite_id);
+    if (asset != NULL) {
+        draw_sprite_asset(framebuf, stride_pixels, asset, x, y, width, height, tint, frame, left, top, right, bottom);
         return;
     }
+#endif
 
-    int radius = 30;
-    int radius_sq = radius * radius;
-    int inner_radius_sq = 23 * 23;
-    int safe_frame = frame < 0 ? -frame : frame;
-    int palette_index = safe_frame % 6;
-    u32 palette[6] = {
-        RGBA8_MAXALPHA(231, 64, 60),
-        RGBA8_MAXALPHA(245, 138, 42),
-        RGBA8_MAXALPHA(248, 209, 72),
-        RGBA8_MAXALPHA(70, 191, 106),
-        RGBA8_MAXALPHA(62, 140, 223),
-        RGBA8_MAXALPHA(156, 91, 216)
-    };
-
-    for (int py = top; py < bottom; ++py) {
-        int local_y = ((py - y) * 64) / height - 32;
-        u32* row = framebuf + py * stride_pixels;
-
-        for (int px = left; px < right; ++px) {
-            int local_x = ((px - x) * 64) / width - 32;
-            int distance_sq = local_x * local_x + local_y * local_y;
-            if (distance_sq > radius_sq) {
-                continue;
-            }
-
-            u32 color;
-            if (sprite_id == 1145756846) {
-                if (distance_sq > inner_radius_sq) {
-                    color = RGBA8_MAXALPHA(24, 28, 34);
-                } else if (abs_int(local_y) <= 5) {
-                    color = RGBA8_MAXALPHA(24, 28, 34);
-                } else if (local_y < 0) {
-                    color = RGBA8_MAXALPHA(226, 42, 52);
-                } else {
-                    color = RGBA8_MAXALPHA(240, 242, 236);
-                }
-
-                int button_distance_sq = local_x * local_x + local_y * local_y;
-                if (button_distance_sq <= 7 * 7) {
-                    color = button_distance_sq <= 4 * 4
-                        ? RGBA8_MAXALPHA(238, 240, 234)
-                        : RGBA8_MAXALPHA(24, 28, 34);
-                }
-            } else {
-                int stripe = ((local_x + local_y + safe_frame * 7) / 8) & 1;
-                if (distance_sq > inner_radius_sq) {
-                    color = RGBA8_MAXALPHA(18, 22, 30);
-                } else if (stripe == 0) {
-                    color = palette[palette_index];
-                } else {
-                    color = palette[(palette_index + 3) % 6];
-                }
-            }
-
-            row[px] = color_over(row[px], color_tint(color, tint));
-        }
-    }
+    draw_fallback_sprite(framebuf, stride_pixels, x, y, width, height, tint, sprite_id, frame, left, top, right, bottom);
 }
 
 static void draw_background(u32* framebuf, u32 stride_pixels, u32 background, u32 accent, int pulse_seed) {

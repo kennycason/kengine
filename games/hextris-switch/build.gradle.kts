@@ -15,7 +15,13 @@ kengineNintendoSwitch {
     displayName.set("Hextris Switch")
     mainClass.set("hextrisswitch.HextrisSwitchGame")
     musicSource.set(layout.projectDirectory.file("sound/techno_boss_worm.ogg"))
-    blockSpriteSheetSource.set(layout.projectDirectory.file("assets/sprites/block_sprites.png"))
+    spriteSheet("blocks") {
+        id.set("hextris/block-sprites")
+        source.set(layout.projectDirectory.file("assets/sprites/block_sprites.png"))
+        tileWidth.set(24)
+        tileHeight.set(24)
+        columns.set(6)
+    }
 }
 
 tasks.matching { task ->

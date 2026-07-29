@@ -1,9 +1,14 @@
+import org.gradle.api.Action
+import org.gradle.api.Named
 import org.gradle.api.Project
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 
-open class KengineNintendoSwitchGameExtension(project: Project) {
+open class KengineNintendoSwitchGameExtension(private val project: Project) {
+    private val mutableSpriteAssets = mutableListOf<KengineNintendoSwitchSpriteAsset>()
+
     val artifactBaseName: Property<String> = project.objects.property(String::class.java)
         .convention(project.name)
     val displayName: Property<String> = project.objects.property(String::class.java)
@@ -17,5 +22,44 @@ open class KengineNintendoSwitchGameExtension(project: Project) {
     val cDefines: ListProperty<String> = project.objects.listProperty(String::class.java)
         .convention(emptyList())
     val musicSource: RegularFileProperty = project.objects.fileProperty()
-    val blockSpriteSheetSource: RegularFileProperty = project.objects.fileProperty()
+    val spriteAssets: List<KengineNintendoSwitchSpriteAsset>
+        get() = mutableSpriteAssets.toList()
+
+    fun sprite(name: String, configure: Action<KengineNintendoSwitchImageAsset>) {
+        val asset = KengineNintendoSwitchImageAsset(name, project)
+        configure.execute(asset)
+        mutableSpriteAssets += asset
+    }
+
+    fun spriteSheet(name: String, configure: Action<KengineNintendoSwitchSpriteSheetAsset>) {
+        val asset = KengineNintendoSwitchSpriteSheetAsset(name, project)
+        configure.execute(asset)
+        mutableSpriteAssets += asset
+    }
+}
+
+sealed class KengineNintendoSwitchSpriteAsset(
+    private val assetName: String,
+    project: Project
+) : Named {
+    val id: Property<String> = project.objects.property(String::class.java)
+        .convention(assetName)
+    val source: RegularFileProperty = project.objects.fileProperty()
+    val extraInputs: ConfigurableFileCollection = project.objects.fileCollection()
+
+    override fun getName(): String = assetName
+}
+
+open class KengineNintendoSwitchImageAsset(
+    name: String,
+    project: Project
+) : KengineNintendoSwitchSpriteAsset(name, project)
+
+open class KengineNintendoSwitchSpriteSheetAsset(
+    name: String,
+    project: Project
+) : KengineNintendoSwitchSpriteAsset(name, project) {
+    val tileWidth: Property<Int> = project.objects.property(Int::class.javaObjectType)
+    val tileHeight: Property<Int> = project.objects.property(Int::class.javaObjectType)
+    val columns: Property<Int> = project.objects.property(Int::class.javaObjectType)
 }

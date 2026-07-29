@@ -14,7 +14,7 @@ Build the Switch NRO:
 jenv exec ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
 ```
 
-The Switch build embeds `sound/techno_boss_worm.ogg` as looped background music and `assets/sprites/block_sprites.png` as a raw RGBA sprite sheet. The backend converts those assets during the Gradle build and mixes procedural SFX for rotate, hard drop, lock, line clear, game over, pause, and reset.
+The Switch build embeds `sound/techno_boss_worm.ogg` as looped background music and declares `assets/sprites/block_sprites.png` through the reusable `spriteSheet` asset DSL. The backend converts those assets during the Gradle build and mixes procedural SFX for rotate, hard drop, lock, line clear, game over, pause, and reset.
 
 Output:
 
