@@ -177,12 +177,22 @@ tasks.register("switchToolchainInfo") {
 
 tasks.register<Exec>("compileSwitchKotlinStatic") {
     group = "switch"
-    description = "Compiles the Kotlin hello-world probe as a static library for the configured Switch Kotlin/Native target."
+    description = "Compiles the Kotlin runtime probe, shared kengine core sources, and Switch demo sources as a Switch Kotlin/Native static library."
 
-    val kotlinSources = fileTree("src/main/kotlin") {
+    val switchKotlinSources = fileTree("src/main/kotlin") {
         include("**/*.kt")
     }
-    inputs.files(kotlinSources)
+    val kengineCoreSources = rootProject.fileTree("kengine-core/src/commonMain/kotlin") {
+        include("**/*.kt")
+    }
+    val nintendoSwitchDemoSources = rootProject.fileTree("games/nintendo-switch-demo/src/commonMain/kotlin") {
+        include("**/*.kt")
+    }
+    val kotlinSources = providers.provider {
+        (switchKotlinSources.files + kengineCoreSources.files + nintendoSwitchDemoSources.files).sortedBy { it.absolutePath }
+    }
+
+    inputs.files(switchKotlinSources, kengineCoreSources, nintendoSwitchDemoSources)
     inputs.property("kotlinTarget", kotlinTarget)
     inputs.property("kotlincNative", providers.provider { kotlincNative().absolutePath })
     inputs.dir(providers.provider {
@@ -215,7 +225,7 @@ tasks.register<Exec>("compileSwitchKotlinStatic") {
             "-output",
             kotlinOutputBase.get().asFile.absolutePath
         )
-        args(kotlinSources.files.sortedBy { it.absolutePath }.map { it.absolutePath })
+        args(kotlinSources.get().map { it.absolutePath })
     }
 }
 

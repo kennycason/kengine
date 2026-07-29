@@ -92,7 +92,11 @@ kotlin {
     }
 
     sourceSets {
-        val commonMain by getting
+        val commonMain by getting {
+            dependencies {
+                api(project(":kengine-core"))
+            }
+        }
         val commonTest by getting
 
         nativeMain {

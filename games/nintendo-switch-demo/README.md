@@ -1,0 +1,31 @@
+# Nintendo Switch Demo
+
+Pure Kotlin demo game used to exercise both the normal Kengine SDL host and the experimental Nintendo Switch backend.
+
+Run/build the desktop Kengine SDL version with the normal native executable tasks:
+
+```bash
+jenv exec ./gradlew :games:nintendo-switch-demo:runDebugExecutableMacosArm64
+```
+
+Desktop controls:
+
+```text
+Arrow keys: move the square
+A: shift the color palette faster
+B: pulse the square size
+```
+
+Build the game-facing NRO with the Switch backend enabled:
+
+```bash
+jenv exec ./gradlew -Pkengine.switch=true :games:nintendo-switch-demo:buildSwitchNro
+```
+
+Output:
+
+```text
+games/nintendo-switch-demo/build/switch/nintendo-switch-demo.nro
+```
+
+The low-level libnx host still lives in `:kengine-nintendo-switch`; this module owns the portable game source and the game-facing artifact path.

@@ -17,6 +17,7 @@ println("Switch enabled: $isSwitchEnabled")
 
 val modules = mutableListOf(
     "kengine-kotlin",
+    "kengine-core",
     "kengine",
     "kengine-test",
     "kengine-reactive",
@@ -48,6 +49,7 @@ modules.addAll(
         "games:hextris",
         "games:image-shuffle",
         "games:mario-3d",
+        "games:nintendo-switch-demo",
         "games:osc3x-synth",
         "games:osc3x-synth-v2",
         "games:physics-demo",
