@@ -1,8 +1,7 @@
-import org.gradle.api.tasks.Copy
-
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     id("kengine.assets")
+    id("kengine.nintendo-switch-game")
 }
 
 group = "kengine.nintendo-switch-demo"
@@ -10,6 +9,12 @@ version = "1.0.0"
 
 repositories {
     mavenCentral()
+}
+
+kengineNintendoSwitch {
+    displayName.set("Kengine Switch Demo")
+    mainClass.set("nintendoswitchdemo.NintendoSwitchDemoGame")
+    blockSpriteSheetSource.set(layout.projectDirectory.file("assets/sprites/block_sprites.png"))
 }
 
 tasks.matching { task ->
@@ -69,41 +74,5 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
-    }
-}
-
-val switchArtifactBaseName = "nintendo-switch-demo"
-val switchOutputDir = layout.buildDirectory.dir("switch")
-val switchNro = switchOutputDir.map { it.file("$switchArtifactBaseName.nro") }
-val switchBackendProject = rootProject.findProject(":kengine-nintendo-switch")
-
-if (switchBackendProject == null) {
-    tasks.register("buildSwitchNro") {
-        group = "switch"
-        description = "Builds the Nintendo Switch NRO for this demo."
-
-        doFirst {
-            throw GradleException("Switch backend is not enabled. Re-run with -Pkengine.switch=true.")
-        }
-    }
-} else {
-    val backendNro = switchBackendProject.layout.buildDirectory.file("switch/kengine-nintendo-switch.nro")
-
-    tasks.register<Copy>("packageSwitchNro") {
-        group = "switch"
-        description = "Copies the backend-built NRO into this game module's build directory."
-        dependsOn(":kengine-nintendo-switch:buildSwitchNro")
-
-        from(backendNro)
-        into(switchOutputDir)
-        rename { "$switchArtifactBaseName.nro" }
-
-        outputs.file(switchNro)
-    }
-
-    tasks.register("buildSwitchNro") {
-        group = "switch"
-        description = "Builds the Nintendo Switch NRO for this demo."
-        dependsOn("packageSwitchNro")
     }
 }

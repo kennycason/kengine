@@ -344,7 +344,7 @@ static void draw_line(u32* framebuf, u32 stride_pixels, int start_x, int start_y
     }
 }
 
-#ifndef KENGINE_SWITCH_HEXTRIS_SPRITES
+#ifndef KENGINE_SWITCH_BLOCK_SPRITES
 static u32 block_sprite_color(int frame) {
     int safe_frame = frame < 0 ? -frame : frame;
     int column = safe_frame % 6;
@@ -362,7 +362,7 @@ static u32 block_sprite_color(int frame) {
 }
 #endif
 
-#ifdef KENGINE_SWITCH_HEXTRIS_SPRITES
+#ifdef KENGINE_SWITCH_BLOCK_SPRITES
 extern const u8 _binary_block_sprites_rgba_start[];
 extern const u8 _binary_block_sprites_rgba_end[];
 
@@ -438,7 +438,7 @@ static void draw_sprite(u32* framebuf, u32 stride_pixels, int x, int y, int widt
     int is_block_sheet = sprite_id == 394425416 || sprite_id == -1106270640;
 
     if (is_block_sheet) {
-#ifdef KENGINE_SWITCH_HEXTRIS_SPRITES
+#ifdef KENGINE_SWITCH_BLOCK_SPRITES
         draw_block_sprite_sheet(framebuf, stride_pixels, x, y, width, height, tint, frame, left, top, right, bottom);
 #else
         u32 base = block_sprite_color(frame);
@@ -704,7 +704,7 @@ static void draw_kengine_frame(Framebuffer* framebuffer) {
     framebufferEnd(framebuffer);
 }
 
-#ifdef KENGINE_SWITCH_HEXTRIS_MUSIC
+#ifdef KENGINE_SWITCH_EMBEDDED_MUSIC
 extern const u8 _binary_music_pcm_start[];
 extern const u8 _binary_music_pcm_end[];
 

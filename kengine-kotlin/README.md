@@ -63,10 +63,10 @@ Inspect the configured compiler:
 jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
 ```
 
-Compile the current Kotlin static probe with the configured local compiler:
+Compile the demo Kotlin static library with the configured local compiler:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileSwitchKotlinStatic
+jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileNintendoSwitchDemoKotlinStatic
 ```
 
 Until the compiler fork has a real Switch target, the Switch module keeps using `linux_arm64` as the staging target. Once `switch_arm64` exists in the fork, `build-kotlin-native-dist.sh` configures that target in `kengine-kotlin/local.properties`.
@@ -82,7 +82,7 @@ jenv exec ./gradlew :kengine-kotlin:kotlinForkInfo
 jenv exec ./gradlew :kengine-kotlin:setupKotlinFork
 jenv exec ./gradlew :kengine-kotlin:buildKotlinNativeDist
 jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileSwitchKotlinStatic
+jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileNintendoSwitchDemoKotlinStatic
 ```
 
 ## Why Not a Submodule?

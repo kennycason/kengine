@@ -1,7 +1,7 @@
 # Kengine Nintendo Switch Prototype
 
 Experimental Nintendo Switch homebrew build harness for proving whether Kotlin/Native can participate in a libnx application.
-The current prototype compiles small shared `:kengine-core` lifecycle, input, and render-command contracts plus the `:games:nintendo-switch-demo` game into the Switch static library while keeping the existing SDL-backed engine loop in `:kengine`.
+The current prototype discovers game modules that apply `kengine.nintendo-switch-game`, compiles their portable `:kengine-core` lifecycle, input, audio-command, and render-command contracts into a Switch static library, then packages each game as a libnx `.nro`.
 
 This module is opt-in and is not part of the normal repo build:
 
@@ -53,7 +53,7 @@ This artifact still uses the text console and prints the original smoke-test dia
 Compile the Kotlin/Native static-library probe and shared kengine core sources:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileSwitchKotlinStatic
+jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileNintendoSwitchDemoKotlinStatic
 ```
 
 Use a local Kotlin/Native compiler fork:
@@ -69,6 +69,18 @@ Attempt the Kotlin-linked NRO:
 ```bash
 jenv exec ./kengine-kotlin/build-kotlin-native-dist.sh
 jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchNro
+```
+
+List registered Switch games:
+
+```bash
+jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchGameInfo
+```
+
+Build every registered Switch game:
+
+```bash
+jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchGameNros
 ```
 
 Build the game-facing demo artifact:
@@ -126,6 +138,31 @@ com.kengine.render.RenderCommandType
 `GameLoop` and the SDL contexts still live in `:kengine`; the Switch module is only consuming portable lifecycle, input, audio-command, and render-context contracts for now.
 The desktop path uses `PortableGameAdapter` plus `RenderContextSdlRenderer` in `:kengine` to execute the same render commands through SDL. Portable audio commands are currently captured there as a no-op surface until the SDL audio adapter is wired in.
 
+## Game Wiring
+
+Game modules opt into Switch packaging with the convention plugin:
+
+```kotlin
+plugins {
+    id("kengine.nintendo-switch-game")
+}
+
+kengineNintendoSwitch {
+    displayName.set("Hextris Switch")
+    mainClass.set("hextrisswitch.HextrisSwitchGame")
+    musicSource.set(layout.projectDirectory.file("sound/techno_boss_worm.ogg"))
+    blockSpriteSheetSource.set(layout.projectDirectory.file("assets/sprites/block_sprites.png"))
+}
+```
+
+The game module gets a stable task:
+
+```bash
+jenv exec ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
+```
+
+The backend registers matching tasks from the game metadata, such as `:kengine-nintendo-switch:buildHextrisSwitchNro`, and writes intermediate outputs under `kengine-nintendo-switch/build/switch/games/<artifact>/`.
+
 The current successful artifact is:
 
 ```text
@@ -143,7 +180,7 @@ libnx C main()
   -> packages as .nro
 ```
 
-Runtime controls for `build/switch/kengine-nintendo-switch.nro`:
+Runtime controls for `games/nintendo-switch-demo/build/switch/nintendo-switch-demo.nro`:
 
 ```text
 D-pad / left stick: move the square

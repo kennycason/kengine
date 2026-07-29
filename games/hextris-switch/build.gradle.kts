@@ -1,8 +1,7 @@
-import org.gradle.api.tasks.Copy
-
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     id("kengine.assets")
+    id("kengine.nintendo-switch-game")
 }
 
 group = "kengine.hextris-switch"
@@ -10,6 +9,13 @@ version = "1.0.0"
 
 repositories {
     mavenCentral()
+}
+
+kengineNintendoSwitch {
+    displayName.set("Hextris Switch")
+    mainClass.set("hextrisswitch.HextrisSwitchGame")
+    musicSource.set(layout.projectDirectory.file("sound/techno_boss_worm.ogg"))
+    blockSpriteSheetSource.set(layout.projectDirectory.file("assets/sprites/block_sprites.png"))
 }
 
 tasks.matching { task ->
@@ -69,41 +75,5 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
-    }
-}
-
-val switchArtifactBaseName = "hextris-switch"
-val switchOutputDir = layout.buildDirectory.dir("switch")
-val switchNro = switchOutputDir.map { it.file("$switchArtifactBaseName.nro") }
-val switchBackendProject = rootProject.findProject(":kengine-nintendo-switch")
-
-if (switchBackendProject == null) {
-    tasks.register("buildSwitchNro") {
-        group = "switch"
-        description = "Builds the Nintendo Switch NRO for Hextris Switch."
-
-        doFirst {
-            throw GradleException("Switch backend is not enabled. Re-run with -Pkengine.switch=true.")
-        }
-    }
-} else {
-    val backendNro = switchBackendProject.layout.buildDirectory.file("switch/games/hextris-switch/hextris-switch.nro")
-
-    tasks.register<Copy>("packageSwitchNro") {
-        group = "switch"
-        description = "Copies the backend-built Hextris Switch NRO into this game module's build directory."
-        dependsOn(":kengine-nintendo-switch:buildHextrisSwitchNro")
-
-        from(backendNro)
-        into(switchOutputDir)
-        rename { "$switchArtifactBaseName.nro" }
-
-        outputs.file(switchNro)
-    }
-
-    tasks.register("buildSwitchNro") {
-        group = "switch"
-        description = "Builds the Nintendo Switch NRO for Hextris Switch."
-        dependsOn("packageSwitchNro")
     }
 }

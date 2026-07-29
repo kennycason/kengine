@@ -301,11 +301,11 @@ run_gradle_checks() {
 
     if command -v jenv >/dev/null 2>&1; then
         jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
-        jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileSwitchKotlinStatic
+        jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileNintendoSwitchDemoKotlinStatic
         jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
     else
         ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
-        ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileSwitchKotlinStatic
+        ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileNintendoSwitchDemoKotlinStatic
         ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
     fi
 }

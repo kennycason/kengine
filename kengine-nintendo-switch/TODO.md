@@ -3,7 +3,7 @@
 ## Current Checkpoint
 
 - C-only Switch homebrew build opens successfully in Ryujinx.
-- Kotlin-linked Switch build compiles, packages as `build/switch/kengine-nintendo-switch.nro`, and launches successfully in Ryujinx.
+- Kotlin-linked Switch game builds compile, package as game-facing NROs, and launch successfully in Ryujinx.
 - The current Kotlin probe now exercises:
   - repeated C-to-Kotlin calls at startup,
   - basic Kotlin allocation through `IntArray`,
@@ -66,14 +66,14 @@
   - Kotlin runtime TLS variables are now emitted as `__emutls_v.*` / `__emutls_t.*`.
   - `_konan_function_0_impl`, `ScopedRunnableState`, and `getCurrentFrame` call `__emutls_get_address` for Kotlin TLS state.
   - Narrow disassembly scan through the Kotlin/runtime wrapper range found no `tpidr_el0`, `tpidrro_el0`, or `__aarch64_read_tp` instructions.
-  - Strict disassembly search found no exact `tpidr_el0` instructions in `build/switch/kengine-nintendo-switch.elf`.
+  - Strict disassembly search found no exact `tpidr_el0` instructions in the linked Switch game ELF.
   - Broad linked-ELF scans still find `tpidrro_el0` in libnx/newlib symbols such as `armGetTls`, mutexes, applet, and filesystem helpers. That is expected platform TLS, not the Kotlin `ThreadRegistry::currentThreadDataNode_` failure mode.
 
 Conclusion: we are not stuck in a loop. The known generated-glue, stale-runtime-bitcode, and direct-Kotlin-TLS failure modes have been addressed in the built ELF, and the Kotlin-linked NRO now launches in Ryujinx. The latest build runs one pure Kotlin game from `:games:nintendo-switch-demo` through shared input and render-context contracts on both Kengine/SDL desktop and C/libnx Switch hosts.
 
 ## Next Steps
 
-1. Launch the rebuilt `build/switch/kengine-nintendo-switch.nro` in Ryujinx and confirm the batched command-transfer build still shows:
+1. Launch the rebuilt `games/nintendo-switch-demo/build/switch/nintendo-switch-demo.nro` in Ryujinx and confirm the batched command-transfer build still shows:
    - a moving software-rendered square over a changing background,
    - visible `KENGINE SWITCH` HUD text,
    - responsive movement from the D-pad / left stick,
