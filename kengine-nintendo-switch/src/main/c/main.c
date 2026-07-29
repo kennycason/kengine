@@ -306,6 +306,7 @@ static void draw_line(u32* framebuf, u32 stride_pixels, int start_x, int start_y
     }
 }
 
+#ifndef KENGINE_SWITCH_HEXTRIS_SPRITES
 static u32 block_sprite_color(int frame) {
     int safe_frame = frame < 0 ? -frame : frame;
     int column = safe_frame % 6;
@@ -321,6 +322,81 @@ static u32 block_sprite_color(int frame) {
 
     return color_add(palette[column], row * 12);
 }
+#endif
+
+#ifdef KENGINE_SWITCH_HEXTRIS_SPRITES
+extern const u8 _binary_block_sprites_rgba_start[];
+extern const u8 _binary_block_sprites_rgba_end[];
+
+#define KENGINE_BLOCK_SPRITE_SHEET_WIDTH 144
+#define KENGINE_BLOCK_SPRITE_SHEET_HEIGHT 144
+#define KENGINE_BLOCK_SPRITE_TILE_SIZE 24
+#define KENGINE_BLOCK_SPRITE_COLUMNS 6
+
+static u32 color_blend(u32 destination, u32 source, int alpha) {
+    alpha = clamp_int(alpha, 0, 255);
+    int inverse = 255 - alpha;
+
+    u32 r = ((((source >> 0) & 0xff) * alpha) + (((destination >> 0) & 0xff) * inverse)) / 255;
+    u32 g = ((((source >> 8) & 0xff) * alpha) + (((destination >> 8) & 0xff) * inverse)) / 255;
+    u32 b = ((((source >> 16) & 0xff) * alpha) + (((destination >> 16) & 0xff) * inverse)) / 255;
+    return RGBA8_MAXALPHA(r, g, b);
+}
+
+static void draw_block_sprite_sheet(
+    u32* framebuf,
+    u32 stride_pixels,
+    int x,
+    int y,
+    int width,
+    int height,
+    u32 tint,
+    int frame,
+    int left,
+    int top,
+    int right,
+    int bottom
+) {
+    size_t expected_size = KENGINE_BLOCK_SPRITE_SHEET_WIDTH * KENGINE_BLOCK_SPRITE_SHEET_HEIGHT * 4;
+    size_t actual_size = (size_t)(_binary_block_sprites_rgba_end - _binary_block_sprites_rgba_start);
+    if (actual_size < expected_size) {
+        return;
+    }
+
+    int safe_frame = frame < 0 ? -frame : frame;
+    int tile_x = (safe_frame % KENGINE_BLOCK_SPRITE_COLUMNS) * KENGINE_BLOCK_SPRITE_TILE_SIZE;
+    int tile_y = ((safe_frame / KENGINE_BLOCK_SPRITE_COLUMNS) % KENGINE_BLOCK_SPRITE_COLUMNS) * KENGINE_BLOCK_SPRITE_TILE_SIZE;
+    int tint_r = (int)((tint >> 0) & 0xff);
+    int tint_g = (int)((tint >> 8) & 0xff);
+    int tint_b = (int)((tint >> 16) & 0xff);
+    int tint_a = (int)((tint >> 24) & 0xff);
+
+    for (int py = top; py < bottom; ++py) {
+        u32* row = framebuf + py * stride_pixels;
+        int source_y = tile_y + ((py - y) * KENGINE_BLOCK_SPRITE_TILE_SIZE) / height;
+        source_y = clamp_int(source_y, 0, KENGINE_BLOCK_SPRITE_SHEET_HEIGHT - 1);
+
+        for (int px = left; px < right; ++px) {
+            int source_x = tile_x + ((px - x) * KENGINE_BLOCK_SPRITE_TILE_SIZE) / width;
+            source_x = clamp_int(source_x, 0, KENGINE_BLOCK_SPRITE_SHEET_WIDTH - 1);
+            size_t source_offset = ((source_y * KENGINE_BLOCK_SPRITE_SHEET_WIDTH) + source_x) * 4;
+            const u8* source = _binary_block_sprites_rgba_start + source_offset;
+
+            int alpha = ((int)source[3] * tint_a) / 255;
+            if (alpha <= 0) {
+                continue;
+            }
+
+            u32 color = RGBA8_MAXALPHA(
+                ((int)source[0] * tint_r) / 255,
+                ((int)source[1] * tint_g) / 255,
+                ((int)source[2] * tint_b) / 255
+            );
+            row[px] = alpha >= 255 ? color : color_blend(row[px], color, alpha);
+        }
+    }
+}
+#endif
 
 static void draw_sprite(u32* framebuf, u32 stride_pixels, int x, int y, int width, int height, u32 tint, int sprite_id, int frame) {
     if (width <= 0 || height <= 0) {
@@ -334,6 +410,9 @@ static void draw_sprite(u32* framebuf, u32 stride_pixels, int x, int y, int widt
     int is_block_sheet = sprite_id == 394425416 || sprite_id == -1106270640;
 
     if (is_block_sheet) {
+#ifdef KENGINE_SWITCH_HEXTRIS_SPRITES
+        draw_block_sprite_sheet(framebuf, stride_pixels, x, y, width, height, tint, frame, left, top, right, bottom);
+#else
         u32 base = block_sprite_color(frame);
         u32 highlight = color_add(base, 36);
         u32 shadow = color_add(base, -42);
@@ -351,6 +430,7 @@ static void draw_sprite(u32* framebuf, u32 stride_pixels, int x, int y, int widt
                 row[px] = color_tint(color, tint);
             }
         }
+#endif
         return;
     }
 

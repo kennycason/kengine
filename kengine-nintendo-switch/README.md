@@ -89,7 +89,7 @@ Build the game-facing Hextris Switch artifact:
 jenv exec ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
 ```
 
-This build converts `games/hextris-switch/sound/techno_boss_worm.ogg` to 48 kHz stereo PCM and embeds it in the NRO for looped libnx `audout` playback. Hextris SFX are currently short procedural voices mixed into the same audio stream from portable `playSound` commands.
+This build converts `games/hextris-switch/sound/techno_boss_worm.ogg` to 48 kHz stereo PCM and `games/hextris-switch/assets/sprites/block_sprites.png` to raw RGBA, then embeds both in the NRO. Hextris SFX are currently short procedural voices mixed into the same audio stream from portable `playSound` commands.
 
 Game artifact:
 

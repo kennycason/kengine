@@ -32,6 +32,9 @@ val hextrisSwitchObject = hextrisSwitchOutputDir.map { it.file("obj/main.o") }
 val hextrisSwitchMusicSource = rootProject.file("games/hextris-switch/sound/techno_boss_worm.ogg")
 val hextrisSwitchMusicPcm = hextrisSwitchOutputDir.map { it.file("audio/music.pcm") }
 val hextrisSwitchMusicObject = hextrisSwitchOutputDir.map { it.file("obj/music_pcm.o") }
+val hextrisSwitchBlockSpritesSource = rootProject.file("games/hextris-switch/assets/sprites/block_sprites.png")
+val hextrisSwitchBlockSpritesRaw = hextrisSwitchOutputDir.map { it.file("sprites/block_sprites.rgba") }
+val hextrisSwitchBlockSpritesObject = hextrisSwitchOutputDir.map { it.file("obj/block_sprites_rgba.o") }
 val hextrisSwitchElf = hextrisSwitchOutputDir.map { it.file("hextris-switch.elf") }
 val hextrisSwitchNacp = hextrisSwitchOutputDir.map { it.file("hextris-switch.nacp") }
 val hextrisSwitchNro = hextrisSwitchOutputDir.map { it.file("hextris-switch.nro") }
@@ -473,12 +476,74 @@ tasks.register<Exec>("compileHextrisSwitchMain") {
             aarch64Tool("aarch64-none-elf-gcc").absolutePath,
             *switchCFlags.toTypedArray(),
             "-DKENGINE_SWITCH_HEXTRIS_MUSIC=1",
+            "-DKENGINE_SWITCH_HEXTRIS_SPRITES=1",
             "-I${libnxInclude().absolutePath}",
             "-I${hextrisSwitchKotlinApiHeader.get().asFile.parentFile.absolutePath}",
             "-c",
             file("src/main/c/main.c").absolutePath,
             "-o",
             hextrisSwitchObject.get().asFile.absolutePath
+        )
+    }
+}
+
+tasks.register<Exec>("convertHextrisSwitchBlockSprites") {
+    group = "switch"
+    description = "Converts the Hextris Switch block sprite sheet to raw RGBA pixels."
+
+    inputs.file(hextrisSwitchBlockSpritesSource)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(hextrisSwitchBlockSpritesRaw)
+
+    doFirst {
+        if (!hextrisSwitchBlockSpritesSource.isFile) {
+            throw GradleException("Missing Hextris Switch sprite sheet: ${hextrisSwitchBlockSpritesSource.absolutePath}")
+        }
+
+        val rawFile = hextrisSwitchBlockSpritesRaw.get().asFile
+        rawFile.parentFile.mkdirs()
+        commandLine(
+            ffmpegExecutable.get(),
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            hextrisSwitchBlockSpritesSource.absolutePath,
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgba",
+            rawFile.absolutePath
+        )
+    }
+}
+
+tasks.register<Exec>("compileHextrisSwitchBlockSpritesObject") {
+    group = "switch"
+    description = "Embeds the Hextris Switch block sprite sheet as a linkable object."
+    dependsOn("convertHextrisSwitchBlockSprites")
+
+    inputs.file(hextrisSwitchBlockSpritesRaw)
+    outputs.file(hextrisSwitchBlockSpritesObject)
+
+    doFirst {
+        configureSwitchEnvironment()
+
+        val rawFile = hextrisSwitchBlockSpritesRaw.get().asFile
+        val objectFile = hextrisSwitchBlockSpritesObject.get().asFile
+        objectFile.parentFile.mkdirs()
+        workingDir(rawFile.parentFile)
+        commandLine(
+            aarch64Tool("aarch64-none-elf-objcopy").absolutePath,
+            "-I",
+            "binary",
+            "-O",
+            "elf64-littleaarch64",
+            "-B",
+            "aarch64",
+            rawFile.name,
+            objectFile.absolutePath
         )
     }
 }
@@ -549,9 +614,9 @@ tasks.register<Exec>("compileHextrisSwitchMusicObject") {
 tasks.register<Exec>("linkHextrisSwitchElf") {
     group = "switch"
     description = "Links the Hextris Switch ELF with the Kotlin/Native static library."
-    dependsOn("compileHextrisSwitchMain", "compileHextrisSwitchMusicObject")
+    dependsOn("compileHextrisSwitchMain", "compileHextrisSwitchMusicObject", "compileHextrisSwitchBlockSpritesObject")
 
-    inputs.files(hextrisSwitchObject, hextrisSwitchMusicObject, hextrisSwitchKotlinStaticLib)
+    inputs.files(hextrisSwitchObject, hextrisSwitchMusicObject, hextrisSwitchBlockSpritesObject, hextrisSwitchKotlinStaticLib)
     outputs.file(hextrisSwitchElf)
 
     doFirst {
@@ -564,6 +629,7 @@ tasks.register<Exec>("linkHextrisSwitchElf") {
             "-Wl,--gc-sections",
             hextrisSwitchObject.get().asFile.absolutePath,
             hextrisSwitchMusicObject.get().asFile.absolutePath,
+            hextrisSwitchBlockSpritesObject.get().asFile.absolutePath,
             hextrisSwitchKotlinStaticLib.get().asFile.absolutePath,
             "-L${libnxLib().absolutePath}",
             "-lstdc++",
