@@ -3,7 +3,9 @@ package com.kengine.render
 import com.kengine.geometry.useGeometryContext
 import com.kengine.sdl.useSDLContext
 
-class RenderContextSdlRenderer {
+class RenderContextSdlRenderer(
+    private val spriteRegistry: PortableSpriteRegistry = PortableSpriteRegistry()
+) {
     fun render(render: RenderContext) {
         var commandIndex = 0
         while (commandIndex < render.commandCount) {
@@ -21,6 +23,22 @@ class RenderContextSdlRenderer {
                 width = render.commandField(commandIndex, RenderCommandBuffer.FIELD_WIDTH),
                 height = render.commandField(commandIndex, RenderCommandBuffer.FIELD_HEIGHT),
                 color = render.commandField(commandIndex, RenderCommandBuffer.FIELD_COLOR)
+            )
+            RenderCommandType.DRAW_LINE -> drawLine(
+                startX = render.commandField(commandIndex, RenderCommandBuffer.FIELD_X),
+                startY = render.commandField(commandIndex, RenderCommandBuffer.FIELD_Y),
+                endX = render.commandField(commandIndex, RenderCommandBuffer.FIELD_WIDTH),
+                endY = render.commandField(commandIndex, RenderCommandBuffer.FIELD_HEIGHT),
+                color = render.commandField(commandIndex, RenderCommandBuffer.FIELD_COLOR)
+            )
+            RenderCommandType.DRAW_SPRITE -> drawSprite(
+                x = render.commandField(commandIndex, RenderCommandBuffer.FIELD_X),
+                y = render.commandField(commandIndex, RenderCommandBuffer.FIELD_Y),
+                width = render.commandField(commandIndex, RenderCommandBuffer.FIELD_WIDTH),
+                height = render.commandField(commandIndex, RenderCommandBuffer.FIELD_HEIGHT),
+                tint = render.commandField(commandIndex, RenderCommandBuffer.FIELD_COLOR),
+                spriteId = render.commandField(commandIndex, RenderCommandBuffer.FIELD_COLOR2),
+                frame = render.commandField(commandIndex, RenderCommandBuffer.FIELD_PARAM)
             )
             RenderCommandType.VERTICAL_GRADIENT -> verticalGradient(
                 render = render,
@@ -45,6 +63,40 @@ class RenderContextSdlRenderer {
                 y = y.toDouble(),
                 width = width.toDouble(),
                 height = height.toDouble(),
+                r = red(color),
+                g = green(color),
+                b = blue(color),
+                a = alpha(color)
+            )
+        }
+    }
+
+    private fun drawSprite(x: Int, y: Int, width: Int, height: Int, tint: Int, spriteId: Int, frame: Int) {
+        if (width <= 0 || height <= 0) return
+
+        val sprite = spriteRegistry.getSprite(spriteId, frame)
+        if (sprite != null) {
+            sprite.draw(
+                x = x.toDouble(),
+                y = y.toDouble(),
+                width = width.toDouble(),
+                height = height.toDouble()
+            )
+            return
+        }
+
+        fillRect(x, y, width, height, tint)
+        drawLine(x, y, x + width, y + height, RenderContext.WHITE)
+        drawLine(x + width, y, x, y + height, RenderContext.WHITE)
+    }
+
+    private fun drawLine(startX: Int, startY: Int, endX: Int, endY: Int, color: Int) {
+        useGeometryContext {
+            drawLine(
+                startX = startX.toDouble(),
+                startY = startY.toDouble(),
+                endX = endX.toDouble(),
+                endY = endY.toDouble(),
                 r = red(color),
                 g = green(color),
                 b = blue(color),

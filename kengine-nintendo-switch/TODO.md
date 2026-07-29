@@ -29,8 +29,13 @@
   - `:games:nintendo-switch-demo:buildSwitchNro` now copies the backend output to `games/nintendo-switch-demo/build/switch/nintendo-switch-demo.nro`.
   - C executes the copied render commands such as vertical gradient and filled rectangles.
   - The same `:games:nintendo-switch-demo` game also runs on desktop through `PortableGameAdapter` and `RenderContextSdlRenderer` in `:kengine`.
+  - The desktop adapter maps arrow keys, WASD, D-pad, left stick, and controller face buttons into the same shared `InputState`.
   - libnx input is passed to Kotlin as a compact mask.
   - D-pad / left stick moves the square, `A` speeds palette cycling, `B` pulses size, and `+` exits.
+  - Shared render commands now include filled rectangles, vertical gradients, lines, and sprite draws across both SDL and Switch framebuffer hosts.
+  - Desktop sprite commands resolve through `PortableSpriteRegistry` into the existing Kengine `SpriteContext` / `TextureManager` path.
+  - Desktop sprite-sheet commands resolve through the same registry into existing `SpriteSheet` tile selection using the shared render-command `frame` field.
+  - Switch sprite commands currently render through a software-pattern sprite fallback; the game-facing API is ready for a later BMP/PNG decoder or prepacked pixel implementation.
 - The first Kotlin crash was fixed at the generated C API wrapper layer:
   - Old failure: invalid read at `0x28`.
   - Old bad instruction: wrapper used `mrs ..., tpidr_el0`.

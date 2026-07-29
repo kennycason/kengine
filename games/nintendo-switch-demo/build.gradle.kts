@@ -2,6 +2,7 @@ import org.gradle.api.tasks.Copy
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
+    id("kengine.assets")
 }
 
 group = "kengine.nintendo-switch-demo"
@@ -9,6 +10,12 @@ version = "1.0.0"
 
 repositories {
     mavenCentral()
+}
+
+tasks.matching { task ->
+    task.name.startsWith("run") && task.name.contains("Executable")
+}.configureEach {
+    dependsOn("copyDebugAssets")
 }
 
 kotlin {

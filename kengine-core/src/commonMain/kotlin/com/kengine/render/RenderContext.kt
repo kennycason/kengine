@@ -29,6 +29,22 @@ class RenderContext(commandCapacity: Int = 128) {
         commands.fillRect(x, y, width, height, color)
     }
 
+    fun drawLine(startX: Int, startY: Int, endX: Int, endY: Int, color: Int) {
+        commands.drawLine(startX, startY, endX, endY, color)
+    }
+
+    fun drawSprite(
+        spriteId: Int,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+        tint: Int = WHITE,
+        frame: Int = 0
+    ) {
+        commands.drawSprite(spriteId, x, y, width, height, tint, frame)
+    }
+
     fun verticalGradient(topColor: Int, bottomColor: Int, pulse: Int = 0) {
         commands.verticalGradient(topColor, bottomColor, pulse)
     }
@@ -43,5 +59,6 @@ class RenderContext(commandCapacity: Int = 128) {
 
     companion object {
         const val FIELD_COUNT = RenderCommandBuffer.FIELD_COUNT
+        const val WHITE = -1
     }
 }

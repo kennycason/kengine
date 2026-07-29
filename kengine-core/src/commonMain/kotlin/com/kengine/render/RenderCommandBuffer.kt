@@ -24,6 +24,15 @@ class RenderCommandBuffer(capacity: Int = 128) {
         add(RenderCommandType.FILL_RECT, x, y, width, height, color, 0, 0)
     }
 
+    fun drawLine(startX: Int, startY: Int, endX: Int, endY: Int, color: Int) {
+        add(RenderCommandType.DRAW_LINE, startX, startY, endX, endY, color, 0, 0)
+    }
+
+    fun drawSprite(spriteId: Int, x: Int, y: Int, width: Int, height: Int, tint: Int, frame: Int = 0) {
+        if (width <= 0 || height <= 0) return
+        add(RenderCommandType.DRAW_SPRITE, x, y, width, height, tint, spriteId, frame)
+    }
+
     fun verticalGradient(topColor: Int, bottomColor: Int, pulse: Int = 0) {
         add(RenderCommandType.VERTICAL_GRADIENT, 0, 0, 0, 0, topColor, bottomColor, pulse)
     }

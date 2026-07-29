@@ -18,6 +18,8 @@
 #define KENGINE_RENDER_CLEAR 1
 #define KENGINE_RENDER_FILL_RECT 2
 #define KENGINE_RENDER_VERTICAL_GRADIENT 3
+#define KENGINE_RENDER_DRAW_LINE 4
+#define KENGINE_RENDER_DRAW_SPRITE 5
 
 #define KENGINE_RENDER_FIELD_TYPE 0
 #define KENGINE_RENDER_FIELD_X 1
@@ -193,6 +195,13 @@ static u32 color_add(u32 color, int amount) {
     return RGBA8_MAXALPHA(r, g, b);
 }
 
+static u32 color_tint(u32 color, u32 tint) {
+    u32 r = (((color >> 0) & 0xff) * ((tint >> 0) & 0xff)) / 255;
+    u32 g = (((color >> 8) & 0xff) * ((tint >> 8) & 0xff)) / 255;
+    u32 b = (((color >> 16) & 0xff) * ((tint >> 16) & 0xff)) / 255;
+    return RGBA8_MAXALPHA(r, g, b);
+}
+
 static void draw_rect(u32* framebuf, u32 stride_pixels, int x, int y, int width, int height, u32 color) {
     int left = clamp_int(x, 0, FB_WIDTH);
     int top = clamp_int(y, 0, FB_HEIGHT);
@@ -203,6 +212,110 @@ static void draw_rect(u32* framebuf, u32 stride_pixels, int x, int y, int width,
         u32* row = framebuf + py * stride_pixels;
         for (int px = left; px < right; ++px) {
             row[px] = color;
+        }
+    }
+}
+
+static int abs_int(int value) {
+    return value < 0 ? -value : value;
+}
+
+static void draw_pixel(u32* framebuf, u32 stride_pixels, int x, int y, u32 color) {
+    if (x < 0 || x >= FB_WIDTH || y < 0 || y >= FB_HEIGHT) {
+        return;
+    }
+    framebuf[y * stride_pixels + x] = color;
+}
+
+static void draw_line(u32* framebuf, u32 stride_pixels, int start_x, int start_y, int end_x, int end_y, u32 color) {
+    int dx = abs_int(end_x - start_x);
+    int sx = start_x < end_x ? 1 : -1;
+    int dy = -abs_int(end_y - start_y);
+    int sy = start_y < end_y ? 1 : -1;
+    int error = dx + dy;
+
+    while (true) {
+        draw_pixel(framebuf, stride_pixels, start_x, start_y, color);
+        if (start_x == end_x && start_y == end_y) {
+            break;
+        }
+
+        int doubled_error = error * 2;
+        if (doubled_error >= dy) {
+            error += dy;
+            start_x += sx;
+        }
+        if (doubled_error <= dx) {
+            error += dx;
+            start_y += sy;
+        }
+    }
+}
+
+static void draw_sprite(u32* framebuf, u32 stride_pixels, int x, int y, int width, int height, u32 tint, int sprite_id, int frame) {
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+
+    int left = clamp_int(x, 0, FB_WIDTH);
+    int top = clamp_int(y, 0, FB_HEIGHT);
+    int right = clamp_int(x + width, 0, FB_WIDTH);
+    int bottom = clamp_int(y + height, 0, FB_HEIGHT);
+    int radius = 30;
+    int radius_sq = radius * radius;
+    int inner_radius_sq = 23 * 23;
+    int safe_frame = frame < 0 ? -frame : frame;
+    int palette_index = safe_frame % 6;
+    u32 palette[6] = {
+        RGBA8_MAXALPHA(231, 64, 60),
+        RGBA8_MAXALPHA(245, 138, 42),
+        RGBA8_MAXALPHA(248, 209, 72),
+        RGBA8_MAXALPHA(70, 191, 106),
+        RGBA8_MAXALPHA(62, 140, 223),
+        RGBA8_MAXALPHA(156, 91, 216)
+    };
+
+    for (int py = top; py < bottom; ++py) {
+        int local_y = ((py - y) * 64) / height - 32;
+        u32* row = framebuf + py * stride_pixels;
+
+        for (int px = left; px < right; ++px) {
+            int local_x = ((px - x) * 64) / width - 32;
+            int distance_sq = local_x * local_x + local_y * local_y;
+            if (distance_sq > radius_sq) {
+                continue;
+            }
+
+            u32 color;
+            if (sprite_id == 1145756846) {
+                if (distance_sq > inner_radius_sq) {
+                    color = RGBA8_MAXALPHA(24, 28, 34);
+                } else if (abs_int(local_y) <= 5) {
+                    color = RGBA8_MAXALPHA(24, 28, 34);
+                } else if (local_y < 0) {
+                    color = RGBA8_MAXALPHA(226, 42, 52);
+                } else {
+                    color = RGBA8_MAXALPHA(240, 242, 236);
+                }
+
+                int button_distance_sq = local_x * local_x + local_y * local_y;
+                if (button_distance_sq <= 7 * 7) {
+                    color = button_distance_sq <= 4 * 4
+                        ? RGBA8_MAXALPHA(238, 240, 234)
+                        : RGBA8_MAXALPHA(24, 28, 34);
+                }
+            } else {
+                int stripe = ((local_x + local_y + safe_frame * 7) / 8) & 1;
+                if (distance_sq > inner_radius_sq) {
+                    color = RGBA8_MAXALPHA(18, 22, 30);
+                } else if (stripe == 0) {
+                    color = palette[palette_index];
+                } else {
+                    color = palette[(palette_index + 3) % 6];
+                }
+            }
+
+            row[px] = color_tint(color, tint);
         }
     }
 }
@@ -242,6 +355,12 @@ static void execute_render_command(
             break;
         case KENGINE_RENDER_FILL_RECT:
             draw_rect(framebuf, stride_pixels, x, y, width, height, color);
+            break;
+        case KENGINE_RENDER_DRAW_LINE:
+            draw_line(framebuf, stride_pixels, x, y, width, height, color);
+            break;
+        case KENGINE_RENDER_DRAW_SPRITE:
+            draw_sprite(framebuf, stride_pixels, x, y, width, height, color, (int)color2, param);
             break;
         case KENGINE_RENDER_VERTICAL_GRADIENT:
             draw_background(framebuf, stride_pixels, color, color2, param);

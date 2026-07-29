@@ -1,6 +1,7 @@
 # Nintendo Switch Demo
 
 Pure Kotlin demo game used to exercise both the normal Kengine SDL host and the experimental Nintendo Switch backend.
+The desktop build registers `assets/sprites/pokeball.bmp` and `assets/sprites/block_sprites.png` through the normal Kengine `SpriteContext`; the Switch build renders the same portable sprite commands through software framebuffer implementations.
 
 Run/build the desktop Kengine SDL version with the normal native executable tasks:
 
@@ -11,9 +12,9 @@ jenv exec ./gradlew :games:nintendo-switch-demo:runDebugExecutableMacosArm64
 Desktop controls:
 
 ```text
-Arrow keys: move the square
-A: shift the color palette faster
-B: pulse the square size
+Arrow keys / WASD: move the square
+Space / J / controller A: shift the color palette faster
+B / K / controller B: pulse the square size
 ```
 
 Build the game-facing NRO with the Switch backend enabled:

@@ -6,12 +6,15 @@ import kotlin.test.assertEquals
 class RenderCommandBufferTest {
     @Test
     fun storesCommandFieldsInOrder() {
-        val commands = RenderCommandBuffer(capacity = 2)
+        val commands = RenderCommandBuffer(capacity = 4)
+        val spriteId = RenderAssetId.sprite("demo/pokeball")
 
         commands.verticalGradient(topColor = 0x11223344, bottomColor = 0x55667788.toInt(), pulse = 9)
         commands.fillRect(x = 10, y = 20, width = 30, height = 40, color = 0x7f00ffee)
+        commands.drawLine(startX = 50, startY = 60, endX = 70, endY = 80, color = 0x01020304)
+        commands.drawSprite(spriteId = spriteId, x = 90, y = 100, width = 110, height = 120, tint = 0x11121314, frame = 3)
 
-        assertEquals(2, commands.count)
+        assertEquals(4, commands.count)
         assertEquals(0, commands.dropped)
         assertEquals(RenderCommandType.VERTICAL_GRADIENT, commands.field(0, RenderCommandBuffer.FIELD_TYPE))
         assertEquals(0x11223344, commands.field(0, RenderCommandBuffer.FIELD_COLOR))
@@ -23,6 +26,20 @@ class RenderCommandBufferTest {
         assertEquals(30, commands.field(1, RenderCommandBuffer.FIELD_WIDTH))
         assertEquals(40, commands.field(1, RenderCommandBuffer.FIELD_HEIGHT))
         assertEquals(0x7f00ffee, commands.field(1, RenderCommandBuffer.FIELD_COLOR))
+        assertEquals(RenderCommandType.DRAW_LINE, commands.field(2, RenderCommandBuffer.FIELD_TYPE))
+        assertEquals(50, commands.field(2, RenderCommandBuffer.FIELD_X))
+        assertEquals(60, commands.field(2, RenderCommandBuffer.FIELD_Y))
+        assertEquals(70, commands.field(2, RenderCommandBuffer.FIELD_WIDTH))
+        assertEquals(80, commands.field(2, RenderCommandBuffer.FIELD_HEIGHT))
+        assertEquals(0x01020304, commands.field(2, RenderCommandBuffer.FIELD_COLOR))
+        assertEquals(RenderCommandType.DRAW_SPRITE, commands.field(3, RenderCommandBuffer.FIELD_TYPE))
+        assertEquals(90, commands.field(3, RenderCommandBuffer.FIELD_X))
+        assertEquals(100, commands.field(3, RenderCommandBuffer.FIELD_Y))
+        assertEquals(110, commands.field(3, RenderCommandBuffer.FIELD_WIDTH))
+        assertEquals(120, commands.field(3, RenderCommandBuffer.FIELD_HEIGHT))
+        assertEquals(0x11121314, commands.field(3, RenderCommandBuffer.FIELD_COLOR))
+        assertEquals(spriteId, commands.field(3, RenderCommandBuffer.FIELD_COLOR2))
+        assertEquals(3, commands.field(3, RenderCommandBuffer.FIELD_PARAM))
     }
 
     @Test

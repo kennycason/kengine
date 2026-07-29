@@ -3,10 +3,13 @@ package nintendoswitchdemo
 import com.kengine.PortableGame
 import com.kengine.input.InputButton
 import com.kengine.input.InputState
+import com.kengine.render.RenderAssetId
 import com.kengine.render.RenderContext
 
 private const val DESIGN_WIDTH = 1280
 private const val DESIGN_HEIGHT = 720
+const val DEMO_POKEBALL_SPRITE = "demo/pokeball"
+const val DEMO_BLOCK_SPRITES = "demo/block-sprites"
 
 class NintendoSwitchDemoGame : PortableGame {
     private var updates = 0
@@ -74,6 +77,7 @@ class NintendoSwitchDemoGame : PortableGame {
         val spriteY = scale(y, DESIGN_HEIGHT, render.height)
         val spriteSize = renderSize(render)
         val inset = (spriteSize / 5).coerceIn(8, 32)
+        val portableSpriteSize = (spriteSize * 3 / 5).coerceAtLeast(28)
 
         render.verticalGradient(background, gradientBottom, draws)
 
@@ -91,10 +95,29 @@ class NintendoSwitchDemoGame : PortableGame {
         render.fillRect(spriteX, spriteY, spriteSize, spriteSize, primary)
         render.fillRect(spriteX + inset, spriteY + inset, spriteSize - inset * 2, spriteSize - inset * 2, accent)
         render.fillRect(spriteX + inset * 2, spriteY + inset * 2, spriteSize - inset * 4, spriteSize - inset * 4, hud)
+        render.drawSprite(
+            spriteId = RenderAssetId.sprite(DEMO_POKEBALL_SPRITE),
+            x = spriteX + (spriteSize - portableSpriteSize) / 2,
+            y = spriteY + (spriteSize - portableSpriteSize) / 2,
+            width = portableSpriteSize,
+            height = portableSpriteSize
+        )
 
         render.fillRect(40, render.height - 76, barWidth(checksum xor 0x4920), 12, hud)
         render.fillRect(40, render.height - 56, barWidth(checksum xor updates), 12, primary)
         render.fillRect(40, render.height - 36, barWidth(checksum xor draws), 12, accent)
+        render.drawSprite(
+            spriteId = RenderAssetId.sprite(DEMO_BLOCK_SPRITES),
+            x = render.width - 124,
+            y = 36,
+            width = 76,
+            height = 76,
+            frame = (draws / 8) % 28
+        )
+
+        val scanY = scanLineY(render)
+        render.drawLine(render.width / 2, render.height / 2, spriteX + spriteSize / 2, spriteY + spriteSize / 2, hud)
+        render.drawLine(36, scanY, render.width - 36, render.height - 1 - scanY, colorMix(primary, hud, 120, 255))
     }
 
     override fun cleanup() {
@@ -117,6 +140,10 @@ class NintendoSwitchDemoGame : PortableGame {
 
     private fun barWidth(seed: Int): Int {
         return 120 + ((seed and Int.MAX_VALUE) % 460)
+    }
+
+    private fun scanLineY(render: RenderContext): Int {
+        return ((draws * 7) % render.height).coerceIn(0, render.height - 1)
     }
 
     private fun backgroundColor(): Int {

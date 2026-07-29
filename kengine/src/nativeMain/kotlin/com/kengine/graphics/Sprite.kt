@@ -85,10 +85,32 @@ class Sprite private constructor(
         drawTransformed(x, y, flip, angle)
     }
 
+    fun draw(
+        x: Double,
+        y: Double,
+        width: Double,
+        height: Double
+    ) {
+        if (width <= 0.0 || height <= 0.0) return
+
+        destRect.apply {
+            this.x = x.toFloat()
+            this.y = y.toFloat()
+            this.w = width.toFloat()
+            this.h = height.toFloat()
+        }
+
+        if (!SDL_RenderTexture(sdlContext.renderer, texture.texture, clipRect?.ptr, destRect.ptr)) {
+            handleError()
+        }
+    }
+
     private fun drawNoRotation(x: Double, y: Double) {
         destRect.apply {
             this.x = x.toFloat()
             this.y = y.toFloat()
+            this.w = scaledWidth
+            this.h = scaledHeight
         }
 
         if (!SDL_RenderTexture(sdlContext.renderer, texture.texture, clipRect?.ptr, destRect.ptr)) {

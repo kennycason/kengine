@@ -15,6 +15,10 @@ class SpriteContext private constructor(
         return manager.getSpriteSheet(name)
     }
 
+    fun addSprite(name: String, sprite: Sprite) {
+        manager.addSprite(name, sprite)
+    }
+
     fun addSpriteFromFilePath(name: String, filePath: String) {
         manager.addSprite(name, Sprite.fromFilePath(filePath))
     }
