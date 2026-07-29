@@ -27,6 +27,7 @@
   - The libnx host translates Switch buttons into shared `InputState`.
   - Kotlin copies each frame's render command list into a C-owned buffer with one ABI call.
   - `:games:nintendo-switch-demo:buildSwitchNro` now copies the backend output to `games/nintendo-switch-demo/build/switch/nintendo-switch-demo.nro`.
+  - `:games:hextris-switch:buildSwitchNro` now builds a separate backend artifact and copies it to `games/hextris-switch/build/switch/hextris-switch.nro`.
   - C executes the copied render commands such as vertical gradient and filled rectangles.
   - The same `:games:nintendo-switch-demo` game also runs on desktop through `PortableGameAdapter` and `RenderContextSdlRenderer` in `:kengine`.
   - The desktop adapter maps arrow keys, WASD, D-pad, left stick, and controller face buttons into the same shared `InputState`.
@@ -37,6 +38,8 @@
   - Desktop sprite-sheet commands resolve through the same registry into existing `SpriteSheet` tile selection using the shared render-command `frame` field.
   - Switch sprite commands currently render through a software-pattern sprite fallback; the game-facing API is ready for a later BMP/PNG decoder or prepacked pixel implementation.
   - Switch text commands fetch the frame-local Kotlin string by command index and render it with a built-in 5x7 software font.
+  - Switch game selection now uses a generated Kotlin `PortableGame` factory per backend NRO task instead of hardcoding one game class in `KengineSwitchRuntime`.
+  - The Switch command buffer is now sized for denser game screens such as Hextris' 15x25 board.
 - The first Kotlin crash was fixed at the generated C API wrapper layer:
   - Old failure: invalid read at `0x28`.
   - Old bad instruction: wrapper used `mrs ..., tpidr_el0`.
@@ -79,16 +82,21 @@ Conclusion: we are not stuck in a loop. The known generated-glue, stale-runtime-
    - size pulsing while holding `B`,
    - slower/faster manual movement while holding `L`/`R`,
    - exit only when pressing `Minus + Plus`.
-2. If it crashes, copy the new Ryujinx failure into `kengine-nintendo-switch/error.log`.
-3. Map the new guest PC and stack addresses with `addr2line`.
-4. Decide whether the next failure is:
+2. Launch `games/hextris-switch/build/switch/hextris-switch.nro` in Ryujinx and confirm:
+   - a playable falling-block board,
+   - square software-rendered block sprites,
+   - score/level/lines text,
+   - D-pad movement, soft drop, hard drop, rotation, pause, and reset.
+3. If it crashes, copy the new Ryujinx failure into `kengine-nintendo-switch/error.log`.
+4. Map the new guest PC and stack addresses with `addr2line`.
+5. Decide whether the next failure is:
    - another Kotlin runtime portability issue,
    - emulated TLS initialization/destructor behavior,
    - libnx/devkitPro integration,
    - or our C/Kotlin boundary code.
-5. Once the render-context framebuffer shell holds in Ryujinx, decide whether the next step is:
-   - creating `games/hextris-switch` against the portable lifecycle,
-   - adding polygon/triangle render commands for the Hextris board,
+6. Once the Hextris Switch shell holds in Ryujinx, decide whether the next step is:
+   - extracting reusable per-game Switch build registration to a cleaner Gradle helper,
+   - adding image decoding or prepacked sprite pixels for Switch,
    - moving more existing Kengine graphics primitives behind portable render commands,
    - or moving from software framebuffer to deko3d/OpenGL.
 

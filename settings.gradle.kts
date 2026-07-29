@@ -47,6 +47,7 @@ modules.addAll(
         "games:kengine-3d-space-shooter",
         "games:helloworld",
         "games:hextris",
+        "games:hextris-switch",
         "games:image-shuffle",
         "games:mario-3d",
         "games:nintendo-switch-demo",

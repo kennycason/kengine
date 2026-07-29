@@ -82,6 +82,18 @@ Game artifact:
 games/nintendo-switch-demo/build/switch/nintendo-switch-demo.nro
 ```
 
+Build the game-facing Hextris Switch artifact:
+
+```bash
+jenv exec ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
+```
+
+Game artifact:
+
+```text
+games/hextris-switch/build/switch/hextris-switch.nro
+```
+
 The same pure Kotlin game can also run through the normal Kengine SDL host:
 
 ```bash
@@ -112,7 +124,7 @@ The current successful artifact is:
 ```text
 libnx C main()
   -> calls generated Kotlin/Native static-library API
-  -> starts a Kotlin KengineSwitchRuntime
+  -> starts a Kotlin KengineSwitchRuntime with a generated per-game PortableGame factory
   -> translates libnx buttons into com.kengine.input.InputState
   -> updates and draws the :games:nintendo-switch-demo PortableGame every app-loop frame
   -> builds the frame through com.kengine.render.RenderContext

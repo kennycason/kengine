@@ -22,6 +22,16 @@ val switchCOnlyElf = switchOutputDir.map { it.file("kengine-nintendo-switch-c-on
 val switchNacp = switchOutputDir.map { it.file("kengine-nintendo-switch.nacp") }
 val switchNro = switchOutputDir.map { it.file("kengine-nintendo-switch.nro") }
 val switchCOnlyNro = switchOutputDir.map { it.file("kengine-nintendo-switch-c-only.nro") }
+val switchGameFactory = switchOutputDir.map { it.file("generated/nintendo-switch-demo/KengineSwitchGameFactory.kt") }
+val hextrisSwitchOutputDir = switchOutputDir.map { it.dir("games/hextris-switch") }
+val hextrisSwitchKotlinOutputBase = hextrisSwitchOutputDir.map { it.file("kotlin/kengine_switch_kotlin") }
+val hextrisSwitchKotlinApiHeader = hextrisSwitchOutputDir.map { it.file("kotlin/kengine_switch_kotlin_api.h") }
+val hextrisSwitchKotlinStaticLib = hextrisSwitchOutputDir.map { it.file("kotlin/libkengine_switch_kotlin.a") }
+val hextrisSwitchGameFactory = hextrisSwitchOutputDir.map { it.file("generated/KengineSwitchGameFactory.kt") }
+val hextrisSwitchObject = hextrisSwitchOutputDir.map { it.file("obj/main.o") }
+val hextrisSwitchElf = hextrisSwitchOutputDir.map { it.file("hextris-switch.elf") }
+val hextrisSwitchNacp = hextrisSwitchOutputDir.map { it.file("hextris-switch.nacp") }
+val hextrisSwitchNro = hextrisSwitchOutputDir.map { it.file("hextris-switch.nro") }
 
 val kengineKotlinLocalProperties = Properties().apply {
     val localProperties = rootProject.file("kengine-kotlin/local.properties")
@@ -175,9 +185,33 @@ tasks.register("switchToolchainInfo") {
     }
 }
 
+tasks.register("generateSwitchGameFactory") {
+    group = "switch"
+    description = "Generates the Kotlin game factory for the Nintendo Switch demo NRO."
+
+    outputs.file(switchGameFactory)
+
+    doLast {
+        val output = switchGameFactory.get().asFile
+        output.parentFile.mkdirs()
+        output.writeText(
+            """
+            package kengine.switchruntime
+
+            import com.kengine.PortableGame
+            import nintendoswitchdemo.NintendoSwitchDemoGame
+
+            fun createSwitchPortableGame(): PortableGame = NintendoSwitchDemoGame()
+            fun switchGameName(): String = "nintendo-switch-demo"
+            """.trimIndent()
+        )
+    }
+}
+
 tasks.register<Exec>("compileSwitchKotlinStatic") {
     group = "switch"
     description = "Compiles the Kotlin runtime probe, shared kengine core sources, and Switch demo sources as a Switch Kotlin/Native static library."
+    dependsOn("generateSwitchGameFactory")
 
     val switchKotlinSources = fileTree("src/main/kotlin") {
         include("**/*.kt")
@@ -189,10 +223,14 @@ tasks.register<Exec>("compileSwitchKotlinStatic") {
         include("**/*.kt")
     }
     val kotlinSources = providers.provider {
-        (switchKotlinSources.files + kengineCoreSources.files + nintendoSwitchDemoSources.files).sortedBy { it.absolutePath }
+        (switchKotlinSources.files +
+            kengineCoreSources.files +
+            nintendoSwitchDemoSources.files +
+            switchGameFactory.get().asFile).sortedBy { it.absolutePath }
     }
 
     inputs.files(switchKotlinSources, kengineCoreSources, nintendoSwitchDemoSources)
+    inputs.file(switchGameFactory)
     inputs.property("kotlinTarget", kotlinTarget)
     inputs.property("kotlincNative", providers.provider { kotlincNative().absolutePath })
     inputs.dir(providers.provider {
@@ -224,6 +262,88 @@ tasks.register<Exec>("compileSwitchKotlinStatic") {
             "static",
             "-output",
             kotlinOutputBase.get().asFile.absolutePath
+        )
+        args(kotlinSources.get().map { it.absolutePath })
+    }
+}
+
+tasks.register("generateHextrisSwitchGameFactory") {
+    group = "switch"
+    description = "Generates the Kotlin game factory for the Hextris Switch NRO."
+
+    outputs.file(hextrisSwitchGameFactory)
+
+    doLast {
+        val output = hextrisSwitchGameFactory.get().asFile
+        output.parentFile.mkdirs()
+        output.writeText(
+            """
+            package kengine.switchruntime
+
+            import com.kengine.PortableGame
+            import hextrisswitch.HextrisSwitchGame
+
+            fun createSwitchPortableGame(): PortableGame = HextrisSwitchGame()
+            fun switchGameName(): String = "hextris-switch"
+            """.trimIndent()
+        )
+    }
+}
+
+tasks.register<Exec>("compileHextrisSwitchKotlinStatic") {
+    group = "switch"
+    description = "Compiles the Kotlin runtime, shared kengine core sources, and Hextris Switch sources as a Switch Kotlin/Native static library."
+    dependsOn("generateHextrisSwitchGameFactory")
+
+    val switchKotlinSources = fileTree("src/main/kotlin") {
+        include("**/*.kt")
+    }
+    val kengineCoreSources = rootProject.fileTree("kengine-core/src/commonMain/kotlin") {
+        include("**/*.kt")
+    }
+    val hextrisSwitchSources = rootProject.fileTree("games/hextris-switch/src/commonMain/kotlin") {
+        include("**/*.kt")
+    }
+    val kotlinSources = providers.provider {
+        (switchKotlinSources.files +
+            kengineCoreSources.files +
+            hextrisSwitchSources.files +
+            hextrisSwitchGameFactory.get().asFile).sortedBy { it.absolutePath }
+    }
+
+    inputs.files(switchKotlinSources, kengineCoreSources, hextrisSwitchSources)
+    inputs.file(hextrisSwitchGameFactory)
+    inputs.property("kotlinTarget", kotlinTarget)
+    inputs.property("kotlincNative", providers.provider { kotlincNative().absolutePath })
+    inputs.dir(providers.provider {
+        kotlincNative().parentFile.parentFile.resolve("konan/targets/${kotlinTarget.get()}/native")
+    })
+        .optional()
+        .withPathSensitivity(PathSensitivity.ABSOLUTE)
+    inputs.dir(providers.provider {
+        kotlincNative().parentFile.parentFile.resolve("konan/lib")
+    })
+        .optional()
+        .withPathSensitivity(PathSensitivity.ABSOLUTE)
+    inputs.file(rootProject.file("kengine-kotlin/local.properties"))
+        .optional()
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.files(hextrisSwitchKotlinApiHeader, hextrisSwitchKotlinStaticLib)
+
+    doFirst {
+        val compiler = tool(
+            kotlincNative(),
+            "Set -Pkengine.switch.kotlincNative=/path/to/kotlinc-native or KOTLINC_NATIVE."
+        )
+        hextrisSwitchKotlinOutputBase.get().asFile.parentFile.mkdirs()
+        commandLine(
+            compiler.absolutePath,
+            "-target",
+            kotlinTarget.get(),
+            "-produce",
+            "static",
+            "-output",
+            hextrisSwitchKotlinOutputBase.get().asFile.absolutePath
         )
         args(kotlinSources.get().map { it.absolutePath })
     }
@@ -330,6 +450,59 @@ tasks.register<Exec>("linkSwitchElf") {
     }
 }
 
+tasks.register<Exec>("compileHextrisSwitchMain") {
+    group = "switch"
+    description = "Compiles the libnx C shell that calls the generated Hextris Switch Kotlin/Native API."
+    dependsOn("compileHextrisSwitchKotlinStatic")
+
+    inputs.file("src/main/c/main.c")
+    inputs.file(hextrisSwitchKotlinApiHeader)
+    outputs.file(hextrisSwitchObject)
+
+    doFirst {
+        configureSwitchEnvironment()
+        hextrisSwitchObject.get().asFile.parentFile.mkdirs()
+        commandLine(
+            aarch64Tool("aarch64-none-elf-gcc").absolutePath,
+            *switchCFlags.toTypedArray(),
+            "-I${libnxInclude().absolutePath}",
+            "-I${hextrisSwitchKotlinApiHeader.get().asFile.parentFile.absolutePath}",
+            "-c",
+            file("src/main/c/main.c").absolutePath,
+            "-o",
+            hextrisSwitchObject.get().asFile.absolutePath
+        )
+    }
+}
+
+tasks.register<Exec>("linkHextrisSwitchElf") {
+    group = "switch"
+    description = "Links the Hextris Switch ELF with the Kotlin/Native static library."
+    dependsOn("compileHextrisSwitchMain")
+
+    inputs.files(hextrisSwitchObject, hextrisSwitchKotlinStaticLib)
+    outputs.file(hextrisSwitchElf)
+
+    doFirst {
+        configureSwitchEnvironment()
+        commandLine(
+            aarch64Tool("aarch64-none-elf-gcc").absolutePath,
+            "-specs=${switchSpecs().absolutePath}",
+            "-g",
+            *switchArchFlags.toTypedArray(),
+            "-Wl,--gc-sections",
+            hextrisSwitchObject.get().asFile.absolutePath,
+            hextrisSwitchKotlinStaticLib.get().asFile.absolutePath,
+            "-L${libnxLib().absolutePath}",
+            "-lstdc++",
+            "-lm",
+            "-lnx",
+            "-o",
+            hextrisSwitchElf.get().asFile.absolutePath
+        )
+    }
+}
+
 tasks.register<Exec>("createSwitchNacp") {
     group = "switch"
     description = "Creates NACP metadata for the Switch prototype."
@@ -346,6 +519,26 @@ tasks.register<Exec>("createSwitchNacp") {
             "kengine",
             version.toString(),
             switchNacp.get().asFile.absolutePath
+        )
+    }
+}
+
+tasks.register<Exec>("createHextrisSwitchNacp") {
+    group = "switch"
+    description = "Creates NACP metadata for the Hextris Switch prototype."
+
+    outputs.file(hextrisSwitchNacp)
+
+    doFirst {
+        configureSwitchEnvironment()
+        hextrisSwitchNacp.get().asFile.parentFile.mkdirs()
+        commandLine(
+            devkitTool("nacptool").absolutePath,
+            "--create",
+            "Hextris Switch",
+            "kengine",
+            version.toString(),
+            hextrisSwitchNacp.get().asFile.absolutePath
         )
     }
 }
@@ -388,6 +581,25 @@ tasks.register<Exec>("packageSwitchNro") {
     }
 }
 
+tasks.register<Exec>("packageHextrisSwitchNro") {
+    group = "switch"
+    description = "Packages the Hextris Switch ELF as an NRO."
+    dependsOn("linkHextrisSwitchElf", "createHextrisSwitchNacp")
+
+    inputs.files(hextrisSwitchElf, hextrisSwitchNacp)
+    outputs.file(hextrisSwitchNro)
+
+    doFirst {
+        configureSwitchEnvironment()
+        commandLine(
+            devkitTool("elf2nro").absolutePath,
+            hextrisSwitchElf.get().asFile.absolutePath,
+            hextrisSwitchNro.get().asFile.absolutePath,
+            "--nacp=${hextrisSwitchNacp.get().asFile.absolutePath}"
+        )
+    }
+}
+
 tasks.register("buildSwitchCOnlyNro") {
     group = "switch"
     description = "Builds the C-only libnx hello-world NRO."
@@ -398,4 +610,10 @@ tasks.register("buildSwitchNro") {
     group = "switch"
     description = "Builds the experimental Kotlin-linked libnx hello-world NRO."
     dependsOn("packageSwitchNro")
+}
+
+tasks.register("buildHextrisSwitchNro") {
+    group = "switch"
+    description = "Builds the experimental Hextris Switch NRO."
+    dependsOn("packageHextrisSwitchNro")
 }

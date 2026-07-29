@@ -37,7 +37,7 @@
 #define KENGINE_RENDER_FIELD_COLOR2 6
 #define KENGINE_RENDER_FIELD_PARAM 7
 #define KENGINE_RENDER_FIELD_COUNT 8
-#define KENGINE_RENDER_MAX_COMMANDS 256
+#define KENGINE_RENDER_MAX_COMMANDS 1024
 
 #ifndef KENGINE_SWITCH_C_ONLY
 static kengine_switch_kotlin_ExportedSymbols* kotlin_symbols(void) {
@@ -282,6 +282,22 @@ static void draw_line(u32* framebuf, u32 stride_pixels, int start_x, int start_y
     }
 }
 
+static u32 block_sprite_color(int frame) {
+    int safe_frame = frame < 0 ? -frame : frame;
+    int column = safe_frame % 6;
+    int row = (safe_frame / 6) % 5;
+    u32 palette[6] = {
+        RGBA8_MAXALPHA(231, 64, 60),
+        RGBA8_MAXALPHA(245, 138, 42),
+        RGBA8_MAXALPHA(248, 209, 72),
+        RGBA8_MAXALPHA(70, 191, 106),
+        RGBA8_MAXALPHA(62, 140, 223),
+        RGBA8_MAXALPHA(156, 91, 216)
+    };
+
+    return color_add(palette[column], row * 12);
+}
+
 static void draw_sprite(u32* framebuf, u32 stride_pixels, int x, int y, int width, int height, u32 tint, int sprite_id, int frame) {
     if (width <= 0 || height <= 0) {
         return;
@@ -291,6 +307,29 @@ static void draw_sprite(u32* framebuf, u32 stride_pixels, int x, int y, int widt
     int top = clamp_int(y, 0, FB_HEIGHT);
     int right = clamp_int(x + width, 0, FB_WIDTH);
     int bottom = clamp_int(y + height, 0, FB_HEIGHT);
+    int is_block_sheet = sprite_id == 394425416 || sprite_id == -1106270640;
+
+    if (is_block_sheet) {
+        u32 base = block_sprite_color(frame);
+        u32 highlight = color_add(base, 36);
+        u32 shadow = color_add(base, -42);
+        u32 border = RGBA8_MAXALPHA(18, 22, 30);
+
+        for (int py = top; py < bottom; ++py) {
+            u32* row = framebuf + py * stride_pixels;
+            for (int px = left; px < right; ++px) {
+                int local_x = px - x;
+                int local_y = py - y;
+                int border_pixel = local_x <= 1 || local_y <= 1 || local_x >= width - 2 || local_y >= height - 2;
+                int highlight_pixel = local_x < width / 3 && local_y < height / 3;
+                int shadow_pixel = local_x > (width * 2) / 3 || local_y > (height * 2) / 3;
+                u32 color = border_pixel ? border : shadow_pixel ? shadow : highlight_pixel ? highlight : base;
+                row[px] = color_tint(color, tint);
+            }
+        }
+        return;
+    }
+
     int radius = 30;
     int radius_sq = radius * radius;
     int inner_radius_sq = 23 * 23;

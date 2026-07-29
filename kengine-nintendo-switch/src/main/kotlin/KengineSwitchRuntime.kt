@@ -1,11 +1,13 @@
 import com.kengine.input.InputButton
 import com.kengine.input.InputState
+import com.kengine.PortableGame
 import com.kengine.render.RenderContext
+import kengine.switchruntime.switchGameName
+import kengine.switchruntime.createSwitchPortableGame
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.IntVar
 import kotlinx.cinterop.set
-import nintendoswitchdemo.NintendoSwitchDemoGame
 
 private const val INPUT_LEFT = 1
 private const val INPUT_RIGHT = 1 shl 1
@@ -19,18 +21,20 @@ private const val INPUT_Y = 1 shl 8
 private const val INPUT_L = 1 shl 9
 private const val INPUT_R = 1 shl 10
 private const val INPUT_SELECT = 1 shl 11
-private const val COMMAND_CAPACITY = 64
+private const val COMMAND_CAPACITY = 1024
 
 private class KengineSwitchRuntime {
     private val input = InputState()
     private val render = RenderContext(COMMAND_CAPACITY)
-    private var game: NintendoSwitchDemoGame? = null
+    private var game: PortableGame? = null
     private var started = false
+    private var checksum = 0x4B_53_57
 
     fun start(): String {
         if (!started) {
-            game = NintendoSwitchDemoGame()
+            game = createSwitchPortableGame()
             started = true
+            checksum = mix(checksum, switchGameName().length)
         }
         return "started ${snapshotPayload()}"
     }
@@ -39,14 +43,16 @@ private class KengineSwitchRuntime {
         val activeGame = game ?: return -1
         inputFromMask(inputMask)
         activeGame.update(input)
-        return activeGame.checksum()
+        checksum = mix(checksum xor input.mask, hostFrame)
+        return checksum
     }
 
     fun draw(hostFrame: Int, screenWidth: Int, screenHeight: Int): Int {
         val activeGame = game ?: return -1
         render.beginFrame(screenWidth, screenHeight)
         activeGame.draw(render)
-        return activeGame.checksum()
+        checksum = mix(checksum + render.commandCount, render.droppedCommandCount xor hostFrame)
+        return checksum
     }
 
     fun snapshot(): String {
@@ -104,7 +110,11 @@ private class KengineSwitchRuntime {
     }
 
     private fun snapshotPayload(): String {
-        return "${game?.snapshot() ?: "without game"} commands=${render.commandCount}/${render.droppedCommandCount}"
+        return "${game?.let { switchGameName() } ?: "without game"} commands=${render.commandCount}/${render.droppedCommandCount} checksum=$checksum"
+    }
+
+    private fun mix(value: Int, salt: Int): Int {
+        return (value * 1_103_515_245 + 12_345) xor salt
     }
 }
 
