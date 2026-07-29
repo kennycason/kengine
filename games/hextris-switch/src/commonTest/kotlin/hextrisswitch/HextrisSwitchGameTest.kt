@@ -32,6 +32,17 @@ class HextrisSwitchGameTest {
     }
 
     @Test
+    fun boardReportsCurrentDropDistanceWithoutMovingPiece() {
+        val board = Board()
+        val startPosition = board.getCurrentPiecePosition()
+        val distance = board.currentDropDistance()
+
+        assertTrue(distance > 0)
+        assertEquals(startPosition, board.getCurrentPiecePosition())
+        assertEquals(distance, board.drop())
+    }
+
+    @Test
     fun updateAndDrawUsePortableCommandsWithinBudget() {
         val game = HextrisSwitchGame()
         val input = InputState()
@@ -51,6 +62,18 @@ class HextrisSwitchGameTest {
         assertEquals(RenderCommandType.VERTICAL_GRADIENT, render.commandField(0, RenderCommandBuffer.FIELD_TYPE))
         assertTrue(hasText(render, "HEXTRIS"))
         assertTrue(hasCommand(render, RenderCommandType.DRAW_SPRITE))
+    }
+
+    @Test
+    fun drawIncludesLandingGuideForActivePiece() {
+        val game = HextrisSwitchGame()
+        val render = RenderContext(commandCapacity = 1024)
+
+        render.beginFrame(width = 1280, height = 720)
+        game.draw(render)
+
+        assertTrue(hasFillRectColor(render, rgba(30, 58, 72)))
+        assertTrue(hasFillRectColor(render, rgba(80, 142, 156)))
     }
 
     @Test
@@ -106,5 +129,24 @@ class HextrisSwitchGameTest {
             }
         }
         return false
+    }
+
+    private fun hasFillRectColor(render: RenderContext, color: Int): Boolean {
+        for (index in 0 until render.commandCount) {
+            if (
+                render.commandField(index, RenderCommandBuffer.FIELD_TYPE) == RenderCommandType.FILL_RECT &&
+                render.commandField(index, RenderCommandBuffer.FIELD_COLOR) == color
+            ) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun rgba(r: Int, g: Int, b: Int): Int {
+        return r.coerceIn(0, 255) or
+            (g.coerceIn(0, 255) shl 8) or
+            (b.coerceIn(0, 255) shl 16) or
+            (255 shl 24)
     }
 }

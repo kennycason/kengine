@@ -127,6 +127,7 @@ class HextrisSwitchGame : PortableGame {
 
         render.fillRect(boardLeft - 6, boardTop - 6, boardWidth + 12, boardHeight + 12, colors.panelBorder)
         render.fillRect(boardLeft, boardTop, boardWidth, boardHeight, colors.panel)
+        drawLandingGuide(render, boardLeft, boardTop, cell, colors)
         drawGrid(render, boardLeft, boardTop, boardWidth, boardHeight, cell, colors.grid)
         drawBoardBlocks(render, boardLeft, boardTop, cell)
         drawCurrentPiece(render, boardLeft, boardTop, cell)
@@ -145,6 +146,68 @@ class HextrisSwitchGame : PortableGame {
 
     fun snapshot(): String {
         return "state=$state score=${board.score} lines=${board.lines} frame=$frame"
+    }
+
+    private fun drawLandingGuide(render: RenderContext, left: Int, top: Int, cell: Int, colors: Palette) {
+        if (state != PlayState.RUNNING) {
+            return
+        }
+
+        val piece = board.getCurrentPiece() ?: return
+        val position = board.getCurrentPiecePosition()
+        val dropDistance = board.currentDropDistance()
+        if (dropDistance <= 0) {
+            return
+        }
+
+        val currentColumnBottoms = IntArray(board.width) { -1 }
+        val landingColumnBottoms = IntArray(board.width) { -1 }
+        val blocks = piece.getBlocks()
+        for (block in blocks) {
+            val x = position.x + block.x
+            val y = position.y + block.y
+            val landingY = y + dropDistance
+            if (x !in 0 until board.width) {
+                continue
+            }
+            if (y in 0 until board.height && y > currentColumnBottoms[x]) {
+                currentColumnBottoms[x] = y
+            }
+            if (landingY in 0 until board.height && landingY > landingColumnBottoms[x]) {
+                landingColumnBottoms[x] = landingY
+            }
+        }
+
+        for (x in 0 until board.width) {
+            val landingBottom = landingColumnBottoms[x]
+            if (landingBottom < 0) {
+                continue
+            }
+            val startY = (currentColumnBottoms[x] + 1).coerceAtLeast(0)
+            if (landingBottom >= startY) {
+                render.fillRect(
+                    left + x * cell + 2,
+                    top + startY * cell + 2,
+                    cell - 4,
+                    (landingBottom - startY + 1) * cell - 4,
+                    colors.landingGuide
+                )
+            }
+        }
+
+        for (block in blocks) {
+            val x = position.x + block.x
+            val y = position.y + block.y + dropDistance
+            if (x in 0 until board.width && y in 0 until board.height) {
+                render.fillRect(
+                    left + x * cell + 5,
+                    top + y * cell + 5,
+                    cell - 10,
+                    cell - 10,
+                    colors.landingTarget
+                )
+            }
+        }
     }
 
     private fun drawGrid(
@@ -329,7 +392,9 @@ class HextrisSwitchGame : PortableGame {
             grid = rgba(32, 38, 58),
             text = rgba(246, 248, 238),
             mutedText = rgba(172, 202, 220),
-            warning = rgba(248, 210, 88)
+            warning = rgba(248, 210, 88),
+            landingGuide = rgba(30, 58, 72),
+            landingTarget = rgba(80, 142, 156)
         )
     }
 
@@ -348,7 +413,9 @@ class HextrisSwitchGame : PortableGame {
         val grid: Int,
         val text: Int,
         val mutedText: Int,
-        val warning: Int
+        val warning: Int,
+        val landingGuide: Int,
+        val landingTarget: Int
     )
 
     private enum class PlayState {

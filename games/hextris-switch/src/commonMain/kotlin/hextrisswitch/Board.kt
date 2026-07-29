@@ -54,6 +54,15 @@ class Board(val width: Int = 15, val height: Int = 25) {
         return distance
     }
 
+    fun currentDropDistance(): Int {
+        val piece = currentPiece ?: return 0
+        var distance = 0
+        while (canPlacePiece(piece, pieceX, pieceY + distance + 1)) {
+            distance += 1
+        }
+        return distance
+    }
+
     fun rotateClockwise(): Boolean {
         val piece = currentPiece ?: return false
         piece.rotateClockwise()
