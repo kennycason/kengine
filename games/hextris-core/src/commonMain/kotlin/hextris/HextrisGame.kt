@@ -21,11 +21,16 @@ class HextrisGame : PortableGame {
     private var clockwiseHold = 0
     private var counterClockwiseHold = 0
     private var state = PlayState.RUNNING
+    private var combo = 0
+    private var comboFlashFrames = 0
     private val pendingSoundIds = IntArray(8)
     private var pendingSoundCount = 0
 
     override fun update(input: InputState) {
         frame += 1
+        if (comboFlashFrames > 0) {
+            comboFlashFrames -= 1
+        }
 
         if (justPressed(input, InputButton.SELECT)) {
             reset()
@@ -116,7 +121,7 @@ class HextrisGame : PortableGame {
     }
 
     override fun draw(render: RenderContext) {
-        val colors = palette(frame)
+        val colors = palette(frame, board.level, comboFlashFrames)
         render.verticalGradient(colors.backgroundTop, colors.backgroundBottom, frame)
 
         val cell = cellSize(render)
@@ -125,7 +130,6 @@ class HextrisGame : PortableGame {
         val boardLeft = (render.width - boardWidth) / 2
         val boardTop = (render.height - boardHeight) / 2
         val rightPanelX = boardLeft + boardWidth + 32
-        val leftPanelX = 36
 
         render.fillRect(boardLeft - 6, boardTop - 6, boardWidth + 12, boardHeight + 12, colors.panelBorder)
         render.fillRect(boardLeft, boardTop, boardWidth, boardHeight, colors.panel)
@@ -134,7 +138,11 @@ class HextrisGame : PortableGame {
         drawBoardBlocks(render, boardLeft, boardTop, cell)
         drawCurrentPiece(render, boardLeft, boardTop, cell)
 
-        drawSidePanels(render, leftPanelX, rightPanelX, boardTop, cell, colors)
+        if (comboFlashFrames > 0) {
+            drawComboPulse(render, boardLeft, boardTop, boardWidth, boardHeight, colors)
+        }
+
+        drawSidePanels(render, boardLeft, rightPanelX, boardTop, boardHeight, cell, colors)
 
         if (state == PlayState.PAUSED) {
             drawOverlay(render, "PAUSED", colors.warning)
@@ -223,26 +231,39 @@ class HextrisGame : PortableGame {
 
     private fun drawSidePanels(
         render: RenderContext,
-        leftPanelX: Int,
+        boardLeft: Int,
         rightPanelX: Int,
         boardTop: Int,
+        boardHeight: Int,
         cell: Int,
         colors: Palette
     ) {
         val nextSize = cell * 6
-        render.drawText("NEXT", leftPanelX, boardTop, colors.text, 3)
-        render.fillRect(leftPanelX, boardTop + 34, nextSize, nextSize, colors.panel)
-        drawNextPiece(render, leftPanelX, boardTop + 34, cell)
+        val previewGap = (cell / 2).coerceAtLeast(12)
+        val nextX = boardLeft - nextSize - previewGap
+        val nextNextX = nextX - nextSize - previewGap
+        val leftPanelX = nextNextX.coerceAtLeast(10)
+        val statValueX = nextX.coerceAtLeast(leftPanelX + 170)
 
-        val statTop = boardTop + nextSize + 58
-        val statValueX = leftPanelX + 142
+        drawPreviewBox(render, board.getNextNextPiece(), leftPanelX, boardTop, nextSize, cell, colors, label = null)
+        drawPreviewBox(render, board.getNextPiece(), nextX, boardTop, nextSize, cell, colors, label = "NEXT")
+
+        val statTop = boardTop + nextSize + 22
         drawStatLine(render, "SCORE", board.score.toString(), leftPanelX, statValueX, statTop, colors)
-        drawStatLine(render, "LEVEL", board.level.toString(), leftPanelX, statValueX, statTop + 48, colors)
-        drawStatLine(render, "LINES", board.lines.toString(), leftPanelX, statValueX, statTop + 96, colors)
-        drawStatLine(render, "PIECES", board.totalPieces().toString(), leftPanelX, statValueX, statTop + 144, colors)
+        drawStatLine(render, "LEVEL", board.level.toString(), leftPanelX, statValueX, statTop + 40, colors)
+        drawStatLine(render, "LINES", board.lines.toString(), leftPanelX, statValueX, statTop + 80, colors)
+        drawStatLine(render, "PIECES", board.totalPieces().toString(), leftPanelX, statValueX, statTop + 120, colors)
 
-        drawControls(render, leftPanelX, statTop + 218, colors)
-        drawPieceStats(render, rightPanelX, boardTop, cell, colors)
+        drawControls(render, leftPanelX, statTop + 182, colors)
+        drawPieceStats(
+            render = render,
+            left = rightPanelX,
+            top = boardTop,
+            width = render.width - rightPanelX - 10,
+            height = boardHeight,
+            cell = cell,
+            colors = colors
+        )
     }
 
     private fun drawStatLine(
@@ -254,8 +275,8 @@ class HextrisGame : PortableGame {
         y: Int,
         colors: Palette
     ) {
-        render.drawText(label, left, y + 4, colors.mutedText, 2)
-        render.drawText(value, valueX, y, colors.text, 3)
+        render.drawText(label, left, y, colors.mutedText, 4)
+        render.drawText(value, valueX, y, colors.text, 4)
     }
 
     private fun drawControls(render: RenderContext, left: Int, top: Int, colors: Palette) {
@@ -268,8 +289,23 @@ class HextrisGame : PortableGame {
         render.drawText("SELECT RESET", left, top + 154, colors.mutedText, 2)
     }
 
-    private fun drawNextPiece(render: RenderContext, left: Int, top: Int, cell: Int) {
-        val piece = board.getNextPiece() ?: return
+    private fun drawPreviewBox(
+        render: RenderContext,
+        piece: Piece?,
+        left: Int,
+        top: Int,
+        size: Int,
+        cell: Int,
+        colors: Palette,
+        label: String?
+    ) {
+        render.fillRect(left - 4, top - 4, size + 8, size + 8, colors.panelBorder)
+        render.fillRect(left, top, size, size, colors.panel)
+        if (label != null) {
+            render.drawText(label, left + 8, top + 8, colors.text, 2)
+        }
+        if (piece == null) return
+
         val blocks = piece.getBlocks()
         val minX = blocks.minOf { it.x }
         val maxX = blocks.maxOf { it.x }
@@ -277,8 +313,9 @@ class HextrisGame : PortableGame {
         val maxY = blocks.maxOf { it.y }
         val width = maxX - minX + 1
         val height = maxY - minY + 1
+        val labelOffset = if (label == null) 0 else cell / 2
         val offsetX = left + ((6 - width) * cell) / 2
-        val offsetY = top + ((6 - height) * cell) / 2
+        val offsetY = top + ((6 - height) * cell) / 2 + labelOffset
 
         for (block in blocks) {
             drawBlock(
@@ -291,26 +328,34 @@ class HextrisGame : PortableGame {
         }
     }
 
-    private fun drawPieceStats(render: RenderContext, left: Int, top: Int, cell: Int, colors: Palette) {
+    private fun drawPieceStats(
+        render: RenderContext,
+        left: Int,
+        top: Int,
+        width: Int,
+        height: Int,
+        cell: Int,
+        colors: Palette
+    ) {
         val counts = board.getPieceCounts()
         val pieceTypes = PieceType.entries
         val piecesPerColumn = (pieceTypes.size + 1) / 2
-        val smallCell = (cell / 2).coerceIn(10, 12)
+        val columnWidth = (width / 2).coerceAtLeast(150)
+        val smallCell = minOf(cell * 5 / 8, (columnWidth - 72) / 6).coerceIn(13, 18)
         val previewWidth = smallCell * 6
-        val columnWidth = previewWidth + 112
-        val rowHeight = 40
-
-        render.drawText("STATS", left, top, colors.text, 3)
+        val rowHeight = (height / piecesPerColumn).coerceAtLeast(smallCell * 3)
 
         for (index in pieceTypes.indices) {
             val pieceType = pieceTypes[index]
             val column = index / piecesPerColumn
             val row = index % piecesPerColumn
             val x = left + column * columnWidth
-            val y = top + 42 + row * rowHeight
+            val y = top + row * rowHeight
+            val pieceY = y + ((rowHeight - smallCell * 3) / 2).coerceAtLeast(0)
+            val countY = y + ((rowHeight - 21) / 2).coerceAtLeast(0)
 
-            drawSmallPiece(render, x, y, smallCell, pieceType)
-            render.drawText("x${counts[pieceType] ?: 0}", x + previewWidth + 12, y + 8, colors.text, 2)
+            drawSmallPiece(render, x, pieceY, smallCell, pieceType)
+            render.drawText("x${counts[pieceType] ?: 0}", x + previewWidth + 8, countY, colors.text, 3)
         }
     }
 
@@ -369,8 +414,11 @@ class HextrisGame : PortableGame {
             state = PlayState.GAME_OVER
             queueSound(Sounds.GAME_OVER)
         } else if (cleared > 0) {
+            combo += 1
+            comboFlashFrames = (12 + combo * 8 + cleared * 4).coerceAtMost(40)
             queueSound(Sounds.LINE_CLEAR)
         } else {
+            combo = 0
             queueSound(Sounds.LOCK)
         }
     }
@@ -383,6 +431,8 @@ class HextrisGame : PortableGame {
         rightHold = 0
         clockwiseHold = 0
         counterClockwiseHold = 0
+        combo = 0
+        comboFlashFrames = 0
     }
 
     private fun queueSound(name: String) {
@@ -394,9 +444,9 @@ class HextrisGame : PortableGame {
     }
 
     private fun cellSize(render: RenderContext): Int {
-        val byHeight = (render.height - 96) / board.height
-        val byWidth = (render.width * 38 / 100) / board.width
-        return minOf(byHeight, byWidth).coerceIn(10, 32)
+        val byHeight = (render.height - 20) / board.height
+        val byWidth = (render.width * 44 / 100) / board.width
+        return minOf(byHeight, byWidth).coerceIn(10, 40)
     }
 
     private fun normalFallPeriod(): Int {
@@ -416,19 +466,49 @@ class HextrisGame : PortableGame {
         return input.isPressed(button) && (previousMask and bit) == 0
     }
 
-    private fun palette(seed: Int): Palette {
+    private fun palette(seed: Int, level: Int, comboFlashFrames: Int): Palette {
         val pulse = (seed / 12) % 32
+        val levelTheme = level % 6
+        val baseTop = when (levelTheme) {
+            0 -> rgba(4 + pulse / 10, 4 + pulse / 12, 14 + pulse / 4)
+            1 -> rgba(1 + pulse / 14, 15 + pulse / 5, 18 + pulse / 7)
+            2 -> rgba(15 + pulse / 5, 5 + pulse / 12, 22 + pulse / 6)
+            3 -> rgba(17 + pulse / 6, 10 + pulse / 8, 1 + pulse / 14)
+            4 -> rgba(3 + pulse / 14, 15 + pulse / 7, 7 + pulse / 10)
+            else -> rgba(14 + pulse / 7, 2 + pulse / 14, 7 + pulse / 9)
+        }
+        val baseBottom = when (levelTheme) {
+            0 -> rgba(1, 1, 8 + pulse / 3)
+            1 -> rgba(0, 8 + pulse / 6, 11 + pulse / 5)
+            2 -> rgba(8 + pulse / 8, 1, 14 + pulse / 4)
+            3 -> rgba(12 + pulse / 5, 5 + pulse / 10, 0)
+            4 -> rgba(0, 10 + pulse / 5, 4 + pulse / 12)
+            else -> rgba(10 + pulse / 4, 0, 4 + pulse / 8)
+        }
+        val flashActive = comboFlashFrames > 0 && (seed / 3) % 2 == 0
+        val backgroundTop = if (flashActive) blend(baseTop, rgba(255, 246, 165), 42) else baseTop
+        val backgroundBottom = if (flashActive) blend(baseBottom, rgba(235, 73, 186), 32) else baseBottom
+
         return Palette(
-            backgroundTop = rgba(pulse / 8, pulse / 8, pulse / 6),
-            backgroundBottom = rgba(5, 5, 12 + pulse / 3),
+            backgroundTop = backgroundTop,
+            backgroundBottom = backgroundBottom,
             panel = rgba(0, 0, 0, 230),
-            panelBorder = rgba(60, 60, 100, 150),
+            panelBorder = if (flashActive) rgba(255, 236, 127, 190) else rgba(60, 60, 100, 150),
             grid = rgba(30, 30, 30, 105),
             text = rgba(255, 255, 255),
             mutedText = rgba(204, 204, 255),
             warning = rgba(255, 255, 0),
-            landingTarget = rgba(54, 63, 82, 125)
+            landingTarget = rgba(54, 63, 82, 125),
+            comboAccent = if (flashActive) rgba(255, 245, 160, 215) else rgba(130, 160, 220, 80)
         )
+    }
+
+    private fun drawComboPulse(render: RenderContext, left: Int, top: Int, width: Int, height: Int, colors: Palette) {
+        val inset = (comboFlashFrames % 8) + 2
+        render.drawLine(left - inset, top - inset, left + width + inset, top - inset, colors.comboAccent)
+        render.drawLine(left - inset, top + height + inset, left + width + inset, top + height + inset, colors.comboAccent)
+        render.drawLine(left - inset, top - inset, left - inset, top + height + inset, colors.comboAccent)
+        render.drawLine(left + width + inset, top - inset, left + width + inset, top + height + inset, colors.comboAccent)
     }
 
     private fun rgba(r: Int, g: Int, b: Int, a: Int = 255): Int {
@@ -436,6 +516,16 @@ class HextrisGame : PortableGame {
             (g.coerceIn(0, 255) shl 8) or
             (b.coerceIn(0, 255) shl 16) or
             (a.coerceIn(0, 255) shl 24)
+    }
+
+    private fun blend(from: Int, to: Int, percent: Int): Int {
+        val amount = percent.coerceIn(0, 100)
+        fun channel(shift: Int): Int {
+            val start = (from shr shift) and 0xff
+            val end = (to shr shift) and 0xff
+            return start + (end - start) * amount / 100
+        }
+        return rgba(channel(0), channel(8), channel(16), channel(24))
     }
 
     private data class Palette(
@@ -447,7 +537,8 @@ class HextrisGame : PortableGame {
         val text: Int,
         val mutedText: Int,
         val warning: Int,
-        val landingTarget: Int
+        val landingTarget: Int,
+        val comboAccent: Int
     )
 
     private enum class PlayState {

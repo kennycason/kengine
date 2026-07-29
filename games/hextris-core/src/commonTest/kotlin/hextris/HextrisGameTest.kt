@@ -23,12 +23,15 @@ class HextrisGameTest {
         assertFalse(board.gameOver)
         assertNotNull(board.getCurrentPiece())
         assertNotNull(board.getNextPiece())
+        assertNotNull(board.getNextNextPiece())
 
         board.drop()
         board.lockPiece()
 
         assertEquals(1, board.totalPieces())
         assertNotNull(board.getCurrentPiece())
+        assertNotNull(board.getNextPiece())
+        assertNotNull(board.getNextNextPiece())
     }
 
     @Test
@@ -63,8 +66,7 @@ class HextrisGameTest {
         assertFalse(hasText(render, "HEXTRIS"))
         assertTrue(hasText(render, "NEXT"))
         assertTrue(hasText(render, "CONTROLS"))
-        assertTrue(hasText(render, "STATS"))
-        assertTrue(textX(render, "NEXT") < textX(render, "STATS"))
+        assertFalse(hasText(render, "STATS"))
         assertTrue(hasCommand(render, RenderCommandType.DRAW_SPRITE))
     }
 
@@ -133,15 +135,6 @@ class HextrisGameTest {
             }
         }
         return false
-    }
-
-    private fun textX(render: RenderContext, text: String): Int {
-        for (index in 0 until render.commandCount) {
-            if (render.commandText(index) == text) {
-                return render.commandField(index, RenderCommandBuffer.FIELD_X)
-            }
-        }
-        return -1
     }
 
     private fun hasFillRectColor(render: RenderContext, color: Int): Boolean {

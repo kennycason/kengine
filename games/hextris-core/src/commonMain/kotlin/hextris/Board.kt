@@ -9,6 +9,7 @@ class Board(val width: Int = 15, val height: Int = 25) {
     private var nextSeed = 0x12345
     private var currentPiece: Piece? = null
     private var nextPiece: Piece? = null
+    private var nextNextPiece: Piece? = null
 
     var score = 0
         private set
@@ -140,6 +141,7 @@ class Board(val width: Int = 15, val height: Int = 25) {
         gameOver = false
         nextSeed = 0x12345
         nextPiece = createPiece()
+        nextNextPiece = createPiece()
         spawnPiece()
     }
 
@@ -165,6 +167,8 @@ class Board(val width: Int = 15, val height: Int = 25) {
 
     fun getNextPiece(): Piece? = nextPiece
 
+    fun getNextNextPiece(): Piece? = nextNextPiece
+
     fun getCurrentPiecePosition(): GridPoint = GridPoint(pieceX, pieceY)
 
     fun getColorAt(x: Int, y: Int): Int? {
@@ -182,7 +186,8 @@ class Board(val width: Int = 15, val height: Int = 25) {
 
     private fun spawnPiece() {
         currentPiece = nextPiece
-        nextPiece = createPiece()
+        nextPiece = nextNextPiece
+        nextNextPiece = createPiece()
         pieceX = width / 2 - 1
         pieceY = 0
 
