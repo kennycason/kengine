@@ -65,6 +65,22 @@ private fun isTriggerAxisPressed(
     return (state.axes.getOrNull(axisIndex) ?: 0.0f) >= TRIGGER_BUTTON_PRESS_THRESHOLD
 }
 
+internal fun mappedAxisValue(
+    axisType: AxisType,
+    state: ControllerInputEventSubscriber.ControllerState,
+    mapping: ControllerMapping,
+    occurrence: Int = 0
+): Float {
+    val physicalAxisIndex = mapping.axisMappings.entries
+        .filter { it.value == axisType }
+        .map { it.key }
+        .sorted()
+        .getOrNull(occurrence)
+        ?: return 0.0f
+
+    return state.axes.getOrNull(physicalAxisIndex) ?: 0.0f
+}
+
 /**
  * Handles controller input events and maintains state for all connected controllers.
  * Supports both SDL Joystick API (with custom mappings) and SDL Gamepad API (standardized).
@@ -111,6 +127,17 @@ class ControllerInputEventSubscriber(
         }
         return controllerStates.entries.firstOrNull { (_, state) ->
             state.axes.isNotEmpty()
+        }?.key
+    }
+
+    fun getFirstControllerIdWithMappedAxes(vararg axisTypes: AxisType): UInt? {
+        lastActiveControllerId?.let { controllerId ->
+            if (controllerHasMappedAxes(controllerId, axisTypes)) {
+                return controllerId
+            }
+        }
+        return controllerStates.entries.firstOrNull { (controllerId, _) ->
+            controllerHasMappedAxes(controllerId, axisTypes)
         }?.key
     }
 
@@ -561,6 +588,16 @@ class ControllerInputEventSubscriber(
         return 0.0f
     }
 
+    fun getMappedAxisValue(
+        controllerId: UInt,
+        axisType: AxisType,
+        occurrence: Int = 0
+    ): Float {
+        val state = controllerStates[controllerId] ?: return 0.0f
+        val mapping = controllerMappings[controllerId] ?: return 0.0f
+        return mappedAxisValue(axisType, state, mapping, occurrence)
+    }
+
     fun isButtonPressed(button: Buttons): Boolean {
         for ((id, state) in controllerStates) {
             val mapping = controllerMappings[id] ?: continue
@@ -617,6 +654,22 @@ class ControllerInputEventSubscriber(
     private fun markControllerActive(controllerId: UInt) {
         if (controllerStates[controllerId]?.axes?.isNotEmpty() == true) {
             lastActiveControllerId = controllerId
+        }
+    }
+
+    private fun controllerHasMappedAxes(
+        controllerId: UInt,
+        axisTypes: Array<out AxisType>
+    ): Boolean {
+        val state = controllerStates[controllerId] ?: return false
+        val mapping = controllerMappings[controllerId] ?: return false
+        if (state.axes.isEmpty()) {
+            return false
+        }
+
+        val requestedAxisTypes = axisTypes.toSet()
+        return mapping.axisMappings.any { (axisIndex, axisType) ->
+            axisIndex in state.axes.indices && axisType in requestedAxisTypes
         }
     }
 }

@@ -5,7 +5,10 @@ import com.kengine.input.controller.controls.ButtonType
 import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.controls.ControllerMapping
 import com.kengine.input.controller.controls.mappings.NintendoSwitch
+import com.kengine.input.controller.controls.mappings.SNES
+import com.kengine.input.controller.controls.mappings.XboxOne
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -60,6 +63,28 @@ class ControllerButtonMappingTest {
         )
 
         assertTrue(isMappedButtonPressed(Buttons.L2, state, NintendoSwitch))
+    }
+
+    @Test
+    fun mappedAxisValueIgnoresRawAxesNotDeclaredByMapping() {
+        val state = controllerState(
+            axes = floatArrayOf(-1.0f, 0.0f),
+            buttons = BooleanArray(0)
+        )
+
+        assertEquals(0.0f, mappedAxisValue(AxisType.STICK_X, state, SNES))
+    }
+
+    @Test
+    fun mappedAxisValueReadsDeclaredStickAxes() {
+        val state = controllerState(
+            axes = floatArrayOf(0.62f, -0.31f, 0.42f),
+            buttons = BooleanArray(0)
+        )
+
+        assertEquals(0.62f, mappedAxisValue(AxisType.STICK_X, state, XboxOne))
+        assertEquals(-0.31f, mappedAxisValue(AxisType.STICK_Y, state, XboxOne))
+        assertEquals(0.42f, mappedAxisValue(AxisType.STICK_X, state, XboxOne, occurrence = 1))
     }
 
     private fun controllerState(

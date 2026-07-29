@@ -277,13 +277,27 @@ fun registerSwitchGameBuild(
     val kengineCoreSources = rootProject.fileTree("kengine-core/src/commonMain/kotlin") {
         include("**/*.kt")
     }
-    val gameSources = gameProject.fileTree("src/commonMain/kotlin") {
-        include("**/*.kt")
+    val gameSourceProjects = (listOf(gameProject) + extension.gameSourceProjects)
+        .distinctBy { it.path }
+    val gameSourceTrees = gameSourceProjects.map { sourceProject ->
+        sourceProject.fileTree("src/commonMain/kotlin") {
+            include("**/*.kt")
+        }
     }
+    val portableAssetExtensions = gameSourceProjects.mapNotNull { sourceProject ->
+        sourceProject.extensions.findByName("kenginePortableAssets") as? KenginePortableAssetsExtension
+    }
+    val generatedGameSourceDirs = portableAssetExtensions.mapNotNull { it.generatedSourceDir }
+    val generatedAssetTaskPaths = portableAssetExtensions.mapNotNull { it.generateTaskPath }
     val kotlinSources = providers.provider {
         (switchKotlinSources.files +
             kengineCoreSources.files +
-            gameSources.files +
+            gameSourceTrees.flatMap { it.files } +
+            generatedGameSourceDirs.flatMap { generatedSourceDir ->
+                generatedSourceDir.get().asFileTree.matching {
+                    include("**/*.kt")
+                }.files
+            } +
             gameFactory.get().asFile).sortedBy { it.absolutePath }
     }
 
@@ -316,9 +330,15 @@ fun registerSwitchGameBuild(
     tasks.register<Exec>(compileKotlinTaskName) {
         group = "switch"
         description = "Compiles $displayName, shared kengine core sources, and the Switch runtime as a Kotlin/Native static library."
-        dependsOn(generateFactoryTaskName)
+        dependsOn(listOf(generateFactoryTaskName) + generatedAssetTaskPaths)
 
-        inputs.files(switchKotlinSources, kengineCoreSources, gameSources)
+        inputs.files(switchKotlinSources, kengineCoreSources)
+        inputs.files(gameSourceTrees)
+        generatedGameSourceDirs.forEach { generatedSourceDir ->
+            inputs.dir(generatedSourceDir)
+                .optional()
+                .withPathSensitivity(PathSensitivity.RELATIVE)
+        }
         inputs.file(gameFactory)
         inputs.property("artifactBaseName", artifactBaseName)
         inputs.property("mainClass", mainClass)

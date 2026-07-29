@@ -6,6 +6,10 @@ plugins {
     id("kengine.sdl-dylib")
 }
 
+val runNativeIntegrationTests = providers.gradleProperty("kengine.integrationTests")
+    .map(String::toBoolean)
+    .getOrElse(false)
+
 repositories {
     mavenCentral()
 }
@@ -113,6 +117,9 @@ kotlin {
 
         nativeTest {
             dependsOn(commonTest)
+            if (!runNativeIntegrationTests) {
+                kotlin.exclude("**/*IT.kt")
+            }
             dependencies {
                 implementation(kotlin("test"))
                 implementation(project(":kengine-test"))

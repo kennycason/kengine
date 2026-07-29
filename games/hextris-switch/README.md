@@ -1,20 +1,12 @@
 # Hextris Switch
 
-Portable Hextris prototype for the experimental Nintendo Switch backend. This module keeps the existing desktop Hextris untouched while exercising the shared `PortableGame`, `InputState`, `AudioContext`, `RenderContext`, sprite, text, and music paths.
+Nintendo Switch NRO host for the shared portable Hextris game in `:games:hextris-core`. This module declares only Switch artifact metadata; source and assets are imported from core through `gameSourceProject(...)` and `assetsFrom(...)`.
 
-Run the desktop SDL version:
-
-```bash
-jenv exec ./gradlew :games:hextris-switch:runDebugExecutableMacosArm64
-```
-
-Build the Switch NRO:
+Build:
 
 ```bash
 jenv exec ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
 ```
-
-The Switch build embeds `sound/techno_boss_worm.ogg` as looped background music and declares `assets/sprites/block_sprites.png` through the reusable `spriteSheet` asset DSL. The backend converts those assets during the Gradle build and mixes procedural SFX for rotate, hard drop, lock, line clear, game over, pause, and reset.
 
 Output:
 
@@ -25,8 +17,9 @@ games/hextris-switch/build/switch/hextris-switch.nro
 Controls:
 
 ```text
-D-pad / arrows / WASD: move and soft drop
-Up: hard drop
+D-pad left/right: move
+D-pad down: soft drop
+D-pad up: hard drop
 A / R: rotate clockwise
 B / L / Y: rotate counter-clockwise
 X: rotate 180 degrees

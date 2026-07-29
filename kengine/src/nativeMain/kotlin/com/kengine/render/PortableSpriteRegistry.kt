@@ -1,5 +1,6 @@
 package com.kengine.render
 
+import com.kengine.assets.PortableAssetCatalog
 import com.kengine.graphics.Sprite
 import com.kengine.graphics.getSpriteContext
 import com.kengine.graphics.useSpriteContext
@@ -38,6 +39,27 @@ class PortableSpriteRegistry {
             addSpriteSheetFromFilePath(name, filePath, tileWidth, tileHeight, offsetX, offsetY, dx, dy)
         }
         spriteSheetNamesById[RenderAssetId.sprite(name)] = name
+        return this
+    }
+
+    fun registerAssetsFromFilePaths(
+        assets: PortableAssetCatalog,
+        resolvePath: (String) -> String = { it }
+    ): PortableSpriteRegistry {
+        assets.sprites.forEach { sprite ->
+            registerSpriteFromFilePath(
+                name = sprite.id,
+                filePath = resolvePath(sprite.source)
+            )
+        }
+        assets.spriteSheets.forEach { spriteSheet ->
+            registerSpriteSheetFromFilePath(
+                name = spriteSheet.id,
+                filePath = resolvePath(spriteSheet.source),
+                tileWidth = spriteSheet.tileWidth,
+                tileHeight = spriteSheet.tileHeight
+            )
+        }
         return this
     }
 

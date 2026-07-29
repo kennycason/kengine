@@ -101,7 +101,7 @@ Build the game-facing Hextris Switch artifact:
 jenv exec ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
 ```
 
-This build converts `games/hextris-switch/sound/techno_boss_worm.ogg` to 48 kHz stereo PCM and declared sprite assets to raw RGBA, then embeds them in the NRO. Hextris SFX are currently short procedural voices mixed into the same audio stream from portable `playSound` commands.
+This build imports shared source and assets from `:games:hextris-core`, converts `games/hextris-core/sound/techno_boss_worm.ogg` to 48 kHz stereo PCM, converts declared sprite assets to raw RGBA, then embeds them in the NRO. Hextris SFX are currently short procedural voices mixed into the same audio stream from portable `playSound` commands.
 
 Game artifact:
 
@@ -112,7 +112,7 @@ games/hextris-switch/build/switch/hextris-switch.nro
 The same pure Kotlin game can also run through the normal Kengine SDL host:
 
 ```bash
-jenv exec ./gradlew :games:nintendo-switch-demo:runDebugExecutableMacosArm64
+jenv exec ./gradlew :games:hextris-desktop:runDebugExecutableMacosArm64
 ```
 
 ## Current Shape
@@ -140,17 +140,17 @@ The desktop path uses `PortableGameAdapter` plus `RenderContextSdlRenderer` in `
 
 ## Game Wiring
 
-Game modules opt into Switch packaging with the convention plugin:
+Portable game modules can declare shared asset names with `kengine.portable-assets`:
 
 ```kotlin
 plugins {
-    id("kengine.nintendo-switch-game")
+    id("kengine.portable-assets")
 }
 
-kengineNintendoSwitch {
-    displayName.set("Hextris Switch")
-    mainClass.set("hextrisswitch.HextrisSwitchGame")
-    musicSource.set(layout.projectDirectory.file("sound/techno_boss_worm.ogg"))
+kenginePortableAssets {
+    packageName.set("hextris")
+    objectName.set("HextrisAssets")
+
     spriteSheet("blocks") {
         id.set("hextris/block-sprites")
         source.set(layout.projectDirectory.file("assets/sprites/block_sprites.png"))
@@ -158,17 +158,40 @@ kengineNintendoSwitch {
         tileHeight.set(24)
         columns.set(6)
     }
+
+    music("theme") {
+        id.set("hextris/techno-boss-worm")
+        source.set(layout.projectDirectory.file("sound/techno_boss_worm.ogg"))
+    }
 }
 ```
 
-Plain image sprites use the same asset path without tile metadata:
+The generated asset object implements `com.kengine.assets.PortableAssetCatalog`; portable games can expose it through `PortableGame.assets` so desktop hosts can load the same catalog without repeating sprite IDs in the launcher.
+
+Plain image sprites use the same shared asset DSL without tile metadata:
 
 ```kotlin
-kengineNintendoSwitch {
+kenginePortableAssets {
     sprite("title_screen_bg") {
         id.set("title-screen-bg")
         source.set(layout.projectDirectory.file("assets/sprites/title_screen_bg.png"))
     }
+}
+```
+
+Switch host modules opt into NRO packaging with `kengine.nintendo-switch-game`:
+
+```kotlin
+plugins {
+    id("kengine.nintendo-switch-game")
+}
+
+kengineNintendoSwitch {
+    artifactBaseName.set("hextris-switch")
+    displayName.set("Hextris Switch")
+    mainClass.set("hextris.HextrisGame")
+    gameSourceProject(project(":games:hextris-core"))
+    assetsFrom(project(":games:hextris-core"))
 }
 ```
 

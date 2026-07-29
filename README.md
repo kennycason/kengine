@@ -423,7 +423,7 @@ export KENGINE_CONTROLLER_MODE=gamepad
 ./myGame.kexe
 
 # Or inline:
-KENGINE_CONTROLLER_MODE=gamepad ./gradlew :games:hextris:runDebugExecutableMacosArm64
+KENGINE_CONTROLLER_MODE=gamepad ./gradlew :games:hextris-desktop:runDebugExecutableMacosArm64
 ```
 
 **Note**: GAMEPAD mode is recommended on macOS to avoid duplicate controller detection issues with certain controllers (e.g., Nintendo SNES controllers).
@@ -949,8 +949,11 @@ Run specific tests:
 ```shell
 ./gradlew macosArm64Test --tests "com.kengine.ui.DrawerIT.drawer component test"
 ```
+
+Native SDL integration tests named `*IT.kt` are excluded from the default `build` path because they open real game contexts and can run timed visual loops. Opt into them explicitly:
+
 ```shell
-./gradlew macosArm64Test --tests "*IT"
+./gradlew -Pkengine.integrationTests=true :kengine:macosArm64Test --tests "*IT"
 ```
 
 Replace `MacosArm64` / `macosArm64` with your host target, for example `LinuxX64` / `linuxX64` or `MingwX64` / `mingwX64`.

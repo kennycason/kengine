@@ -10,8 +10,10 @@ class PortableGameRunner(
 ) {
     init {
         GameRunner(frameRate) {
+            val portableGame = gameBuilder()
+            spriteRegistry.registerAssetsFromFilePaths(portableGame.assets)
             PortableGameAdapter(
-                portableGame = gameBuilder(),
+                portableGame = portableGame,
                 spriteRegistry = spriteRegistry,
                 commandCapacity = commandCapacity
             )

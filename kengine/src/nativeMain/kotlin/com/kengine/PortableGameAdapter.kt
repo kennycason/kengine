@@ -3,6 +3,9 @@ package com.kengine
 import com.kengine.audio.AudioContext
 import com.kengine.input.InputButton
 import com.kengine.input.InputState
+import com.kengine.input.controller.CalibratedControllerAxes
+import com.kengine.input.controller.ControllerAxisInputSettings
+import com.kengine.input.controller.controls.AxisType
 import com.kengine.input.controller.controls.Buttons
 import com.kengine.input.controller.useControllerContext
 import com.kengine.input.keyboard.useKeyboardContext
@@ -11,10 +14,17 @@ import com.kengine.render.RenderContext
 import com.kengine.render.RenderContextSdlRenderer
 import com.kengine.sdl.getSDLContext
 import com.kengine.sdl.useSDLContext
+import com.kengine.time.getClockContext
 
-private const val LEFT_STICK_X_AXIS = 0
-private const val LEFT_STICK_Y_AXIS = 1
-private const val LEFT_STICK_THRESHOLD = 0.45f
+private const val LOGICAL_LEFT_STICK_X_AXIS = 0
+private const val LOGICAL_LEFT_STICK_Y_AXIS = 1
+private const val LEFT_STICK_THRESHOLD = 0.45
+private val PORTABLE_CONTROLLER_AXIS_SETTINGS = ControllerAxisInputSettings(
+    axisCount = 2,
+    deadzone = 0.14,
+    rawReleaseDeadzone = 0.08f,
+    calibrationSeconds = 0.2
+)
 
 class PortableGameAdapter(
     private val portableGame: PortableGame,
@@ -25,6 +35,7 @@ class PortableGameAdapter(
     private val input = InputState()
     private val audio = AudioContext()
     private val render = RenderContext(commandCapacity)
+    private val controllerAxes = CalibratedControllerAxes(PORTABLE_CONTROLLER_AXIS_SETTINGS)
 
     override fun update() {
         input.reset()
@@ -43,8 +54,19 @@ class PortableGameAdapter(
             press(InputButton.SELECT, keyboard.isTabPressed() || keyboard.isBackspacePressed())
         }
         useControllerContext {
-            val leftStickX = controller.getAxisValue(LEFT_STICK_X_AXIS)
-            val leftStickY = controller.getAxisValue(LEFT_STICK_Y_AXIS)
+            val controllerId = controller.getFirstControllerIdWithMappedAxes(AxisType.STICK_X, AxisType.STICK_Y)
+            val axisSample = controllerAxes.sample(
+                controllerId = controllerId,
+                elapsedSeconds = getClockContext().totalTimeSec
+            ) { id, logicalAxisIndex ->
+                when (logicalAxisIndex) {
+                    LOGICAL_LEFT_STICK_X_AXIS -> controller.getMappedAxisValue(id, AxisType.STICK_X)
+                    LOGICAL_LEFT_STICK_Y_AXIS -> controller.getMappedAxisValue(id, AxisType.STICK_Y)
+                    else -> 0.0f
+                }
+            }
+            val leftStickX = axisSample.axis(LOGICAL_LEFT_STICK_X_AXIS)
+            val leftStickY = axisSample.axis(LOGICAL_LEFT_STICK_Y_AXIS)
 
             press(InputButton.LEFT, controller.isButtonPressed(Buttons.DPAD_LEFT) || leftStickX < -LEFT_STICK_THRESHOLD)
             press(InputButton.RIGHT, controller.isButtonPressed(Buttons.DPAD_RIGHT) || leftStickX > LEFT_STICK_THRESHOLD)

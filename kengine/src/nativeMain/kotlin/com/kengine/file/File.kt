@@ -2,6 +2,7 @@ package com.kengine.file
 
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
+import sdl3.SDL_GetBasePath
 import sdl3.SDL_GetCurrentDirectory
 import sdl3.SDL_free
 import platform.posix.F_OK
@@ -46,6 +47,14 @@ object File {
             if (isExist(resourcesPath)) {
                 return resourcesPath
             }
+        }
+
+        // SDL's base path tracks the executable/resource directory. Gradle native
+        // run tasks often keep CWD at the project root while copied assets live
+        // beside the executable.
+        val sdlBasePath = SDL_GetBasePath()?.toKString()?.withoutTrailingPathSeparator()
+        if (sdlBasePath != null && (isExist("$sdlBasePath/assets") || isExist("$sdlBasePath/sound"))) {
+            return sdlBasePath
         }
 
         // Linux AppImage

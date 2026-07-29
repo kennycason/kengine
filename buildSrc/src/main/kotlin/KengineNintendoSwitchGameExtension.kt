@@ -1,4 +1,5 @@
 import org.gradle.api.Action
+import org.gradle.api.GradleException
 import org.gradle.api.Named
 import org.gradle.api.Project
 import org.gradle.api.file.ConfigurableFileCollection
@@ -8,6 +9,7 @@ import org.gradle.api.provider.Property
 
 open class KengineNintendoSwitchGameExtension(private val project: Project) {
     private val mutableSpriteAssets = mutableListOf<KengineNintendoSwitchSpriteAsset>()
+    private val mutableGameSourceProjects = mutableListOf<Project>()
 
     val artifactBaseName: Property<String> = project.objects.property(String::class.java)
         .convention(project.name)
@@ -24,6 +26,8 @@ open class KengineNintendoSwitchGameExtension(private val project: Project) {
     val musicSource: RegularFileProperty = project.objects.fileProperty()
     val spriteAssets: List<KengineNintendoSwitchSpriteAsset>
         get() = mutableSpriteAssets.toList()
+    val gameSourceProjects: List<Project>
+        get() = mutableGameSourceProjects.toList()
 
     fun sprite(name: String, configure: Action<KengineNintendoSwitchImageAsset>) {
         val asset = KengineNintendoSwitchImageAsset(name, project)
@@ -35,6 +39,42 @@ open class KengineNintendoSwitchGameExtension(private val project: Project) {
         val asset = KengineNintendoSwitchSpriteSheetAsset(name, project)
         configure.execute(asset)
         mutableSpriteAssets += asset
+    }
+
+    fun gameSourceProject(sourceProject: Project) {
+        project.evaluationDependsOn(sourceProject.path)
+        mutableGameSourceProjects += sourceProject
+    }
+
+    fun assetsFrom(sourceProject: Project) {
+        project.evaluationDependsOn(sourceProject.path)
+        val portableAssets = sourceProject.extensions.findByName("kenginePortableAssets") as? KenginePortableAssetsExtension
+            ?: throw GradleException("${sourceProject.path} must apply kengine.portable-assets before assetsFrom can be used.")
+
+        portableAssets.assets.forEach { portableAsset ->
+            when (portableAsset) {
+                is KenginePortableImageAsset -> {
+                    val asset = KengineNintendoSwitchImageAsset(portableAsset.name, project)
+                    asset.id.set(portableAsset.id)
+                    asset.source.set(portableAsset.source)
+                    mutableSpriteAssets += asset
+                }
+                is KenginePortableSpriteSheetAsset -> {
+                    val asset = KengineNintendoSwitchSpriteSheetAsset(portableAsset.name, project)
+                    asset.id.set(portableAsset.id)
+                    asset.source.set(portableAsset.source)
+                    asset.tileWidth.set(portableAsset.tileWidth)
+                    asset.tileHeight.set(portableAsset.tileHeight)
+                    asset.columns.set(portableAsset.columns)
+                    mutableSpriteAssets += asset
+                }
+                is KenginePortableMusicAsset -> {
+                    if (!musicSource.isPresent) {
+                        musicSource.set(portableAsset.source)
+                    }
+                }
+            }
+        }
     }
 }
 
