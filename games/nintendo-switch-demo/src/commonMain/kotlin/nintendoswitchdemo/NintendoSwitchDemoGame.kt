@@ -28,9 +28,14 @@ class NintendoSwitchDemoGame : PortableGame {
 
         val manualX = input.axis(InputButton.LEFT, InputButton.RIGHT)
         val manualY = input.axis(InputButton.UP, InputButton.DOWN)
+        val manualSpeed = when {
+            input.isPressed(InputButton.L) -> 5
+            input.isPressed(InputButton.R) -> 15
+            else -> 9
+        }
         if (manualX != 0 || manualY != 0) {
-            x += manualX * 9
-            y += manualY * 9
+            x += manualX * manualSpeed
+            y += manualY * manualSpeed
         } else {
             x += velocityX
             y += velocityY
@@ -47,6 +52,10 @@ class NintendoSwitchDemoGame : PortableGame {
 
         if (input.isPressed(InputButton.A)) {
             colorPhase += 9
+        } else if (input.isPressed(InputButton.X)) {
+            colorPhase += 13
+        } else if (input.isPressed(InputButton.Y)) {
+            colorPhase -= 7
         } else {
             colorPhase += 2
         }
@@ -55,6 +64,10 @@ class NintendoSwitchDemoGame : PortableGame {
             132 + wave(updates * 5) / 6
         } else {
             92 + wave(updates * 3) / 9
+        }
+
+        if (input.isPressed(InputButton.SELECT)) {
+            checksum = checksum xor 0x53_45_4C
         }
 
         val sampleIndex = updates % samples.size
@@ -118,6 +131,9 @@ class NintendoSwitchDemoGame : PortableGame {
         val scanY = scanLineY(render)
         render.drawLine(render.width / 2, render.height / 2, spriteX + spriteSize / 2, spriteY + spriteSize / 2, hud)
         render.drawLine(36, scanY, render.width - 36, render.height - 1 - scanY, colorMix(primary, hud, 120, 255))
+        render.drawText("KENGINE SWITCH", 36, 28, hud, 4)
+        render.drawText("DPAD/WASD MOVE  A/X/Y COLOR  B SIZE  L/R SPEED", 36, 68, colorMix(hud, primary, 64, 255), 2)
+        render.drawText("X:$x Y:$y U:$updates D:$draws", 36, 92, colorMix(hud, accent, 80, 255), 2)
     }
 
     override fun cleanup() {

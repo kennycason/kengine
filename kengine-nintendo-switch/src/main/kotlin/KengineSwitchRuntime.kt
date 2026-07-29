@@ -13,6 +13,12 @@ private const val INPUT_UP = 1 shl 2
 private const val INPUT_DOWN = 1 shl 3
 private const val INPUT_A = 1 shl 4
 private const val INPUT_B = 1 shl 5
+private const val INPUT_START = 1 shl 6
+private const val INPUT_X = 1 shl 7
+private const val INPUT_Y = 1 shl 8
+private const val INPUT_L = 1 shl 9
+private const val INPUT_R = 1 shl 10
+private const val INPUT_SELECT = 1 shl 11
 private const val COMMAND_CAPACITY = 64
 
 private class KengineSwitchRuntime {
@@ -77,6 +83,10 @@ private class KengineSwitchRuntime {
         return commandLimit
     }
 
+    fun commandText(commandIndex: Int): String {
+        return render.commandText(commandIndex)
+    }
+
     private fun inputFromMask(inputMask: Int) {
         input.reset()
         input.set(InputButton.LEFT, (inputMask and INPUT_LEFT) != 0)
@@ -85,6 +95,12 @@ private class KengineSwitchRuntime {
         input.set(InputButton.DOWN, (inputMask and INPUT_DOWN) != 0)
         input.set(InputButton.A, (inputMask and INPUT_A) != 0)
         input.set(InputButton.B, (inputMask and INPUT_B) != 0)
+        input.set(InputButton.START, (inputMask and INPUT_START) != 0)
+        input.set(InputButton.X, (inputMask and INPUT_X) != 0)
+        input.set(InputButton.Y, (inputMask and INPUT_Y) != 0)
+        input.set(InputButton.L, (inputMask and INPUT_L) != 0)
+        input.set(InputButton.R, (inputMask and INPUT_R) != 0)
+        input.set(InputButton.SELECT, (inputMask and INPUT_SELECT) != 0)
     }
 
     private fun snapshotPayload(): String {
@@ -117,4 +133,8 @@ fun kengineSwitchRuntimeCleanup(): String {
 @OptIn(ExperimentalForeignApi::class)
 fun kengineSwitchRuntimeCopyCommands(destination: CPointer<IntVar>?, maxCommands: Int): Int {
     return kengineSwitchRuntime.copyCommandsTo(destination, maxCommands)
+}
+
+fun kengineSwitchRuntimeCommandText(commandIndex: Int): String {
+    return kengineSwitchRuntime.commandText(commandIndex)
 }

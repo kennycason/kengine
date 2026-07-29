@@ -45,12 +45,20 @@ class RenderContext(commandCapacity: Int = 128) {
         commands.drawSprite(spriteId, x, y, width, height, tint, frame)
     }
 
+    fun drawText(text: String, x: Int, y: Int, color: Int, scale: Int = 2) {
+        commands.drawText(text, x, y, color, scale)
+    }
+
     fun verticalGradient(topColor: Int, bottomColor: Int, pulse: Int = 0) {
         commands.verticalGradient(topColor, bottomColor, pulse)
     }
 
     fun commandField(commandIndex: Int, fieldIndex: Int): Int {
         return commands.field(commandIndex, fieldIndex)
+    }
+
+    fun commandText(commandIndex: Int): String {
+        return commands.text(commandIndex)
     }
 
     fun copyCommandsTo(destination: IntArray, maxCommands: Int = destination.size / RenderCommandBuffer.FIELD_COUNT): Int {

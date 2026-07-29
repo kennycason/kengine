@@ -27,7 +27,7 @@ class RenderContextTest {
 
     @Test
     fun recordsDrawCommandsThroughContext() {
-        val render = RenderContext(commandCapacity = 4)
+        val render = RenderContext(commandCapacity = 5)
         val spriteId = RenderAssetId.sprite("demo/pokeball")
 
         render.beginFrame(width = 640, height = 480)
@@ -35,8 +35,9 @@ class RenderContextTest {
         render.fillRect(x = 10, y = 20, width = 30, height = 40, color = 0x21222324)
         render.drawLine(startX = 50, startY = 60, endX = 70, endY = 80, color = 0x31323334)
         render.drawSprite(spriteId = spriteId, x = 90, y = 100, width = 110, height = 120, tint = 0x41424344, frame = 5)
+        render.drawText(text = "SCORE 123", x = 130, y = 140, color = 0x51525354, scale = 3)
 
-        assertEquals(4, render.commandCount)
+        assertEquals(5, render.commandCount)
         assertEquals(RenderCommandType.VERTICAL_GRADIENT, render.commandField(0, RenderCommandBuffer.FIELD_TYPE))
         assertEquals(0x01020304, render.commandField(0, RenderCommandBuffer.FIELD_COLOR))
         assertEquals(0x11121314, render.commandField(0, RenderCommandBuffer.FIELD_COLOR2))
@@ -61,6 +62,12 @@ class RenderContextTest {
         assertEquals(0x41424344, render.commandField(3, RenderCommandBuffer.FIELD_COLOR))
         assertEquals(spriteId, render.commandField(3, RenderCommandBuffer.FIELD_COLOR2))
         assertEquals(5, render.commandField(3, RenderCommandBuffer.FIELD_PARAM))
+        assertEquals(RenderCommandType.DRAW_TEXT, render.commandField(4, RenderCommandBuffer.FIELD_TYPE))
+        assertEquals(130, render.commandField(4, RenderCommandBuffer.FIELD_X))
+        assertEquals(140, render.commandField(4, RenderCommandBuffer.FIELD_Y))
+        assertEquals(3, render.commandField(4, RenderCommandBuffer.FIELD_WIDTH))
+        assertEquals(0x51525354, render.commandField(4, RenderCommandBuffer.FIELD_COLOR))
+        assertEquals("SCORE 123", render.commandText(4))
     }
 
     @Test

@@ -15,6 +15,11 @@ Desktop controls:
 Arrow keys / WASD: move the square
 Space / J / controller A: shift the color palette faster
 B / K / controller B: pulse the square size
+X / U / controller X: shift the color palette faster
+Y / I / controller Y: reverse the palette shift
+Q / left shift / controller L1: slow manual movement
+E / right shift / controller R1: speed up manual movement
+Tab / backspace / controller select: perturb the checksum
 ```
 
 Build the game-facing NRO with the Switch backend enabled:
@@ -30,3 +35,4 @@ games/nintendo-switch-demo/build/switch/nintendo-switch-demo.nro
 ```
 
 The low-level libnx host still lives in `:kengine-nintendo-switch`; this module owns the portable game source and the game-facing artifact path.
+In Ryujinx, use the same D-pad / left stick and face/shoulder controls. Press `-` and `+` together to exit the Switch runtime.

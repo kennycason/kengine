@@ -7,5 +7,10 @@ enum class InputButton {
     DOWN,
     A,
     B,
-    START
+    START,
+    X,
+    Y,
+    L,
+    R,
+    SELECT
 }

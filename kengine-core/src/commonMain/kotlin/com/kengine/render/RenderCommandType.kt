@@ -6,4 +6,5 @@ object RenderCommandType {
     const val VERTICAL_GRADIENT = 3
     const val DRAW_LINE = 4
     const val DRAW_SPRITE = 5
+    const val DRAW_TEXT = 6
 }

@@ -6,15 +6,16 @@ import kotlin.test.assertEquals
 class RenderCommandBufferTest {
     @Test
     fun storesCommandFieldsInOrder() {
-        val commands = RenderCommandBuffer(capacity = 4)
+        val commands = RenderCommandBuffer(capacity = 5)
         val spriteId = RenderAssetId.sprite("demo/pokeball")
 
         commands.verticalGradient(topColor = 0x11223344, bottomColor = 0x55667788.toInt(), pulse = 9)
         commands.fillRect(x = 10, y = 20, width = 30, height = 40, color = 0x7f00ffee)
         commands.drawLine(startX = 50, startY = 60, endX = 70, endY = 80, color = 0x01020304)
         commands.drawSprite(spriteId = spriteId, x = 90, y = 100, width = 110, height = 120, tint = 0x11121314, frame = 3)
+        commands.drawText(text = "KENGINE", x = 130, y = 140, color = 0x21222324, scale = 4)
 
-        assertEquals(4, commands.count)
+        assertEquals(5, commands.count)
         assertEquals(0, commands.dropped)
         assertEquals(RenderCommandType.VERTICAL_GRADIENT, commands.field(0, RenderCommandBuffer.FIELD_TYPE))
         assertEquals(0x11223344, commands.field(0, RenderCommandBuffer.FIELD_COLOR))
@@ -40,6 +41,12 @@ class RenderCommandBufferTest {
         assertEquals(0x11121314, commands.field(3, RenderCommandBuffer.FIELD_COLOR))
         assertEquals(spriteId, commands.field(3, RenderCommandBuffer.FIELD_COLOR2))
         assertEquals(3, commands.field(3, RenderCommandBuffer.FIELD_PARAM))
+        assertEquals(RenderCommandType.DRAW_TEXT, commands.field(4, RenderCommandBuffer.FIELD_TYPE))
+        assertEquals(130, commands.field(4, RenderCommandBuffer.FIELD_X))
+        assertEquals(140, commands.field(4, RenderCommandBuffer.FIELD_Y))
+        assertEquals(4, commands.field(4, RenderCommandBuffer.FIELD_WIDTH))
+        assertEquals(0x21222324, commands.field(4, RenderCommandBuffer.FIELD_COLOR))
+        assertEquals("KENGINE", commands.text(4))
     }
 
     @Test
@@ -56,6 +63,7 @@ class RenderCommandBufferTest {
 
         assertEquals(0, commands.count)
         assertEquals(0, commands.dropped)
+        assertEquals("", commands.text(0))
     }
 
     @Test

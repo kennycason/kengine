@@ -31,11 +31,12 @@
   - The same `:games:nintendo-switch-demo` game also runs on desktop through `PortableGameAdapter` and `RenderContextSdlRenderer` in `:kengine`.
   - The desktop adapter maps arrow keys, WASD, D-pad, left stick, and controller face buttons into the same shared `InputState`.
   - libnx input is passed to Kotlin as a compact mask.
-  - D-pad / left stick moves the square, `A` speeds palette cycling, `B` pulses size, and `+` exits.
-  - Shared render commands now include filled rectangles, vertical gradients, lines, and sprite draws across both SDL and Switch framebuffer hosts.
+  - D-pad / left stick moves the square, `A`/`X`/`Y` exercise palette changes, `B` pulses size, `L`/`R` alter manual movement speed, `Minus` maps to select, and `Minus + Plus` exits.
+  - Shared render commands now include filled rectangles, vertical gradients, lines, sprite draws, and bitmap text across both SDL and Switch framebuffer hosts.
   - Desktop sprite commands resolve through `PortableSpriteRegistry` into the existing Kengine `SpriteContext` / `TextureManager` path.
   - Desktop sprite-sheet commands resolve through the same registry into existing `SpriteSheet` tile selection using the shared render-command `frame` field.
   - Switch sprite commands currently render through a software-pattern sprite fallback; the game-facing API is ready for a later BMP/PNG decoder or prepacked pixel implementation.
+  - Switch text commands fetch the frame-local Kotlin string by command index and render it with a built-in 5x7 software font.
 - The first Kotlin crash was fixed at the generated C API wrapper layer:
   - Old failure: invalid read at `0x28`.
   - Old bad instruction: wrapper used `mrs ..., tpidr_el0`.
@@ -71,9 +72,13 @@ Conclusion: we are not stuck in a loop. The known generated-glue, stale-runtime-
 
 1. Launch the rebuilt `build/switch/kengine-nintendo-switch.nro` in Ryujinx and confirm the batched command-transfer build still shows:
    - a moving software-rendered square over a changing background,
+   - visible `KENGINE SWITCH` HUD text,
    - responsive movement from the D-pad / left stick,
    - faster color changes while holding `A`,
-   - size pulsing while holding `B`.
+   - color changes while holding `X` or `Y`,
+   - size pulsing while holding `B`,
+   - slower/faster manual movement while holding `L`/`R`,
+   - exit only when pressing `Minus + Plus`.
 2. If it crashes, copy the new Ryujinx failure into `kengine-nintendo-switch/error.log`.
 3. Map the new guest PC and stack addresses with `addr2line`.
 4. Decide whether the next failure is:
@@ -82,10 +87,9 @@ Conclusion: we are not stuck in a loop. The known generated-glue, stale-runtime-
    - libnx/devkitPro integration,
    - or our C/Kotlin boundary code.
 5. Once the render-context framebuffer shell holds in Ryujinx, decide whether the next step is:
-   - a richer command set for image/text/mesh experiments,
-   - controller mapping for the desktop `PortableGameAdapter`,
+   - creating `games/hextris-switch` against the portable lifecycle,
+   - adding polygon/triangle render commands for the Hextris board,
    - moving more existing Kengine graphics primitives behind portable render commands,
-   - wiring a small existing Kengine sample onto the portable lifecycle,
    - or moving from software framebuffer to deko3d/OpenGL.
 
 ## Useful Commands

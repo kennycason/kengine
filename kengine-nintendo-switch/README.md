@@ -127,5 +127,10 @@ Runtime controls for `build/switch/kengine-nintendo-switch.nro`:
 D-pad / left stick: move the square
 A: shift the color palette faster
 B: pulse the square size
-+: exit
+X: shift the color palette faster
+Y: reverse the palette shift
+L / ZL: slow manual movement
+R / ZR: speed up manual movement
+Minus: select
+Minus + Plus: exit
 ```

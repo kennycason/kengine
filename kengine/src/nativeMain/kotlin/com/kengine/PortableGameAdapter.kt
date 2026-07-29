@@ -34,6 +34,11 @@ class PortableGameAdapter(
             press(InputButton.A, keyboard.isSpacePressed() || keyboard.isJPressed())
             press(InputButton.B, keyboard.isBPressed() || keyboard.isKPressed())
             press(InputButton.START, keyboard.isReturnPressed() || keyboard.isEscapePressed())
+            press(InputButton.X, keyboard.isXPressed() || keyboard.isUPressed())
+            press(InputButton.Y, keyboard.isYPressed() || keyboard.isIPressed())
+            press(InputButton.L, keyboard.isQPressed() || keyboard.isLShiftPressed())
+            press(InputButton.R, keyboard.isEPressed() || keyboard.isRShiftPressed())
+            press(InputButton.SELECT, keyboard.isTabPressed() || keyboard.isBackspacePressed())
         }
         useControllerContext {
             val leftStickX = controller.getAxisValue(LEFT_STICK_X_AXIS)
@@ -46,6 +51,11 @@ class PortableGameAdapter(
             press(InputButton.A, controller.isButtonPressed(Buttons.A))
             press(InputButton.B, controller.isButtonPressed(Buttons.B))
             press(InputButton.START, controller.isButtonPressed(Buttons.START))
+            press(InputButton.X, controller.isButtonPressed(Buttons.X))
+            press(InputButton.Y, controller.isButtonPressed(Buttons.Y))
+            press(InputButton.L, controller.isButtonPressed(Buttons.L1))
+            press(InputButton.R, controller.isButtonPressed(Buttons.R1))
+            press(InputButton.SELECT, controller.isButtonPressed(Buttons.SELECT))
         }
         portableGame.update(input)
     }

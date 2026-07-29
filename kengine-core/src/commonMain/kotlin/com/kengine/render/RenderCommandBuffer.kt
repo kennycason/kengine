@@ -3,6 +3,7 @@ package com.kengine.render
 class RenderCommandBuffer(capacity: Int = 128) {
     private val commandCapacity = capacity.coerceAtLeast(1)
     private val values = IntArray(commandCapacity * FIELD_COUNT)
+    private val textValues = arrayOfNulls<String>(commandCapacity)
 
     var count: Int = 0
         private set
@@ -11,6 +12,11 @@ class RenderCommandBuffer(capacity: Int = 128) {
         private set
 
     fun reset() {
+        var index = 0
+        while (index < count) {
+            textValues[index] = null
+            index += 1
+        }
         count = 0
         dropped = 0
     }
@@ -33,6 +39,11 @@ class RenderCommandBuffer(capacity: Int = 128) {
         add(RenderCommandType.DRAW_SPRITE, x, y, width, height, tint, spriteId, frame)
     }
 
+    fun drawText(text: String, x: Int, y: Int, color: Int, scale: Int = 2) {
+        if (text.isEmpty() || scale <= 0) return
+        add(RenderCommandType.DRAW_TEXT, x, y, scale, 0, color, 0, 0, text)
+    }
+
     fun verticalGradient(topColor: Int, bottomColor: Int, pulse: Int = 0) {
         add(RenderCommandType.VERTICAL_GRADIENT, 0, 0, 0, 0, topColor, bottomColor, pulse)
     }
@@ -42,6 +53,13 @@ class RenderCommandBuffer(capacity: Int = 128) {
             return 0
         }
         return values[commandIndex * FIELD_COUNT + fieldIndex]
+    }
+
+    fun text(commandIndex: Int): String {
+        if (commandIndex !in 0 until count) {
+            return ""
+        }
+        return textValues[commandIndex] ?: ""
     }
 
     fun copyTo(destination: IntArray, maxCommands: Int = destination.size / FIELD_COUNT): Int {
@@ -59,13 +77,24 @@ class RenderCommandBuffer(capacity: Int = 128) {
         return commandLimit
     }
 
-    private fun add(type: Int, x: Int, y: Int, width: Int, height: Int, color: Int, color2: Int, param: Int) {
+    private fun add(
+        type: Int,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+        color: Int,
+        color2: Int,
+        param: Int,
+        text: String? = null
+    ) {
         if (count >= commandCapacity) {
             dropped += 1
             return
         }
 
         val offset = count * FIELD_COUNT
+        textValues[count] = text
         values[offset + FIELD_TYPE] = type
         values[offset + FIELD_X] = x
         values[offset + FIELD_Y] = y
