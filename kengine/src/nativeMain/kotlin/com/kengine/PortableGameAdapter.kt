@@ -1,5 +1,6 @@
 package com.kengine
 
+import com.kengine.audio.AudioContext
 import com.kengine.input.InputButton
 import com.kengine.input.InputState
 import com.kengine.input.controller.controls.Buttons
@@ -22,6 +23,7 @@ class PortableGameAdapter(
     private val renderer: RenderContextSdlRenderer = RenderContextSdlRenderer(spriteRegistry)
 ) : Game {
     private val input = InputState()
+    private val audio = AudioContext()
     private val render = RenderContext(commandCapacity)
 
     override fun update() {
@@ -58,6 +60,8 @@ class PortableGameAdapter(
             press(InputButton.SELECT, controller.isButtonPressed(Buttons.SELECT))
         }
         portableGame.update(input)
+        audio.beginFrame()
+        portableGame.audio(audio)
     }
 
     override fun draw() {

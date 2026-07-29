@@ -41,12 +41,23 @@
 #define KENGINE_RENDER_FIELD_COUNT 8
 #define KENGINE_RENDER_MAX_COMMANDS 1024
 
+#define KENGINE_AUDIO_LOOP_MUSIC 1
+#define KENGINE_AUDIO_STOP_MUSIC 2
+
+#define KENGINE_AUDIO_FIELD_TYPE 0
+#define KENGINE_AUDIO_FIELD_ASSET_ID 1
+#define KENGINE_AUDIO_FIELD_VOLUME 2
+#define KENGINE_AUDIO_FIELD_PARAM 3
+#define KENGINE_AUDIO_FIELD_COUNT 4
+#define KENGINE_AUDIO_MAX_COMMANDS 32
+
 #ifndef KENGINE_SWITCH_C_ONLY
 static kengine_switch_kotlin_ExportedSymbols* kotlin_symbols(void) {
     return kengine_switch_kotlin_symbols();
 }
 
 static kengine_switch_kotlin_KInt g_render_commands[KENGINE_RENDER_MAX_COMMANDS * KENGINE_RENDER_FIELD_COUNT];
+static kengine_switch_kotlin_KInt g_audio_commands[KENGINE_AUDIO_MAX_COMMANDS * KENGINE_AUDIO_FIELD_COUNT];
 #endif
 
 static int kotlin_add_probe(void) {
@@ -130,6 +141,11 @@ static int kotlin_runtime_update(int host_frame, int input_mask) {
     return symbols->kotlin.root.kengineSwitchRuntimeUpdate(host_frame, input_mask);
 }
 
+static int kotlin_runtime_audio(int host_frame) {
+    kengine_switch_kotlin_ExportedSymbols* symbols = kotlin_symbols();
+    return symbols->kotlin.root.kengineSwitchRuntimeAudio(host_frame);
+}
+
 static int kotlin_runtime_draw(int host_frame) {
     kengine_switch_kotlin_ExportedSymbols* symbols = kotlin_symbols();
     return symbols->kotlin.root.kengineSwitchRuntimeDraw(host_frame, FB_WIDTH, FB_HEIGHT);
@@ -150,6 +166,11 @@ static void kotlin_runtime_cleanup(void) {
 static int kotlin_copy_commands(kengine_switch_kotlin_KInt* destination, int max_commands) {
     kengine_switch_kotlin_ExportedSymbols* symbols = kotlin_symbols();
     return symbols->kotlin.root.kengineSwitchRuntimeCopyCommands(destination, max_commands);
+}
+
+static int kotlin_copy_audio_commands(kengine_switch_kotlin_KInt* destination, int max_commands) {
+    kengine_switch_kotlin_ExportedSymbols* symbols = kotlin_symbols();
+    return symbols->kotlin.root.kengineSwitchRuntimeCopyAudioCommands(destination, max_commands);
 }
 
 static const char* kotlin_command_text(int command_index) {
@@ -593,6 +614,7 @@ typedef struct {
     bool audout_initialized;
     bool audout_started;
     bool playing;
+    int current_asset_id;
 } KengineSwitchAudioState;
 
 static KengineSwitchAudioState g_audio_state;
@@ -644,8 +666,20 @@ static void kengine_switch_audio_stop(void) {
     memset(&g_audio_state, 0, sizeof(g_audio_state));
 }
 
-static void kengine_switch_audio_start(void) {
+static void kengine_switch_audio_loop_music(int asset_id, int volume) {
+    if (asset_id == 0) {
+        return;
+    }
+    if (g_audio_state.playing && g_audio_state.current_asset_id == asset_id) {
+        audoutSetAudioOutVolume((float)clamp_int(volume, 0, 255) / 255.0f);
+        return;
+    }
+    if (g_audio_state.audout_initialized) {
+        kengine_switch_audio_stop();
+    }
+
     memset(&g_audio_state, 0, sizeof(g_audio_state));
+    g_audio_state.current_asset_id = asset_id;
 
     size_t music_size = kengine_switch_music_size();
     if (music_size == 0) {
@@ -679,6 +713,7 @@ static void kengine_switch_audio_start(void) {
     }
     g_audio_state.audout_started = true;
     g_audio_state.playing = true;
+    audoutSetAudioOutVolume((float)clamp_int(volume, 0, 255) / 255.0f);
 
     for (int index = 0; index < KENGINE_AUDIO_BUFFER_COUNT; ++index) {
         AudioOutBuffer* buffer = &g_audio_state.buffers[index];
@@ -715,7 +750,9 @@ static void kengine_switch_audio_update(void) {
     }
 }
 #else
-static void kengine_switch_audio_start(void) {
+static void kengine_switch_audio_loop_music(int asset_id, int volume) {
+    (void)asset_id;
+    (void)volume;
 }
 
 static void kengine_switch_audio_update(void) {
@@ -724,6 +761,31 @@ static void kengine_switch_audio_update(void) {
 static void kengine_switch_audio_stop(void) {
 }
 #endif
+
+static void execute_audio_command(const kengine_switch_kotlin_KInt* commands, int command_index) {
+    int offset = command_index * KENGINE_AUDIO_FIELD_COUNT;
+    int type = commands[offset + KENGINE_AUDIO_FIELD_TYPE];
+    int asset_id = commands[offset + KENGINE_AUDIO_FIELD_ASSET_ID];
+    int volume = commands[offset + KENGINE_AUDIO_FIELD_VOLUME];
+
+    switch (type) {
+        case KENGINE_AUDIO_LOOP_MUSIC:
+            kengine_switch_audio_loop_music(asset_id, volume);
+            break;
+        case KENGINE_AUDIO_STOP_MUSIC:
+            kengine_switch_audio_stop();
+            break;
+        default:
+            break;
+    }
+}
+
+static void execute_audio_commands(void) {
+    int command_count = clamp_int(kotlin_copy_audio_commands(g_audio_commands, KENGINE_AUDIO_MAX_COMMANDS), 0, KENGINE_AUDIO_MAX_COMMANDS);
+    for (int index = 0; index < command_count; ++index) {
+        execute_audio_command(g_audio_commands, index);
+    }
+}
 
 static int run_kotlin_framebuffer_demo(void) {
     NWindow* window = nwindowGetDefault();
@@ -746,7 +808,6 @@ static int run_kotlin_framebuffer_demo(void) {
 
     int diagnostic_checksum = kotlin_add_probe() ^ kotlin_message_code_probe() ^ kotlin_startup_probe();
     kotlin_runtime_start();
-    kengine_switch_audio_start();
 
     int frame_count = 0;
     while (appletMainLoop()) {
@@ -760,10 +821,12 @@ static int run_kotlin_framebuffer_demo(void) {
 
         int input_mask = input_mask_from_buttons(buttons);
         int update_checksum = kotlin_runtime_update(frame_count, input_mask);
+        int audio_checksum = kotlin_runtime_audio(frame_count);
+        execute_audio_commands();
         int draw_checksum = kotlin_runtime_draw(frame_count);
 
         if ((frame_count % 120) == 0) {
-            diagnostic_checksum ^= kotlin_allocation_probe(frame_count + 1, 16) ^ update_checksum ^ draw_checksum;
+            diagnostic_checksum ^= kotlin_allocation_probe(frame_count + 1, 16) ^ update_checksum ^ audio_checksum ^ draw_checksum;
             kotlin_runtime_snapshot();
         }
 

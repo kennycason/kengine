@@ -1,6 +1,8 @@
 package hextrisswitch
 
 import com.kengine.PortableGame
+import com.kengine.audio.AudioAssetId
+import com.kengine.audio.AudioContext
 import com.kengine.input.InputButton
 import com.kengine.input.InputState
 import com.kengine.render.RenderAssetId
@@ -88,6 +90,10 @@ class HextrisSwitchGame : PortableGame {
         }
 
         previousMask = input.mask
+    }
+
+    override fun audio(audio: AudioContext) {
+        audio.loopMusic(AudioAssetId.music(Sprites.MUSIC_ID))
     }
 
     override fun draw(render: RenderContext) {

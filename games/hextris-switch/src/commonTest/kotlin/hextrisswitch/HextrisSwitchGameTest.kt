@@ -1,5 +1,9 @@
 package hextrisswitch
 
+import com.kengine.audio.AudioAssetId
+import com.kengine.audio.AudioCommandBuffer
+import com.kengine.audio.AudioCommandType
+import com.kengine.audio.AudioContext
 import com.kengine.input.InputButton
 import com.kengine.input.InputState
 import com.kengine.render.RenderCommandBuffer
@@ -47,6 +51,23 @@ class HextrisSwitchGameTest {
         assertEquals(RenderCommandType.VERTICAL_GRADIENT, render.commandField(0, RenderCommandBuffer.FIELD_TYPE))
         assertTrue(hasText(render, "HEXTRIS"))
         assertTrue(hasCommand(render, RenderCommandType.DRAW_SPRITE))
+    }
+
+    @Test
+    fun requestsLoopedMusicThroughPortableAudio() {
+        val game = HextrisSwitchGame()
+        val audio = AudioContext(commandCapacity = 4)
+
+        audio.beginFrame()
+        game.audio(audio)
+
+        assertEquals(1, audio.commandCount)
+        assertEquals(0, audio.droppedCommandCount)
+        assertEquals(AudioCommandType.LOOP_MUSIC, audio.commandField(0, AudioCommandBuffer.FIELD_TYPE))
+        assertEquals(
+            AudioAssetId.music(Sprites.MUSIC_ID),
+            audio.commandField(0, AudioCommandBuffer.FIELD_ASSET_ID)
+        )
     }
 
     private fun hasText(render: RenderContext, text: String): Boolean {

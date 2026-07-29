@@ -114,13 +114,17 @@ com.kengine.Game
 com.kengine.PortableGame
 com.kengine.input.InputButton
 com.kengine.input.InputState
+com.kengine.audio.AudioAssetId
+com.kengine.audio.AudioCommandBuffer
+com.kengine.audio.AudioContext
+com.kengine.audio.AudioCommandType
 com.kengine.render.RenderContext
 com.kengine.render.RenderCommandBuffer
 com.kengine.render.RenderCommandType
 ```
 
-`GameLoop` and the SDL contexts still live in `:kengine`; the Switch module is only consuming portable lifecycle, input, and render-context contracts for now.
-The desktop path uses `PortableGameAdapter` plus `RenderContextSdlRenderer` in `:kengine` to execute the same render commands through SDL.
+`GameLoop` and the SDL contexts still live in `:kengine`; the Switch module is only consuming portable lifecycle, input, audio-command, and render-context contracts for now.
+The desktop path uses `PortableGameAdapter` plus `RenderContextSdlRenderer` in `:kengine` to execute the same render commands through SDL. Portable audio commands are currently captured there as a no-op surface until the SDL audio adapter is wired in.
 
 The current successful artifact is:
 
@@ -129,7 +133,9 @@ libnx C main()
   -> calls generated Kotlin/Native static-library API
   -> starts a Kotlin KengineSwitchRuntime with a generated per-game PortableGame factory
   -> translates libnx buttons into com.kengine.input.InputState
-  -> updates and draws the :games:nintendo-switch-demo PortableGame every app-loop frame
+  -> updates, emits audio commands, and draws the selected PortableGame every app-loop frame
+  -> copies Kotlin audio commands into a C-owned command buffer
+  -> keeps requested music loops playing through libnx audout
   -> builds the frame through com.kengine.render.RenderContext
   -> copies Kotlin render commands into a C-owned command buffer
   -> renders a software framebuffer through libnx

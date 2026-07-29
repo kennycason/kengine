@@ -1,3 +1,4 @@
+import com.kengine.audio.AudioContext
 import com.kengine.input.InputButton
 import com.kengine.input.InputState
 import com.kengine.PortableGame
@@ -22,9 +23,11 @@ private const val INPUT_L = 1 shl 9
 private const val INPUT_R = 1 shl 10
 private const val INPUT_SELECT = 1 shl 11
 private const val COMMAND_CAPACITY = 1024
+private const val AUDIO_COMMAND_CAPACITY = 32
 
 private class KengineSwitchRuntime {
     private val input = InputState()
+    private val audio = AudioContext(AUDIO_COMMAND_CAPACITY)
     private val render = RenderContext(COMMAND_CAPACITY)
     private var game: PortableGame? = null
     private var started = false
@@ -44,6 +47,14 @@ private class KengineSwitchRuntime {
         inputFromMask(inputMask)
         activeGame.update(input)
         checksum = mix(checksum xor input.mask, hostFrame)
+        return checksum
+    }
+
+    fun audio(hostFrame: Int): Int {
+        val activeGame = game ?: return -1
+        audio.beginFrame()
+        activeGame.audio(audio)
+        checksum = mix(checksum + audio.commandCount, audio.droppedCommandCount xor hostFrame)
         return checksum
     }
 
@@ -89,6 +100,27 @@ private class KengineSwitchRuntime {
         return commandLimit
     }
 
+    @OptIn(ExperimentalForeignApi::class)
+    fun copyAudioCommandsTo(destination: CPointer<IntVar>?, maxCommands: Int): Int {
+        if (destination == null || maxCommands <= 0) {
+            return 0
+        }
+
+        val commandLimit = minOf(audio.commandCount, maxCommands)
+        var outputIndex = 0
+        var commandIndex = 0
+        while (commandIndex < commandLimit) {
+            var fieldIndex = 0
+            while (fieldIndex < AudioContext.FIELD_COUNT) {
+                destination[outputIndex] = audio.commandField(commandIndex, fieldIndex)
+                outputIndex += 1
+                fieldIndex += 1
+            }
+            commandIndex += 1
+        }
+        return commandLimit
+    }
+
     fun commandText(commandIndex: Int): String {
         return render.commandText(commandIndex)
     }
@@ -110,7 +142,7 @@ private class KengineSwitchRuntime {
     }
 
     private fun snapshotPayload(): String {
-        return "${game?.let { switchGameName() } ?: "without game"} commands=${render.commandCount}/${render.droppedCommandCount} checksum=$checksum"
+        return "${game?.let { switchGameName() } ?: "without game"} commands=${render.commandCount}/${render.droppedCommandCount} audio=${audio.commandCount}/${audio.droppedCommandCount} checksum=$checksum"
     }
 
     private fun mix(value: Int, salt: Int): Int {
@@ -128,6 +160,10 @@ fun kengineSwitchRuntimeUpdate(hostFrame: Int, inputMask: Int): Int {
     return kengineSwitchRuntime.update(hostFrame, inputMask)
 }
 
+fun kengineSwitchRuntimeAudio(hostFrame: Int): Int {
+    return kengineSwitchRuntime.audio(hostFrame)
+}
+
 fun kengineSwitchRuntimeDraw(hostFrame: Int, screenWidth: Int, screenHeight: Int): Int {
     return kengineSwitchRuntime.draw(hostFrame, screenWidth, screenHeight)
 }
@@ -143,6 +179,11 @@ fun kengineSwitchRuntimeCleanup(): String {
 @OptIn(ExperimentalForeignApi::class)
 fun kengineSwitchRuntimeCopyCommands(destination: CPointer<IntVar>?, maxCommands: Int): Int {
     return kengineSwitchRuntime.copyCommandsTo(destination, maxCommands)
+}
+
+@OptIn(ExperimentalForeignApi::class)
+fun kengineSwitchRuntimeCopyAudioCommands(destination: CPointer<IntVar>?, maxCommands: Int): Int {
+    return kengineSwitchRuntime.copyAudioCommandsTo(destination, maxCommands)
 }
 
 fun kengineSwitchRuntimeCommandText(commandIndex: Int): String {

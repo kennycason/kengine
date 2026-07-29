@@ -1,6 +1,6 @@
 # Hextris Switch
 
-Portable Hextris prototype for the experimental Nintendo Switch backend. This module keeps the existing desktop Hextris untouched while exercising the shared `PortableGame`, `InputState`, `RenderContext`, sprite, and text paths.
+Portable Hextris prototype for the experimental Nintendo Switch backend. This module keeps the existing desktop Hextris untouched while exercising the shared `PortableGame`, `InputState`, `AudioContext`, `RenderContext`, sprite, text, and music paths.
 
 Run the desktop SDL version:
 
