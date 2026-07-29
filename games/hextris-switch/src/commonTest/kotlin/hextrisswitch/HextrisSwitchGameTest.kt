@@ -72,8 +72,8 @@ class HextrisSwitchGameTest {
         render.beginFrame(width = 1280, height = 720)
         game.draw(render)
 
-        assertTrue(hasFillRectColor(render, rgba(30, 58, 72)))
-        assertTrue(hasFillRectColor(render, rgba(80, 142, 156)))
+        assertTrue(hasFillRectColor(render, rgba(114, 202, 220, 70)))
+        assertTrue(hasFillRectColor(render, rgba(176, 248, 255, 145)))
     }
 
     @Test
@@ -143,10 +143,10 @@ class HextrisSwitchGameTest {
         return false
     }
 
-    private fun rgba(r: Int, g: Int, b: Int): Int {
+    private fun rgba(r: Int, g: Int, b: Int, a: Int = 255): Int {
         return r.coerceIn(0, 255) or
             (g.coerceIn(0, 255) shl 8) or
             (b.coerceIn(0, 255) shl 16) or
-            (255 shl 24)
+            (a.coerceIn(0, 255) shl 24)
     }
 }

@@ -393,16 +393,16 @@ class HextrisSwitchGame : PortableGame {
             text = rgba(246, 248, 238),
             mutedText = rgba(172, 202, 220),
             warning = rgba(248, 210, 88),
-            landingGuide = rgba(30, 58, 72),
-            landingTarget = rgba(80, 142, 156)
+            landingGuide = rgba(114, 202, 220, 70),
+            landingTarget = rgba(176, 248, 255, 145)
         )
     }
 
-    private fun rgba(r: Int, g: Int, b: Int): Int {
+    private fun rgba(r: Int, g: Int, b: Int, a: Int = 255): Int {
         return r.coerceIn(0, 255) or
             (g.coerceIn(0, 255) shl 8) or
             (b.coerceIn(0, 255) shl 16) or
-            (255 shl 24)
+            (a.coerceIn(0, 255) shl 24)
     }
 
     private data class Palette(

@@ -232,6 +232,38 @@ static int clamp_int(int value, int minimum, int maximum) {
     return value;
 }
 
+static u32 color_rgba(int r, int g, int b, int a) {
+    return ((u32)clamp_int(r, 0, 255)) |
+        ((u32)clamp_int(g, 0, 255) << 8) |
+        ((u32)clamp_int(b, 0, 255) << 16) |
+        ((u32)clamp_int(a, 0, 255) << 24);
+}
+
+static int color_alpha(u32 color) {
+    return (int)((color >> 24) & 0xff);
+}
+
+static u32 color_blend(u32 destination, u32 source, int alpha) {
+    alpha = clamp_int(alpha, 0, 255);
+    int inverse = 255 - alpha;
+
+    u32 r = ((((source >> 0) & 0xff) * alpha) + (((destination >> 0) & 0xff) * inverse)) / 255;
+    u32 g = ((((source >> 8) & 0xff) * alpha) + (((destination >> 8) & 0xff) * inverse)) / 255;
+    u32 b = ((((source >> 16) & 0xff) * alpha) + (((destination >> 16) & 0xff) * inverse)) / 255;
+    return color_rgba((int)r, (int)g, (int)b, 255);
+}
+
+static u32 color_over(u32 destination, u32 source) {
+    int alpha = color_alpha(source);
+    if (alpha <= 0) {
+        return destination;
+    }
+    if (alpha >= 255) {
+        return source;
+    }
+    return color_blend(destination, source, alpha);
+}
+
 static u32 color_mix(u32 from, u32 to, int amount, int maximum) {
     amount = clamp_int(amount, 0, maximum);
     int inverse = maximum - amount;
@@ -239,24 +271,30 @@ static u32 color_mix(u32 from, u32 to, int amount, int maximum) {
     u32 r = (((from >> 0) & 0xff) * inverse + ((to >> 0) & 0xff) * amount) / maximum;
     u32 g = (((from >> 8) & 0xff) * inverse + ((to >> 8) & 0xff) * amount) / maximum;
     u32 b = (((from >> 16) & 0xff) * inverse + ((to >> 16) & 0xff) * amount) / maximum;
-    return RGBA8_MAXALPHA(r, g, b);
+    return color_rgba((int)r, (int)g, (int)b, 255);
 }
 
 static u32 color_add(u32 color, int amount) {
     u32 r = (u32)clamp_int((int)((color >> 0) & 0xff) + amount, 0, 255);
     u32 g = (u32)clamp_int((int)((color >> 8) & 0xff) + amount, 0, 255);
     u32 b = (u32)clamp_int((int)((color >> 16) & 0xff) + amount, 0, 255);
-    return RGBA8_MAXALPHA(r, g, b);
+    return color_rgba((int)r, (int)g, (int)b, color_alpha(color));
 }
 
 static u32 color_tint(u32 color, u32 tint) {
     u32 r = (((color >> 0) & 0xff) * ((tint >> 0) & 0xff)) / 255;
     u32 g = (((color >> 8) & 0xff) * ((tint >> 8) & 0xff)) / 255;
     u32 b = (((color >> 16) & 0xff) * ((tint >> 16) & 0xff)) / 255;
-    return RGBA8_MAXALPHA(r, g, b);
+    u32 a = (((color >> 24) & 0xff) * ((tint >> 24) & 0xff)) / 255;
+    return color_rgba((int)r, (int)g, (int)b, (int)a);
 }
 
 static void draw_rect(u32* framebuf, u32 stride_pixels, int x, int y, int width, int height, u32 color) {
+    int alpha = color_alpha(color);
+    if (alpha <= 0) {
+        return;
+    }
+
     int left = clamp_int(x, 0, FB_WIDTH);
     int top = clamp_int(y, 0, FB_HEIGHT);
     int right = clamp_int(x + width, 0, FB_WIDTH);
@@ -265,7 +303,7 @@ static void draw_rect(u32* framebuf, u32 stride_pixels, int x, int y, int width,
     for (int py = top; py < bottom; ++py) {
         u32* row = framebuf + py * stride_pixels;
         for (int px = left; px < right; ++px) {
-            row[px] = color;
+            row[px] = alpha >= 255 ? color : color_blend(row[px], color, alpha);
         }
     }
 }
@@ -278,7 +316,7 @@ static void draw_pixel(u32* framebuf, u32 stride_pixels, int x, int y, u32 color
     if (x < 0 || x >= FB_WIDTH || y < 0 || y >= FB_HEIGHT) {
         return;
     }
-    framebuf[y * stride_pixels + x] = color;
+    framebuf[y * stride_pixels + x] = color_over(framebuf[y * stride_pixels + x], color);
 }
 
 static void draw_line(u32* framebuf, u32 stride_pixels, int start_x, int start_y, int end_x, int end_y, u32 color) {
@@ -332,16 +370,6 @@ extern const u8 _binary_block_sprites_rgba_end[];
 #define KENGINE_BLOCK_SPRITE_SHEET_HEIGHT 144
 #define KENGINE_BLOCK_SPRITE_TILE_SIZE 24
 #define KENGINE_BLOCK_SPRITE_COLUMNS 6
-
-static u32 color_blend(u32 destination, u32 source, int alpha) {
-    alpha = clamp_int(alpha, 0, 255);
-    int inverse = 255 - alpha;
-
-    u32 r = ((((source >> 0) & 0xff) * alpha) + (((destination >> 0) & 0xff) * inverse)) / 255;
-    u32 g = ((((source >> 8) & 0xff) * alpha) + (((destination >> 8) & 0xff) * inverse)) / 255;
-    u32 b = ((((source >> 16) & 0xff) * alpha) + (((destination >> 16) & 0xff) * inverse)) / 255;
-    return RGBA8_MAXALPHA(r, g, b);
-}
 
 static void draw_block_sprite_sheet(
     u32* framebuf,
@@ -427,7 +455,7 @@ static void draw_sprite(u32* framebuf, u32 stride_pixels, int x, int y, int widt
                 int highlight_pixel = local_x < width / 3 && local_y < height / 3;
                 int shadow_pixel = local_x > (width * 2) / 3 || local_y > (height * 2) / 3;
                 u32 color = border_pixel ? border : shadow_pixel ? shadow : highlight_pixel ? highlight : base;
-                row[px] = color_tint(color, tint);
+                row[px] = color_over(row[px], color_tint(color, tint));
             }
         }
 #endif
@@ -488,7 +516,7 @@ static void draw_sprite(u32* framebuf, u32 stride_pixels, int x, int y, int widt
                 }
             }
 
-            row[px] = color_tint(color, tint);
+            row[px] = color_over(row[px], color_tint(color, tint));
         }
     }
 }
