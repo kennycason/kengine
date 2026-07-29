@@ -14,7 +14,7 @@ Build the Switch NRO:
 jenv exec ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
 ```
 
-The Switch build embeds `sound/techno_boss_worm.ogg` as looped background music. The backend converts it to 48 kHz stereo PCM during the Gradle build.
+The Switch build embeds `sound/techno_boss_worm.ogg` as looped background music. The backend converts it to 48 kHz stereo PCM during the Gradle build and mixes procedural SFX for rotate, hard drop, lock, line clear, game over, pause, and reset.
 
 Output:
 

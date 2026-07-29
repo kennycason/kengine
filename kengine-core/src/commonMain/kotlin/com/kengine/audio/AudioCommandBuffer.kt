@@ -24,6 +24,11 @@ class AudioCommandBuffer(capacity: Int = 32) {
         add(AudioCommandType.STOP_MUSIC, assetId, 0, 0)
     }
 
+    fun playSound(assetId: Int, volume: Int = MAX_VOLUME) {
+        if (assetId == 0) return
+        add(AudioCommandType.PLAY_SOUND, assetId, volume.coerceIn(0, MAX_VOLUME), 0)
+    }
+
     fun field(commandIndex: Int, fieldIndex: Int): Int {
         if (commandIndex !in 0 until count || fieldIndex !in 0 until FIELD_COUNT) {
             return 0

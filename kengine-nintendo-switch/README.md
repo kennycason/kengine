@@ -89,7 +89,7 @@ Build the game-facing Hextris Switch artifact:
 jenv exec ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
 ```
 
-This build converts `games/hextris-switch/sound/techno_boss_worm.ogg` to 48 kHz stereo PCM and embeds it in the NRO for looped libnx `audout` playback.
+This build converts `games/hextris-switch/sound/techno_boss_worm.ogg` to 48 kHz stereo PCM and embeds it in the NRO for looped libnx `audout` playback. Hextris SFX are currently short procedural voices mixed into the same audio stream from portable `playSound` commands.
 
 Game artifact:
 
@@ -136,6 +136,7 @@ libnx C main()
   -> updates, emits audio commands, and draws the selected PortableGame every app-loop frame
   -> copies Kotlin audio commands into a C-owned command buffer
   -> keeps requested music loops playing through libnx audout
+  -> mixes requested one-shot SFX into the active PCM stream
   -> builds the frame through com.kengine.render.RenderContext
   -> copies Kotlin render commands into a C-owned command buffer
   -> renders a software framebuffer through libnx

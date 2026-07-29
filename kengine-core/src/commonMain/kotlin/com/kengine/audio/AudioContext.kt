@@ -21,6 +21,10 @@ class AudioContext(commandCapacity: Int = 32) {
         commands.stopMusic(assetId)
     }
 
+    fun playSound(assetId: Int, volume: Int = AudioCommandBuffer.MAX_VOLUME) {
+        commands.playSound(assetId, volume)
+    }
+
     fun commandField(commandIndex: Int, fieldIndex: Int): Int {
         return commands.field(commandIndex, fieldIndex)
     }

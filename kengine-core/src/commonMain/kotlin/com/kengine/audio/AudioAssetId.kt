@@ -5,6 +5,10 @@ object AudioAssetId {
         return stableId("music:$name")
     }
 
+    fun sound(name: String): Int {
+        return stableId("sound:$name")
+    }
+
     private fun stableId(value: String): Int {
         var hash = FNV_OFFSET_BASIS
         for (char in value) {

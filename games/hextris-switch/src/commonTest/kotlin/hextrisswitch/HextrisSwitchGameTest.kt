@@ -65,8 +65,28 @@ class HextrisSwitchGameTest {
         assertEquals(0, audio.droppedCommandCount)
         assertEquals(AudioCommandType.LOOP_MUSIC, audio.commandField(0, AudioCommandBuffer.FIELD_TYPE))
         assertEquals(
-            AudioAssetId.music(Sprites.MUSIC_ID),
+            AudioAssetId.music(Sounds.MUSIC),
             audio.commandField(0, AudioCommandBuffer.FIELD_ASSET_ID)
+        )
+    }
+
+    @Test
+    fun requestsSoundEffectAfterSuccessfulRotation() {
+        val game = HextrisSwitchGame()
+        val input = InputState()
+        val audio = AudioContext(commandCapacity = 4)
+
+        input.set(InputButton.A)
+        game.update(input)
+        audio.beginFrame()
+        game.audio(audio)
+
+        assertEquals(2, audio.commandCount)
+        assertEquals(AudioCommandType.LOOP_MUSIC, audio.commandField(0, AudioCommandBuffer.FIELD_TYPE))
+        assertEquals(AudioCommandType.PLAY_SOUND, audio.commandField(1, AudioCommandBuffer.FIELD_TYPE))
+        assertEquals(
+            AudioAssetId.sound(Sounds.ROTATE),
+            audio.commandField(1, AudioCommandBuffer.FIELD_ASSET_ID)
         )
     }
 

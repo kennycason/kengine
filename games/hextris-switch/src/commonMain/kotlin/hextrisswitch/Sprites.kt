@@ -3,7 +3,6 @@ package hextrisswitch
 object Sprites {
     const val BLOCK_SPRITES = "assets/sprites/block_sprites.png"
     const val BLOCK_SPRITE_ID = "hextris/block-sprites"
-    const val MUSIC_ID = "hextris/techno-boss-worm"
     const val BLOCK_SIZE = 24
 
     val PIECE_SPRITES = mapOf(

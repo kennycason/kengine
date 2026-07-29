@@ -19,22 +19,27 @@ class HextrisSwitchGame : PortableGame {
     private var clockwiseHold = 0
     private var counterClockwiseHold = 0
     private var state = PlayState.RUNNING
+    private val pendingSoundIds = IntArray(8)
+    private var pendingSoundCount = 0
 
     override fun update(input: InputState) {
         frame += 1
 
         if (justPressed(input, InputButton.SELECT)) {
             reset()
+            queueSound(Sounds.RESET)
             previousMask = input.mask
             return
         }
 
         if (justPressed(input, InputButton.START)) {
+            val previousState = state
             state = when (state) {
                 PlayState.RUNNING -> PlayState.PAUSED
                 PlayState.PAUSED -> PlayState.RUNNING
                 PlayState.GAME_OVER -> PlayState.RUNNING.also { reset() }
             }
+            queueSound(if (previousState == PlayState.GAME_OVER) Sounds.RESET else Sounds.PAUSE)
             previousMask = input.mask
             return
         }
@@ -64,13 +69,21 @@ class HextrisSwitchGame : PortableGame {
         when {
             justPressed(input, InputButton.X) ||
                 (justPressed(input, InputButton.L) && input.isPressed(InputButton.R)) ||
-                (justPressed(input, InputButton.R) && input.isPressed(InputButton.L)) -> board.rotate180()
-            shouldRepeat(counterClockwiseHold, firstDelay = 14, repeatRate = 8) -> board.rotateCounterClockwise()
-            shouldRepeat(clockwiseHold, firstDelay = 14, repeatRate = 8) -> board.rotateClockwise()
+                (justPressed(input, InputButton.R) && input.isPressed(InputButton.L)) -> {
+                if (board.rotate180()) queueSound(Sounds.ROTATE)
+            }
+            shouldRepeat(counterClockwiseHold, firstDelay = 14, repeatRate = 8) -> {
+                if (board.rotateCounterClockwise()) queueSound(Sounds.ROTATE)
+            }
+            shouldRepeat(clockwiseHold, firstDelay = 14, repeatRate = 8) -> {
+                if (board.rotateClockwise()) queueSound(Sounds.ROTATE)
+            }
         }
 
         if (justPressed(input, InputButton.UP)) {
-            board.drop()
+            if (board.drop() > 0) {
+                queueSound(Sounds.HARD_DROP)
+            }
             lockCurrentPiece()
             previousMask = input.mask
             return
@@ -93,7 +106,11 @@ class HextrisSwitchGame : PortableGame {
     }
 
     override fun audio(audio: AudioContext) {
-        audio.loopMusic(AudioAssetId.music(Sprites.MUSIC_ID))
+        audio.loopMusic(AudioAssetId.music(Sounds.MUSIC))
+        for (index in 0 until pendingSoundCount) {
+            audio.playSound(pendingSoundIds[index])
+        }
+        pendingSoundCount = 0
     }
 
     override fun draw(render: RenderContext) {
@@ -247,12 +264,17 @@ class HextrisSwitchGame : PortableGame {
 
     private fun lockCurrentPiece() {
         val levelBefore = board.level
-        board.lockPiece()
+        val cleared = board.lockPiece()
         if (board.level != levelBefore) {
             fallCounter = 0
         }
         if (board.gameOver) {
             state = PlayState.GAME_OVER
+            queueSound(Sounds.GAME_OVER)
+        } else if (cleared > 0) {
+            queueSound(Sounds.LINE_CLEAR)
+        } else {
+            queueSound(Sounds.LOCK)
         }
     }
 
@@ -264,6 +286,14 @@ class HextrisSwitchGame : PortableGame {
         rightHold = 0
         clockwiseHold = 0
         counterClockwiseHold = 0
+    }
+
+    private fun queueSound(name: String) {
+        if (pendingSoundCount >= pendingSoundIds.size) {
+            return
+        }
+        pendingSoundIds[pendingSoundCount] = AudioAssetId.sound(name)
+        pendingSoundCount += 1
     }
 
     private fun cellSize(render: RenderContext): Int {

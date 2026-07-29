@@ -6,19 +6,24 @@ import kotlin.test.assertEquals
 class AudioCommandBufferTest {
     @Test
     fun storesMusicCommandsInOrder() {
-        val commands = AudioCommandBuffer(capacity = 2)
+        val commands = AudioCommandBuffer(capacity = 3)
         val musicId = AudioAssetId.music("demo/theme")
+        val soundId = AudioAssetId.sound("demo/click")
 
         commands.loopMusic(musicId, volume = 300)
+        commands.playSound(soundId, volume = 128)
         commands.stopMusic(musicId)
 
-        assertEquals(2, commands.count)
+        assertEquals(3, commands.count)
         assertEquals(0, commands.dropped)
         assertEquals(AudioCommandType.LOOP_MUSIC, commands.field(0, AudioCommandBuffer.FIELD_TYPE))
         assertEquals(musicId, commands.field(0, AudioCommandBuffer.FIELD_ASSET_ID))
         assertEquals(AudioCommandBuffer.MAX_VOLUME, commands.field(0, AudioCommandBuffer.FIELD_VOLUME))
-        assertEquals(AudioCommandType.STOP_MUSIC, commands.field(1, AudioCommandBuffer.FIELD_TYPE))
-        assertEquals(musicId, commands.field(1, AudioCommandBuffer.FIELD_ASSET_ID))
+        assertEquals(AudioCommandType.PLAY_SOUND, commands.field(1, AudioCommandBuffer.FIELD_TYPE))
+        assertEquals(soundId, commands.field(1, AudioCommandBuffer.FIELD_ASSET_ID))
+        assertEquals(128, commands.field(1, AudioCommandBuffer.FIELD_VOLUME))
+        assertEquals(AudioCommandType.STOP_MUSIC, commands.field(2, AudioCommandBuffer.FIELD_TYPE))
+        assertEquals(musicId, commands.field(2, AudioCommandBuffer.FIELD_ASSET_ID))
     }
 
     @Test
