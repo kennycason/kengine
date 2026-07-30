@@ -97,7 +97,7 @@ Useful build checks:
 ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:validateSwitchKotlinToolchain
 ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchGameInfo
 ./gradlew :kengine-core:allTests :games:hextris-core:allTests :games:nintendo-switch-demo:allTests
-./gradlew -Pkengine.enableNintendoSwitch=true :games:nintendo-switch-demo:buildSwitchNro :games:hextris-switch:buildSwitchNro
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:buildSwitchGameNros
 ```
 
 Current registered Switch game artifacts:

@@ -244,6 +244,7 @@ tasks.register("validateSwitchKotlinToolchain") {
 }
 
 data class SwitchGameRegistration(
+    val gameProjectPath: String,
     val artifactBaseName: String,
     val displayName: String,
     val buildTaskName: String
@@ -914,6 +915,7 @@ fun registerSwitchGameBuild(
     }
 
     return SwitchGameRegistration(
+        gameProjectPath = gameProject.path,
         artifactBaseName = artifactBaseName,
         displayName = displayName,
         buildTaskName = buildTaskName
@@ -1039,8 +1041,8 @@ gradle.projectsEvaluated {
 
     tasks.register("buildSwitchGameNros") {
         group = "switch"
-        description = "Builds every registered Nintendo Switch game NRO."
-        dependsOn(registrations.map { it.buildTaskName })
+        description = "Builds every registered Nintendo Switch game-facing NRO."
+        dependsOn(registrations.map { "${it.gameProjectPath}:buildSwitchNro" })
     }
 
     val defaultRegistration = registrations.firstOrNull { it.artifactBaseName == "nintendo-switch-demo" }

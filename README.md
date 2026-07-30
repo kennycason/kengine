@@ -954,10 +954,10 @@ Build without tests:
 ./gradlew clean build -x allTests -x macosArm64Test -x jvmTest -x jsTest
 ```
 
-Build with the experimental Nintendo Switch backend enabled:
+Build the current game-facing Nintendo Switch NROs:
 
 ```shell
-./gradlew -Pkengine.enableNintendoSwitch=true :games:nintendo-switch-demo:buildSwitchNro
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:buildSwitchGameNros
 ```
 
 Build with the experimental Playdate backend enabled:

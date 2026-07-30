@@ -89,7 +89,7 @@ List registered Switch games:
 ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchGameInfo
 ```
 
-Build every registered Switch game:
+Build every registered game-facing Switch NRO:
 
 ```bash
 ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:buildSwitchGameNros
