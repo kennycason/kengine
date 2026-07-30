@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <malloc.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <switch.h>
+#include "kengine_switch_storage.h"
 
 #ifndef KENGINE_SWITCH_C_ONLY
 #include "kengine_switch_kotlin_api.h"
@@ -54,6 +57,191 @@
 #define KENGINE_AUDIO_FIELD_PARAM 3
 #define KENGINE_AUDIO_FIELD_COUNT 4
 #define KENGINE_AUDIO_MAX_COMMANDS 32
+
+#define KENGINE_STORAGE_MAX_KEY_LENGTH 64
+#define KENGINE_STORAGE_MAX_RECORD_BYTES (64 * 1024)
+#define KENGINE_STORAGE_PATH_BYTES 256
+#define KENGINE_STORAGE_DEVICE "sdmc"
+#define KENGINE_STORAGE_ROOT "sdmc:/switch/kengine/saves"
+#define KENGINE_STORAGE_DIRECTORY_MODE 0777
+
+static bool g_storage_initialized = false;
+static bool g_storage_available = false;
+
+static bool kengine_switch_storage_key_valid(const char* key) {
+    if (key == NULL || key[0] == '\0') {
+        return false;
+    }
+
+    int length = 0;
+    for (const char* cursor = key; *cursor != '\0'; ++cursor) {
+        char value = *cursor;
+        bool allowed = (value >= 'a' && value <= 'z') ||
+            (value >= 'A' && value <= 'Z') ||
+            (value >= '0' && value <= '9') ||
+            value == '.' ||
+            value == '_' ||
+            value == '-';
+        if (!allowed) {
+            return false;
+        }
+        length += 1;
+        if (length > KENGINE_STORAGE_MAX_KEY_LENGTH) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool kengine_switch_storage_ensure_directory(const char* path) {
+    if (path == NULL || path[0] == '\0') {
+        return false;
+    }
+
+    char current[KENGINE_STORAGE_PATH_BYTES];
+    size_t length = strlen(path);
+    if (length >= sizeof(current)) {
+        return false;
+    }
+
+    for (size_t index = 0; index <= length; ++index) {
+        current[index] = path[index];
+        if ((path[index] == '/' || path[index] == '\0') && index > 0) {
+            current[index] = '\0';
+            if (strcmp(current, "sdmc:") != 0) {
+                mkdir(current, KENGINE_STORAGE_DIRECTORY_MODE);
+            }
+            current[index] = path[index];
+        }
+    }
+
+    return access(path, F_OK) == 0;
+}
+
+static bool kengine_switch_storage_init(void) {
+    if (g_storage_initialized) {
+        return g_storage_available;
+    }
+
+    g_storage_initialized = true;
+    Result result = fsdevMountSdmc();
+    if (R_FAILED(result) && access("sdmc:/", F_OK) != 0) {
+        g_storage_available = false;
+        return false;
+    }
+
+    g_storage_available = kengine_switch_storage_ensure_directory(KENGINE_STORAGE_ROOT);
+    return g_storage_available;
+}
+
+static bool kengine_switch_storage_path(const char* key, char* destination, size_t destination_size) {
+    if (!kengine_switch_storage_key_valid(key)) {
+        return false;
+    }
+    int written = snprintf(destination, destination_size, "%s/%s.dat", KENGINE_STORAGE_ROOT, key);
+    return written > 0 && (size_t)written < destination_size;
+}
+
+int kengine_switch_storage_load(const char* key, void* destination, int max_bytes) {
+    if (!kengine_switch_storage_init() || destination == NULL || max_bytes < 0 || max_bytes > KENGINE_STORAGE_MAX_RECORD_BYTES) {
+        return -1;
+    }
+
+    char path[KENGINE_STORAGE_PATH_BYTES];
+    if (!kengine_switch_storage_path(key, path, sizeof(path))) {
+        return -1;
+    }
+
+    FILE* file = fopen(path, "rb");
+    if (file == NULL) {
+        return -1;
+    }
+
+    if (fseek(file, 0, SEEK_END) != 0) {
+        fclose(file);
+        return -1;
+    }
+    long size = ftell(file);
+    if (size < 0 || size > max_bytes || size > KENGINE_STORAGE_MAX_RECORD_BYTES) {
+        fclose(file);
+        return -1;
+    }
+    if (fseek(file, 0, SEEK_SET) != 0) {
+        fclose(file);
+        return -1;
+    }
+
+    size_t read = size == 0 ? 0 : fread(destination, 1, (size_t)size, file);
+    fclose(file);
+    return read == (size_t)size ? (int)size : -1;
+}
+
+int kengine_switch_storage_save(const char* key, const void* data, int size) {
+    if (!kengine_switch_storage_init() || size < 0 || size > KENGINE_STORAGE_MAX_RECORD_BYTES || (size > 0 && data == NULL)) {
+        return 0;
+    }
+
+    char path[KENGINE_STORAGE_PATH_BYTES];
+    char temporary_path[KENGINE_STORAGE_PATH_BYTES];
+    if (!kengine_switch_storage_path(key, path, sizeof(path))) {
+        return 0;
+    }
+    int written = snprintf(temporary_path, sizeof(temporary_path), "%s.tmp", path);
+    if (written <= 0 || (size_t)written >= sizeof(temporary_path)) {
+        return 0;
+    }
+
+    FILE* file = fopen(temporary_path, "wb");
+    if (file == NULL) {
+        return 0;
+    }
+
+    size_t bytes_written = size == 0 ? 0 : fwrite(data, 1, (size_t)size, file);
+    fflush(file);
+    fclose(file);
+    if (bytes_written != (size_t)size) {
+        remove(temporary_path);
+        return 0;
+    }
+
+    remove(path);
+    if (rename(temporary_path, path) != 0) {
+        remove(temporary_path);
+        return 0;
+    }
+
+    fsdevCommitDevice(KENGINE_STORAGE_DEVICE);
+    return 1;
+}
+
+int kengine_switch_storage_delete(const char* key) {
+    if (!kengine_switch_storage_init()) {
+        return 0;
+    }
+
+    char path[KENGINE_STORAGE_PATH_BYTES];
+    if (!kengine_switch_storage_path(key, path, sizeof(path))) {
+        return 0;
+    }
+
+    remove(path);
+    fsdevCommitDevice(KENGINE_STORAGE_DEVICE);
+    return 1;
+}
+
+int kengine_switch_storage_exists(const char* key) {
+    if (!kengine_switch_storage_init()) {
+        return 0;
+    }
+
+    char path[KENGINE_STORAGE_PATH_BYTES];
+    if (!kengine_switch_storage_path(key, path, sizeof(path))) {
+        return 0;
+    }
+
+    return access(path, F_OK) == 0 ? 1 : 0;
+}
 
 #ifndef KENGINE_SWITCH_C_ONLY
 static kengine_switch_kotlin_ExportedSymbols* kotlin_symbols(void) {
@@ -1063,6 +1251,7 @@ static int run_kotlin_framebuffer_demo(void) {
     padInitializeDefault(&pad);
 
     int diagnostic_checksum = kotlin_add_probe() ^ kotlin_message_code_probe() ^ kotlin_startup_probe();
+    kengine_switch_storage_init();
     kotlin_runtime_start();
 
     int frame_count = 0;

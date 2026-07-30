@@ -9,6 +9,7 @@ import com.kengine.input.InputState
 import com.kengine.render.RenderCommandBuffer
 import com.kengine.render.RenderCommandType
 import com.kengine.render.RenderContext
+import com.kengine.storage.InMemoryPortableStorage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -65,6 +66,7 @@ class HextrisGameTest {
         assertEquals(RenderCommandType.VERTICAL_GRADIENT, render.commandField(0, RenderCommandBuffer.FIELD_TYPE))
         assertFalse(hasText(render, "HEXTRIS"))
         assertTrue(hasText(render, "NEXT"))
+        assertTrue(hasText(render, "BEST"))
         assertTrue(hasText(render, "CONTROLS"))
         assertFalse(hasText(render, "STATS"))
         assertTrue(hasCommand(render, RenderCommandType.DRAW_SPRITE))
@@ -117,6 +119,48 @@ class HextrisGameTest {
             AudioAssetId.sound(Sounds.ROTATE),
             audio.commandField(1, AudioCommandBuffer.FIELD_ASSET_ID)
         )
+    }
+
+    @Test
+    fun loadsHighScoreFromPortableStorage() {
+        val storage = InMemoryPortableStorage()
+        storage.saveString(HextrisGame.HIGH_SCORE_KEY, "1234")
+        val game = HextrisGame()
+        val render = RenderContext(commandCapacity = 1024)
+
+        game.attachStorage(storage)
+        render.beginFrame(width = 1280, height = 720)
+        game.draw(render)
+
+        assertTrue(game.snapshot().contains("highScore=1234"))
+        assertTrue(hasText(render, "BEST"))
+        assertTrue(hasText(render, "1234"))
+    }
+
+    @Test
+    fun savesNewHighScoreToPortableStorage() {
+        val storage = InMemoryPortableStorage()
+        storage.saveString(HextrisGame.HIGH_SCORE_KEY, "300")
+        val game = HextrisGame()
+
+        game.attachStorage(storage)
+        game.recordHighScore(900)
+
+        assertEquals("900", storage.loadString(HextrisGame.HIGH_SCORE_KEY))
+        assertTrue(game.snapshot().contains("highScore=900"))
+    }
+
+    @Test
+    fun keepsExistingHighScoreWhenScoreDoesNotBeatIt() {
+        val storage = InMemoryPortableStorage()
+        storage.saveString(HextrisGame.HIGH_SCORE_KEY, "900")
+        val game = HextrisGame()
+
+        game.attachStorage(storage)
+        game.recordHighScore(300)
+
+        assertEquals("900", storage.loadString(HextrisGame.HIGH_SCORE_KEY))
+        assertTrue(game.snapshot().contains("highScore=900"))
     }
 
     private fun hasText(render: RenderContext, text: String): Boolean {

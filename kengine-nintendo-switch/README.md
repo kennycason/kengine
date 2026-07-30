@@ -138,6 +138,7 @@ com.kengine.audio.AudioAssetId
 com.kengine.audio.AudioCommandBuffer
 com.kengine.audio.AudioContext
 com.kengine.audio.AudioCommandType
+com.kengine.storage.PortableStorage
 com.kengine.render.RenderContext
 com.kengine.render.RenderCommandBuffer
 com.kengine.render.RenderCommandType
@@ -146,7 +147,22 @@ com.kengine.render.RenderCommandType
 `GameLoop` and the SDL contexts still live in `:kengine`; the Switch module is only consuming portable lifecycle, input, audio-command, and render-context contracts for now.
 The desktop path uses `PortableGameAdapter` plus `RenderContextSdlRenderer` in `:kengine` to execute the same render commands through SDL. Portable audio commands are currently captured there as a no-op surface until the SDL audio adapter is wired in.
 
-The current 2D Switch focus is to make this portable surface complete enough for real games before expanding into networking or 3D. The highest-priority missing piece is a small host-owned storage contract for save data; arbitrary file paths should stay out of portable game code.
+The current 2D Switch focus is to make this portable surface complete enough for real games before expanding into networking or 3D. Storage is intentionally exposed as small named records; arbitrary file paths should stay out of portable game code.
+
+## Storage
+
+Switch runtime startup attaches `SwitchPortableStorage` to each `PortableGame`. The storage ABI is declared in `src/main/c/kengine_switch_storage.h`, then each game build generates a matching Kotlin/Native cinterop klib before compiling the game static library.
+
+Current homebrew behavior:
+
+```text
+PortableGame.attachStorage(SwitchPortableStorage(namespace))
+  -> Kotlin calls generated cinterop bindings
+  -> C host validates keys and writes temp files
+  -> records land under sdmc:/switch/kengine/saves/<namespace>.<key>.dat
+```
+
+The implementation supports `load`, `save`, `delete`, and `exists` for records up to 64 KB. Hextris uses `hextris.high-score.dat` for its visible `BEST` value. This still needs manual Ryujinx and hardware validation.
 
 ## Game Wiring
 

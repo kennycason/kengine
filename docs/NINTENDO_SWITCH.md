@@ -31,6 +31,7 @@ The shared portable API currently used by Switch lives in `:kengine-core`:
 - `RenderContext`, `RenderCommandBuffer`, `RenderCommandType`
 - `AudioContext`, `AudioCommandBuffer`, `AudioCommandType`
 - `PortableAssetCatalog`
+- `PortableStorage`
 
 The Switch host currently handles these render commands:
 
@@ -47,7 +48,7 @@ Audio is command-buffer based. Music assets are converted to 48 kHz stereo PCM a
 
 ## Known Gaps
 
-- Save files / file writing are not supported yet.
+- Switch save data has a homebrew smoke-test backend, but has not been manually validated in Ryujinx or on hardware yet.
 - Runtime asset loading from arbitrary files is not part of the portable Switch path.
 - The existing `com.kengine.file.File` helper lives in `:kengine`, is SDL/native-host oriented, and is read/path focused; it is not available to `:kengine-core` portable games.
 - SDL UI, tiled maps, font contexts, texture-manager APIs, and richer graphics primitives are not yet behind the portable command-buffer surface.
@@ -56,22 +57,23 @@ Audio is command-buffer based. Music assets are converted to 48 kHz stereo PCM a
 
 ## Save Data
 
-The next important platform feature is a portable storage API. We should not expose arbitrary POSIX-style writes directly to portable Kotlin games. The host platform should own storage policy, mount points, atomic writes, quotas, and error translation.
+The first portable storage path is implemented. Portable games now get a `PortableStorage` instance through `PortableGame.attachStorage(storage)`, and storage is exposed as small named records instead of arbitrary file paths.
 
 For the public libnx homebrew path, filesystem access is explicit: `fsdev` can mount SD card storage, save data, temporary storage, cache storage, and other filesystems, and savedata writes require an explicit `fsdevCommitDevice()` after writing. See the libnx filesystem device docs: https://switchbrew.github.io/libnx/fs__dev_8h.html
 
 For any commercial Switch SDK path, save-data rules, quotas, user/account behavior, and certification details must be checked in Nintendo's developer documentation. Those details are not public repo assumptions.
 
-Proposed Kengine storage shape:
+Current Kengine storage shape:
 
-- Add a `:kengine-core` storage contract with small named records, not paths.
-- Restrict record keys to a conservative namespace such as `[A-Za-z0-9._-]`.
-- Start with bounded values, for example 16-64 KB per record.
-- Support `load`, `save`, `delete`, and `exists`.
-- Make host implementations responsible for atomic writes and commit behavior.
-- Add a desktop host implementation backed by an app-data directory.
-- Add a Switch host implementation backed by a mounted save filesystem or, for homebrew-only smoke tests, an explicit SD-card directory.
-- Add a simple demo/Hextris high-score save and reload path as the validation case.
+- `:kengine-core` defines `PortableStorage`, `NoOpPortableStorage`, `InMemoryPortableStorage`, and portable key validation.
+- Record keys are restricted to `[A-Za-z0-9._-]` and 64 characters.
+- Records are bounded to 64 KB by default.
+- The API supports `load`, `save`, `delete`, `exists`, plus string helpers.
+- Desktop storage writes to an app-data directory under `~/.kengine/saves/<namespace>/`.
+- Switch storage uses a generated cinterop klib for the C host storage ABI.
+- The current Switch homebrew backend stores records under `sdmc:/switch/kengine/saves/<namespace>.<key>.dat`.
+- Switch writes use temp-file replacement and call `fsdevCommitDevice()` after save/delete.
+- Hextris uses this path for high-score persistence and draws it as `BEST`.
 
 ## Local Java
 
@@ -120,18 +122,19 @@ Manual Ryujinx validation should cover:
 - score/level/lines text,
 - movement, soft drop, hard drop, rotation, pause, and reset,
 - music loop and one-shot sound effects,
-- after storage lands: save, quit, relaunch, reload.
+- Hextris save, quit, relaunch, and `BEST` reload.
 
 ## Next Step
 
-The next Switch task should be: add the portable save/storage contract and validate it with a visible 2D game behavior, such as Hextris high score persistence.
+The next Switch task should be manual validation of Hextris high-score persistence in Ryujinx, then on hardware when available.
 
 Concrete order:
 
-1. Add the storage API and tests in `:kengine-core`.
-2. Add a desktop implementation so the contract can be exercised without Switch tooling.
-3. Wire a tiny save/reload path into `:games:hextris-core` or the Switch demo.
-4. Implement the Switch host storage backend with conservative key validation, bounded writes, atomic replacement, and required commit behavior.
-5. Add storage to the Ryujinx manual checklist.
+1. Launch `games/hextris-switch/build/switch/hextris-switch.nro` in Ryujinx.
+2. Create a score above `0` and confirm `BEST` updates.
+3. Exit cleanly with `Minus + Plus`.
+4. Relaunch and confirm `BEST` reloads from storage.
+5. Inspect the emulator SD-card filesystem for `switch/kengine/saves/hextris.high-score.dat` if reload fails.
+6. Decide whether to keep the SD-card homebrew backend for now or move to a true mounted save-data backend next.
 
 After that, the next 2D work should be a feature matrix pass: sprite transparency/tint/scaling/clipping, text glyph coverage, audio edge cases, input mapping, and lifecycle/reset behavior.

@@ -35,7 +35,9 @@ private class KengineSwitchRuntime {
 
     fun start(): String {
         if (!started) {
-            game = createSwitchPortableGame()
+            val createdGame = createSwitchPortableGame()
+            createdGame.attachStorage(SwitchPortableStorage(createdGame.storageNamespace))
+            game = createdGame
             started = true
             checksum = mix(checksum, switchGameName().length)
         }

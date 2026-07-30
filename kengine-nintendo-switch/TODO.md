@@ -40,6 +40,10 @@
   - Switch text commands fetch the frame-local Kotlin string by command index and render it with a built-in 5x7 software font.
   - Switch game selection now uses a generated Kotlin `PortableGame` factory per backend NRO task instead of hardcoding one game class in `KengineSwitchRuntime`.
   - The Switch command buffer is now sized for denser game screens such as Hextris' 15x25 board.
+  - Switch games now receive `PortableStorage` during runtime startup.
+  - The Switch build now generates a tiny cinterop klib for the C storage ABI before compiling each game static library.
+  - The current homebrew storage backend writes small records under `sdmc:/switch/kengine/saves/`.
+  - Hextris now persists high score through portable storage and renders it as `BEST`.
 - The first Kotlin crash was fixed at the generated C API wrapper layer:
   - Old failure: invalid read at `0x28`.
   - Old bad instruction: wrapper used `mrs ..., tpidr_el0`.
@@ -87,21 +91,16 @@ Conclusion: we are not stuck in a loop. The known generated-glue, stale-runtime-
    - square software-rendered block sprites,
    - score/level/lines text,
    - D-pad movement, soft drop, hard drop, rotation, pause, and reset.
-3. Add a portable storage/save-data API in `:kengine-core` before expanding into networking or 3D:
-   - expose named records instead of arbitrary file paths,
-   - validate keys with a conservative namespace,
-   - keep initial values small and bounded,
-   - add load/save/delete/exists tests,
-   - wire a desktop implementation first,
-   - wire the Switch host to a mounted filesystem with atomic replacement and required commit behavior.
-4. Add one visible save/reload behavior to either `:games:hextris-core` or `:games:nintendo-switch-demo`; Hextris high score persistence is the best real-game smoke test.
-5. Add the save/reload case to the Ryujinx checklist:
-   - create or update saved state,
-   - exit cleanly,
+3. Validate Hextris high-score persistence in Ryujinx:
+   - create a score above `0`,
+   - confirm the on-screen `BEST` value updates,
+   - exit cleanly with `Minus + Plus`,
    - relaunch,
-   - verify the state reloads,
+   - verify `BEST` reloads,
    - verify corrupt/missing storage falls back safely.
-6. After storage works, do a 2D support matrix pass:
+4. If Ryujinx save/reload fails, inspect the emulator SD-card filesystem for `switch/kengine/saves/hextris.high-score.dat`.
+5. Decide whether the homebrew SD-card backend is enough for this phase or whether to move next to a true mounted save-data backend.
+6. After storage is manually validated, do a 2D support matrix pass:
    - sprite transparency, tinting, scaling, frame selection, and clipping,
    - text glyph coverage and positioning,
    - audio start/stop/retrigger behavior,

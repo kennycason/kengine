@@ -7,11 +7,16 @@ import com.kengine.input.InputButton
 import com.kengine.input.InputState
 import com.kengine.render.RenderAssetId
 import com.kengine.render.RenderContext
+import com.kengine.storage.NoOpPortableStorage
+import com.kengine.storage.PortableStorage
 
 class HextrisGame : PortableGame {
     override val assets = HextrisAssets
+    override val storageNamespace = "hextris"
 
     private val board = Board()
+    private var storage: PortableStorage = NoOpPortableStorage
+    private var highScore = 0
 
     private var frame = 0
     private var previousMask = 0
@@ -112,6 +117,11 @@ class HextrisGame : PortableGame {
         previousMask = input.mask
     }
 
+    override fun attachStorage(storage: PortableStorage) {
+        this.storage = storage
+        highScore = storage.loadString(HIGH_SCORE_KEY)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+    }
+
     override fun audio(audio: AudioContext) {
         audio.loopMusic(AudioAssetId.music(Sounds.MUSIC))
         for (index in 0 until pendingSoundCount) {
@@ -155,7 +165,7 @@ class HextrisGame : PortableGame {
     }
 
     fun snapshot(): String {
-        return "state=$state score=${board.score} lines=${board.lines} frame=$frame"
+        return "state=$state score=${board.score} highScore=$highScore lines=${board.lines} frame=$frame"
     }
 
     private fun drawLandingGuide(render: RenderContext, left: Int, top: Int, cell: Int, colors: Palette) {
@@ -250,11 +260,12 @@ class HextrisGame : PortableGame {
 
         val statTop = boardTop + nextSize + 22
         drawStatLine(render, "SCORE", board.score.toString(), leftPanelX, statValueX, statTop, colors)
-        drawStatLine(render, "LEVEL", board.level.toString(), leftPanelX, statValueX, statTop + 40, colors)
-        drawStatLine(render, "LINES", board.lines.toString(), leftPanelX, statValueX, statTop + 80, colors)
-        drawStatLine(render, "PIECES", board.totalPieces().toString(), leftPanelX, statValueX, statTop + 120, colors)
+        drawStatLine(render, "BEST", highScore.toString(), leftPanelX, statValueX, statTop + 40, colors)
+        drawStatLine(render, "LEVEL", board.level.toString(), leftPanelX, statValueX, statTop + 80, colors)
+        drawStatLine(render, "LINES", board.lines.toString(), leftPanelX, statValueX, statTop + 120, colors)
+        drawStatLine(render, "PIECES", board.totalPieces().toString(), leftPanelX, statValueX, statTop + 160, colors)
 
-        drawControls(render, leftPanelX, statTop + 182, colors)
+        drawControls(render, leftPanelX, statTop + 222, colors)
         drawPieceStats(
             render = render,
             left = rightPanelX,
@@ -421,6 +432,15 @@ class HextrisGame : PortableGame {
             combo = 0
             queueSound(Sounds.LOCK)
         }
+        recordHighScore(board.score)
+    }
+
+    internal fun recordHighScore(score: Int) {
+        if (score <= highScore) {
+            return
+        }
+        highScore = score
+        storage.saveString(HIGH_SCORE_KEY, highScore.toString())
     }
 
     private fun reset() {
@@ -545,5 +565,9 @@ class HextrisGame : PortableGame {
         RUNNING,
         PAUSED,
         GAME_OVER
+    }
+
+    companion object {
+        const val HIGH_SCORE_KEY = "high-score"
     }
 }

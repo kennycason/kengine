@@ -79,6 +79,10 @@ fun kotlincNative(): File {
     return file("${System.getProperty("user.home")}/.konan/kotlin-native-prebuilt-$host-${libs.versions.kotlin.get()}/bin/kotlinc-native")
 }
 
+fun cinterop(): File {
+    return kotlincNative().parentFile.resolve("cinterop")
+}
+
 fun devkitPro(): File {
     return file(envOrDefault("DEVKITPRO", "/opt/devkitpro"))
 }
@@ -262,6 +266,8 @@ fun registerSwitchGameBuild(
     val kotlinOutputBase = gameOutputDir.map { it.file("kotlin/kengine_switch_kotlin") }
     val kotlinApiHeader = gameOutputDir.map { it.file("kotlin/kengine_switch_kotlin_api.h") }
     val kotlinStaticLib = gameOutputDir.map { it.file("kotlin/libkengine_switch_kotlin.a") }
+    val storageInteropBase = gameOutputDir.map { it.file("kotlin/kengine_switch_storage") }
+    val storageInteropKlib = gameOutputDir.map { it.file("kotlin/kengine_switch_storage.klib") }
     val gameFactory = gameOutputDir.map { it.file("generated/KengineSwitchGameFactory.kt") }
     val cObject = gameOutputDir.map { it.file("obj/main.o") }
     val switchElf = gameOutputDir.map { it.file("$artifactBaseName.elf") }
@@ -326,14 +332,46 @@ fun registerSwitchGameBuild(
         }
     }
 
+    val generateStorageInteropTaskName = "generate${taskPrefix}StorageInterop"
+    tasks.register<Exec>(generateStorageInteropTaskName) {
+        group = "switch"
+        description = "Generates Kotlin/Native cinterop bindings for $displayName Switch storage callbacks."
+
+        val storageHeader = file("src/main/c/kengine_switch_storage.h")
+        inputs.file(storageHeader)
+        inputs.property("kotlinTarget", kotlinTarget)
+        inputs.property("cinterop", providers.provider { cinterop().absolutePath })
+        outputs.file(storageInteropKlib)
+
+        doFirst {
+            val interop = tool(
+                cinterop(),
+                "Set -Pkengine.switch.kotlincNative=/path/to/kotlinc-native or KOTLIN_NATIVE_HOME with cinterop."
+            )
+            storageInteropBase.get().asFile.parentFile.mkdirs()
+            commandLine(
+                interop.absolutePath,
+                "-target",
+                kotlinTarget.get(),
+                "-pkg",
+                "kengine.switchhost",
+                "-header",
+                storageHeader.absolutePath,
+                "-o",
+                storageInteropBase.get().asFile.absolutePath
+            )
+        }
+    }
+
     val compileKotlinTaskName = "compile${taskPrefix}KotlinStatic"
     tasks.register<Exec>(compileKotlinTaskName) {
         group = "switch"
         description = "Compiles $displayName, shared kengine core sources, and the Switch runtime as a Kotlin/Native static library."
-        dependsOn(listOf(generateFactoryTaskName) + generatedAssetTaskPaths)
+        dependsOn(listOf(generateFactoryTaskName, generateStorageInteropTaskName) + generatedAssetTaskPaths)
 
         inputs.files(switchKotlinSources, kengineCoreSources)
         inputs.files(gameSourceTrees)
+        inputs.file(storageInteropKlib)
         generatedGameSourceDirs.forEach { generatedSourceDir ->
             inputs.dir(generatedSourceDir)
                 .optional()
@@ -371,6 +409,8 @@ fun registerSwitchGameBuild(
                 kotlinTarget.get(),
                 "-produce",
                 "static",
+                "-library",
+                storageInteropKlib.get().asFile.absolutePath,
                 "-output",
                 kotlinOutputBase.get().asFile.absolutePath
             )
