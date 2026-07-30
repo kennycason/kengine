@@ -223,10 +223,10 @@ write_local_properties() {
         printf 'kengine.kotlin.version=%s\n' "$VERSION"
         printf 'kengine.kotlin.branch=%s\n' "$BRANCH"
         if [ -x "$native_home/bin/kotlinc-native" ]; then
-            printf 'kengine.kotlin.nativeHome=%s\n' "$native_home"
+            printf 'kengine.switch.kotlinNativeHome=%s\n' "$native_home"
         else
             printf '# Build first, then uncomment or rerun build-kotlin-native-dist.sh:\n'
-            printf '# kengine.kotlin.nativeHome=%s\n' "$native_home"
+            printf '# kengine.switch.kotlinNativeHome=%s\n' "$native_home"
         fi
         printf '# Use this after the compiler fork knows about the target:\n'
         printf '# kengine.switch.kotlinTarget=switch_arm64\n'

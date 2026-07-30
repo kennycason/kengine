@@ -5,7 +5,7 @@ Nintendo Switch NRO host for the shared portable Hextris game in `:games:hextris
 Build:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
+./gradlew -Pkengine.enableNintendoSwitch=true :games:hextris-switch:buildSwitchNro
 ```
 
 Output:

@@ -32,14 +32,14 @@ tasks.register("kotlinForkInfo") {
 
     doLast {
         val repo = localProperty("kengine.kotlin.repo")?.let(::file) ?: defaultCheckoutDir()
-        val nativeHome = localProperty("kengine.kotlin.nativeHome")?.let(::file)
+        val nativeHome = localProperty("kengine.switch.kotlinNativeHome")?.let(::file)
             ?: repo.resolve("kotlin-native/dist")
-        val kotlincNative = localProperty("kengine.switch.kotlincNative")?.let(::file)
-            ?: nativeHome.resolve("bin/kotlinc-native")
+        val kotlincNative = nativeHome.resolve("bin/kotlinc-native")
 
         println("Kengine Kotlin version: ${libs.versions.kotlin.get()}")
         println("Kotlin fork repo: ${repo.absolutePath} (${repo.resolve(".git").isDirectory})")
         println("Kotlin/Native home: ${nativeHome.absolutePath} (${nativeHome.isDirectory})")
+        println("Switch Kotlin/Native home property: kengine.switch.kotlinNativeHome")
         println("kotlinc-native: ${kotlincNative.absolutePath} (${kotlincNative.exists()})")
         println("Switch target override: ${localProperty("kengine.switch.kotlinTarget") ?: "(not configured)"}")
         println("Local properties: ${localPropertiesFile.asFile.absolutePath} (${localPropertiesFile.asFile.isFile})")

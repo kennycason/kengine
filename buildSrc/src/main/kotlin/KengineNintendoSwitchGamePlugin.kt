@@ -32,7 +32,9 @@ class KengineNintendoSwitchGamePlugin : Plugin<Project> {
                 description = "Builds the Nintendo Switch NRO for ${project.path}."
 
                 doFirst {
-                    throw GradleException("Switch backend is not enabled. Re-run with -Pkengine.switch=true.")
+                    throw GradleException(
+                        "Switch backend is not enabled. Re-run with -Pkengine.enableNintendoSwitch=true."
+                    )
                 }
             }
             return

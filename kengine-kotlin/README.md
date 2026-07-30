@@ -49,7 +49,7 @@ Kotlin's root `gradle.properties` disables Native by default, so the `-Pkotlin.n
 The helper also builds `:native:kotlin-native-utils:jar` first and publishes a tiny fork-local bootstrap override under `build/kengine-bootstrap-overrides/repo`. That lets Kotlin's included `native-build-tools` build use the forked target registry while generating runtime and stdlib artifacts. Because that local jar intentionally has the upstream bootstrap coordinate with forked contents, the helper disables Gradle dependency verification for these fork-local builds.
 The full upstream `:kotlin-native:dist` task is not required for this prototype and may fail in unrelated host cache generation, so the helper intentionally uses the smaller path above.
 
-After a successful build, `local.properties` points `kengine.kotlin.nativeHome` at the fork's generated Kotlin/Native distribution. If the forked compiler lists `switch_arm64`, the script also writes:
+After a successful build, `local.properties` points `kengine.switch.kotlinNativeHome` at the fork's generated Kotlin/Native distribution. If the forked compiler lists `switch_arm64`, the script also writes:
 
 ```properties
 kengine.switch.kotlinTarget=switch_arm64
@@ -60,29 +60,30 @@ kengine.switch.kotlinTarget=switch_arm64
 Inspect the configured compiler:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchToolchainInfo
 ```
 
 Compile the demo Kotlin static library with the configured local compiler:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileNintendoSwitchDemoKotlinStatic
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:compileNintendoSwitchDemoKotlinStatic
 ```
 
 Until the compiler fork has a real Switch target, the Switch module keeps using `linux_arm64` as the staging target. Once `switch_arm64` exists in the fork, `build-kotlin-native-dist.sh` configures that target in `kengine-kotlin/local.properties`.
 
-This intentionally swaps only the `kotlinc-native` executable used by `kengine-nintendo-switch`. Swapping the whole repository to a locally published Kotlin Gradle plugin is a separate step we should do later, after the forked compiler can compile the Switch probe.
+This intentionally swaps only the `kotlinc-native` executable used by `kengine-nintendo-switch`. The rest of the repository continues to use the stock Kotlin Gradle plugin pinned in `gradle/libs.versions.toml`.
 
 ## Gradle Helper Tasks
 
 The support module is included in the main Gradle build:
 
 ```bash
-jenv exec ./gradlew :kengine-kotlin:kotlinForkInfo
-jenv exec ./gradlew :kengine-kotlin:setupKotlinFork
-jenv exec ./gradlew :kengine-kotlin:buildKotlinNativeDist
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileNintendoSwitchDemoKotlinStatic
+./gradlew :kengine-kotlin:kotlinForkInfo
+./gradlew :kengine-kotlin:setupKotlinFork
+./gradlew :kengine-kotlin:buildKotlinNativeDist
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchToolchainInfo
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:validateSwitchKotlinToolchain
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:compileNintendoSwitchDemoKotlinStatic
 ```
 
 ## Why Not a Submodule?

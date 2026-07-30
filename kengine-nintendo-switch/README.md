@@ -6,18 +6,21 @@ The current prototype discovers game modules that apply `kengine.nintendo-switch
 This module is opt-in and is not part of the normal repo build:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchToolchainInfo
 ```
-
-If local `JAVA_HOME` points at `.jenv/versions/system`, prefer the explicit JDK 17 form:
-
-```bash
-JAVA_HOME="$(jenv prefix 17.0)" ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
-```
-
-The repo `.java-version` selects `17.0`, but a shell with `JENV_FORCEJAVAHOME=true` can still export the invalid `system` path before Gradle starts.
 
 ## Toolchain
+
+Normal Kengine modules use the stock Kotlin Gradle plugin. This module uses the Kengine Kotlin/Native fork only for its direct `kotlinc-native` and `cinterop` calls.
+
+The fork helper writes the machine-local compiler path to `kengine-kotlin/local.properties`:
+
+```properties
+kengine.switch.kotlinNativeHome=/path/to/kengine-kotlin-nintendo-switch/kotlin-native/dist
+kengine.switch.kotlinTarget=switch_arm64
+```
+
+For one-off overrides, use `-Pkengine.switch.kotlinNativeHome=/path/to/kotlin-native/dist` and `-Pkengine.switch.kotlinTarget=switch_arm64`.
 
 The macOS setup script installs and verifies the public homebrew toolchain:
 
@@ -53,7 +56,7 @@ ffmpeg
 Validate the libnx shell without Kotlin:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
 ```
 
 This artifact still uses the text console and prints the original smoke-test diagnostics.
@@ -61,7 +64,7 @@ This artifact still uses the text console and prints the original smoke-test dia
 Compile the Kotlin/Native static-library probe and shared kengine core sources:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileNintendoSwitchDemoKotlinStatic
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:compileNintendoSwitchDemoKotlinStatic
 ```
 
 Use a local Kotlin/Native compiler fork:
@@ -69,32 +72,33 @@ Use a local Kotlin/Native compiler fork:
 ```bash
 ./kengine-kotlin/setup-kotlin-fork.sh
 ./kengine-kotlin/build-kotlin-native-dist.sh
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchToolchainInfo
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:validateSwitchKotlinToolchain
 ```
 
 Attempt the Kotlin-linked NRO:
 
 ```bash
-jenv exec ./kengine-kotlin/build-kotlin-native-dist.sh
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchNro
+./kengine-kotlin/build-kotlin-native-dist.sh
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:buildSwitchNro
 ```
 
 List registered Switch games:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchGameInfo
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchGameInfo
 ```
 
 Build every registered Switch game:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchGameNros
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:buildSwitchGameNros
 ```
 
 Build the game-facing demo artifact:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :games:nintendo-switch-demo:buildSwitchNro
+./gradlew -Pkengine.enableNintendoSwitch=true :games:nintendo-switch-demo:buildSwitchNro
 ```
 
 Game artifact:
@@ -106,7 +110,7 @@ games/nintendo-switch-demo/build/switch/nintendo-switch-demo.nro
 Build the game-facing Hextris Switch artifact:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
+./gradlew -Pkengine.enableNintendoSwitch=true :games:hextris-switch:buildSwitchNro
 ```
 
 This build imports shared source and assets from `:games:hextris-core`, converts `games/hextris-core/sound/techno_boss_worm.ogg` to 48 kHz stereo PCM, converts declared sprite assets to raw RGBA, then embeds them in the NRO. Hextris SFX are currently short procedural voices mixed into the same audio stream from portable `playSound` commands.
@@ -120,7 +124,7 @@ games/hextris-switch/build/switch/hextris-switch.nro
 The same pure Kotlin game can also run through the normal Kengine SDL host:
 
 ```bash
-jenv exec ./gradlew :games:hextris-desktop:runDebugExecutableMacosArm64
+./gradlew :games:hextris-desktop:runDebugExecutableMacosArm64
 ```
 
 ## Current Shape
@@ -224,7 +228,7 @@ kengineNintendoSwitch {
 The game module gets a stable task:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
+./gradlew -Pkengine.enableNintendoSwitch=true :games:hextris-switch:buildSwitchNro
 ```
 
 The backend registers matching tasks from the game metadata, such as `:kengine-nintendo-switch:buildHextrisSwitchNro`, and writes intermediate outputs under `kengine-nintendo-switch/build/switch/games/<artifact>/`.

@@ -2,6 +2,8 @@
 
 Playdate SDK setup: https://play.date/dev/
 
+This module is opt-in and is not part of the normal repo build. Enable it with `-Pkengine.enablePlaydate=true`.
+
 ### Export SDK Path
 
 ```shell
@@ -10,7 +12,7 @@ export PATH=$PATH:$PLAYDATE_SDK_PATH/bin
 ```
 
 ```shell
-./gradlew build     # in project root
+./gradlew -Pkengine.enablePlaydate=true build     # in project root
 cd kengine-playdate/KenginePlaydate
 make clean && make
 # normally you'd just run make run, however there are some issues, so do the below

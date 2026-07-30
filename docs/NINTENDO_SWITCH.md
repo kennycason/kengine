@@ -2,10 +2,10 @@
 
 Kengine's Switch work is now an experimental, opt-in 2D homebrew backend. It no longer depends on waiting for SDL3-on-libnx support: the Switch host is a small C/libnx application that owns the framebuffer, input, audio output, and NRO packaging, while Kotlin/Native owns portable game state and emits command buffers.
 
-Switch modules are only included when Gradle is run with:
+Switch modules are only included when explicitly enabled:
 
 ```bash
--Pkengine.switch=true
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchToolchainInfo
 ```
 
 ## Current Direction
@@ -21,6 +21,19 @@ Near-term Switch support is focused on proving a complete 2D game loop:
 - write and reload save data.
 
 Networking and 3D are intentionally deferred until this 2D baseline is boring and repeatable.
+
+## Kotlin Toolchain Boundary
+
+Normal Kengine modules continue to use the stock Kotlin Gradle plugin pinned in `gradle/libs.versions.toml`. The Switch backend is the only place that uses the Kengine Kotlin/Native fork, and it does that by directly invoking a configured `kotlinc-native` executable.
+
+The fork helper writes the machine-local compiler path to `kengine-kotlin/local.properties`:
+
+```properties
+kengine.switch.kotlinNativeHome=/path/to/kengine-kotlin-nintendo-switch/kotlin-native/dist
+kengine.switch.kotlinTarget=switch_arm64
+```
+
+For one-off overrides, use `-Pkengine.switch.kotlinNativeHome=/path/to/kotlin-native/dist` and `-Pkengine.switch.kotlinTarget=switch_arm64`.
 
 ## Working Surface
 
@@ -75,33 +88,16 @@ Current Kengine storage shape:
 - Switch writes use temp-file replacement and call `fsdevCommitDevice()` after save/delete.
 - Hextris uses this path for high-score persistence and draws it as `BEST`.
 
-## Local Java
-
-Switch Gradle tasks require a real JDK 17. The repository `.java-version` currently selects `17.0`, but local shell setup can still override it.
-
-If Gradle fails with:
-
-```text
-JAVA_HOME=/Users/kenny/.jenv/versions/system
-```
-
-the problem is local shell state, not the Switch build. In the current environment, `JENV_FORCEJAVAHOME=true` exports that invalid `JAVA_HOME`, and `PATH` resolves `/usr/bin/java` before jenv shims. Use an explicit per-command Java home until shell init is fixed:
-
-```bash
-JAVA_HOME="$(jenv prefix 17.0)" ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
-```
-
-Longer-term, fix shell init so `~/.jenv/shims` appears before `/usr/bin` and so `JAVA_HOME` is not forced to `.jenv/versions/system`.
-
 ## Verification
 
 Useful build checks:
 
 ```bash
-JAVA_HOME="$(jenv prefix 17.0)" ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
-JAVA_HOME="$(jenv prefix 17.0)" ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchGameInfo
-JAVA_HOME="$(jenv prefix 17.0)" ./gradlew :kengine-core:allTests :games:hextris-core:allTests :games:nintendo-switch-demo:allTests
-JAVA_HOME="$(jenv prefix 17.0)" ./gradlew -Pkengine.switch=true :games:nintendo-switch-demo:buildSwitchNro :games:hextris-switch:buildSwitchNro
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchToolchainInfo
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:validateSwitchKotlinToolchain
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchGameInfo
+./gradlew :kengine-core:allTests :games:hextris-core:allTests :games:nintendo-switch-demo:allTests
+./gradlew -Pkengine.enableNintendoSwitch=true :games:nintendo-switch-demo:buildSwitchNro :games:hextris-switch:buildSwitchNro
 ```
 
 Current registered Switch game artifacts:

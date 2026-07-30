@@ -299,15 +299,10 @@ run_gradle_checks() {
 
     cd "$REPO_ROOT"
 
-    if command -v jenv >/dev/null 2>&1; then
-        jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
-        jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileNintendoSwitchDemoKotlinStatic
-        jenv exec ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
-    else
-        ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:switchToolchainInfo
-        ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:compileNintendoSwitchDemoKotlinStatic
-        ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
-    fi
+    ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchToolchainInfo
+    ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:validateSwitchKotlinToolchain
+    ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:compileNintendoSwitchDemoKotlinStatic
+    ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
 }
 
 log "This script will configure the devkitPro Switch homebrew toolchain for kengine-nintendo-switch."

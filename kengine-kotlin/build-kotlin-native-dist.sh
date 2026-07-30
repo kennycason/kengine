@@ -256,7 +256,7 @@ if [ "$UPDATE_LOCAL_PROPERTIES" -eq 1 ]; then
         printf 'kengine.kotlin.repo=%s\n' "$CHECKOUT_DIR"
         printf 'kengine.kotlin.version=%s\n' "$VERSION"
         printf 'kengine.kotlin.branch=%s\n' "$BRANCH"
-        printf 'kengine.kotlin.nativeHome=%s\n' "$NATIVE_HOME"
+        printf 'kengine.switch.kotlinNativeHome=%s\n' "$NATIVE_HOME"
         if [ "$SWITCH_TARGET_AVAILABLE" -eq 1 ]; then
             printf 'kengine.switch.kotlinTarget=switch_arm64\n'
         else

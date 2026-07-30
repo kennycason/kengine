@@ -6,7 +6,7 @@ The desktop build registers `assets/sprites/pokeball.bmp` and `assets/sprites/bl
 Run/build the desktop Kengine SDL version with the normal native executable tasks:
 
 ```bash
-jenv exec ./gradlew :games:nintendo-switch-demo:runDebugExecutableMacosArm64
+./gradlew :games:nintendo-switch-demo:runDebugExecutableMacosArm64
 ```
 
 Desktop controls:
@@ -25,7 +25,7 @@ Tab / backspace / controller select: perturb the checksum
 Build the game-facing NRO with the Switch backend enabled:
 
 ```bash
-jenv exec ./gradlew -Pkengine.switch=true :games:nintendo-switch-demo:buildSwitchNro
+./gradlew -Pkengine.enableNintendoSwitch=true :games:nintendo-switch-demo:buildSwitchNro
 ```
 
 Output:

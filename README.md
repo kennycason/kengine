@@ -941,8 +941,29 @@ bash sdl3/build_sdl.sh
 See [SDL3 Installation Guide](sdl3/README.md) for more details.
 
 Build the project:
+
 ```shell
 ./gradlew clean build
+```
+
+Nintendo Switch and Playdate modules are disabled by default. Enable them explicitly only when working on those backends.
+
+Build without tests:
+
+```shell
+./gradlew clean build -x allTests -x macosArm64Test -x jvmTest -x jsTest
+```
+
+Build with the experimental Nintendo Switch backend enabled:
+
+```shell
+./gradlew -Pkengine.enableNintendoSwitch=true :games:nintendo-switch-demo:buildSwitchNro
+```
+
+Build with the experimental Playdate backend enabled:
+
+```shell
+./gradlew -Pkengine.enablePlaydate=true :kengine-playdate:build
 ```
 
 Run specific tests:

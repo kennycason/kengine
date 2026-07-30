@@ -32,15 +32,19 @@ fun localProperty(name: String): String? {
     return kengineKotlinLocalProperties.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
 }
 
-fun configuredValue(propertyName: String, environmentName: String, defaultValue: String): String {
+data class ConfiguredKotlinNativeCompiler(
+    val executable: File,
+    val source: String
+)
+
+fun configuredValue(propertyName: String, defaultValue: String): String {
     providers.gradleProperty(propertyName).orNull?.let { return it }
-    providers.environmentVariable(environmentName).orNull?.let { return it }
     localProperty(propertyName)?.let { return it }
     return defaultValue
 }
 
 val kotlinTarget = providers.provider {
-    configuredValue("kengine.switch.kotlinTarget", "KENGINE_SWITCH_KOTLIN_TARGET", "linux_arm64")
+    configuredValue("kengine.switch.kotlinTarget", "linux_arm64")
 }
 
 val ffmpegExecutable = providers.gradleProperty("kengine.switch.ffmpeg")
@@ -51,36 +55,72 @@ fun envOrDefault(name: String, defaultValue: String): String {
     return providers.environmentVariable(name).orElse(defaultValue).get()
 }
 
+fun configuredKotlincNative(): ConfiguredKotlinNativeCompiler {
+    providers.gradleProperty("kengine.switch.kotlinNativeHome").orNull?.let {
+        return ConfiguredKotlinNativeCompiler(
+            file(it).resolve("bin/kotlinc-native"),
+            "Gradle property kengine.switch.kotlinNativeHome"
+        )
+    }
+    localProperty("kengine.switch.kotlinNativeHome")?.let {
+        return ConfiguredKotlinNativeCompiler(
+            file(it).resolve("bin/kotlinc-native"),
+            "kengine-kotlin/local.properties kengine.switch.kotlinNativeHome"
+        )
+    }
+
+    throw GradleException(
+        "Switch Kotlin/Native home is not configured. Run ./kengine-kotlin/build-kotlin-native-dist.sh " +
+            "or set -Pkengine.switch.kotlinNativeHome=/path/to/kotlin-native/dist."
+    )
+}
+
 fun kotlincNative(): File {
-    providers.gradleProperty("kengine.switch.kotlincNative").orNull?.let { return file(it) }
-    providers.environmentVariable("KOTLINC_NATIVE").orNull?.let { return file(it) }
-    localProperty("kengine.switch.kotlincNative")?.let { return file(it) }
-
-    providers.gradleProperty("kengine.kotlin.nativeHome").orNull?.let {
-        return file(it).resolve("bin/kotlinc-native")
-    }
-    providers.environmentVariable("KENGINE_KOTLIN_NATIVE_HOME").orNull?.let {
-        return file(it).resolve("bin/kotlinc-native")
-    }
-    localProperty("kengine.kotlin.nativeHome")?.let {
-        return file(it).resolve("bin/kotlinc-native")
-    }
-
-    val osName = System.getProperty("os.name")
-    val arch = System.getProperty("os.arch")
-    val host = when {
-        osName == "Mac OS X" && arch == "aarch64" -> "macos-aarch64"
-        osName == "Mac OS X" -> "macos-x86_64"
-        osName == "Linux" -> "linux-x86_64"
-        osName.startsWith("Windows") -> "windows-x86_64"
-        else -> throw GradleException("Unsupported Kotlin/Native host OS [$osName].")
-    }
-
-    return file("${System.getProperty("user.home")}/.konan/kotlin-native-prebuilt-$host-${libs.versions.kotlin.get()}/bin/kotlinc-native")
+    return configuredKotlincNative().executable
 }
 
 fun cinterop(): File {
     return kotlincNative().parentFile.resolve("cinterop")
+}
+
+fun kotlinNativeTargets(compiler: File): List<String> {
+    if (!compiler.isFile) {
+        return emptyList()
+    }
+
+    val output = try {
+        val process = ProcessBuilder(compiler.absolutePath, "-list-targets")
+            .redirectErrorStream(true)
+            .start()
+        val text = process.inputStream.bufferedReader().use { it.readText() }
+        val exitCode = process.waitFor()
+        if (exitCode != 0) {
+            return emptyList()
+        }
+        text
+    } catch (_: Exception) {
+        return emptyList()
+    }
+
+    return output.lineSequence()
+        .map { it.trim().substringBefore(" ") }
+        .filter { it.isNotEmpty() }
+        .toList()
+}
+
+fun validateKotlinNativeTarget(compiler: File, target: String) {
+    if (!compiler.canExecute()) {
+        throw GradleException("Kotlin/Native compiler is not executable: ${compiler.absolutePath}")
+    }
+
+    val targets = kotlinNativeTargets(compiler)
+    if (targets.isNotEmpty() && target !in targets) {
+        throw GradleException(
+            "Kotlin/Native compiler at ${compiler.absolutePath} does not list target '$target'. " +
+                "Configure the Switch fork with -Pkengine.switch.kotlinNativeHome=/path/to/kotlin-native/dist. " +
+                "Available targets include: ${targets.take(12).joinToString(", ")}"
+        )
+    }
 }
 
 fun devkitPro(): File {
@@ -167,17 +207,39 @@ tasks.register("switchToolchainInfo") {
     description = "Prints the experimental Switch toolchain paths used by this module."
 
     doLast {
-        val compiler = kotlincNative()
+        val compilerConfig = configuredKotlincNative()
+        val compiler = compilerConfig.executable
+        val targets = kotlinNativeTargets(compiler)
+        val target = kotlinTarget.get()
         val devkitProDir = devkitPro()
         val devkitA64Dir = devkitA64()
         println("Kotlin/Native compiler: ${compiler.absolutePath} (${compiler.exists()})")
-        println("Kotlin/Native target probe: ${kotlinTarget.get()}")
+        println("Kotlin/Native compiler source: ${compilerConfig.source}")
+        println("Kotlin/Native target: $target")
+        println("Kotlin/Native target supported: ${if (targets.isEmpty()) "(not probed)" else target in targets}")
         println("Kengine Kotlin fork: ${localProperty("kengine.kotlin.repo") ?: "(not configured)"}")
+        println("Switch Kotlin/Native home property: kengine.switch.kotlinNativeHome")
         println("DEVKITPRO: ${devkitProDir.absolutePath} (${devkitProDir.exists()})")
         println("DEVKITA64: ${devkitA64Dir.absolutePath} (${devkitA64Dir.exists()})")
         println("aarch64-none-elf-gcc: ${devkitA64Dir.resolve("bin/aarch64-none-elf-gcc").absolutePath}")
         println("nacptool: ${devkitProDir.resolve("tools/bin/nacptool").absolutePath}")
         println("elf2nro: ${devkitProDir.resolve("tools/bin/elf2nro").absolutePath}")
+    }
+}
+
+tasks.register("validateSwitchKotlinToolchain") {
+    group = "switch"
+    description = "Validates that the configured Switch Kotlin/Native compiler supports the selected target."
+
+    doLast {
+        val compilerConfig = configuredKotlincNative()
+        val compiler = tool(
+            compilerConfig.executable,
+            "Configure the Switch Kotlin/Native fork with kengine.switch.kotlinNativeHome."
+        )
+        val target = kotlinTarget.get()
+        validateKotlinNativeTarget(compiler, target)
+        println("Switch Kotlin/Native toolchain OK: $target via ${compiler.absolutePath}")
     }
 }
 
@@ -344,9 +406,14 @@ fun registerSwitchGameBuild(
         outputs.file(storageInteropKlib)
 
         doFirst {
+            val compiler = tool(
+                kotlincNative(),
+                "Configure the Switch Kotlin/Native fork with kengine.switch.kotlinNativeHome."
+            )
+            validateKotlinNativeTarget(compiler, kotlinTarget.get())
             val interop = tool(
                 cinterop(),
-                "Set -Pkengine.switch.kotlincNative=/path/to/kotlinc-native or KOTLIN_NATIVE_HOME with cinterop."
+                "Set -Pkengine.switch.kotlinNativeHome=/path/to/kotlin-native/dist with cinterop."
             )
             storageInteropBase.get().asFile.parentFile.mkdirs()
             commandLine(
@@ -400,8 +467,9 @@ fun registerSwitchGameBuild(
         doFirst {
             val compiler = tool(
                 kotlincNative(),
-                "Set -Pkengine.switch.kotlincNative=/path/to/kotlinc-native or KOTLINC_NATIVE."
+                "Set -Pkengine.switch.kotlinNativeHome=/path/to/kotlin-native/dist."
             )
+            validateKotlinNativeTarget(compiler, kotlinTarget.get())
             kotlinOutputBase.get().asFile.parentFile.mkdirs()
             commandLine(
                 compiler.absolutePath,

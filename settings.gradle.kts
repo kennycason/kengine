@@ -7,12 +7,12 @@ pluginManagement {
 
 rootProject.name = "kengine"
 
-// Playdate requires explicit opt-in via -Pkengine.playdate=true
+// Playdate requires explicit opt-in via -Pkengine.enablePlaydate=true.
 // Kotlin/Native's linuxArm32Hfp emits ARMv4 code incompatible with Playdate's Cortex-M7 (ARMv7E-M)
-val isPlaydateEnabled = extra.properties["kengine.playdate"]?.toString()?.toBoolean() == true
+val isPlaydateEnabled = extra.properties["kengine.enablePlaydate"]?.toString()?.toBoolean() == true
 println("Playdate enabled: $isPlaydateEnabled")
 
-val isSwitchEnabled = extra.properties["kengine.switch"]?.toString()?.toBoolean() == true
+val isSwitchEnabled = extra.properties["kengine.enableNintendoSwitch"]?.toString()?.toBoolean() == true
 println("Switch enabled: $isSwitchEnabled")
 
 val modules = mutableListOf(
