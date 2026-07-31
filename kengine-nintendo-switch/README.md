@@ -121,6 +121,20 @@ Game artifact:
 games/hextris-switch/build/switch/hextris-switch.nro
 ```
 
+Build the 2D diagnostics Switch artifact:
+
+```bash
+./gradlew -Pkengine.enableNintendoSwitch=true :games:nintendo-switch-2d-diagnostics:buildSwitchNro
+```
+
+This build exercises the portable 2D contract directly: sprite alpha/tint/scale/clipping/offscreen frames, sprite-sheet frame selection, text glyphs, lines, fills, gradients, SFX overlap, music stop/restart, lifecycle cleanup, and render-command overflow behavior.
+
+Game artifact:
+
+```text
+games/nintendo-switch-2d-diagnostics/build/switch/nintendo-switch-2d-diagnostics.nro
+```
+
 The same pure Kotlin game can also run through the normal Kengine SDL host:
 
 ```bash

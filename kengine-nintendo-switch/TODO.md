@@ -28,6 +28,7 @@
   - Kotlin copies each frame's render command list into a C-owned buffer with one ABI call.
   - `:games:nintendo-switch-demo:buildSwitchNro` now copies the backend output to `games/nintendo-switch-demo/build/switch/nintendo-switch-demo.nro`.
   - `:games:hextris-switch:buildSwitchNro` now builds a separate backend artifact and copies it to `games/hextris-switch/build/switch/hextris-switch.nro`.
+  - `:games:nintendo-switch-2d-diagnostics:buildSwitchNro` now builds a focused 2D diagnostics artifact at `games/nintendo-switch-2d-diagnostics/build/switch/nintendo-switch-2d-diagnostics.nro`.
   - C executes the copied render commands such as vertical gradient and filled rectangles.
   - The same `:games:nintendo-switch-demo` game also runs on desktop through `PortableGameAdapter` and `RenderContextSdlRenderer` in `:kengine`.
   - The desktop adapter maps arrow keys, WASD, D-pad, left stick, and controller face buttons into the same shared `InputState`.
@@ -36,7 +37,7 @@
   - Shared render commands now include filled rectangles, vertical gradients, lines, sprite draws, and bitmap text across both SDL and Switch framebuffer hosts.
   - Desktop sprite commands resolve through `PortableSpriteRegistry` into the existing Kengine `SpriteContext` / `TextureManager` path.
   - Desktop sprite-sheet commands resolve through the same registry into existing `SpriteSheet` tile selection using the shared render-command `frame` field.
-  - Switch sprite commands currently render through a software-pattern sprite fallback; the game-facing API is ready for a later BMP/PNG decoder or prepacked pixel implementation.
+  - Switch sprite commands render embedded raw RGBA sprite and sprite-sheet assets generated during the Gradle build.
   - Switch text commands fetch the frame-local Kotlin string by command index and render it with a built-in 5x7 software font.
   - Switch game selection now uses a generated Kotlin `PortableGame` factory per backend NRO task instead of hardcoding one game class in `KengineSwitchRuntime`.
   - The Switch command buffer is now sized for denser game screens such as Hextris' 15x25 board.
@@ -73,56 +74,39 @@
   - Strict disassembly search found no exact `tpidr_el0` instructions in the linked Switch game ELF.
   - Broad linked-ELF scans still find `tpidrro_el0` in libnx/newlib symbols such as `armGetTls`, mutexes, applet, and filesystem helpers. That is expected platform TLS, not the Kotlin `ThreadRegistry::currentThreadDataNode_` failure mode.
 
-Conclusion: we are not stuck in a loop. The known generated-glue, stale-runtime-bitcode, and direct-Kotlin-TLS failure modes have been addressed in the built ELF, and the Kotlin-linked NRO now launches in Ryujinx. The latest build runs one pure Kotlin game from `:games:nintendo-switch-demo` through shared input and render-context contracts on both Kengine/SDL desktop and C/libnx Switch hosts.
+Conclusion: we are not stuck in a loop. The known generated-glue, stale-runtime-bitcode, and direct-Kotlin-TLS failure modes have been addressed in the built ELF, and Kotlin-linked game-facing NROs now launch in Ryujinx. The latest builds run pure Kotlin portable games through shared input, render, audio, asset, and storage contracts on both Kengine/SDL desktop and C/libnx Switch hosts.
 
 ## Next Steps
 
-1. Launch the rebuilt `games/nintendo-switch-demo/build/switch/nintendo-switch-demo.nro` in Ryujinx and confirm the current 2D command-transfer build still shows:
-   - a moving software-rendered square over a changing background,
-   - visible `KENGINE SWITCH` HUD text,
-   - responsive movement from the D-pad / left stick,
-   - faster color changes while holding `A`,
-   - color changes while holding `X` or `Y`,
-   - size pulsing while holding `B`,
-   - slower/faster manual movement while holding `L`/`R`,
-   - exit only when pressing `Minus + Plus`.
-2. Launch `games/hextris-switch/build/switch/hextris-switch.nro` in Ryujinx and confirm:
-   - a playable falling-block board,
-   - square software-rendered block sprites,
-   - score/level/lines text,
-   - D-pad movement, soft drop, hard drop, rotation, pause, and reset.
-3. Validate Hextris high-score persistence in Ryujinx:
-   - create a score above `0`,
-   - confirm the on-screen `BEST` value updates,
-   - exit cleanly with `Minus + Plus`,
-   - relaunch,
-   - verify `BEST` reloads,
-   - verify corrupt/missing storage falls back safely.
-4. If Ryujinx save/reload fails, inspect the emulator SD-card filesystem for `switch/kengine/saves/hextris.high-score.dat`.
-5. Decide whether the homebrew SD-card backend is enough for this phase or whether to move next to a true mounted save-data backend.
-6. After storage is manually validated, do a 2D support matrix pass:
-   - sprite transparency, tinting, scaling, frame selection, and clipping,
-   - text glyph coverage and positioning,
-   - audio start/stop/retrigger behavior,
-   - input mapping, pause/reset, and lifecycle cleanup.
-7. If a Switch launch crashes, copy the new Ryujinx failure into `kengine-nintendo-switch/error.log`.
-8. Map the new guest PC and stack addresses with `addr2line`.
-9. Decide whether the next failure is:
+1. Build `games/nintendo-switch-2d-diagnostics/build/switch/nintendo-switch-2d-diagnostics.nro`.
+2. Launch the diagnostics NRO in Ryujinx and verify:
+   - sprite transparency, tinting, scaling, clipping/offscreen draws, and sprite-sheet frame selection,
+   - text glyph coverage, text scale, lines, translucent fills, and gradients,
+   - declared SFX overlap, sound-only playback, music stop/restart, and volume changes,
+   - command-buffer overflow counters when stress mode exceeds the current budget,
+   - cleanup and restart behavior after exiting and relaunching.
+3. Record the highest stable emulator command count from the performance page before drops appear.
+4. Repeat the same diagnostics pass on hardware when available and compare the stable command count against Ryujinx.
+5. Keep Hextris as the real-game regression pass for board rendering, sprite blocks, score/level/lines text, movement, rotation, pause/reset, music, SFX, and high-score persistence.
+6. If a Switch launch crashes, copy the new Ryujinx failure into `kengine-nintendo-switch/error.log`.
+7. Map the new guest PC and stack addresses with `addr2line`.
+8. Decide whether the next failure is:
    - another Kotlin runtime portability issue,
    - emulated TLS initialization/destructor behavior,
    - libnx/devkitPro integration,
    - or our C/Kotlin boundary code.
-10. Keep networking and 3D deferred until the 2D/runtime checklist is stable.
+9. Keep networking and 3D deferred until the 2D/runtime checklist is stable.
 
 ## Useful Commands
 
 ```bash
-JAVA_HOME="$(jenv prefix 17.0)" ./kengine-kotlin/build-kotlin-native-dist.sh
-JAVA_HOME="$(jenv prefix 17.0)" ./gradlew :games:nintendo-switch-demo:runDebugExecutableMacosArm64
-JAVA_HOME="$(jenv prefix 17.0)" ./gradlew -Pkengine.switch=true :games:nintendo-switch-demo:buildSwitchNro
-JAVA_HOME="$(jenv prefix 17.0)" ./gradlew -Pkengine.switch=true :games:hextris-switch:buildSwitchNro
-JAVA_HOME="$(jenv prefix 17.0)" ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:clean :kengine-nintendo-switch:buildSwitchNro
-JAVA_HOME="$(jenv prefix 17.0)" ./gradlew -Pkengine.switch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
+./kengine-kotlin/build-kotlin-native-dist.sh
+./gradlew :games:nintendo-switch-demo:runDebugExecutableMacosArm64
+./gradlew -Pkengine.enableNintendoSwitch=true :games:nintendo-switch-demo:buildSwitchNro
+./gradlew -Pkengine.enableNintendoSwitch=true :games:hextris-switch:buildSwitchNro
+./gradlew -Pkengine.enableNintendoSwitch=true :games:nintendo-switch-2d-diagnostics:buildSwitchNro
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:buildSwitchGameNros
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:buildSwitchCOnlyNro
 ```
 
 Disassembly checks:

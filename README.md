@@ -960,6 +960,63 @@ Build the current game-facing Nintendo Switch NROs:
 ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:buildSwitchGameNros
 ```
 
+Build the Nintendo Switch 2D diagnostics NRO:
+
+```shell
+./gradlew -Pkengine.enableNintendoSwitch=true :games:nintendo-switch-2d-diagnostics:buildSwitchNro
+```
+
+Hextris shows the intended portable game shape:
+
+- `:games:hextris-core` owns shared Kotlin gameplay, render/audio commands, storage keys, and portable asset declarations.
+- `:games:hextris-desktop` owns only the SDL desktop launcher and desktop packaging.
+- `:games:hextris-switch` owns only Switch artifact metadata and imports source/assets from core.
+
+Switch configuration is intentionally small:
+
+```kotlin
+plugins {
+    id("kengine.nintendo-switch-game")
+}
+
+group = "kengine.hextris-switch"
+version = "1.0.0"
+
+kengineNintendoSwitch {
+    artifactBaseName.set("hextris-switch")
+    displayName.set("Hextris Switch")
+    iconSource.set(layout.projectDirectory.file("assets/icon.jpg"))
+    mainClass.set("hextris.HextrisGame")
+    gameSourceProject(project(":games:hextris-core"))
+    assetsFrom(project(":games:hextris-core"))
+}
+```
+
+The desktop launcher is similarly direct:
+
+```kotlin
+import com.kengine.PortableGameRunner
+import com.kengine.createGameContext
+import com.kengine.log.Logger
+import hextris.HextrisGame
+
+fun main() {
+    createGameContext(
+        title = "Kengine - Hextris Desktop",
+        width = 1280,
+        height = 720,
+        logLevel = Logger.Level.INFO
+    ) {
+        PortableGameRunner(
+            frameRate = 60,
+            commandCapacity = 1024
+        ) {
+            HextrisGame()
+        }
+    }
+}
+```
+
 Build with the experimental Playdate backend enabled:
 
 ```shell

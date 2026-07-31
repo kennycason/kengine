@@ -55,7 +55,8 @@ modules.addAll(
         "games:osc3x-synth",
         "games:osc3x-synth-v2",
         "games:physics-demo",
-        "games:rubiks-cube-3d"
+        "games:rubiks-cube-3d",
+        "games:nintendo-switch-2d-diagnostics"
     )
 )
 

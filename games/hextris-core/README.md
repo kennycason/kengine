@@ -1,6 +1,8 @@
 # Hextris Core
 
-Shared portable Hextris game logic, rendering commands, audio commands, and asset declarations. Platform modules such as `:games:hextris-desktop` and `:games:hextris-switch` instantiate `hextris.HextrisGame` instead of duplicating gameplay code or asset names.
+Shared portable Hextris game logic, rendering commands, audio commands, storage keys, and asset declarations. Platform modules such as `:games:hextris-desktop` and `:games:hextris-switch` instantiate `hextris.HextrisGame` instead of duplicating gameplay code or asset names.
+
+This is the intended Kengine pattern: keep game behavior and portable assets in core, then make each platform module a small host wrapper.
 
 The module declares portable assets with `kenginePortableAssets`:
 

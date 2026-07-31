@@ -1,5 +1,3 @@
-import org.gradle.api.tasks.Copy
-
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     id("kengine.packaging")
@@ -12,51 +10,7 @@ repositories {
     mavenCentral()
 }
 
-val hextrisCoreProject = project(":games:hextris-core")
-val copyDebugPortableAssets by tasks.registering(Copy::class) {
-    from(hextrisCoreProject.layout.projectDirectory.dir("assets")) {
-        into("assets")
-    }
-    from(hextrisCoreProject.layout.projectDirectory.dir("sound")) {
-        into("sound")
-    }
-    into(layout.buildDirectory.dir(KengineHostTarget.binPath("debugExecutable")))
-}
-
-val copyReleasePortableAssets by tasks.registering(Copy::class) {
-    from(hextrisCoreProject.layout.projectDirectory.dir("assets")) {
-        into("assets")
-    }
-    from(hextrisCoreProject.layout.projectDirectory.dir("sound")) {
-        into("sound")
-    }
-    into(layout.buildDirectory.dir(KengineHostTarget.binPath("releaseExecutable")))
-}
-
-tasks.named("build") {
-    dependsOn(copyDebugPortableAssets, copyReleasePortableAssets)
-}
-
-tasks.matching { task ->
-    task.name.startsWith("run") && task.name.contains("Executable")
-}.configureEach {
-    dependsOn(copyDebugPortableAssets)
-}
-
-tasks.matching { it.name == "packageMacApp" }.configureEach {
-    dependsOn(copyReleasePortableAssets)
-    doLast {
-        copy {
-            from(hextrisCoreProject.layout.projectDirectory.dir("assets")) {
-                into("assets")
-            }
-            from(hextrisCoreProject.layout.projectDirectory.dir("sound")) {
-                into("sound")
-            }
-            into(layout.buildDirectory.dir("dist/Hextris-desktop.app/Contents/Resources"))
-        }
-    }
-}
+configureKenginePortableGameAssets(project(":games:hextris-core"))
 
 kotlin {
     jvm()

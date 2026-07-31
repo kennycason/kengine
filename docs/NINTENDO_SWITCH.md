@@ -100,7 +100,7 @@ Useful build checks:
 ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchToolchainInfo
 ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:validateSwitchKotlinToolchain
 ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchGameInfo
-./gradlew :kengine-core:allTests :games:hextris-core:allTests :games:nintendo-switch-demo:allTests
+./gradlew :kengine-core:allTests :games:hextris-core:allTests :games:nintendo-switch-demo:allTests :games:nintendo-switch-2d-diagnostics:allTests
 ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:buildSwitchGameNros
 ```
 
@@ -109,6 +109,7 @@ Current registered Switch game artifacts:
 ```text
 games/nintendo-switch-demo/build/switch/nintendo-switch-demo.nro
 games/hextris-switch/build/switch/hextris-switch.nro
+games/nintendo-switch-2d-diagnostics/build/switch/nintendo-switch-2d-diagnostics.nro
 ```
 
 Manual Ryujinx validation should cover:
@@ -123,17 +124,18 @@ Manual Ryujinx validation should cover:
 - movement, soft drop, hard drop, rotation, pause, and reset,
 - music loop and one-shot sound effects,
 - Hextris save, quit, relaunch, and `BEST` reload.
+- 2D diagnostics pages for sprite alpha/tint/scale/clipping/offscreen frames, text glyphs, line/fill/gradient coverage, SFX overlap, music stop/restart, lifecycle cleanup, and render-command overflow behavior.
 
 ## Next Step
 
-The next Switch task should be a focused 2D diagnostics pass that exercises platform behavior beyond the happy-path Hextris loop.
+The next Switch task is to run the dedicated diagnostics NRO in Ryujinx and then on hardware, record the current 2D budget, and fix anything the stress pages expose.
 
 Concrete order:
 
-1. Add a small Switch-focused diagnostics scene or expand `:games:nintendo-switch-demo`.
-2. Cover sprite transparency, tint, scaling, clipping/offscreen draws, and sprite-sheet frame selection.
-3. Cover text glyphs, line/fill/gradient edge cases, command-buffer overflow, and lifecycle cleanup/restart.
-4. Cover declared SFX playback overlap, sound-only playback, music restart/stop behavior, and volume changes.
-5. Validate the diagnostics NRO in Ryujinx, then on hardware when available.
+1. Build `:games:nintendo-switch-2d-diagnostics:buildSwitchNro`.
+2. In Ryujinx, step through all pages and verify sprite transparency/tint/scale/clipping/offscreen draws, sprite-sheet frames, text glyphs, lines, fills, gradients, declared SFX overlap, music stop/restart, and lifecycle cleanup.
+3. On the performance page, raise the stress count until drops appear, then record the highest stable command count for the emulator.
+4. Repeat the same pass on hardware when available and compare the stable command count against Ryujinx.
+5. If command overflow happens below the current expected game load, reduce per-frame command volume or add a host-side batching path before broadening the portable 2D API.
 
 Homebrew SD-card saves are the intended storage target for now.

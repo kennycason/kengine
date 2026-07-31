@@ -1,17 +1,56 @@
 # Hextris Desktop
 
-SDL desktop host for the shared portable Hextris game in `:games:hextris-core`. This module owns the native executable and runtime asset copy tasks; gameplay, layout, sprite names, and asset declarations live in core and are loaded from `HextrisGame.assets`.
+SDL desktop host for the shared portable Hextris game in `:games:hextris-core`. This module owns the native executable and launcher; gameplay, layout, sprite names, and asset declarations live in core and are loaded from `HextrisGame.assets`.
+
+The desktop Gradle file points at core for runtime assets:
+
+```kotlin
+plugins {
+    alias(libs.plugins.kotlinMultiplatform)
+    id("kengine.packaging")
+}
+
+group = "kengine.hextris-desktop"
+version = "1.0.0"
+
+configureKenginePortableGameAssets(project(":games:hextris-core"))
+```
+
+The launcher is just a normal Kengine context running the portable game:
+
+```kotlin
+import com.kengine.PortableGameRunner
+import com.kengine.createGameContext
+import com.kengine.log.Logger
+import hextris.HextrisGame
+
+fun main() {
+    createGameContext(
+        title = "Kengine - Hextris Desktop",
+        width = 1280,
+        height = 720,
+        logLevel = Logger.Level.INFO
+    ) {
+        PortableGameRunner(
+            frameRate = 60,
+            commandCapacity = 1024
+        ) {
+            HextrisGame()
+        }
+    }
+}
+```
 
 Run:
 
 ```bash
-jenv exec ./gradlew :games:hextris-desktop:runDebugExecutableMacosArm64
+./gradlew :games:hextris-desktop:runDebugExecutableMacosArm64
 ```
 
 Build:
 
 ```bash
-jenv exec ./gradlew :games:hextris-desktop:linkDebugExecutableMacosArm64
+./gradlew :games:hextris-desktop:linkDebugExecutableMacosArm64
 ```
 
 The desktop window is 1280x720 to match the Switch layout.
