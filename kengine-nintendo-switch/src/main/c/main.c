@@ -12,6 +12,9 @@
 #ifdef KENGINE_SWITCH_SPRITE_ASSETS
 #include "kengine_switch_sprite_assets.h"
 #endif
+#ifdef KENGINE_SWITCH_SOUND_ASSETS
+#include "kengine_switch_sound_assets.h"
+#endif
 
 #define FB_WIDTH 1280
 #define FB_HEIGHT 720
@@ -858,9 +861,11 @@ static void draw_kengine_frame(Framebuffer* framebuffer) {
     framebufferEnd(framebuffer);
 }
 
+#if defined(KENGINE_SWITCH_EMBEDDED_MUSIC) || defined(KENGINE_SWITCH_SOUND_ASSETS)
 #ifdef KENGINE_SWITCH_EMBEDDED_MUSIC
 extern const u8 _binary_music_pcm_start[];
 extern const u8 _binary_music_pcm_end[];
+#endif
 
 #define KENGINE_AUDIO_BUFFER_COUNT 4
 #define KENGINE_AUDIO_SAMPLE_RATE 48000
@@ -877,11 +882,9 @@ typedef struct {
     int age_samples;
     int duration_samples;
     int volume;
-    int start_frequency;
-    int end_frequency;
-    int noise_amount;
-    u32 phase;
-    u32 noise;
+    const u8* pcm_start;
+    const u8* pcm_end;
+    size_t pcm_offset;
 } KengineSwitchSfxVoice;
 
 typedef struct {
@@ -898,63 +901,46 @@ typedef struct {
 static KengineSwitchAudioState g_audio_state;
 
 static size_t kengine_switch_music_size(void) {
+#ifdef KENGINE_SWITCH_EMBEDDED_MUSIC
     return (size_t)(_binary_music_pcm_end - _binary_music_pcm_start);
+#else
+    return 0;
+#endif
 }
 
 static int clamp_sample(int value) {
     return clamp_int(value, -32768, 32767);
 }
 
-static int kengine_switch_audio_stable_id(const char* prefix, const char* name) {
-    u32 hash = 2166136261u;
-
-    for (const char* cursor = prefix; *cursor != '\0'; ++cursor) {
-        hash ^= (u8)(*cursor);
-        hash *= 16777619u;
-    }
-    for (const char* cursor = name; *cursor != '\0'; ++cursor) {
-        hash ^= (u8)(*cursor);
-        hash *= 16777619u;
-    }
-
-    return hash == 0 ? 1 : (int)hash;
-}
-
-static bool kengine_switch_audio_matches_sound(int asset_id, const char* name) {
-    return asset_id == kengine_switch_audio_stable_id("sound:", name);
-}
-
-static u32 kengine_switch_audio_frequency_step(int frequency) {
-    return (u32)(((u64)frequency << 32) / KENGINE_AUDIO_SAMPLE_RATE);
+static int read_s16_le(const u8* value) {
+    return (s16)((u16)value[0] | ((u16)value[1] << 8));
 }
 
 static int kengine_switch_sfx_sample(KengineSwitchSfxVoice* voice) {
     if (!voice->active || voice->duration_samples <= 0) {
         return 0;
     }
-    if (voice->age_samples >= voice->duration_samples) {
+
+    if (voice->pcm_start == NULL || voice->pcm_end == NULL) {
         voice->active = false;
         return 0;
     }
 
-    int frequency = voice->start_frequency +
-        ((voice->end_frequency - voice->start_frequency) * voice->age_samples) / voice->duration_samples;
-    voice->phase += kengine_switch_audio_frequency_step(frequency);
-
-    int wave = (voice->phase & 0x80000000u) != 0 ? 1 : -1;
-    if (voice->noise_amount > 0) {
-        voice->noise = voice->noise * 1664525u + 1013904223u;
-        int noise_wave = (voice->noise & 0x80000000u) != 0 ? 1 : -1;
-        wave = (wave * (255 - voice->noise_amount) + noise_wave * voice->noise_amount) / 255;
+    size_t pcm_size = (size_t)(voice->pcm_end - voice->pcm_start);
+    if (voice->pcm_offset + 3 >= pcm_size || voice->age_samples >= voice->duration_samples) {
+        voice->active = false;
+        return 0;
     }
 
-    int remaining = voice->duration_samples - voice->age_samples;
-    int amplitude = (voice->volume * 40 * remaining) / voice->duration_samples;
+    const u8* source = voice->pcm_start + voice->pcm_offset;
+    int left = read_s16_le(source);
+    int right = read_s16_le(source + 2);
+    voice->pcm_offset += KENGINE_AUDIO_CHANNEL_COUNT * KENGINE_AUDIO_BYTES_PER_SAMPLE;
     voice->age_samples += 1;
     if (voice->age_samples >= voice->duration_samples) {
         voice->active = false;
     }
-    return wave * amplitude;
+    return (((left + right) / 2) * voice->volume) / 255;
 }
 
 static int kengine_switch_audio_sfx_sample(void) {
@@ -983,25 +969,31 @@ static void kengine_switch_audio_mix_sfx(void* destination, size_t destination_s
 }
 
 static void kengine_switch_audio_fill(void* destination, size_t destination_size) {
-    size_t music_size = kengine_switch_music_size();
-    if (destination == NULL || destination_size == 0 || music_size == 0) {
+    if (destination == NULL || destination_size == 0) {
         return;
     }
 
     u8* output = (u8*)destination;
-    size_t written = 0;
-    while (written < destination_size) {
-        size_t remaining_music = music_size - g_audio_state.music_offset;
-        size_t remaining_output = destination_size - written;
-        size_t chunk_size = remaining_music < remaining_output ? remaining_music : remaining_output;
+    memset(output, 0, destination_size);
 
-        memcpy(output + written, _binary_music_pcm_start + g_audio_state.music_offset, chunk_size);
-        written += chunk_size;
-        g_audio_state.music_offset += chunk_size;
-        if (g_audio_state.music_offset >= music_size) {
-            g_audio_state.music_offset = 0;
+#ifdef KENGINE_SWITCH_EMBEDDED_MUSIC
+    size_t music_size = kengine_switch_music_size();
+    if (music_size > 0 && g_audio_state.current_asset_id != 0) {
+        size_t written = 0;
+        while (written < destination_size) {
+            size_t remaining_music = music_size - g_audio_state.music_offset;
+            size_t remaining_output = destination_size - written;
+            size_t chunk_size = remaining_music < remaining_output ? remaining_music : remaining_output;
+
+            memcpy(output + written, _binary_music_pcm_start + g_audio_state.music_offset, chunk_size);
+            written += chunk_size;
+            g_audio_state.music_offset += chunk_size;
+            if (g_audio_state.music_offset >= music_size) {
+                g_audio_state.music_offset = 0;
+            }
         }
     }
+#endif
 
     kengine_switch_audio_mix_sfx(destination, destination_size);
     armDCacheFlush(destination, destination_size);
@@ -1026,29 +1018,15 @@ static void kengine_switch_audio_stop(void) {
     memset(&g_audio_state, 0, sizeof(g_audio_state));
 }
 
-static void kengine_switch_audio_loop_music(int asset_id, int volume) {
-    if (asset_id == 0) {
-        return;
-    }
-    if (g_audio_state.playing && g_audio_state.current_asset_id == asset_id) {
-        audoutSetAudioOutVolume((float)clamp_int(volume, 0, 255) / 255.0f);
-        return;
-    }
+static bool kengine_switch_audio_start_output(int volume) {
     if (g_audio_state.audout_initialized) {
-        kengine_switch_audio_stop();
-    }
-
-    memset(&g_audio_state, 0, sizeof(g_audio_state));
-    g_audio_state.current_asset_id = asset_id;
-
-    size_t music_size = kengine_switch_music_size();
-    if (music_size == 0) {
-        return;
+        audoutSetAudioOutVolume((float)clamp_int(volume, 0, 255) / 255.0f);
+        return true;
     }
 
     Result result = audoutInitialize();
     if (R_FAILED(result)) {
-        return;
+        return false;
     }
     g_audio_state.audout_initialized = true;
 
@@ -1056,20 +1034,20 @@ static void kengine_switch_audio_loop_music(int asset_id, int volume) {
         audoutGetChannelCount() != KENGINE_AUDIO_CHANNEL_COUNT ||
         audoutGetPcmFormat() != PcmFormat_Int16) {
         kengine_switch_audio_stop();
-        return;
+        return false;
     }
 
     g_audio_state.buffer_data = (u8*)memalign(0x1000, KENGINE_AUDIO_BUFFER_SIZE * KENGINE_AUDIO_BUFFER_COUNT);
     if (g_audio_state.buffer_data == NULL) {
         kengine_switch_audio_stop();
-        return;
+        return false;
     }
     memset(g_audio_state.buffer_data, 0, KENGINE_AUDIO_BUFFER_SIZE * KENGINE_AUDIO_BUFFER_COUNT);
 
     result = audoutStartAudioOut();
     if (R_FAILED(result)) {
         kengine_switch_audio_stop();
-        return;
+        return false;
     }
     g_audio_state.audout_started = true;
     g_audio_state.playing = true;
@@ -1085,66 +1063,67 @@ static void kengine_switch_audio_loop_music(int asset_id, int volume) {
 
         if (!kengine_switch_audio_queue_buffer(buffer)) {
             kengine_switch_audio_stop();
-            return;
+            return false;
         }
+    }
+
+    return true;
+}
+
+static void kengine_switch_audio_loop_music(int asset_id, int volume) {
+    if (asset_id == 0) {
+        return;
+    }
+
+    size_t music_size = kengine_switch_music_size();
+    if (music_size == 0) {
+        return;
+    }
+
+    if (g_audio_state.current_asset_id != asset_id) {
+        g_audio_state.current_asset_id = asset_id;
+        g_audio_state.music_offset = 0;
+    }
+
+    if (!kengine_switch_audio_start_output(volume)) {
+        g_audio_state.current_asset_id = 0;
     }
 }
 
-static void kengine_switch_audio_configure_sfx(KengineSwitchSfxVoice* voice, int asset_id, int volume) {
+static void kengine_switch_audio_configure_sfx(
+    KengineSwitchSfxVoice* voice,
+    int asset_id,
+    int volume,
+    const u8* pcm_start,
+    const u8* pcm_end
+) {
     voice->active = true;
     voice->asset_id = asset_id;
     voice->age_samples = 0;
-    voice->duration_samples = 2400;
     voice->volume = clamp_int(volume, 0, 255);
-    voice->start_frequency = 700;
-    voice->end_frequency = 700;
-    voice->noise_amount = 0;
-    voice->phase = 0;
-    voice->noise = 0x12345678u ^ (u32)asset_id;
+    voice->pcm_start = pcm_start;
+    voice->pcm_end = pcm_end;
+    voice->pcm_offset = 0;
 
-    if (kengine_switch_audio_matches_sound(asset_id, "hextris/rotate")) {
-        voice->duration_samples = 2400;
-        voice->volume = clamp_int(volume, 0, 180);
-        voice->start_frequency = 880;
-        voice->end_frequency = 1280;
-    } else if (kengine_switch_audio_matches_sound(asset_id, "hextris/hard-drop")) {
-        voice->duration_samples = 5200;
-        voice->volume = clamp_int(volume, 0, 220);
-        voice->start_frequency = 360;
-        voice->end_frequency = 110;
-        voice->noise_amount = 80;
-    } else if (kengine_switch_audio_matches_sound(asset_id, "hextris/lock")) {
-        voice->duration_samples = 3600;
-        voice->volume = clamp_int(volume, 0, 190);
-        voice->start_frequency = 210;
-        voice->end_frequency = 150;
-        voice->noise_amount = 110;
-    } else if (kengine_switch_audio_matches_sound(asset_id, "hextris/line-clear")) {
-        voice->duration_samples = 8800;
-        voice->volume = clamp_int(volume, 0, 220);
-        voice->start_frequency = 560;
-        voice->end_frequency = 1560;
-    } else if (kengine_switch_audio_matches_sound(asset_id, "hextris/game-over")) {
-        voice->duration_samples = 18000;
-        voice->volume = clamp_int(volume, 0, 210);
-        voice->start_frequency = 320;
-        voice->end_frequency = 70;
-        voice->noise_amount = 50;
-    } else if (kengine_switch_audio_matches_sound(asset_id, "hextris/pause")) {
-        voice->duration_samples = 2800;
-        voice->volume = clamp_int(volume, 0, 150);
-        voice->start_frequency = 620;
-        voice->end_frequency = 420;
-    } else if (kengine_switch_audio_matches_sound(asset_id, "hextris/reset")) {
-        voice->duration_samples = 4200;
-        voice->volume = clamp_int(volume, 0, 170);
-        voice->start_frequency = 1250;
-        voice->end_frequency = 760;
+    size_t pcm_size = (size_t)(pcm_end - pcm_start);
+    voice->duration_samples = (int)(pcm_size / (KENGINE_AUDIO_CHANNEL_COUNT * KENGINE_AUDIO_BYTES_PER_SAMPLE));
+    if (voice->duration_samples <= 0) {
+        voice->active = false;
+        return;
     }
 }
 
 static void kengine_switch_audio_play_sound(int asset_id, int volume) {
-    if (!g_audio_state.audout_initialized || asset_id == 0) {
+    if (asset_id == 0) {
+        return;
+    }
+#ifdef KENGINE_SWITCH_SOUND_ASSETS
+    const KengineSwitchSoundAsset* sound_asset = kengine_switch_find_sound_asset(asset_id);
+    if (sound_asset == NULL) {
+        printf("Kengine Switch missing declared sound asset id: %d\n", asset_id);
+        return;
+    }
+    if (!g_audio_state.audout_initialized && !kengine_switch_audio_start_output(255)) {
         return;
     }
 
@@ -1163,7 +1142,16 @@ static void kengine_switch_audio_play_sound(int asset_id, int volume) {
     }
 
     (void)oldest_age;
-    kengine_switch_audio_configure_sfx(&g_audio_state.sfx[selected_index], asset_id, volume);
+    kengine_switch_audio_configure_sfx(
+        &g_audio_state.sfx[selected_index],
+        asset_id,
+        volume,
+        sound_asset->data_start,
+        sound_asset->data_end
+    );
+#else
+    printf("Kengine Switch received sound asset id %d, but this game declares no Switch sound assets.\n", asset_id);
+#endif
 }
 
 static void kengine_switch_audio_update(void) {

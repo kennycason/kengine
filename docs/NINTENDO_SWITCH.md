@@ -18,7 +18,8 @@ Near-term Switch support is focused on proving a complete 2D game loop:
 - draw software-framebuffer 2D commands,
 - render sprites, sprite sheets, text, lines, fills, and gradients,
 - play music and one-shot sound commands,
-- write and reload save data.
+- write and reload save data,
+- package NRO metadata and launcher icons per game.
 
 Networking and 3D are intentionally deferred until this 2D baseline is boring and repeatable.
 
@@ -57,11 +58,13 @@ The Switch host currently handles these render commands:
 
 Sprite assets are converted during the Gradle build into raw RGBA blobs and embedded into the NRO. Sprite sheets use the same asset declaration path and select frames through the portable render command's `frame` field. This avoids runtime PNG/BMP decoding on Switch for now.
 
-Audio is command-buffer based. Music assets are converted to 48 kHz stereo PCM at build time and mixed through `audout`; known Hextris sound effects are currently procedural one-shot voices.
+Audio is command-buffer based. Music and declared sound assets are converted to 48 kHz stereo PCM at build time and mixed through `audout`; undeclared sound IDs are reported and skipped. Procedural SFX generation lives in `:kengine-sound` for creating source assets, not as a hidden Switch runtime fallback.
+
+NRO metadata is generated from each `kengineNintendoSwitch` block's `displayName`, `author`, and `version`. Game icons can be configured with `iconSource`; the build converts the source image to the 256x256 JPEG passed to `elf2nro`.
 
 ## Known Gaps
 
-- Switch save data has a homebrew smoke-test backend, but has not been manually validated in Ryujinx or on hardware yet.
+- Switch save data has been manually validated in Ryujinx for Hextris high-score persistence, but has not been validated on hardware yet.
 - Runtime asset loading from arbitrary files is not part of the portable Switch path.
 - The existing `com.kengine.file.File` helper lives in `:kengine`, is SDL/native-host oriented, and is read/path focused; it is not available to `:kengine-core` portable games.
 - SDL UI, tiled maps, font contexts, texture-manager APIs, and richer graphics primitives are not yet behind the portable command-buffer surface.
@@ -87,6 +90,7 @@ Current Kengine storage shape:
 - The current Switch homebrew backend stores records under `sdmc:/switch/kengine/saves/<namespace>.<key>.dat`.
 - Switch writes use temp-file replacement and call `fsdevCommitDevice()` after save/delete.
 - Hextris uses this path for high-score persistence and draws it as `BEST`.
+- Hextris high-score persistence has been validated across Ryujinx game sessions.
 
 ## Verification
 
@@ -122,15 +126,14 @@ Manual Ryujinx validation should cover:
 
 ## Next Step
 
-The next Switch task should be manual validation of Hextris high-score persistence in Ryujinx, then on hardware when available.
+The next Switch task should be a focused 2D diagnostics pass that exercises platform behavior beyond the happy-path Hextris loop.
 
 Concrete order:
 
-1. Launch `games/hextris-switch/build/switch/hextris-switch.nro` in Ryujinx.
-2. Create a score above `0` and confirm `BEST` updates.
-3. Exit cleanly with `Minus + Plus`.
-4. Relaunch and confirm `BEST` reloads from storage.
-5. Inspect the emulator SD-card filesystem for `switch/kengine/saves/hextris.high-score.dat` if reload fails.
-6. Decide whether to keep the SD-card homebrew backend for now or move to a true mounted save-data backend next.
+1. Add a small Switch-focused diagnostics scene or expand `:games:nintendo-switch-demo`.
+2. Cover sprite transparency, tint, scaling, clipping/offscreen draws, and sprite-sheet frame selection.
+3. Cover text glyphs, line/fill/gradient edge cases, command-buffer overflow, and lifecycle cleanup/restart.
+4. Cover declared SFX playback overlap, sound-only playback, music restart/stop behavior, and volume changes.
+5. Validate the diagnostics NRO in Ryujinx, then on hardware when available.
 
-After that, the next 2D work should be a feature matrix pass: sprite transparency/tint/scaling/clipping, text glyph coverage, audio edge cases, input mapping, and lifecycle/reset behavior.
+Homebrew SD-card saves are the intended storage target for now.

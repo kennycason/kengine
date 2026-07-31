@@ -40,6 +40,7 @@ class KenginePortableAssetsPlugin : Plugin<Project> {
                             is KenginePortableImageAsset -> "sprite"
                             is KenginePortableSpriteSheetAsset -> "spriteSheet"
                             is KenginePortableMusicAsset -> "music"
+                            is KenginePortableSoundAsset -> "sound"
                         }
                     ).joinToString(":")
                 }
@@ -98,6 +99,7 @@ abstract class KengineGeneratePortableAssetsTask : DefaultTask() {
         val imageAssets = assets.filterIsInstance<KenginePortableImageAsset>()
         val spriteSheets = assets.filterIsInstance<KenginePortableSpriteSheetAsset>()
         val musicAssets = assets.filterIsInstance<KenginePortableMusicAsset>()
+        val soundAssets = assets.filterIsInstance<KenginePortableSoundAsset>()
 
         output.writeText(
             buildString {
@@ -105,6 +107,7 @@ abstract class KengineGeneratePortableAssetsTask : DefaultTask() {
                 appendLine()
                 appendLine("import com.kengine.assets.PortableAssetCatalog")
                 appendLine("import com.kengine.assets.PortableMusicAsset")
+                appendLine("import com.kengine.assets.PortableSoundAsset")
                 appendLine("import com.kengine.assets.PortableSpriteAsset")
                 appendLine("import com.kengine.assets.PortableSpriteSheetAsset")
                 appendLine()
@@ -148,6 +151,16 @@ abstract class KengineGeneratePortableAssetsTask : DefaultTask() {
                     appendLine("    override val music = listOf(")
                     musicAssets.forEach { asset ->
                         appendLine("        PortableMusicAsset(${assetConstantName(asset)}_ID, ${assetConstantName(asset)}_SOURCE),")
+                    }
+                    appendLine("    )")
+                }
+                appendLine()
+                if (soundAssets.isEmpty()) {
+                    appendLine("    override val sounds = emptyList<PortableSoundAsset>()")
+                } else {
+                    appendLine("    override val sounds = listOf(")
+                    soundAssets.forEach { asset ->
+                        appendLine("        PortableSoundAsset(${assetConstantName(asset)}_ID, ${assetConstantName(asset)}_SOURCE),")
                     }
                     appendLine("    )")
                 }

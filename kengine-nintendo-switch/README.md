@@ -113,7 +113,7 @@ Build the game-facing Hextris Switch artifact:
 ./gradlew -Pkengine.enableNintendoSwitch=true :games:hextris-switch:buildSwitchNro
 ```
 
-This build imports shared source and assets from `:games:hextris-core`, converts `games/hextris-core/sound/techno_boss_worm.ogg` to 48 kHz stereo PCM, converts declared sprite assets to raw RGBA, then embeds them in the NRO. Hextris SFX are currently short procedural voices mixed into the same audio stream from portable `playSound` commands.
+This build imports shared source and assets from `:games:hextris-core`, converts `games/hextris-core/sound/techno_boss_worm.ogg` and declared SFX WAVs to 48 kHz stereo PCM, converts declared sprite assets to raw RGBA, converts the configured icon to a 256x256 JPEG, then embeds/packages them in the NRO.
 
 Game artifact:
 
@@ -166,7 +166,7 @@ PortableGame.attachStorage(SwitchPortableStorage(namespace))
   -> records land under sdmc:/switch/kengine/saves/<namespace>.<key>.dat
 ```
 
-The implementation supports `load`, `save`, `delete`, and `exists` for records up to 64 KB. Hextris uses `hextris.high-score.dat` for its visible `BEST` value. This still needs manual Ryujinx and hardware validation.
+The implementation supports `load`, `save`, `delete`, and `exists` for records up to 64 KB. Hextris uses `hextris.high-score.dat` for its visible `BEST` value, and that flow has been validated across Ryujinx game sessions. Hardware validation is still pending.
 
 ## Game Wiring
 
@@ -192,6 +192,11 @@ kenginePortableAssets {
     music("theme") {
         id.set("hextris/techno-boss-worm")
         source.set(layout.projectDirectory.file("sound/techno_boss_worm.ogg"))
+    }
+
+    sound("rotate") {
+        id.set("hextris/rotate")
+        source.set(layout.projectDirectory.file("sound/sfx/rotate.wav"))
     }
 }
 ```
@@ -219,6 +224,7 @@ plugins {
 kengineNintendoSwitch {
     artifactBaseName.set("hextris-switch")
     displayName.set("Hextris Switch")
+    iconSource.set(layout.projectDirectory.file("assets/icon.jpg"))
     mainClass.set("hextris.HextrisGame")
     gameSourceProject(project(":games:hextris-core"))
     assetsFrom(project(":games:hextris-core"))
@@ -243,7 +249,7 @@ libnx C main()
   -> updates, emits audio commands, and draws the selected PortableGame every app-loop frame
   -> copies Kotlin audio commands into a C-owned command buffer
   -> keeps requested music loops playing through libnx audout
-  -> mixes requested one-shot SFX into the active PCM stream
+  -> mixes requested declared one-shot SFX into the active PCM stream
   -> builds the frame through com.kengine.render.RenderContext
   -> copies Kotlin render commands into a C-owned command buffer
   -> renders a software framebuffer through libnx

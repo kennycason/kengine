@@ -26,6 +26,41 @@ kenginePortableAssets {
         id.set("hextris/techno-boss-worm")
         source.set(layout.projectDirectory.file("sound/techno_boss_worm.ogg"))
     }
+
+    sound("rotate") {
+        id.set("hextris/rotate")
+        source.set(layout.projectDirectory.file("sound/sfx/rotate.wav"))
+    }
+
+    sound("hard-drop") {
+        id.set("hextris/hard-drop")
+        source.set(layout.projectDirectory.file("sound/sfx/hard-drop.wav"))
+    }
+
+    sound("lock") {
+        id.set("hextris/lock")
+        source.set(layout.projectDirectory.file("sound/sfx/lock.wav"))
+    }
+
+    sound("line-clear") {
+        id.set("hextris/line-clear")
+        source.set(layout.projectDirectory.file("sound/sfx/line-clear.wav"))
+    }
+
+    sound("game-over") {
+        id.set("hextris/game-over")
+        source.set(layout.projectDirectory.file("sound/sfx/game-over.wav"))
+    }
+
+    sound("pause") {
+        id.set("hextris/pause")
+        source.set(layout.projectDirectory.file("sound/sfx/pause.wav"))
+    }
+
+    sound("reset") {
+        id.set("hextris/reset")
+        source.set(layout.projectDirectory.file("sound/sfx/reset.wav"))
+    }
 }
 
 kotlin {

@@ -1,6 +1,6 @@
 # Hextris Switch
 
-Nintendo Switch NRO host for the shared portable Hextris game in `:games:hextris-core`. This module declares only Switch artifact metadata; source and assets are imported from core through `gameSourceProject(...)` and `assetsFrom(...)`.
+Nintendo Switch NRO host for the shared portable Hextris game in `:games:hextris-core`. This module declares Switch artifact metadata and the launcher icon; source, sprite, music, and SFX assets are imported from core through `gameSourceProject(...)` and `assetsFrom(...)`.
 
 Build:
 

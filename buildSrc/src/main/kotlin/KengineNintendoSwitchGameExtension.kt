@@ -9,6 +9,7 @@ import org.gradle.api.provider.Property
 
 open class KengineNintendoSwitchGameExtension(private val project: Project) {
     private val mutableSpriteAssets = mutableListOf<KengineNintendoSwitchSpriteAsset>()
+    private val mutableSoundAssets = mutableListOf<KengineNintendoSwitchSoundAsset>()
     private val mutableGameSourceProjects = mutableListOf<Project>()
 
     val artifactBaseName: Property<String> = project.objects.property(String::class.java)
@@ -24,8 +25,11 @@ open class KengineNintendoSwitchGameExtension(private val project: Project) {
     val cDefines: ListProperty<String> = project.objects.listProperty(String::class.java)
         .convention(emptyList())
     val musicSource: RegularFileProperty = project.objects.fileProperty()
+    val iconSource: RegularFileProperty = project.objects.fileProperty()
     val spriteAssets: List<KengineNintendoSwitchSpriteAsset>
         get() = mutableSpriteAssets.toList()
+    val soundAssets: List<KengineNintendoSwitchSoundAsset>
+        get() = mutableSoundAssets.toList()
     val gameSourceProjects: List<Project>
         get() = mutableGameSourceProjects.toList()
 
@@ -39,6 +43,12 @@ open class KengineNintendoSwitchGameExtension(private val project: Project) {
         val asset = KengineNintendoSwitchSpriteSheetAsset(name, project)
         configure.execute(asset)
         mutableSpriteAssets += asset
+    }
+
+    fun sound(name: String, configure: Action<KengineNintendoSwitchSoundAsset>) {
+        val asset = KengineNintendoSwitchSoundAsset(name, project)
+        configure.execute(asset)
+        mutableSoundAssets += asset
     }
 
     fun gameSourceProject(sourceProject: Project) {
@@ -73,6 +83,12 @@ open class KengineNintendoSwitchGameExtension(private val project: Project) {
                         musicSource.set(portableAsset.source)
                     }
                 }
+                is KenginePortableSoundAsset -> {
+                    val asset = KengineNintendoSwitchSoundAsset(portableAsset.name, project)
+                    asset.id.set(portableAsset.id)
+                    asset.source.set(portableAsset.source)
+                    mutableSoundAssets += asset
+                }
             }
         }
     }
@@ -102,4 +118,16 @@ open class KengineNintendoSwitchSpriteSheetAsset(
     val tileWidth: Property<Int> = project.objects.property(Int::class.javaObjectType)
     val tileHeight: Property<Int> = project.objects.property(Int::class.javaObjectType)
     val columns: Property<Int> = project.objects.property(Int::class.javaObjectType)
+}
+
+open class KengineNintendoSwitchSoundAsset(
+    private val assetName: String,
+    project: Project
+) : Named {
+    val id: Property<String> = project.objects.property(String::class.java)
+        .convention(assetName)
+    val source: RegularFileProperty = project.objects.fileProperty()
+    val extraInputs: ConfigurableFileCollection = project.objects.fileCollection()
+
+    override fun getName(): String = assetName
 }

@@ -37,6 +37,12 @@ open class KenginePortableAssetsExtension(private val project: Project) {
         configure.execute(asset)
         mutableAssets += asset
     }
+
+    fun sound(name: String, configure: Action<KenginePortableSoundAsset>) {
+        val asset = KenginePortableSoundAsset(name, project)
+        configure.execute(asset)
+        mutableAssets += asset
+    }
 }
 
 sealed class KenginePortableAsset(
@@ -65,6 +71,11 @@ open class KenginePortableSpriteSheetAsset(
 }
 
 open class KenginePortableMusicAsset(
+    name: String,
+    project: Project
+) : KenginePortableAsset(name, project)
+
+open class KenginePortableSoundAsset(
     name: String,
     project: Project
 ) : KenginePortableAsset(name, project)

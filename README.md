@@ -889,7 +889,7 @@ kengine/
 ├── kengine-reactive/              // hooks system (useState, useEffect, useContext, useMemo, useReducer)
 ├── kengine-test/                  // fluent assertion testing framework
 ├── kengine-network/               // networking via SDL3_net (TCP/UDP)
-├── kengine-sound/                 // audio synthesis/playback via SDL3_mixer
+├── kengine-sound/                 // audio synthesis/playback, procedural SFX, SDL3_mixer
 ├── kengine-physics/               // 2D physics via Chipmunk bindings
 ├── kengine-3d/                    // experimental 3D via SDL3 GPU
 ├── packaging/                     // icons and packaging resources

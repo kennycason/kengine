@@ -258,6 +258,14 @@ data class SwitchSpriteAssetBuild(
     val objectTaskName: String
 )
 
+data class SwitchSoundAssetBuild(
+    val asset: KengineNintendoSwitchSoundAsset,
+    val symbolName: String,
+    val pcmFile: Provider<RegularFile>,
+    val objectFile: Provider<RegularFile>,
+    val objectTaskName: String
+)
+
 data class SwitchImageDimensions(
     val width: Int,
     val height: Int
@@ -268,8 +276,16 @@ fun switchGameExtension(project: Project): KengineNintendoSwitchGameExtension? {
 }
 
 fun stableSpriteId(name: String): Int {
+    return stableAssetId("sprite:", name)
+}
+
+fun stableSoundId(name: String): Int {
+    return stableAssetId("sound:", name)
+}
+
+fun stableAssetId(prefix: String, name: String): Int {
     var hash = -0x7ee3623b
-    for (char in "sprite:$name") {
+    for (char in "$prefix$name") {
         hash = hash xor char.code
         hash *= 0x01000193
     }
@@ -335,6 +351,7 @@ fun registerSwitchGameBuild(
     val cObject = gameOutputDir.map { it.file("obj/main.o") }
     val switchElf = gameOutputDir.map { it.file("$artifactBaseName.elf") }
     val switchNacp = gameOutputDir.map { it.file("$artifactBaseName.nacp") }
+    val switchIcon = gameOutputDir.map { it.file("$artifactBaseName-icon.jpg") }
     val switchNro = gameOutputDir.map { it.file("$artifactBaseName.nro") }
     val spriteManifestHeader = gameOutputDir.map { it.file("generated/c/kengine_switch_sprite_assets.h") }
     val spriteManifestSource = gameOutputDir.map { it.file("generated/c/kengine_switch_sprite_assets.c") }
@@ -728,6 +745,202 @@ fun registerSwitchGameBuild(
         }
     }
 
+    val soundAssetBuilds = extension.soundAssets.mapIndexed { index, asset ->
+        val symbolName = "sound_${index}_${cIdentifier(asset.name)}"
+        val assetTaskPrefix = "$taskPrefix${kengineNintendoSwitchTaskPrefix("${index}_${asset.name}")}"
+        val soundPcm = gameOutputDir.map { it.file("audio/sfx/$symbolName.pcm") }
+        val soundObject = gameOutputDir.map { it.file("obj/${symbolName}_pcm.o") }
+        val convertTaskName = "convert${assetTaskPrefix}SoundPcm"
+        val objectTaskName = "compile${assetTaskPrefix}SoundObject"
+        val soundSource = asset.source.orNull?.asFile
+            ?: throw GradleException("${gameProject.path} sound asset '${asset.name}' must configure source.")
+
+        tasks.register<Exec>(convertTaskName) {
+            group = "switch"
+            description = "Converts sound asset '${asset.name}' for $displayName to raw PCM."
+
+            inputs.file(soundSource)
+                .withPathSensitivity(PathSensitivity.RELATIVE)
+            inputs.files(asset.extraInputs)
+            outputs.file(soundPcm)
+
+            doFirst {
+                if (!soundSource.isFile) {
+                    throw GradleException("Missing sound asset '${asset.name}' for $displayName: ${soundSource.absolutePath}")
+                }
+
+                val pcmFile = soundPcm.get().asFile
+                pcmFile.parentFile.mkdirs()
+                commandLine(
+                    ffmpegExecutable.get(),
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-y",
+                    "-i",
+                    soundSource.absolutePath,
+                    "-ac",
+                    "2",
+                    "-ar",
+                    "48000",
+                    "-f",
+                    "s16le",
+                    pcmFile.absolutePath
+                )
+            }
+        }
+
+        tasks.register<Exec>(objectTaskName) {
+            group = "switch"
+            description = "Embeds sound asset '${asset.name}' for $displayName as a linkable object."
+            dependsOn(convertTaskName)
+
+            inputs.file(soundPcm)
+            outputs.file(soundObject)
+
+            doFirst {
+                configureSwitchEnvironment()
+
+                val pcmFile = soundPcm.get().asFile
+                val objectFile = soundObject.get().asFile
+                objectFile.parentFile.mkdirs()
+                workingDir(pcmFile.parentFile)
+                commandLine(
+                    aarch64Tool("aarch64-none-elf-objcopy").absolutePath,
+                    "-I",
+                    "binary",
+                    "-O",
+                    "elf64-littleaarch64",
+                    "-B",
+                    "aarch64",
+                    pcmFile.name,
+                    objectFile.absolutePath
+                )
+            }
+        }
+
+        SwitchSoundAssetBuild(
+            asset = asset,
+            symbolName = symbolName,
+            pcmFile = soundPcm,
+            objectFile = soundObject,
+            objectTaskName = objectTaskName
+        )
+    }
+
+    if (soundAssetBuilds.isNotEmpty()) {
+        val soundManifestHeader = gameOutputDir.map { it.file("generated/c/kengine_switch_sound_assets.h") }
+        val soundManifestSource = gameOutputDir.map { it.file("generated/c/kengine_switch_sound_assets.c") }
+        val soundManifestObject = gameOutputDir.map { it.file("obj/kengine_switch_sound_assets.o") }
+        val generateSoundManifestTaskName = "generate${taskPrefix}SoundAssetManifest"
+        val compileSoundManifestTaskName = "compile${taskPrefix}SoundAssetManifestObject"
+
+        cDefineArgs += "-DKENGINE_SWITCH_SOUND_ASSETS=1"
+        assetObjectFiles += soundManifestObject
+        assetObjectFiles += soundAssetBuilds.map { it.objectFile }
+        assetObjectTaskNames += compileSoundManifestTaskName
+        assetObjectTaskNames += soundAssetBuilds.map { it.objectTaskName }
+        mainGeneratedHeaderFiles += soundManifestHeader
+        mainGeneratedHeaderTaskNames += generateSoundManifestTaskName
+
+        tasks.register(generateSoundManifestTaskName) {
+            group = "switch"
+            description = "Generates the C sound asset manifest for $displayName."
+
+            inputs.files(soundAssetBuilds.map { it.asset.source })
+            inputs.property(
+                "soundAssets",
+                soundAssetBuilds.joinToString("|") { build ->
+                    listOf(build.asset.name, build.asset.id.get()).joinToString(":")
+                }
+            )
+            outputs.files(soundManifestHeader, soundManifestSource)
+
+            doLast {
+                val headerFile = soundManifestHeader.get().asFile
+                val sourceFile = soundManifestSource.get().asFile
+                headerFile.parentFile.mkdirs()
+                sourceFile.parentFile.mkdirs()
+
+                headerFile.writeText(
+                    """
+                    #pragma once
+                    #include <stddef.h>
+
+                    typedef struct {
+                        int asset_id;
+                        const unsigned char* data_start;
+                        const unsigned char* data_end;
+                    } KengineSwitchSoundAsset;
+
+                    const KengineSwitchSoundAsset* kengine_switch_find_sound_asset(int asset_id);
+                    int kengine_switch_sound_asset_count(void);
+                    """.trimIndent() + "\n"
+                )
+
+                val declarations = StringBuilder()
+                val entries = StringBuilder()
+                soundAssetBuilds.forEach { build ->
+                    declarations.appendLine("extern const unsigned char _binary_${build.symbolName}_pcm_start[];")
+                    declarations.appendLine("extern const unsigned char _binary_${build.symbolName}_pcm_end[];")
+                    entries.appendLine(
+                        "    { ${stableSoundId(build.asset.id.get())}, " +
+                            "_binary_${build.symbolName}_pcm_start, _binary_${build.symbolName}_pcm_end },"
+                    )
+                }
+
+                sourceFile.writeText(
+                    buildString {
+                        appendLine("#include \"kengine_switch_sound_assets.h\"")
+                        appendLine()
+                        append(declarations)
+                        appendLine()
+                        appendLine("static const KengineSwitchSoundAsset kengine_switch_sound_assets[] = {")
+                        append(entries)
+                        appendLine("};")
+                        appendLine()
+                        appendLine("const KengineSwitchSoundAsset* kengine_switch_find_sound_asset(int asset_id) {")
+                        appendLine("    int count = kengine_switch_sound_asset_count();")
+                        appendLine("    for (int index = 0; index < count; ++index) {")
+                        appendLine("        if (kengine_switch_sound_assets[index].asset_id == asset_id) {")
+                        appendLine("            return &kengine_switch_sound_assets[index];")
+                        appendLine("        }")
+                        appendLine("    }")
+                        appendLine("    return 0;")
+                        appendLine("}")
+                        appendLine()
+                        appendLine("int kengine_switch_sound_asset_count(void) {")
+                        appendLine("    return (int)(sizeof(kengine_switch_sound_assets) / sizeof(kengine_switch_sound_assets[0]));")
+                        appendLine("}")
+                    }
+                )
+            }
+        }
+
+        tasks.register<Exec>(compileSoundManifestTaskName) {
+            group = "switch"
+            description = "Compiles the C sound asset manifest for $displayName."
+            dependsOn(generateSoundManifestTaskName)
+
+            inputs.files(soundManifestHeader, soundManifestSource)
+            outputs.file(soundManifestObject)
+
+            doFirst {
+                configureSwitchEnvironment()
+                soundManifestObject.get().asFile.parentFile.mkdirs()
+                commandLine(
+                    aarch64Tool("aarch64-none-elf-gcc").absolutePath,
+                    *switchCFlags.toTypedArray(),
+                    "-I${soundManifestHeader.get().asFile.parentFile.absolutePath}",
+                    "-c",
+                    soundManifestSource.get().asFile.absolutePath,
+                    "-o",
+                    soundManifestObject.get().asFile.absolutePath
+                )
+            }
+        }
+    }
+
     extension.musicSource.orNull?.asFile?.let { musicSource ->
         val musicPcm = gameOutputDir.map { it.file("audio/music.pcm") }
         val musicObject = gameOutputDir.map { it.file("obj/music_pcm.o") }
@@ -888,23 +1101,66 @@ fun registerSwitchGameBuild(
         }
     }
 
+    val convertIconTaskName = extension.iconSource.orNull?.asFile?.let { iconSource ->
+        val taskName = "convert${taskPrefix}IconJpeg"
+        tasks.register<Exec>(taskName) {
+            group = "switch"
+            description = "Converts the $displayName icon to the NRO icon JPEG format."
+
+            inputs.file(iconSource)
+                .withPathSensitivity(PathSensitivity.RELATIVE)
+            outputs.file(switchIcon)
+
+            doFirst {
+                if (!iconSource.isFile) {
+                    throw GradleException("Missing icon source for $displayName: ${iconSource.absolutePath}")
+                }
+
+                val iconFile = switchIcon.get().asFile
+                iconFile.parentFile.mkdirs()
+                commandLine(
+                    ffmpegExecutable.get(),
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-y",
+                    "-i",
+                    iconSource.absolutePath,
+                    "-vf",
+                    "scale=256:256:force_original_aspect_ratio=increase,crop=256:256,format=yuvj420p",
+                    "-frames:v",
+                    "1",
+                    iconFile.absolutePath
+                )
+            }
+        }
+        taskName
+    }
+
     val packageTaskName = "package${taskPrefix}Nro"
     tasks.register<Exec>(packageTaskName) {
         group = "switch"
         description = "Packages the $displayName ELF as an NRO."
-        dependsOn(linkTaskName, createNacpTaskName)
+        dependsOn(listOf(linkTaskName, createNacpTaskName) + listOfNotNull(convertIconTaskName))
 
         inputs.files(switchElf, switchNacp)
+        convertIconTaskName?.let {
+            inputs.file(switchIcon)
+        }
         outputs.file(switchNro)
 
         doFirst {
             configureSwitchEnvironment()
-            commandLine(
+            val packageArgs = mutableListOf(
                 devkitTool("elf2nro").absolutePath,
                 switchElf.get().asFile.absolutePath,
                 switchNro.get().asFile.absolutePath,
                 "--nacp=${switchNacp.get().asFile.absolutePath}"
             )
+            if (convertIconTaskName != null) {
+                packageArgs += "--icon=${switchIcon.get().asFile.absolutePath}"
+            }
+            commandLine(packageArgs)
         }
     }
 

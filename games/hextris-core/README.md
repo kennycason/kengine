@@ -16,13 +16,23 @@ kenginePortableAssets {
         tileHeight.set(24)
         columns.set(6)
     }
+
+    music("theme") {
+        id.set("hextris/techno-boss-worm")
+        source.set(layout.projectDirectory.file("sound/techno_boss_worm.ogg"))
+    }
+
+    sound("rotate") {
+        id.set("hextris/rotate")
+        source.set(layout.projectDirectory.file("sound/sfx/rotate.wav"))
+    }
 }
 ```
 
-The generated `HextrisAssets` object implements Kengine's portable asset catalog, and `HextrisGame.assets` exposes that catalog to host backends.
+The generated `HextrisAssets` object implements Kengine's portable asset catalog, and `HextrisGame.assets` exposes that catalog to host backends. Hextris currently declares one sprite sheet, one music track, and one-shot SFX WAVs.
 
 Run tests:
 
 ```bash
-jenv exec ./gradlew :games:hextris-core:allTests
+./gradlew :games:hextris-core:allTests
 ```

@@ -18,14 +18,21 @@ data class PortableMusicAsset(
     val source: String
 )
 
+data class PortableSoundAsset(
+    val id: String,
+    val source: String
+)
+
 interface PortableAssetCatalog {
     val sprites: List<PortableSpriteAsset>
     val spriteSheets: List<PortableSpriteSheetAsset>
     val music: List<PortableMusicAsset>
+    val sounds: List<PortableSoundAsset>
 }
 
 object EmptyPortableAssetCatalog : PortableAssetCatalog {
     override val sprites: List<PortableSpriteAsset> = emptyList()
     override val spriteSheets: List<PortableSpriteSheetAsset> = emptyList()
     override val music: List<PortableMusicAsset> = emptyList()
+    override val sounds: List<PortableSoundAsset> = emptyList()
 }
