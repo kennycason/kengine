@@ -1,5 +1,6 @@
 import org.gradle.api.GradleException
 import org.gradle.api.Project
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFile
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Exec
@@ -10,10 +11,23 @@ import javax.imageio.ImageIO
 
 plugins {
     base
+    idea
 }
 
 group = "kengine.nintendo.switch"
 version = "0.1.0"
+
+idea {
+    module {
+        sourceDirs.add(file("src/main/kotlin"))
+        sourceDirs.add(file("src/main/c"))
+    }
+}
+
+val isNintendoSwitchEnabled = providers.gradleProperty("kengine.enableNintendoSwitch")
+    .map { it.toBoolean() }
+    .orElse(false)
+    .get()
 
 val switchOutputDir = layout.buildDirectory.dir("switch")
 val cOnlyObject = switchOutputDir.map { it.file("obj/main_c_only.o") }
@@ -21,10 +35,12 @@ val switchCOnlyElf = switchOutputDir.map { it.file("kengine-nintendo-switch-c-on
 val switchNacp = switchOutputDir.map { it.file("kengine-nintendo-switch.nacp") }
 val switchCOnlyNro = switchOutputDir.map { it.file("kengine-nintendo-switch-c-only.nro") }
 
-val kengineKotlinLocalProperties = Properties().apply {
-    val localProperties = rootProject.file("kengine-kotlin/local.properties")
-    if (localProperties.isFile) {
-        localProperties.inputStream().use(::load)
+val kengineKotlinLocalProperties: Properties by lazy {
+    Properties().apply {
+        val localProperties = rootProject.file("kengine-kotlin/local.properties")
+        if (localProperties.isFile) {
+            localProperties.inputStream().use(::load)
+        }
     }
 }
 
@@ -202,44 +218,90 @@ val switchArchFlags = listOf(
     "-fPIE"
 )
 
-tasks.register("switchToolchainInfo") {
-    group = "switch"
-    description = "Prints the experimental Switch toolchain paths used by this module."
+fun disabledSwitchMessage(): String {
+    return "Nintendo Switch backend is disabled. Re-run with -Pkengine.enableNintendoSwitch=true."
+}
 
-    doLast {
-        val compilerConfig = configuredKotlincNative()
-        val compiler = compilerConfig.executable
-        val targets = kotlinNativeTargets(compiler)
-        val target = kotlinTarget.get()
-        val devkitProDir = devkitPro()
-        val devkitA64Dir = devkitA64()
-        println("Kotlin/Native compiler: ${compiler.absolutePath} (${compiler.exists()})")
-        println("Kotlin/Native compiler source: ${compilerConfig.source}")
-        println("Kotlin/Native target: $target")
-        println("Kotlin/Native target supported: ${if (targets.isEmpty()) "(not probed)" else target in targets}")
-        println("Kengine Kotlin fork: ${localProperty("kengine.kotlin.repo") ?: "(not configured)"}")
-        println("Switch Kotlin/Native home property: kengine.switch.kotlinNativeHome")
-        println("DEVKITPRO: ${devkitProDir.absolutePath} (${devkitProDir.exists()})")
-        println("DEVKITA64: ${devkitA64Dir.absolutePath} (${devkitA64Dir.exists()})")
-        println("aarch64-none-elf-gcc: ${devkitA64Dir.resolve("bin/aarch64-none-elf-gcc").absolutePath}")
-        println("nacptool: ${devkitProDir.resolve("tools/bin/nacptool").absolutePath}")
-        println("elf2nro: ${devkitProDir.resolve("tools/bin/elf2nro").absolutePath}")
+fun registerDisabledSwitchTask(name: String, taskDescription: String) {
+    tasks.register(name) {
+        group = "switch"
+        description = "$taskDescription Requires -Pkengine.enableNintendoSwitch=true."
+
+        doFirst {
+            throw GradleException(disabledSwitchMessage())
+        }
     }
 }
 
-tasks.register("validateSwitchKotlinToolchain") {
-    group = "switch"
-    description = "Validates that the configured Switch Kotlin/Native compiler supports the selected target."
+fun registerDisabledSwitchBackendTasks() {
+    registerDisabledSwitchTask(
+        "switchToolchainInfo",
+        "Prints the experimental Switch toolchain paths used by this module."
+    )
+    registerDisabledSwitchTask(
+        "validateSwitchKotlinToolchain",
+        "Validates that the configured Switch Kotlin/Native compiler supports the selected target."
+    )
+    registerDisabledSwitchTask(
+        "buildSwitchCOnlyNro",
+        "Builds the C-only libnx hello-world NRO."
+    )
+    registerDisabledSwitchTask(
+        "switchGameInfo",
+        "Prints the Nintendo Switch game projects registered for this build."
+    )
+    registerDisabledSwitchTask(
+        "buildSwitchGameNros",
+        "Builds every registered Nintendo Switch game-facing NRO."
+    )
+    registerDisabledSwitchTask(
+        "buildSwitchNro",
+        "Builds the default registered Nintendo Switch game NRO."
+    )
+}
 
-    doLast {
-        val compilerConfig = configuredKotlincNative()
-        val compiler = tool(
-            compilerConfig.executable,
-            "Configure the Switch Kotlin/Native fork with kengine.switch.kotlinNativeHome."
-        )
-        val target = kotlinTarget.get()
-        validateKotlinNativeTarget(compiler, target)
-        println("Switch Kotlin/Native toolchain OK: $target via ${compiler.absolutePath}")
+fun registerSwitchToolchainInfoTask() {
+    tasks.register("switchToolchainInfo") {
+        group = "switch"
+        description = "Prints the experimental Switch toolchain paths used by this module."
+
+        doLast {
+            val compilerConfig = configuredKotlincNative()
+            val compiler = compilerConfig.executable
+            val targets = kotlinNativeTargets(compiler)
+            val target = kotlinTarget.get()
+            val devkitProDir = devkitPro()
+            val devkitA64Dir = devkitA64()
+            println("Kotlin/Native compiler: ${compiler.absolutePath} (${compiler.exists()})")
+            println("Kotlin/Native compiler source: ${compilerConfig.source}")
+            println("Kotlin/Native target: $target")
+            println("Kotlin/Native target supported: ${if (targets.isEmpty()) "(not probed)" else target in targets}")
+            println("Kengine Kotlin fork: ${localProperty("kengine.kotlin.repo") ?: "(not configured)"}")
+            println("Switch Kotlin/Native home property: kengine.switch.kotlinNativeHome")
+            println("DEVKITPRO: ${devkitProDir.absolutePath} (${devkitProDir.exists()})")
+            println("DEVKITA64: ${devkitA64Dir.absolutePath} (${devkitA64Dir.exists()})")
+            println("aarch64-none-elf-gcc: ${devkitA64Dir.resolve("bin/aarch64-none-elf-gcc").absolutePath}")
+            println("nacptool: ${devkitProDir.resolve("tools/bin/nacptool").absolutePath}")
+            println("elf2nro: ${devkitProDir.resolve("tools/bin/elf2nro").absolutePath}")
+        }
+    }
+}
+
+fun registerValidateSwitchKotlinToolchainTask() {
+    tasks.register("validateSwitchKotlinToolchain") {
+        group = "switch"
+        description = "Validates that the configured Switch Kotlin/Native compiler supports the selected target."
+
+        doLast {
+            val compilerConfig = configuredKotlincNative()
+            val compiler = tool(
+                compilerConfig.executable,
+                "Configure the Switch Kotlin/Native fork with kengine.switch.kotlinNativeHome."
+            )
+            val target = kotlinTarget.get()
+            validateKotlinNativeTarget(compiler, target)
+            println("Switch Kotlin/Native toolchain OK: $target via ${compiler.absolutePath}")
+        }
     }
 }
 
@@ -325,6 +387,373 @@ fun switchImageDimensions(imageFile: File): SwitchImageDimensions {
     throw GradleException("Unable to read sprite asset dimensions: ${imageFile.absolutePath}")
 }
 
+fun renderGameFactorySource(mainClass: String, artifactBaseName: String): String {
+    val factoryClassName = mainClass.substringAfterLast(".")
+    val factoryImport = if (mainClass.contains(".")) "import $mainClass\n" else ""
+
+    return """
+        package kengine.switchruntime
+
+        import com.kengine.PortableGame
+        $factoryImport
+        fun createSwitchPortableGame(): PortableGame = $factoryClassName()
+        fun switchGameName(): String = "$artifactBaseName"
+    """.trimIndent() + "\n"
+}
+
+fun renderSpriteAssetHeader(): String {
+    return """
+        #pragma once
+        #include <stddef.h>
+
+        typedef struct {
+            int sprite_id;
+            int width;
+            int height;
+            int tile_width;
+            int tile_height;
+            int columns;
+            const unsigned char* data_start;
+            const unsigned char* data_end;
+        } KengineSwitchSpriteAsset;
+
+        const KengineSwitchSpriteAsset* kengine_switch_find_sprite_asset(int sprite_id);
+        int kengine_switch_sprite_asset_count(void);
+    """.trimIndent() + "\n"
+}
+
+fun renderSpriteAssetSource(declarations: String, entries: String): String {
+    return buildString {
+        appendLine("#include \"kengine_switch_sprite_assets.h\"")
+        appendLine()
+        append(declarations)
+        appendLine()
+        appendLine("static const KengineSwitchSpriteAsset kengine_switch_sprite_assets[] = {")
+        append(entries)
+        appendLine("};")
+        appendLine()
+        appendLine("const KengineSwitchSpriteAsset* kengine_switch_find_sprite_asset(int sprite_id) {")
+        appendLine("    int count = kengine_switch_sprite_asset_count();")
+        appendLine("    for (int index = 0; index < count; ++index) {")
+        appendLine("        if (kengine_switch_sprite_assets[index].sprite_id == sprite_id) {")
+        appendLine("            return &kengine_switch_sprite_assets[index];")
+        appendLine("        }")
+        appendLine("    }")
+        appendLine("    return 0;")
+        appendLine("}")
+        appendLine()
+        appendLine("int kengine_switch_sprite_asset_count(void) {")
+        appendLine("    return (int)(sizeof(kengine_switch_sprite_assets) / sizeof(kengine_switch_sprite_assets[0]));")
+        appendLine("}")
+    }
+}
+
+fun renderSoundAssetHeader(): String {
+    return """
+        #pragma once
+        #include <stddef.h>
+
+        typedef struct {
+            int asset_id;
+            const unsigned char* data_start;
+            const unsigned char* data_end;
+        } KengineSwitchSoundAsset;
+
+        const KengineSwitchSoundAsset* kengine_switch_find_sound_asset(int asset_id);
+        int kengine_switch_sound_asset_count(void);
+    """.trimIndent() + "\n"
+}
+
+fun renderSoundAssetSource(declarations: String, entries: String): String {
+    return buildString {
+        appendLine("#include \"kengine_switch_sound_assets.h\"")
+        appendLine()
+        append(declarations)
+        appendLine()
+        appendLine("static const KengineSwitchSoundAsset kengine_switch_sound_assets[] = {")
+        append(entries)
+        appendLine("};")
+        appendLine()
+        appendLine("const KengineSwitchSoundAsset* kengine_switch_find_sound_asset(int asset_id) {")
+        appendLine("    int count = kengine_switch_sound_asset_count();")
+        appendLine("    for (int index = 0; index < count; ++index) {")
+        appendLine("        if (kengine_switch_sound_assets[index].asset_id == asset_id) {")
+        appendLine("            return &kengine_switch_sound_assets[index];")
+        appendLine("        }")
+        appendLine("    }")
+        appendLine("    return 0;")
+        appendLine("}")
+        appendLine()
+        appendLine("int kengine_switch_sound_asset_count(void) {")
+        appendLine("    return (int)(sizeof(kengine_switch_sound_assets) / sizeof(kengine_switch_sound_assets[0]));")
+        appendLine("}")
+    }
+}
+
+fun ffmpegRgbaCommand(source: File, output: File): List<String> {
+    return listOf(
+        ffmpegExecutable.get(),
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        source.absolutePath,
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgba",
+        output.absolutePath
+    )
+}
+
+fun ffmpegPcmCommand(source: File, output: File): List<String> {
+    return listOf(
+        ffmpegExecutable.get(),
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        source.absolutePath,
+        "-ac",
+        "2",
+        "-ar",
+        "48000",
+        "-f",
+        "s16le",
+        output.absolutePath
+    )
+}
+
+fun ffmpegIconCommand(source: File, output: File): List<String> {
+    return listOf(
+        ffmpegExecutable.get(),
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        source.absolutePath,
+        "-vf",
+        "scale=256:256:force_original_aspect_ratio=increase,crop=256:256,format=yuvj420p",
+        "-frames:v",
+        "1",
+        output.absolutePath
+    )
+}
+
+fun objcopyBinaryCommand(source: File, output: File): List<String> {
+    return listOf(
+        aarch64Tool("aarch64-none-elf-objcopy").absolutePath,
+        "-I",
+        "binary",
+        "-O",
+        "elf64-littleaarch64",
+        "-B",
+        "aarch64",
+        source.name,
+        output.absolutePath
+    )
+}
+
+fun nacpCommand(displayName: String, author: String, version: String, output: File): List<String> {
+    return listOf(
+        devkitTool("nacptool").absolutePath,
+        "--create",
+        displayName,
+        author,
+        version,
+        output.absolutePath
+    )
+}
+
+fun nroPackageCommand(
+    elf: File,
+    nro: File,
+    nacp: File,
+    icon: File?
+): List<String> {
+    return buildList {
+        add(devkitTool("elf2nro").absolutePath)
+        add(elf.absolutePath)
+        add(nro.absolutePath)
+        add("--nacp=${nacp.absolutePath}")
+        if (icon != null) {
+            add("--icon=${icon.absolutePath}")
+        }
+    }
+}
+
+fun registerRgbaConversionTask(
+    taskName: String,
+    description: String,
+    source: File,
+    output: Provider<RegularFile>,
+    extraInputs: ConfigurableFileCollection
+) {
+    tasks.register<Exec>(taskName) {
+        group = "switch"
+        this.description = description
+
+        inputs.file(source)
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+        inputs.files(extraInputs)
+        outputs.file(output)
+
+        doFirst {
+            if (!source.isFile) {
+                throw GradleException("Missing sprite asset for RGBA conversion: ${source.absolutePath}")
+            }
+
+            val outputFile = output.get().asFile
+            outputFile.parentFile.mkdirs()
+            commandLine(ffmpegRgbaCommand(source, outputFile))
+        }
+    }
+}
+
+fun registerPcmConversionTask(
+    taskName: String,
+    description: String,
+    source: File,
+    output: Provider<RegularFile>,
+    extraInputs: ConfigurableFileCollection? = null
+) {
+    tasks.register<Exec>(taskName) {
+        group = "switch"
+        this.description = description
+
+        inputs.file(source)
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+        extraInputs?.let { inputs.files(it) }
+        outputs.file(output)
+
+        doFirst {
+            if (!source.isFile) {
+                throw GradleException("Missing PCM source for $description: ${source.absolutePath}")
+            }
+
+            val outputFile = output.get().asFile
+            outputFile.parentFile.mkdirs()
+            commandLine(ffmpegPcmCommand(source, outputFile))
+        }
+    }
+}
+
+fun registerEmbeddedBinaryObjectTask(
+    taskName: String,
+    description: String,
+    source: Provider<RegularFile>,
+    output: Provider<RegularFile>,
+    dependsOnTaskName: String
+) {
+    tasks.register<Exec>(taskName) {
+        group = "switch"
+        this.description = description
+        dependsOn(dependsOnTaskName)
+
+        inputs.file(source)
+        outputs.file(output)
+
+        doFirst {
+            configureSwitchEnvironment()
+
+            val sourceFile = source.get().asFile
+            val outputFile = output.get().asFile
+            outputFile.parentFile.mkdirs()
+            workingDir(sourceFile.parentFile)
+            commandLine(objcopyBinaryCommand(sourceFile, outputFile))
+        }
+    }
+}
+
+fun registerIconConversionTask(
+    taskName: String,
+    description: String,
+    source: File,
+    output: Provider<RegularFile>
+) {
+    tasks.register<Exec>(taskName) {
+        group = "switch"
+        this.description = description
+
+        inputs.file(source)
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+        outputs.file(output)
+
+        doFirst {
+            if (!source.isFile) {
+                throw GradleException("Missing icon source: ${source.absolutePath}")
+            }
+
+            val outputFile = output.get().asFile
+            outputFile.parentFile.mkdirs()
+            commandLine(ffmpegIconCommand(source, outputFile))
+        }
+    }
+}
+
+fun registerNacpTask(
+    taskName: String,
+    description: String,
+    displayName: String,
+    author: String,
+    appVersion: String,
+    output: Provider<RegularFile>
+) {
+    tasks.register<Exec>(taskName) {
+        group = "switch"
+        this.description = description
+
+        inputs.property("displayName", displayName)
+        inputs.property("author", author)
+        inputs.property("version", appVersion)
+        outputs.file(output)
+
+        doFirst {
+            configureSwitchEnvironment()
+            val outputFile = output.get().asFile
+            outputFile.parentFile.mkdirs()
+            commandLine(nacpCommand(displayName, author, appVersion, outputFile))
+        }
+    }
+}
+
+fun registerNroPackageTask(
+    taskName: String,
+    description: String,
+    dependsOnTasks: List<String>,
+    elf: Provider<RegularFile>,
+    nacp: Provider<RegularFile>,
+    nro: Provider<RegularFile>,
+    icon: Provider<RegularFile>? = null
+) {
+    tasks.register<Exec>(taskName) {
+        group = "switch"
+        this.description = description
+        dependsOn(dependsOnTasks)
+
+        inputs.files(elf, nacp)
+        if (icon != null) {
+            inputs.file(icon)
+        }
+        outputs.file(nro)
+
+        doFirst {
+            configureSwitchEnvironment()
+            commandLine(
+                nroPackageCommand(
+                    elf = elf.get().asFile,
+                    nro = nro.get().asFile,
+                    nacp = nacp.get().asFile,
+                    icon = icon?.get()?.asFile
+                )
+            )
+        }
+    }
+}
+
 fun registerSwitchGameBuild(
     gameProject: Project,
     extension: KengineNintendoSwitchGameExtension
@@ -338,8 +767,6 @@ fun registerSwitchGameBuild(
     val taskPrefix = kengineNintendoSwitchTaskPrefix(artifactBaseName)
     val buildTaskName = extension.backendBuildTaskName.orNull
         ?: kengineNintendoSwitchBuildTaskName(artifactBaseName)
-    val factoryClassName = mainClass.substringAfterLast(".")
-    val factoryImport = if (mainClass.contains(".")) "import $mainClass\n" else ""
 
     val gameOutputDir = switchOutputDir.map { it.dir("games/$artifactBaseName") }
     val kotlinOutputBase = gameOutputDir.map { it.file("kotlin/kengine_switch_kotlin") }
@@ -399,16 +826,7 @@ fun registerSwitchGameBuild(
         doLast {
             val output = gameFactory.get().asFile
             output.parentFile.mkdirs()
-            output.writeText(
-                """
-                package kengine.switchruntime
-
-                import com.kengine.PortableGame
-                $factoryImport
-                fun createSwitchPortableGame(): PortableGame = $factoryClassName()
-                fun switchGameName(): String = "$artifactBaseName"
-                """.trimIndent()
-            )
+            output.writeText(renderGameFactorySource(mainClass, artifactBaseName))
         }
     }
 
@@ -524,67 +942,21 @@ fun registerSwitchGameBuild(
         val spriteSource = asset.source.orNull?.asFile
             ?: throw GradleException("${gameProject.path} sprite asset '${asset.name}' must configure source.")
 
-        tasks.register<Exec>(convertTaskName) {
-            group = "switch"
-            description = "Converts sprite asset '${asset.name}' for $displayName to raw RGBA pixels."
+        registerRgbaConversionTask(
+            taskName = convertTaskName,
+            description = "Converts sprite asset '${asset.name}' for $displayName to raw RGBA pixels.",
+            source = spriteSource,
+            output = rawSprite,
+            extraInputs = asset.extraInputs
+        )
 
-            inputs.file(spriteSource)
-                .withPathSensitivity(PathSensitivity.RELATIVE)
-            inputs.files(asset.extraInputs)
-            outputs.file(rawSprite)
-
-            doFirst {
-                if (!spriteSource.isFile) {
-                    throw GradleException("Missing sprite asset '${asset.name}' for $displayName: ${spriteSource.absolutePath}")
-                }
-
-                val rawFile = rawSprite.get().asFile
-                rawFile.parentFile.mkdirs()
-                commandLine(
-                    ffmpegExecutable.get(),
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",
-                    "-y",
-                    "-i",
-                    spriteSource.absolutePath,
-                    "-f",
-                    "rawvideo",
-                    "-pix_fmt",
-                    "rgba",
-                    rawFile.absolutePath
-                )
-            }
-        }
-
-        tasks.register<Exec>(objectTaskName) {
-            group = "switch"
-            description = "Embeds sprite asset '${asset.name}' for $displayName as a linkable object."
-            dependsOn(convertTaskName)
-
-            inputs.file(rawSprite)
-            outputs.file(spriteObject)
-
-            doFirst {
-                configureSwitchEnvironment()
-
-                val rawFile = rawSprite.get().asFile
-                val objectFile = spriteObject.get().asFile
-                objectFile.parentFile.mkdirs()
-                workingDir(rawFile.parentFile)
-                commandLine(
-                    aarch64Tool("aarch64-none-elf-objcopy").absolutePath,
-                    "-I",
-                    "binary",
-                    "-O",
-                    "elf64-littleaarch64",
-                    "-B",
-                    "aarch64",
-                    rawFile.name,
-                    objectFile.absolutePath
-                )
-            }
-        }
+        registerEmbeddedBinaryObjectTask(
+            taskName = objectTaskName,
+            description = "Embeds sprite asset '${asset.name}' for $displayName as a linkable object.",
+            source = rawSprite,
+            output = spriteObject,
+            dependsOnTaskName = convertTaskName
+        )
 
         SwitchSpriteAssetBuild(
             asset = asset,
@@ -634,26 +1006,7 @@ fun registerSwitchGameBuild(
                 headerFile.parentFile.mkdirs()
                 sourceFile.parentFile.mkdirs()
 
-                headerFile.writeText(
-                    """
-                    #pragma once
-                    #include <stddef.h>
-
-                    typedef struct {
-                        int sprite_id;
-                        int width;
-                        int height;
-                        int tile_width;
-                        int tile_height;
-                        int columns;
-                        const unsigned char* data_start;
-                        const unsigned char* data_end;
-                    } KengineSwitchSpriteAsset;
-
-                    const KengineSwitchSpriteAsset* kengine_switch_find_sprite_asset(int sprite_id);
-                    int kengine_switch_sprite_asset_count(void);
-                    """.trimIndent() + "\n"
-                )
+                headerFile.writeText(renderSpriteAssetHeader())
 
                 val declarations = StringBuilder()
                 val entries = StringBuilder()
@@ -693,31 +1046,7 @@ fun registerSwitchGameBuild(
                     )
                 }
 
-                sourceFile.writeText(
-                    buildString {
-                        appendLine("#include \"kengine_switch_sprite_assets.h\"")
-                        appendLine()
-                        append(declarations)
-                        appendLine()
-                        appendLine("static const KengineSwitchSpriteAsset kengine_switch_sprite_assets[] = {")
-                        append(entries)
-                        appendLine("};")
-                        appendLine()
-                        appendLine("const KengineSwitchSpriteAsset* kengine_switch_find_sprite_asset(int sprite_id) {")
-                        appendLine("    int count = kengine_switch_sprite_asset_count();")
-                        appendLine("    for (int index = 0; index < count; ++index) {")
-                        appendLine("        if (kengine_switch_sprite_assets[index].sprite_id == sprite_id) {")
-                        appendLine("            return &kengine_switch_sprite_assets[index];")
-                        appendLine("        }")
-                        appendLine("    }")
-                        appendLine("    return 0;")
-                        appendLine("}")
-                        appendLine()
-                        appendLine("int kengine_switch_sprite_asset_count(void) {")
-                        appendLine("    return (int)(sizeof(kengine_switch_sprite_assets) / sizeof(kengine_switch_sprite_assets[0]));")
-                        appendLine("}")
-                    }
-                )
+                sourceFile.writeText(renderSpriteAssetSource(declarations.toString(), entries.toString()))
             }
         }
 
@@ -755,69 +1084,21 @@ fun registerSwitchGameBuild(
         val soundSource = asset.source.orNull?.asFile
             ?: throw GradleException("${gameProject.path} sound asset '${asset.name}' must configure source.")
 
-        tasks.register<Exec>(convertTaskName) {
-            group = "switch"
-            description = "Converts sound asset '${asset.name}' for $displayName to raw PCM."
+        registerPcmConversionTask(
+            taskName = convertTaskName,
+            description = "Converts sound asset '${asset.name}' for $displayName to raw PCM.",
+            source = soundSource,
+            output = soundPcm,
+            extraInputs = asset.extraInputs
+        )
 
-            inputs.file(soundSource)
-                .withPathSensitivity(PathSensitivity.RELATIVE)
-            inputs.files(asset.extraInputs)
-            outputs.file(soundPcm)
-
-            doFirst {
-                if (!soundSource.isFile) {
-                    throw GradleException("Missing sound asset '${asset.name}' for $displayName: ${soundSource.absolutePath}")
-                }
-
-                val pcmFile = soundPcm.get().asFile
-                pcmFile.parentFile.mkdirs()
-                commandLine(
-                    ffmpegExecutable.get(),
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",
-                    "-y",
-                    "-i",
-                    soundSource.absolutePath,
-                    "-ac",
-                    "2",
-                    "-ar",
-                    "48000",
-                    "-f",
-                    "s16le",
-                    pcmFile.absolutePath
-                )
-            }
-        }
-
-        tasks.register<Exec>(objectTaskName) {
-            group = "switch"
-            description = "Embeds sound asset '${asset.name}' for $displayName as a linkable object."
-            dependsOn(convertTaskName)
-
-            inputs.file(soundPcm)
-            outputs.file(soundObject)
-
-            doFirst {
-                configureSwitchEnvironment()
-
-                val pcmFile = soundPcm.get().asFile
-                val objectFile = soundObject.get().asFile
-                objectFile.parentFile.mkdirs()
-                workingDir(pcmFile.parentFile)
-                commandLine(
-                    aarch64Tool("aarch64-none-elf-objcopy").absolutePath,
-                    "-I",
-                    "binary",
-                    "-O",
-                    "elf64-littleaarch64",
-                    "-B",
-                    "aarch64",
-                    pcmFile.name,
-                    objectFile.absolutePath
-                )
-            }
-        }
+        registerEmbeddedBinaryObjectTask(
+            taskName = objectTaskName,
+            description = "Embeds sound asset '${asset.name}' for $displayName as a linkable object.",
+            source = soundPcm,
+            output = soundObject,
+            dependsOnTaskName = convertTaskName
+        )
 
         SwitchSoundAssetBuild(
             asset = asset,
@@ -862,21 +1143,7 @@ fun registerSwitchGameBuild(
                 headerFile.parentFile.mkdirs()
                 sourceFile.parentFile.mkdirs()
 
-                headerFile.writeText(
-                    """
-                    #pragma once
-                    #include <stddef.h>
-
-                    typedef struct {
-                        int asset_id;
-                        const unsigned char* data_start;
-                        const unsigned char* data_end;
-                    } KengineSwitchSoundAsset;
-
-                    const KengineSwitchSoundAsset* kengine_switch_find_sound_asset(int asset_id);
-                    int kengine_switch_sound_asset_count(void);
-                    """.trimIndent() + "\n"
-                )
+                headerFile.writeText(renderSoundAssetHeader())
 
                 val declarations = StringBuilder()
                 val entries = StringBuilder()
@@ -889,31 +1156,7 @@ fun registerSwitchGameBuild(
                     )
                 }
 
-                sourceFile.writeText(
-                    buildString {
-                        appendLine("#include \"kengine_switch_sound_assets.h\"")
-                        appendLine()
-                        append(declarations)
-                        appendLine()
-                        appendLine("static const KengineSwitchSoundAsset kengine_switch_sound_assets[] = {")
-                        append(entries)
-                        appendLine("};")
-                        appendLine()
-                        appendLine("const KengineSwitchSoundAsset* kengine_switch_find_sound_asset(int asset_id) {")
-                        appendLine("    int count = kengine_switch_sound_asset_count();")
-                        appendLine("    for (int index = 0; index < count; ++index) {")
-                        appendLine("        if (kengine_switch_sound_assets[index].asset_id == asset_id) {")
-                        appendLine("            return &kengine_switch_sound_assets[index];")
-                        appendLine("        }")
-                        appendLine("    }")
-                        appendLine("    return 0;")
-                        appendLine("}")
-                        appendLine()
-                        appendLine("int kengine_switch_sound_asset_count(void) {")
-                        appendLine("    return (int)(sizeof(kengine_switch_sound_assets) / sizeof(kengine_switch_sound_assets[0]));")
-                        appendLine("}")
-                    }
-                )
+                sourceFile.writeText(renderSoundAssetSource(declarations.toString(), entries.toString()))
             }
         }
 
@@ -951,68 +1194,20 @@ fun registerSwitchGameBuild(
         assetObjectFiles += musicObject
         assetObjectTaskNames += objectTaskName
 
-        tasks.register<Exec>(convertTaskName) {
-            group = "switch"
-            description = "Converts the music track for $displayName to libnx-compatible raw PCM."
+        registerPcmConversionTask(
+            taskName = convertTaskName,
+            description = "Converts the music track for $displayName to libnx-compatible raw PCM.",
+            source = musicSource,
+            output = musicPcm
+        )
 
-            inputs.file(musicSource)
-                .withPathSensitivity(PathSensitivity.RELATIVE)
-            outputs.file(musicPcm)
-
-            doFirst {
-                if (!musicSource.isFile) {
-                    throw GradleException("Missing music source for $displayName: ${musicSource.absolutePath}")
-                }
-
-                val pcmFile = musicPcm.get().asFile
-                pcmFile.parentFile.mkdirs()
-                commandLine(
-                    ffmpegExecutable.get(),
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",
-                    "-y",
-                    "-i",
-                    musicSource.absolutePath,
-                    "-ac",
-                    "2",
-                    "-ar",
-                    "48000",
-                    "-f",
-                    "s16le",
-                    pcmFile.absolutePath
-                )
-            }
-        }
-
-        tasks.register<Exec>(objectTaskName) {
-            group = "switch"
-            description = "Embeds the PCM music stream for $displayName as a linkable object."
-            dependsOn(convertTaskName)
-
-            inputs.file(musicPcm)
-            outputs.file(musicObject)
-
-            doFirst {
-                configureSwitchEnvironment()
-
-                val pcmFile = musicPcm.get().asFile
-                val objectFile = musicObject.get().asFile
-                objectFile.parentFile.mkdirs()
-                workingDir(pcmFile.parentFile)
-                commandLine(
-                    aarch64Tool("aarch64-none-elf-objcopy").absolutePath,
-                    "-I",
-                    "binary",
-                    "-O",
-                    "elf64-littleaarch64",
-                    "-B",
-                    "aarch64",
-                    pcmFile.name,
-                    objectFile.absolutePath
-                )
-            }
-        }
+        registerEmbeddedBinaryObjectTask(
+            taskName = objectTaskName,
+            description = "Embeds the PCM music stream for $displayName as a linkable object.",
+            source = musicPcm,
+            output = musicObject,
+            dependsOnTaskName = convertTaskName
+        )
     }
 
     val compileMainTaskName = "compile${taskPrefix}Main"
@@ -1078,91 +1273,36 @@ fun registerSwitchGameBuild(
     }
 
     val createNacpTaskName = "create${taskPrefix}Nacp"
-    tasks.register<Exec>(createNacpTaskName) {
-        group = "switch"
-        description = "Creates NACP metadata for $displayName."
-
-        inputs.property("displayName", displayName)
-        inputs.property("author", author)
-        inputs.property("version", gameVersion)
-        outputs.file(switchNacp)
-
-        doFirst {
-            configureSwitchEnvironment()
-            switchNacp.get().asFile.parentFile.mkdirs()
-            commandLine(
-                devkitTool("nacptool").absolutePath,
-                "--create",
-                displayName,
-                author,
-                gameVersion,
-                switchNacp.get().asFile.absolutePath
-            )
-        }
-    }
+    registerNacpTask(
+        taskName = createNacpTaskName,
+        description = "Creates NACP metadata for $displayName.",
+        displayName = displayName,
+        author = author,
+        appVersion = gameVersion,
+        output = switchNacp
+    )
 
     val convertIconTaskName = extension.iconSource.orNull?.asFile?.let { iconSource ->
         val taskName = "convert${taskPrefix}IconJpeg"
-        tasks.register<Exec>(taskName) {
-            group = "switch"
-            description = "Converts the $displayName icon to the NRO icon JPEG format."
-
-            inputs.file(iconSource)
-                .withPathSensitivity(PathSensitivity.RELATIVE)
-            outputs.file(switchIcon)
-
-            doFirst {
-                if (!iconSource.isFile) {
-                    throw GradleException("Missing icon source for $displayName: ${iconSource.absolutePath}")
-                }
-
-                val iconFile = switchIcon.get().asFile
-                iconFile.parentFile.mkdirs()
-                commandLine(
-                    ffmpegExecutable.get(),
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",
-                    "-y",
-                    "-i",
-                    iconSource.absolutePath,
-                    "-vf",
-                    "scale=256:256:force_original_aspect_ratio=increase,crop=256:256,format=yuvj420p",
-                    "-frames:v",
-                    "1",
-                    iconFile.absolutePath
-                )
-            }
-        }
+        registerIconConversionTask(
+            taskName = taskName,
+            description = "Converts the $displayName icon to the NRO icon JPEG format.",
+            source = iconSource,
+            output = switchIcon
+        )
         taskName
     }
 
     val packageTaskName = "package${taskPrefix}Nro"
-    tasks.register<Exec>(packageTaskName) {
-        group = "switch"
-        description = "Packages the $displayName ELF as an NRO."
-        dependsOn(listOf(linkTaskName, createNacpTaskName) + listOfNotNull(convertIconTaskName))
-
-        inputs.files(switchElf, switchNacp)
-        convertIconTaskName?.let {
-            inputs.file(switchIcon)
-        }
-        outputs.file(switchNro)
-
-        doFirst {
-            configureSwitchEnvironment()
-            val packageArgs = mutableListOf(
-                devkitTool("elf2nro").absolutePath,
-                switchElf.get().asFile.absolutePath,
-                switchNro.get().asFile.absolutePath,
-                "--nacp=${switchNacp.get().asFile.absolutePath}"
-            )
-            if (convertIconTaskName != null) {
-                packageArgs += "--icon=${switchIcon.get().asFile.absolutePath}"
-            }
-            commandLine(packageArgs)
-        }
-    }
+    registerNroPackageTask(
+        taskName = packageTaskName,
+        description = "Packages the $displayName ELF as an NRO.",
+        dependsOnTasks = listOf(linkTaskName, createNacpTaskName) + listOfNotNull(convertIconTaskName),
+        elf = switchElf,
+        nacp = switchNacp,
+        nro = switchNro,
+        icon = if (convertIconTaskName != null) switchIcon else null
+    )
 
     tasks.register(buildTaskName) {
         group = "switch"
@@ -1178,142 +1318,134 @@ fun registerSwitchGameBuild(
     )
 }
 
-tasks.register<Exec>("compileSwitchMainCOnly") {
-    group = "switch"
-    description = "Compiles the libnx hello-world C shell without Kotlin linkage."
-
-    inputs.file("src/main/c/main.c")
-    outputs.file(cOnlyObject)
-
-    doFirst {
-        configureSwitchEnvironment()
-        cOnlyObject.get().asFile.parentFile.mkdirs()
-        commandLine(
-            aarch64Tool("aarch64-none-elf-gcc").absolutePath,
-            *switchCFlags.toTypedArray(),
-            "-DKENGINE_SWITCH_C_ONLY=1",
-            "-I${libnxInclude().absolutePath}",
-            "-c",
-            file("src/main/c/main.c").absolutePath,
-            "-o",
-            cOnlyObject.get().asFile.absolutePath
-        )
-    }
-}
-
-tasks.register<Exec>("linkSwitchCOnlyElf") {
-    group = "switch"
-    description = "Links the C-only libnx hello-world ELF."
-    dependsOn("compileSwitchMainCOnly")
-
-    inputs.file(cOnlyObject)
-    outputs.file(switchCOnlyElf)
-
-    doFirst {
-        configureSwitchEnvironment()
-        commandLine(
-            aarch64Tool("aarch64-none-elf-gcc").absolutePath,
-            "-specs=${switchSpecs().absolutePath}",
-            "-g",
-            *switchArchFlags.toTypedArray(),
-            "-Wl,--gc-sections",
-            cOnlyObject.get().asFile.absolutePath,
-            "-L${libnxLib().absolutePath}",
-            "-lnx",
-            "-o",
-            switchCOnlyElf.get().asFile.absolutePath
-        )
-    }
-}
-
-tasks.register<Exec>("createSwitchNacp") {
-    group = "switch"
-    description = "Creates NACP metadata for the Switch prototype."
-
-    outputs.file(switchNacp)
-
-    doFirst {
-        configureSwitchEnvironment()
-        switchNacp.get().asFile.parentFile.mkdirs()
-        commandLine(
-            devkitTool("nacptool").absolutePath,
-            "--create",
-            "Kengine Nintendo Switch",
-            "kengine",
-            version.toString(),
-            switchNacp.get().asFile.absolutePath
-        )
-    }
-}
-
-tasks.register<Exec>("packageSwitchCOnlyNro") {
-    group = "switch"
-    description = "Packages the C-only libnx hello-world ELF as an NRO."
-    dependsOn("linkSwitchCOnlyElf", "createSwitchNacp")
-
-    inputs.files(switchCOnlyElf, switchNacp)
-    outputs.file(switchCOnlyNro)
-
-    doFirst {
-        configureSwitchEnvironment()
-        commandLine(
-            devkitTool("elf2nro").absolutePath,
-            switchCOnlyElf.get().asFile.absolutePath,
-            switchCOnlyNro.get().asFile.absolutePath,
-            "--nacp=${switchNacp.get().asFile.absolutePath}"
-        )
-    }
-}
-
-tasks.register("buildSwitchCOnlyNro") {
-    group = "switch"
-    description = "Builds the C-only libnx hello-world NRO."
-    dependsOn("packageSwitchCOnlyNro")
-}
-
-gradle.projectsEvaluated {
-    val registrations = rootProject.allprojects
-        .mapNotNull { gameProject ->
-            switchGameExtension(gameProject)?.let { extension ->
-                registerSwitchGameBuild(gameProject, extension)
-            }
-        }
-        .sortedBy { it.artifactBaseName }
-
-    tasks.register("switchGameInfo") {
+fun registerSwitchCOnlyTasks() {
+    tasks.register<Exec>("compileSwitchMainCOnly") {
         group = "switch"
-        description = "Prints the Nintendo Switch game projects registered for this build."
+        description = "Compiles the libnx hello-world C shell without Kotlin linkage."
 
-        doLast {
-            if (registrations.isEmpty()) {
-                println("No kengine.nintendo-switch-game projects are registered.")
-            } else {
-                registrations.forEach { registration ->
-                    println("${registration.artifactBaseName}: ${registration.displayName} -> :kengine-nintendo-switch:${registration.buildTaskName}")
+        inputs.file("src/main/c/main.c")
+        outputs.file(cOnlyObject)
+
+        doFirst {
+            configureSwitchEnvironment()
+            cOnlyObject.get().asFile.parentFile.mkdirs()
+            commandLine(
+                aarch64Tool("aarch64-none-elf-gcc").absolutePath,
+                *switchCFlags.toTypedArray(),
+                "-DKENGINE_SWITCH_C_ONLY=1",
+                "-I${libnxInclude().absolutePath}",
+                "-c",
+                file("src/main/c/main.c").absolutePath,
+                "-o",
+                cOnlyObject.get().asFile.absolutePath
+            )
+        }
+    }
+
+    tasks.register<Exec>("linkSwitchCOnlyElf") {
+        group = "switch"
+        description = "Links the C-only libnx hello-world ELF."
+        dependsOn("compileSwitchMainCOnly")
+
+        inputs.file(cOnlyObject)
+        outputs.file(switchCOnlyElf)
+
+        doFirst {
+            configureSwitchEnvironment()
+            commandLine(
+                aarch64Tool("aarch64-none-elf-gcc").absolutePath,
+                "-specs=${switchSpecs().absolutePath}",
+                "-g",
+                *switchArchFlags.toTypedArray(),
+                "-Wl,--gc-sections",
+                cOnlyObject.get().asFile.absolutePath,
+                "-L${libnxLib().absolutePath}",
+                "-lnx",
+                "-o",
+                switchCOnlyElf.get().asFile.absolutePath
+            )
+        }
+    }
+
+    registerNacpTask(
+        taskName = "createSwitchNacp",
+        description = "Creates NACP metadata for the Switch prototype.",
+        displayName = "Kengine Nintendo Switch",
+        author = "kengine",
+        appVersion = version.toString(),
+        output = switchNacp
+    )
+
+    registerNroPackageTask(
+        taskName = "packageSwitchCOnlyNro",
+        description = "Packages the C-only libnx hello-world ELF as an NRO.",
+        dependsOnTasks = listOf("linkSwitchCOnlyElf", "createSwitchNacp"),
+        elf = switchCOnlyElf,
+        nacp = switchNacp,
+        nro = switchCOnlyNro
+    )
+
+    tasks.register("buildSwitchCOnlyNro") {
+        group = "switch"
+        description = "Builds the C-only libnx hello-world NRO."
+        dependsOn("packageSwitchCOnlyNro")
+    }
+}
+
+fun registerSwitchGameTasks() {
+    gradle.projectsEvaluated {
+        val registrations = rootProject.allprojects
+            .mapNotNull { gameProject ->
+                switchGameExtension(gameProject)?.let { extension ->
+                    registerSwitchGameBuild(gameProject, extension)
+                }
+            }
+            .sortedBy { it.artifactBaseName }
+
+        tasks.register("switchGameInfo") {
+            group = "switch"
+            description = "Prints the Nintendo Switch game projects registered for this build."
+
+            doLast {
+                if (registrations.isEmpty()) {
+                    println("No kengine.nintendo-switch-game projects are registered.")
+                } else {
+                    registrations.forEach { registration ->
+                        println("${registration.artifactBaseName}: ${registration.displayName} -> :kengine-nintendo-switch:${registration.buildTaskName}")
+                    }
                 }
             }
         }
-    }
 
-    tasks.register("buildSwitchGameNros") {
-        group = "switch"
-        description = "Builds every registered Nintendo Switch game-facing NRO."
-        dependsOn(registrations.map { "${it.gameProjectPath}:buildSwitchNro" })
-    }
+        tasks.register("buildSwitchGameNros") {
+            group = "switch"
+            description = "Builds every registered Nintendo Switch game-facing NRO."
+            dependsOn(registrations.map { "${it.gameProjectPath}:buildSwitchNro" })
+        }
 
-    val defaultRegistration = registrations.firstOrNull { it.artifactBaseName == "nintendo-switch-demo" }
-        ?: registrations.firstOrNull()
+        val defaultRegistration = registrations.firstOrNull { it.artifactBaseName == "nintendo-switch-demo" }
+            ?: registrations.firstOrNull()
 
-    tasks.register("buildSwitchNro") {
-        group = "switch"
-        description = "Builds the default registered Nintendo Switch game NRO."
+        tasks.register("buildSwitchNro") {
+            group = "switch"
+            description = "Builds the default registered Nintendo Switch game NRO."
 
-        if (defaultRegistration == null) {
-            doFirst {
-                throw GradleException("No kengine.nintendo-switch-game projects are registered.")
+            if (defaultRegistration == null) {
+                doFirst {
+                    throw GradleException("No kengine.nintendo-switch-game projects are registered.")
+                }
+            } else {
+                dependsOn(defaultRegistration.buildTaskName)
             }
-        } else {
-            dependsOn(defaultRegistration.buildTaskName)
         }
     }
+}
+
+if (isNintendoSwitchEnabled) {
+    registerSwitchToolchainInfoTask()
+    registerValidateSwitchKotlinToolchainTask()
+    registerSwitchCOnlyTasks()
+    registerSwitchGameTasks()
+} else {
+    registerDisabledSwitchBackendTasks()
 }

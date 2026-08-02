@@ -24,21 +24,14 @@ class KengineNintendoSwitchGamePlugin : Plugin<Project> {
         val artifactBaseName = extension.artifactBaseName.get()
         val switchOutputDir = project.layout.buildDirectory.dir("switch")
         val switchNro = switchOutputDir.map { it.file("$artifactBaseName.nro") }
-        val switchBackendProject = project.rootProject.findProject(":kengine-nintendo-switch")
 
-        if (switchBackendProject == null) {
-            project.tasks.register("buildSwitchNro") {
-                group = "switch"
-                description = "Builds the Nintendo Switch NRO for ${project.path}."
-
-                doFirst {
-                    throw GradleException(
-                        "Switch backend is not enabled. Re-run with -Pkengine.enableNintendoSwitch=true."
-                    )
-                }
-            }
+        if (!project.isNintendoSwitchEnabled()) {
+            project.registerDisabledSwitchNroTask()
             return
         }
+
+        val switchBackendProject = project.rootProject.findProject(":kengine-nintendo-switch")
+            ?: throw GradleException("Switch backend project :kengine-nintendo-switch is not included in this build.")
 
         val backendBuildTaskName = extension.backendBuildTaskName.orNull
             ?: kengineNintendoSwitchBuildTaskName(artifactBaseName)
@@ -62,6 +55,27 @@ class KengineNintendoSwitchGamePlugin : Plugin<Project> {
             group = "switch"
             description = "Builds the Nintendo Switch NRO for ${project.path}."
             dependsOn("packageSwitchNro")
+        }
+    }
+
+    private fun Project.isNintendoSwitchEnabled(): Boolean {
+        return providers.gradleProperty("kengine.enableNintendoSwitch")
+            .map { it.toBoolean() }
+            .orElse(false)
+            .get()
+    }
+
+    private fun Project.registerDisabledSwitchNroTask() {
+        val projectPath = path
+        tasks.register("buildSwitchNro") {
+            group = "switch"
+            description = "Builds the Nintendo Switch NRO for $projectPath."
+
+            doFirst {
+                throw GradleException(
+                    "Nintendo Switch backend is disabled. Re-run with -Pkengine.enableNintendoSwitch=true."
+                )
+            }
         }
     }
 }

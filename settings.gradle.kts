@@ -13,7 +13,7 @@ val isPlaydateEnabled = extra.properties["kengine.enablePlaydate"]?.toString()?.
 println("Playdate enabled: $isPlaydateEnabled")
 
 val isSwitchEnabled = extra.properties["kengine.enableNintendoSwitch"]?.toString()?.toBoolean() == true
-println("Switch enabled: $isSwitchEnabled")
+println("Switch tasks enabled: $isSwitchEnabled")
 
 val modules = mutableListOf(
     "kengine-kotlin",
@@ -27,15 +27,12 @@ val modules = mutableListOf(
     "kengine-3d-model-viewer",
     "kengine-network",
     "kengine-physics",
-    "kengine-sound"
+    "kengine-sound",
+    "kengine-nintendo-switch"
 )
 
 if (isPlaydateEnabled) {
     modules.add("kengine-playdate")
-}
-
-if (isSwitchEnabled) {
-    modules.add("kengine-nintendo-switch")
 }
 
 modules.addAll(

@@ -946,7 +946,7 @@ Build the project:
 ./gradlew clean build
 ```
 
-Nintendo Switch and Playdate modules are disabled by default. Enable them explicitly only when working on those backends.
+Nintendo Switch tasks and the Playdate module are disabled by default. Enable them explicitly only when working on those backends.
 
 Build without tests:
 

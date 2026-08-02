@@ -2,11 +2,13 @@
 
 Kengine's Switch work is now an experimental, opt-in 2D homebrew backend. It no longer depends on waiting for SDL3-on-libnx support: the Switch host is a small C/libnx application that owns the framebuffer, input, audio output, and NRO packaging, while Kotlin/Native owns portable game state and emits command buffers.
 
-Switch modules are only included when explicitly enabled:
+Switch projects are included in the Gradle model for IDE visibility, but real Switch tasks are disabled unless explicitly enabled:
 
 ```bash
 ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchToolchainInfo
 ```
+
+Without `-Pkengine.enableNintendoSwitch=true`, Switch build tasks are stubs that fail with a clear enablement message and do not require devkitPro or the Kengine Kotlin/Native fork.
 
 ## Current Direction
 
@@ -25,7 +27,7 @@ Networking and 3D are intentionally deferred until this 2D baseline is boring an
 
 ## Kotlin Toolchain Boundary
 
-Normal Kengine modules continue to use the stock Kotlin Gradle plugin pinned in `gradle/libs.versions.toml`. The Switch backend is the only place that uses the Kengine Kotlin/Native fork, and it does that by directly invoking a configured `kotlinc-native` executable.
+Normal Kengine modules continue to use the stock Kotlin Gradle plugin pinned in `gradle/libs.versions.toml`. The Switch backend is the only place that uses the Kengine Kotlin/Native fork, and it does that by directly invoking a configured `kotlinc-native` executable from enabled Switch tasks.
 
 The fork helper writes the machine-local compiler path to `kengine-kotlin/local.properties`:
 

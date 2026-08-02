@@ -3,15 +3,17 @@
 Experimental Nintendo Switch homebrew build harness for proving whether Kotlin/Native can participate in a libnx application.
 The current prototype discovers game modules that apply `kengine.nintendo-switch-game`, compiles their portable `:kengine-core` lifecycle, input, audio-command, and render-command contracts into a Switch static library, then packages each game as a libnx `.nro`.
 
-This module is opt-in and is not part of the normal repo build:
+This module is included in the normal Gradle project model for IDE visibility, but its real build tasks are opt-in:
 
 ```bash
 ./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:switchToolchainInfo
 ```
 
+Without `-Pkengine.enableNintendoSwitch=true`, the public Switch tasks are disabled stubs and do not require devkitPro or the Kengine Kotlin/Native fork.
+
 ## Toolchain
 
-Normal Kengine modules use the stock Kotlin Gradle plugin. This module uses the Kengine Kotlin/Native fork only for its direct `kotlinc-native` and `cinterop` calls.
+Normal Kengine modules use the stock Kotlin Gradle plugin. This module uses the Kengine Kotlin/Native fork only from enabled Switch tasks that directly call `kotlinc-native` and `cinterop`.
 
 The fork helper writes the machine-local compiler path to `kengine-kotlin/local.properties`:
 
