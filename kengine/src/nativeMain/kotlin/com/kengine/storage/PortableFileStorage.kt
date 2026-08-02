@@ -17,11 +17,8 @@ import platform.posix.fseek
 import platform.posix.ftell
 import platform.posix.fwrite
 import platform.posix.getenv
-import platform.posix.mkdir
 import platform.posix.remove
 import platform.posix.rename
-
-private const val DIRECTORY_MODE = 493
 
 class PortableFileStorage(
     namespace: String,
@@ -38,8 +35,8 @@ class PortableFileStorage(
             if (fseek(file, 0, SEEK_END) != 0) {
                 return null
             }
-            val size = ftell(file)
-            if (size < 0 || size > maxRecordSize) {
+            val size = ftell(file).toLong()
+            if (size < 0 || size > maxRecordSize.toLong()) {
                 return null
             }
             if (fseek(file, 0, SEEK_SET) != 0) {
@@ -151,9 +148,11 @@ private fun ensureDirectory(path: String): Boolean {
             current.isEmpty() -> part
             else -> "$current/$part"
         }
-        mkdir(current, DIRECTORY_MODE.convert())
         if (access(current, F_OK) != 0) {
-            return false
+            createDirectory(current)
+            if (access(current, F_OK) != 0) {
+                return false
+            }
         }
     }
 
@@ -164,3 +163,5 @@ private fun String.withoutTrailingPathSeparator(): String {
     val isWindowsRoot = length == 3 && this[1] == ':' && (this[2] == '\\' || this[2] == '/')
     return if (length > 1 && !isWindowsRoot) trimEnd('/', '\\') else this
 }
+
+internal expect fun createDirectory(path: String)
