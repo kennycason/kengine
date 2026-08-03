@@ -97,6 +97,6 @@ GitHub Actions (`.github/workflows/build.yml`) runs on push/PR to main:
 
 ## Current Status & Known Issues
 - **WASM target**: Branch `wasm-target` exists but contains no work. Would require SDL3 replacement with WebGL/Canvas
-- **Playdate**: Blocked — Kotlin/Native linuxArm32Hfp emits ARMv4, Playdate requires ARMv7E-M (Cortex-M7). Opt-in via `-Pkengine.playdate=true`
-- **Nintendo Switch**: Blocked on libnx SDL3 support (currently SDL2 only)
+- **Playdate**: Blocked — Kotlin/Native linuxArm32Hfp emits ARMv4, Playdate requires ARMv7E-M (Cortex-M7). Opt-in via `-Pkengine.enablePlaydate=true`.
+- **Nintendo Switch**: Experimental opt-in backend via `-Pkengine.enableNintendoSwitch=true`; uses a libnx C host plus Kotlin/Native static library and portable 2D input/audio/render command buffers. Current focus is 2D runtime coverage and save data; networking and 3D are deferred.
 - **Windows CI**: Fragile due to Konan/MINGW CRT compatibility; required 9 iterations to stabilize

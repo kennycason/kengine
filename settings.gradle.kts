@@ -7,12 +7,17 @@ pluginManagement {
 
 rootProject.name = "kengine"
 
-// Playdate requires explicit opt-in via -Pkengine.playdate=true
+// Playdate requires explicit opt-in via -Pkengine.enablePlaydate=true.
 // Kotlin/Native's linuxArm32Hfp emits ARMv4 code incompatible with Playdate's Cortex-M7 (ARMv7E-M)
-val isPlaydateEnabled = extra.properties["kengine.playdate"]?.toString()?.toBoolean() == true
+val isPlaydateEnabled = extra.properties["kengine.enablePlaydate"]?.toString()?.toBoolean() == true
 println("Playdate enabled: $isPlaydateEnabled")
 
+val isSwitchEnabled = extra.properties["kengine.enableNintendoSwitch"]?.toString()?.toBoolean() == true
+println("Switch tasks enabled: $isSwitchEnabled")
+
 val modules = mutableListOf(
+    "kengine-kotlin",
+    "kengine-core",
     "kengine",
     "kengine-test",
     "kengine-reactive",
@@ -22,7 +27,8 @@ val modules = mutableListOf(
     "kengine-3d-model-viewer",
     "kengine-network",
     "kengine-physics",
-    "kengine-sound"
+    "kengine-sound",
+    "kengine-nintendo-switch"
 )
 
 if (isPlaydateEnabled) {
@@ -37,13 +43,17 @@ modules.addAll(
         "games:kengine-3d-demos",
         "games:kengine-3d-space-shooter",
         "games:helloworld",
-        "games:hextris",
+        "games:hextris-core",
+        "games:hextris-desktop",
+        "games:hextris-switch",
         "games:image-shuffle",
         "games:mario-3d",
+        "games:nintendo-switch-demo",
         "games:osc3x-synth",
         "games:osc3x-synth-v2",
         "games:physics-demo",
-        "games:rubiks-cube-3d"
+        "games:rubiks-cube-3d",
+        "games:nintendo-switch-2d-diagnostics"
     )
 )
 

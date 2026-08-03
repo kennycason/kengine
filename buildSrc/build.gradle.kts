@@ -32,5 +32,13 @@ gradlePlugin {
             id = "kengine.packaging"
             implementationClass = "KenginePackagingPlugin"
         }
+        create("kengineNintendoSwitchGame") {
+            id = "kengine.nintendo-switch-game"
+            implementationClass = "KengineNintendoSwitchGamePlugin"
+        }
+        create("kenginePortableAssets") {
+            id = "kengine.portable-assets"
+            implementationClass = "KenginePortableAssetsPlugin"
+        }
     }
 }

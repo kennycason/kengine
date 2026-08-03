@@ -423,7 +423,7 @@ export KENGINE_CONTROLLER_MODE=gamepad
 ./myGame.kexe
 
 # Or inline:
-KENGINE_CONTROLLER_MODE=gamepad ./gradlew :games:hextris:runDebugExecutableMacosArm64
+KENGINE_CONTROLLER_MODE=gamepad ./gradlew :games:hextris-desktop:runDebugExecutableMacosArm64
 ```
 
 **Note**: GAMEPAD mode is recommended on macOS to avoid duplicate controller detection issues with certain controllers (e.g., Nintendo SNES controllers).
@@ -889,7 +889,7 @@ kengine/
 ├── kengine-reactive/              // hooks system (useState, useEffect, useContext, useMemo, useReducer)
 ├── kengine-test/                  // fluent assertion testing framework
 ├── kengine-network/               // networking via SDL3_net (TCP/UDP)
-├── kengine-sound/                 // audio synthesis/playback via SDL3_mixer
+├── kengine-sound/                 // audio synthesis/playback, procedural SFX, SDL3_mixer
 ├── kengine-physics/               // 2D physics via Chipmunk bindings
 ├── kengine-3d/                    // experimental 3D via SDL3 GPU
 ├── packaging/                     // icons and packaging resources
@@ -941,16 +941,97 @@ bash sdl3/build_sdl.sh
 See [SDL3 Installation Guide](sdl3/README.md) for more details.
 
 Build the project:
+
 ```shell
 ./gradlew clean build
+```
+
+Nintendo Switch tasks and the Playdate module are disabled by default. Enable them explicitly only when working on those backends.
+
+Build without tests:
+
+```shell
+./gradlew clean build -x allTests -x macosArm64Test -x jvmTest -x jsTest
+```
+
+Build the current game-facing Nintendo Switch NROs:
+
+```shell
+./gradlew -Pkengine.enableNintendoSwitch=true :kengine-nintendo-switch:buildSwitchGameNros
+```
+
+Build the Nintendo Switch 2D diagnostics NRO:
+
+```shell
+./gradlew -Pkengine.enableNintendoSwitch=true :games:nintendo-switch-2d-diagnostics:buildSwitchNro
+```
+
+Hextris shows the intended portable game shape:
+
+- `:games:hextris-core` owns shared Kotlin gameplay, render/audio commands, storage keys, and portable asset declarations.
+- `:games:hextris-desktop` owns only the SDL desktop launcher and desktop packaging.
+- `:games:hextris-switch` owns only Switch artifact metadata and imports source/assets from core.
+
+Switch configuration is intentionally small:
+
+```kotlin
+plugins {
+    id("kengine.nintendo-switch-game")
+}
+
+group = "kengine.hextris-switch"
+version = "1.0.0"
+
+kengineNintendoSwitch {
+    artifactBaseName.set("hextris-switch")
+    displayName.set("Hextris Switch")
+    iconSource.set(layout.projectDirectory.file("assets/icon.jpg"))
+    mainClass.set("hextris.HextrisGame")
+    gameSourceProject(project(":games:hextris-core"))
+    assetsFrom(project(":games:hextris-core"))
+}
+```
+
+The desktop launcher is similarly direct:
+
+```kotlin
+import com.kengine.PortableGameRunner
+import com.kengine.createGameContext
+import com.kengine.log.Logger
+import hextris.HextrisGame
+
+fun main() {
+    createGameContext(
+        title = "Kengine - Hextris Desktop",
+        width = 1280,
+        height = 720,
+        logLevel = Logger.Level.INFO
+    ) {
+        PortableGameRunner(
+            frameRate = 60,
+            commandCapacity = 1024
+        ) {
+            HextrisGame()
+        }
+    }
+}
+```
+
+Build with the experimental Playdate backend enabled:
+
+```shell
+./gradlew -Pkengine.enablePlaydate=true :kengine-playdate:build
 ```
 
 Run specific tests:
 ```shell
 ./gradlew macosArm64Test --tests "com.kengine.ui.DrawerIT.drawer component test"
 ```
+
+Native SDL integration tests named `*IT.kt` are excluded from the default `build` path because they open real game contexts and can run timed visual loops. Opt into them explicitly:
+
 ```shell
-./gradlew macosArm64Test --tests "*IT"
+./gradlew -Pkengine.integrationTests=true :kengine:macosArm64Test --tests "*IT"
 ```
 
 Replace `MacosArm64` / `macosArm64` with your host target, for example `LinuxX64` / `linuxX64` or `MingwX64` / `mingwX64`.

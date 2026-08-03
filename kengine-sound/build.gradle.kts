@@ -17,7 +17,6 @@ kotlin {
 
     compilerOptions {
         freeCompilerArgs.addAll(
-            "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
             "-opt-in=kotlin.ExperimentalStdlibApi"
         )
     }
