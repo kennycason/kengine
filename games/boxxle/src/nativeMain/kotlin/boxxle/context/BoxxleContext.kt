@@ -12,9 +12,12 @@ class BoxxleContext private constructor(
     val player: Player
 ) : Context() {
 
-    val tileDim = 32
+    val tileDim: Double
+        get() = BASE_TILE_DIM * level.data.scale
 
     companion object {
+        const val BASE_TILE_DIM = 32
+
         private var currentContext: BoxxleContext? = null
 
         fun get(): BoxxleContext {
@@ -35,7 +38,7 @@ class BoxxleContext private constructor(
             useSpriteContext {
                 addSpriteSheet(
                     Sprites.BOXXLE_SHEET,
-                    SpriteSheet.fromFilePath(Sprites.BOXXLE_SHEET_BMP, 32, 32)
+                    SpriteSheet.fromFilePath(Sprites.BOXXLE_SHEET_BMP, BASE_TILE_DIM, BASE_TILE_DIM)
                 )
             }
         }

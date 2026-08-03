@@ -45,6 +45,7 @@ This has also been an experiment with ChatGPT + Claude to help with coding + des
   - [Logging](#logging)
   - [Math Utilities](#math-utilities)
 - [3D / SDL GPU](#3d--sdl-gpu)
+- [Nintendo 64 plan](docs/NINTENDO_64.md)
 - [Unit Testing](kengine-test/)
 - [Dev](#dev)
   - [Project structure](#project-structure)
@@ -818,6 +819,8 @@ logger.info { "New Position: $newPosition" }
 
 Kengine has an experimental native 3D layer in `kengine-3d`, built on SDL3's `SDL_GPU` API. SDL3 still handles windowing, input, audio, timing, and platform concerns; Kengine adds the game-facing 3D pieces on top.
 
+The broader Nintendo 64 roadmap is tracked in [`docs/NINTENDO_64.md`](docs/NINTENDO_64.md). It covers both the N64-inspired 3D platformer work and the longer-range Kotlin/Native target work that may branch from the current Switch compiler target effort.
+
 Current 3D support includes:
 
 - GPU-backed windows via `RenderBackend.SDL_GPU_3D`.
@@ -947,6 +950,11 @@ Build the project:
 ```
 
 Nintendo Switch tasks and the Playdate module are disabled by default. Enable them explicitly only when working on those backends.
+
+Platform planning docs:
+
+- [`docs/NINTENDO_SWITCH.md`](docs/NINTENDO_SWITCH.md) covers the current opt-in Switch homebrew backend.
+- [`docs/NINTENDO_64.md`](docs/NINTENDO_64.md) covers the N64-inspired 3D stack and the planned Kotlin/Native N64 target feasibility work.
 
 Build without tests:
 

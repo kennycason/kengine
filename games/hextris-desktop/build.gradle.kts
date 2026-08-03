@@ -63,6 +63,7 @@ kotlin {
         val nativeMain by getting {
             dependencies {
                 implementation(project(":kengine"))
+                implementation(project(":kengine-sound"))
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.kengine
 
+import com.kengine.audio.PortableAudioSink
 import com.kengine.render.PortableSpriteRegistry
 import com.kengine.storage.PortableFileStorage
 import com.kengine.storage.PortableStorage
@@ -8,6 +9,7 @@ class PortableGameRunner(
     frameRate: Int = 60,
     spriteRegistry: PortableSpriteRegistry = PortableSpriteRegistry(),
     commandCapacity: Int = 256,
+    audioSink: PortableAudioSink = PortableAudioSink.NoOp,
     storageBuilder: (PortableGame) -> PortableStorage = { game -> PortableFileStorage(game.storageNamespace) },
     gameBuilder: () -> PortableGame
 ) {
@@ -19,7 +21,8 @@ class PortableGameRunner(
             PortableGameAdapter(
                 portableGame = portableGame,
                 spriteRegistry = spriteRegistry,
-                commandCapacity = commandCapacity
+                commandCapacity = commandCapacity,
+                audioSink = audioSink
             )
         }
     }

@@ -44,6 +44,7 @@ class GameContext private constructor(
     private val contexts: Array<out Context> = arrayOf()
 ) : Context(), Logging {
     var isRunning = true
+    private val registeredContexts = mutableListOf<Context>()
 
     init {
         initContexts()
@@ -51,6 +52,9 @@ class GameContext private constructor(
 
     fun registerContext(context: Context) {
         ContextRegistry.register(context)
+        if (registeredContexts.none { it === context } && contexts.none { it === context }) {
+            registeredContexts.add(context)
+        }
     }
 
     companion object {
@@ -98,6 +102,9 @@ class GameContext private constructor(
 
     override fun cleanup() {
         logger.info { "Cleaning up GameContext" }
+        registeredContexts.asReversed().forEach { it.cleanup() }
+        contexts.reversed().forEach { it.cleanup() }
+
         log.cleanup()
         action.cleanup()
         effect.cleanup()
@@ -113,8 +120,6 @@ class GameContext private constructor(
         view.cleanup()
         sdl.cleanup()
         clock.cleanup()
-
-        contexts.forEach { it.cleanup() }
 
         ContextRegistry.clearAll()
         currentContext = null
@@ -137,6 +142,7 @@ class GameContext private constructor(
         ContextRegistry.register(action)
         ContextRegistry.register(effect)
         ContextRegistry.register(clock)
+        contexts.forEach { ContextRegistry.register(it) }
 
         getKeyboardContext().init()
         getMouseContext().init()
