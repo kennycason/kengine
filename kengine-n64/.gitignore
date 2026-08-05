@@ -1,0 +1,4 @@
+build/
+*.z64
+n64-build/build/
+n64-build/libdragon/

@@ -40,5 +40,9 @@ gradlePlugin {
             id = "kengine.portable-assets"
             implementationClass = "KenginePortableAssetsPlugin"
         }
+        create("kengineN64Game") {
+            id = "kengine.n64-game"
+            implementationClass = "KengineN64GamePlugin"
+        }
     }
 }

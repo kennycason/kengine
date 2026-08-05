@@ -59,3 +59,27 @@ tasks.register<Exec>("buildKotlinNativeDist") {
 
     commandLine("bash", layout.projectDirectory.file("build-kotlin-native-dist.sh").asFile.absolutePath)
 }
+
+fun defaultN64CheckoutDir(): File {
+    return rootProject.layout.projectDirectory.asFile.parentFile.resolve("kengine-kotlin-n64")
+}
+
+tasks.register("kotlinN64ForkInfo") {
+    group = "kengine kotlin"
+    description = "Prints the local Kotlin compiler fork configuration for kengine-n64."
+
+    doLast {
+        val n64Repo = localProperty("kengine.n64.kotlinRepo")?.let(::file) ?: defaultN64CheckoutDir()
+        val n64NativeHome = localProperty("kengine.n64.kotlinNativeHome")?.let(::file)
+            ?: n64Repo.resolve("kotlin-native/dist")
+        val n64KotlincNative = n64NativeHome.resolve("bin/kotlinc-native")
+
+        println("Kengine Kotlin version: ${libs.versions.kotlin.get()}")
+        println("N64 Kotlin fork repo: ${n64Repo.absolutePath} (${n64Repo.resolve(".git").isDirectory})")
+        println("N64 Kotlin/Native home: ${n64NativeHome.absolutePath} (${n64NativeHome.isDirectory})")
+        println("N64 Kotlin/Native home property: kengine.n64.kotlinNativeHome")
+        println("kotlinc-native: ${n64KotlincNative.absolutePath} (${n64KotlincNative.exists()})")
+        println("N64 target override: ${localProperty("kengine.n64.kotlinTarget") ?: "(not configured)"}")
+        println("Local properties: ${localPropertiesFile.asFile.absolutePath} (${localPropertiesFile.asFile.isFile})")
+    }
+}

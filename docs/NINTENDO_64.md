@@ -39,6 +39,26 @@ For Nintendo 64, the target name, ABI, linker flow, C host/toolchain, runtime co
 - Keep any real N64 backend on the portable `:kengine-core` surface first. Do not depend on SDL, desktop `:kengine`, or modern GPU APIs for the hardware-target path.
 - Treat a standalone `kengine-n64` or `kengine-nintendo-64` module as acceptable, even if it is separated from desktop Kengine and Switch internals. Reuse should be earned by constraints, not forced.
 
+## Emulator Compatibility
+
+Modern libdragon uses custom RSP microcode (`rspq`) and sends raw RDP commands directly. This is how real N64 hardware works, but it is incompatible with emulators that use HLE (High-Level Emulation) for the RSP.
+
+HLE RSP plugins (like mupen64plus's default `rsp-hle`) work by recognizing specific microcode patterns from Nintendo's official SDK (F3DEX, F3DEX2, S2DEX, etc.) and reimplementing them on the host CPU. They do not recognize libdragon's custom microcode, resulting in a black screen.
+
+### Recommended Emulators
+
+| Emulator | RSP Mode | libdragon Support | Notes |
+|----------|----------|-------------------|-------|
+| **ares** | LLE | Works | Recommended for homebrew development. Accurate hardware emulation. `brew install --cask ares-emulator` on macOS. |
+| **simple64** | LLE (parallel-rsp/parallel-rdp) | Works | Also accurate. Good alternative to ares. |
+| **mupen64plus** (default plugins) | HLE | Black screen | Default `rsp-hle` does not recognize libdragon microcode. |
+| **mupen64plus** (parallel plugins) | LLE | Works | Requires `mupen64plus-rsp-parallel` and `mupen64plus-video-parallel` plugins (not in standard Homebrew package). |
+| **Real N64 hardware** (EverDrive 64, 64drive) | N/A | Works | The ground truth. libdragon is designed and tested against real hardware. |
+
+### Why This Matters
+
+The black screen on mupen64plus does NOT indicate a broken ROM. Commercial N64 games used Nintendo's proprietary microcodes which HLE plugins know about. Homebrew with custom microcodes (all modern libdragon output) requires LLE — actual instruction-by-instruction emulation of the RSP hardware. Any ROM that runs on ares or simple64 will run on real N64 hardware via a flashcart.
+
 ## Current Assets
 
 `games/mario-3d/assets/models` currently includes:
@@ -189,16 +209,76 @@ python3 tools/extract_glb_animations.py "$HOME/code/mario64-assets/assets/models
 - The probe has clear build, link, package, and emulator/hardware validation notes.
 - Only after that probe works do we attempt portable input, render commands, audio commands, or a real game.
 
+## Build Commands
+
+### Prerequisites
+
+- Docker Desktop (with Rosetta 2 enabled on Apple Silicon for x86 emulation)
+- ares emulator: `brew install --cask ares-emulator`
+
+### C-Only ROM (no Kotlin, pure libdragon)
+
+```shell
+# Build the ROM via Docker
+./gradlew :kengine-n64:buildN64COnlyZ64 -Pkengine.enableNintendo64=true
+
+# Build and launch in ares
+./gradlew :kengine-n64:runN64COnly -Pkengine.enableNintendo64=true
+```
+
+The C-only ROM is built inside Docker using the libdragon toolchain. The Docker volume `kengine-n64-toolchain` persists the built SDK across builds. The output ROM is at `kengine-n64/n64-build/kengine-n64-c-only.z64`.
+
+### Manual Docker Build (without Gradle)
+
+```shell
+# First time: pull the image (requires --platform on Apple Silicon)
+docker pull --platform linux/amd64 ghcr.io/dragonminded/libdragon:latest
+
+# Build
+docker run --rm --platform linux/amd64 \
+  -v kengine-n64-toolchain:/n64_toolchain \
+  -v $(pwd)/kengine-n64/n64-build:/build \
+  -w /build -e N64_INST=/n64_toolchain \
+  ghcr.io/dragonminded/libdragon:latest make -j4
+```
+
+### Running ROMs
+
+```shell
+# ares (recommended, LLE — works with modern libdragon)
+open -a ares kengine-n64/n64-build/kengine-n64-c-only.z64
+```
+
+## Module Layout
+
+```
+kengine-n64/
+  build.gradle.kts            # Gradle build with Docker integration, opt-in via -Pkengine.enableNintendo64=true
+  n64-build/                   # Standalone C-only build directory (Docker + Makefile)
+    src/main.c                 # C-only demo (modern libdragon API)
+    Makefile                   # libdragon n64.mk Makefile
+  src/main/c/
+    main.c                     # Full C host (C-only + Kotlin-linked modes, modern libdragon API)
+    kengine_n64_storage.h      # Storage C ABI for Kotlin cinterop
+  src/main/kotlin/
+    KengineN64Runtime.kt       # Kotlin runtime (command buffer bridge)
+    KengineN64Storage.kt       # Kotlin storage wrapper
+    N64Hello.kt                # Probe functions
+  setup-n64-build-macos.sh     # Alternative: native toolchain install (not recommended)
+```
+
 ## Near-Term TODO
 
-1. Create or document the separate local `kengine-kotlin-n64` fork strategy.
-2. Decide the first N64 target feasibility questions: target name, architecture descriptor, ABI/toolchain, host shape, runtime artifact path, and packaging/validation flow.
-3. Sketch the future standalone `kengine-n64` or `kengine-nintendo-64` module boundary and opt-in Gradle property without implementing it prematurely.
-4. Prove a tiny Kotlin/Native static-library target path before expanding any Kengine libraries.
-5. Keep `games:mario-3d` green after the recent engine extractions.
-6. Add richer collision: slope limits, ledges, world bounds, and clearer debug overlays.
-7. Add camera preset/save controls to `kengine-3d-model-viewer`.
-8. Define the first explicit N64-style render preset.
-9. Tighten asset health reporting for bundled Mario, Bowser, Goomba, Ridley, and Battlefield models.
-10. Add small deterministic tests around movement state transitions and collision helpers.
-11. Update this document whenever a workstream graduates into `docs/KENGINE_3D_PLAN.md`, `docs/NINTENDO_SWITCH.md`, or a reusable engine API.
+1. ~~Create or document the separate local `kengine-kotlin-n64` fork strategy.~~ Done: `kengine-kotlin/setup-n64-kotlin-fork.sh`
+2. ~~Sketch the future standalone `kengine-n64` module boundary and opt-in Gradle property.~~ Done: `kengine-n64/build.gradle.kts` with `-Pkengine.enableNintendo64=true`
+3. ~~Build a working C-only N64 ROM via Docker.~~ Done: `buildN64COnlyZ64` task produces working .z64
+4. ~~Validate ROM in emulator.~~ Done: verified in ares with controller input, rendering, and text
+5. Decide the first N64 target feasibility questions: target name, architecture descriptor, ABI/toolchain, runtime artifact path.
+6. Prove a tiny Kotlin/Native static-library target path before expanding any Kengine libraries.
+7. Keep `games:mario-3d` green after the recent engine extractions.
+8. Add richer collision: slope limits, ledges, world bounds, and clearer debug overlays.
+9. Add camera preset/save controls to `kengine-3d-model-viewer`.
+10. Define the first explicit N64-style render preset.
+11. Tighten asset health reporting for bundled Mario, Bowser, Goomba, Ridley, and Battlefield models.
+12. Add small deterministic tests around movement state transitions and collision helpers.
+13. Update this document whenever a workstream graduates into `docs/KENGINE_3D_PLAN.md`, `docs/NINTENDO_SWITCH.md`, or a reusable engine API.
