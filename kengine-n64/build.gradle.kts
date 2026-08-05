@@ -646,13 +646,6 @@ fun registerGameBuildTasks(
     val gameOutputDir = n64OutputDir.map { it.dir("games/$artifactBaseName") }
 
     val kotlinSources = mutableListOf<File>()
-    val coreProject = rootProject.findProject(":kengine-core")
-    if (coreProject != null) {
-        val coreSrc = coreProject.file("src/commonMain/kotlin")
-        if (coreSrc.isDirectory) {
-            kotlinSources.add(coreSrc)
-        }
-    }
     kotlinSources.add(file("src/main/kotlin"))
     extension.gameSourceProjects.forEach { sourceProject ->
         val commonSrc = sourceProject.file("src/commonMain/kotlin")
@@ -904,6 +897,40 @@ fun registerGameBuildTasks(
     val kotlinOutputBaseName = artifactBaseName.replace('-', '_')
     val kotlinStaticLib = gameOutputDir.map { it.file("lib/lib${kotlinOutputBaseName}.a") }
     val kotlinApiHeader = gameOutputDir.map { it.file("lib/${kotlinOutputBaseName}_api.h") }
+    val coreKlib = gameOutputDir.map { it.file("klib/kengine_core.klib") }
+
+    val coreProject = rootProject.findProject(":kengine-core")
+    val coreSrcDir = coreProject?.file("src/commonMain/kotlin")
+
+    if (coreSrcDir != null && coreSrcDir.isDirectory) {
+        tasks.register<Exec>("compile${taskPrefix}CoreKlib") {
+            group = "n64"
+            description = "Compiles the kengine-core klib for $artifactBaseName."
+
+            inputs.dir(coreSrcDir).withPathSensitivity(PathSensitivity.RELATIVE)
+            outputs.file(coreKlib)
+
+            doFirst {
+                coreKlib.get().asFile.parentFile.mkdirs()
+                val target = kotlinTarget.get()
+                commandLine(
+                    buildList {
+                        add(kotlincNative().absolutePath)
+                        add("-target")
+                        add(target)
+                        add("-produce")
+                        add("library")
+                        add("-output")
+                        add(coreKlib.get().asFile.absolutePath)
+                        coreSrcDir.walkTopDown()
+                            .filter { it.isFile && it.extension == "kt" }
+                            .forEach { add(it.absolutePath) }
+                    }
+                )
+            }
+        }
+    }
+
     val storageCinteropKlib = gameOutputDir.map { it.file("klib/kengine_n64_storage.klib") }
 
     tasks.register<Exec>("compile${taskPrefix}StorageCinterop") {
@@ -937,12 +964,18 @@ fun registerGameBuildTasks(
         description = "Compiles the N64 Kotlin static library for $artifactBaseName."
         dependsOn("generate${taskPrefix}GameFactory")
         dependsOn("compile${taskPrefix}StorageCinterop")
+        if (coreSrcDir != null && coreSrcDir.isDirectory) {
+            dependsOn("compile${taskPrefix}CoreKlib")
+        }
 
         kotlinSources.forEach { sourceDir ->
             inputs.dir(sourceDir).withPathSensitivity(PathSensitivity.RELATIVE)
         }
         inputs.file(gameFactoryFile)
         inputs.file(storageCinteropKlib)
+        if (coreSrcDir != null && coreSrcDir.isDirectory) {
+            inputs.file(coreKlib)
+        }
         outputs.file(kotlinStaticLib)
         outputs.file(kotlinApiHeader)
 
@@ -958,6 +991,10 @@ fun registerGameBuildTasks(
                     add("static")
                     add("-output")
                     add(kotlinStaticLib.get().asFile.parentFile.resolve(kotlinOutputBaseName).absolutePath)
+                    if (coreKlib.get().asFile.exists()) {
+                        add("-library")
+                        add(coreKlib.get().asFile.absolutePath)
+                    }
                     add("-library")
                     add(storageCinteropKlib.get().asFile.absolutePath)
                     add("-Xbinary=gc=noop")
