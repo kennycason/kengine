@@ -21,23 +21,29 @@ class SoundContext private constructor(
     private val manager: SoundManager
 ) : Context(), Logging {
 
-    var mixer: CPointer<cnames.structs.MIX_Mixer>? = null
-        private set
+    private var mixerHandle: CPointer<cnames.structs.MIX_Mixer>? = null
 
     init {
         require(SDL_Init(SDL_INIT_AUDIO)) {
             Companion.logger.error("Error initializing SDL Audio: ${SDL_GetError()?.toKString()}")
             exit(1)
         }
+    }
 
+    fun mixer(): CPointer<cnames.structs.MIX_Mixer> {
+        mixerHandle?.let { return it }
         require(MIX_Init()) {
             "Failed to initialize SDL_mixer: ${SDL_GetError()?.toKString()}"
         }
 
-        mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, null)
-        requireNotNull(mixer) {
-            "Failed to create SDL_mixer device: ${SDL_GetError()?.toKString()}"
+        val createdMixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, null)
+        if (createdMixer == null) {
+            val error = SDL_GetError()?.toKString()
+            MIX_Quit()
+            throw IllegalStateException("Failed to create SDL_mixer device: $error")
         }
+        mixerHandle = createdMixer
+        return createdMixer
     }
 
     fun addSound(name: String, sound: Sound) {
@@ -51,9 +57,11 @@ class SoundContext private constructor(
     override fun cleanup() {
         logger.info { "Cleaning up SoundContext" }
         manager.cleanup()
-        mixer?.let { MIX_DestroyMixer(it) }
-        mixer = null
-        MIX_Quit()
+        mixerHandle?.let {
+            MIX_DestroyMixer(it)
+            MIX_Quit()
+        }
+        mixerHandle = null
         currentContext = null
     }
 

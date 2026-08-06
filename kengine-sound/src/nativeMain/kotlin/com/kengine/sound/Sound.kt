@@ -29,9 +29,7 @@ class Sound(filePath: String) {
     private val fullFilePath = File.resolveAssetPath(filePath)
 
     init {
-        val mixer = getSoundContext().mixer
-            ?: error("SoundContext mixer not initialized")
-        audio = MIX_LoadAudio(mixer, fullFilePath, true)
+        audio = MIX_LoadAudio(getSoundContext().mixer(), fullFilePath, true)
         requireNotNull(audio) { "Failed to load sound: $fullFilePath" }
     }
 
@@ -116,9 +114,7 @@ class Sound(filePath: String) {
 
     private fun prepareTrack() {
         if (track == null) {
-            val mixer = getSoundContext().mixer
-                ?: error("SoundContext mixer not initialized")
-            track = MIX_CreateTrack(mixer)
+            track = MIX_CreateTrack(getSoundContext().mixer())
             requireNotNull(track) { "Failed to create track for: $fullFilePath" }
         }
         track?.let {

@@ -15,6 +15,7 @@ This has also been an experiment with ChatGPT + Claude to help with coding + des
   - [Example Games](#example-games)
     - [Hello, World](#hello-world)
     - [Boxxle](#boxxle)
+    - [Hextris](#hextris)
     - [Osc3x Synth](#osc3x-synth)
   - [Documentation](#documentation)
     - [Graphics](#graphics)
@@ -173,6 +174,14 @@ fun main() {
     }
 }
 ```
+
+<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/games/boxxle-n64/screenshot.png" width="50%" />
+
+The Nintendo 64 ROM target lives in [`games/boxxle-n64/`](games/boxxle-n64/) and runs the shared [`boxxle-core`](games/boxxle-core/) game logic and assets.
+
+### [Hextris](games/hextris-core/)
+
+Hextris is split into shared core logic plus desktop and Nintendo Switch targets. The Switch demo target lives in [`games/hextris-switch/`](games/hextris-switch/), with a demo video on [YouTube](https://youtu.be/f7y5omH15mU).
 
 ### [Osc3x Synth](games/osc3x-synth/) + [V2](games/osc3x-synth-v2/)
 

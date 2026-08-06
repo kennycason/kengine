@@ -34,6 +34,95 @@ class BoxxleGameTest {
     }
 
     @Test
+    fun completionStopsMainMusicBeforeFinishSound() {
+        val game = BoxxleGame()
+        val audio = AudioContext(commandCapacity = 4)
+
+        audio.beginFrame()
+        game.audio(audio)
+        completeFirstLevel(game)
+        audio.beginFrame()
+        game.audio(audio)
+
+        assertEquals(2, audio.commandCount)
+        assertEquals(AudioCommandType.STOP_MUSIC, audio.commandField(0, AudioCommandBuffer.FIELD_TYPE))
+        assertEquals(
+            AudioAssetId.music(BoxxleAssets.MAIN_ID),
+            audio.commandField(0, AudioCommandBuffer.FIELD_ASSET_ID)
+        )
+        assertEquals(AudioCommandType.PLAY_SOUND, audio.commandField(1, AudioCommandBuffer.FIELD_TYPE))
+        assertEquals(
+            AudioAssetId.sound(BoxxleAssets.FINISH_ID),
+            audio.commandField(1, AudioCommandBuffer.FIELD_ASSET_ID)
+        )
+    }
+
+    @Test
+    fun mainMusicDoesNotLoopDuringCompletionDelay() {
+        val game = BoxxleGame()
+        val audio = AudioContext(commandCapacity = 4)
+
+        completeFirstLevel(game)
+        audio.beginFrame()
+        game.audio(audio)
+        audio.beginFrame()
+        game.audio(audio)
+
+        assertEquals(0, audio.commandCount)
+    }
+
+    @Test
+    fun newLevelAfterCompletionRestartsMainMusic() {
+        val game = BoxxleGame(
+            BoxxleTiming(
+                moveAnimationFrames = 1,
+                levelCompleteDelayFrames = 1,
+                levelSwitchHoldFrames = 1
+            )
+        )
+        val audio = AudioContext(commandCapacity = 4)
+
+        tapMove(game, InputButton.DOWN)
+        tapMove(game, InputButton.RIGHT)
+        tapMove(game, InputButton.UP)
+        tapMove(game, InputButton.RIGHT)
+        tapMove(game, InputButton.DOWN)
+        audio.beginFrame()
+        game.audio(audio)
+        game.update(input())
+        audio.beginFrame()
+        game.audio(audio)
+
+        assertContains(game.snapshot(), "level=1")
+        assertEquals(2, audio.commandCount)
+        assertEquals(AudioCommandType.STOP_MUSIC, audio.commandField(0, AudioCommandBuffer.FIELD_TYPE))
+        assertEquals(AudioCommandType.LOOP_MUSIC, audio.commandField(1, AudioCommandBuffer.FIELD_TYPE))
+        assertEquals(
+            AudioAssetId.music(BoxxleAssets.MAIN_ID),
+            audio.commandField(1, AudioCommandBuffer.FIELD_ASSET_ID)
+        )
+    }
+
+    @Test
+    fun levelShortcutRestartsMainMusic() {
+        val game = BoxxleGame()
+        val audio = AudioContext(commandCapacity = 4)
+
+        audio.beginFrame()
+        game.audio(audio)
+        repeat(18) {
+            game.update(input(InputButton.R))
+        }
+        audio.beginFrame()
+        game.audio(audio)
+
+        assertContains(game.snapshot(), "level=1")
+        assertEquals(2, audio.commandCount)
+        assertEquals(AudioCommandType.STOP_MUSIC, audio.commandField(0, AudioCommandBuffer.FIELD_TYPE))
+        assertEquals(AudioCommandType.LOOP_MUSIC, audio.commandField(1, AudioCommandBuffer.FIELD_TYPE))
+    }
+
+    @Test
     fun pushesBoxOnFirstLevel() {
         val game = BoxxleGame()
         press(game, InputButton.DOWN)
@@ -238,6 +327,19 @@ class BoxxleGameTest {
         repeat(14) {
             game.update(input())
         }
+    }
+
+    private fun tapMove(game: BoxxleGame, button: InputButton) {
+        game.update(input(button))
+        game.update(input())
+    }
+
+    private fun completeFirstLevel(game: BoxxleGame) {
+        press(game, InputButton.DOWN)
+        press(game, InputButton.RIGHT)
+        press(game, InputButton.UP)
+        press(game, InputButton.RIGHT)
+        press(game, InputButton.DOWN)
     }
 
     private fun spriteDrawX(game: BoxxleGame, frame: Int): Int {

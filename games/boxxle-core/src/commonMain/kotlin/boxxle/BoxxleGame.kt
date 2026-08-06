@@ -21,6 +21,8 @@ class BoxxleGame(
     private var previousMask = 0
     private var completeFrames = 0
     private var pendingFinishSound = false
+    private var pendingStopMainMusic = false
+    private var mainMusicEnabled = true
     private var moveAnimation: MoveAnimation? = null
     private var directionIntent: Direction? = null
     private var queuedDirection: Direction? = null
@@ -90,10 +92,16 @@ class BoxxleGame(
     }
 
     override fun audio(audio: AudioContext) {
-        audio.loopMusic(mainMusic, volume = 230)
+        if (pendingStopMainMusic) {
+            audio.stopMusic(mainMusic)
+            pendingStopMainMusic = false
+        }
         if (pendingFinishSound) {
             audio.playSound(finishSound, volume = 190)
             pendingFinishSound = false
+        }
+        if (mainMusicEnabled) {
+            audio.loopMusic(mainMusic, volume = 230)
         }
     }
 
@@ -285,6 +293,8 @@ class BoxxleGame(
             return false
         }
         if (completeFrames == 0) {
+            mainMusicEnabled = false
+            pendingStopMainMusic = true
             pendingFinishSound = true
             completeFrames = timing.levelCompleteDelayFrames.coerceAtLeast(1)
         }
@@ -301,6 +311,8 @@ class BoxxleGame(
         resetLevelShortcutHolds()
         completeFrames = 0
         pendingFinishSound = false
+        pendingStopMainMusic = true
+        mainMusicEnabled = true
         moveAnimation = null
     }
 
