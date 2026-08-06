@@ -714,8 +714,8 @@ fun registerGameBuildTasks(
     extension.spriteAssets.forEach { spriteAsset ->
         val assetName = spriteAsset.name
         val symbolName = "kengine_n64_sprite_${cIdentifier(assetName)}"
-        val rawFile = gameOutputDir.map { it.file("assets/sprites/$assetName.rgba") }
-        val objectFile = gameOutputDir.map { it.file("assets/sprites/$assetName.o") }
+        val rawFile = gameOutputDir.map { it.file("assets/sprites/$symbolName.rgba") }
+        val objectFile = gameOutputDir.map { it.file("assets/sprites/$symbolName.o") }
         val convertTaskName = "convert${taskPrefix}Sprite${cIdentifier(assetName).replaceFirstChar { it.uppercase() }}"
         val objcopyTaskName = "objcopy${taskPrefix}Sprite${cIdentifier(assetName).replaceFirstChar { it.uppercase() }}"
 
