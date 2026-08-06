@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <libdragon.h>
 
@@ -65,6 +66,8 @@
 
 #define KENGINE_AUDIO_SAMPLE_RATE 22050
 #define KENGINE_AUDIO_NUM_CHANNELS 4
+#define KENGINE_AUDIO_MUSIC_CHANNEL 0
+#define KENGINE_AUDIO_FIRST_SOUND_CHANNEL 1
 
 /* In-memory PCM waveform for the mixer */
 #ifdef KENGINE_N64_SOUND_ASSETS
@@ -80,11 +83,16 @@ static void kengine_pcm_read(void* ctx, samplebuffer_t* sbuf, int wpos, int wlen
     int16_t* dest = (int16_t*)samplebuffer_append(sbuf, wlen);
     for (int i = 0; i < wlen; i++) {
         int idx = wpos + i;
+        if (pcm->wave.loop_len > 0 && pcm->num_samples > 0) {
+            idx %= pcm->num_samples;
+        }
         dest[i] = idx < pcm->num_samples ? pcm->samples[idx] : 0;
     }
 }
 
 static kengine_pcm_wave_t g_sound_waves[KENGINE_AUDIO_NUM_CHANNELS];
+static int g_current_music_asset_id = 0;
+static int g_current_music_volume = -1;
 
 static void kengine_audio_callback(int16_t* buffer, size_t nsamples) {
     mixer_poll(buffer, nsamples);
@@ -97,39 +105,75 @@ static void kengine_audio_init(void) {
     audio_write_silence();
 }
 
-static void kengine_play_sound(int asset_id, int volume) {
+static bool kengine_play_audio_asset(int asset_id, int channel, int volume, bool loop, const char* name) {
     const KengineN64SoundAsset* asset = kengine_n64_find_sound_asset(asset_id);
-    if (!asset) return;
+    if (!asset) return false;
 
     const int16_t* samples = (const int16_t*)asset->data_start;
     int byte_count = (int)(asset->data_end - asset->data_start);
     int num_samples = byte_count / 2;
 
-    /* Find a free mixer channel */
-    static int next_channel = 0;
-    int ch = next_channel;
-    next_channel = (next_channel + 1) % KENGINE_AUDIO_NUM_CHANNELS;
-
-    mixer_ch_stop(ch);
+    mixer_ch_stop(channel);
 
     /* Set up a resident PCM waveform for the mixer */
-    kengine_pcm_wave_t* pcm = &g_sound_waves[ch];
+    kengine_pcm_wave_t* pcm = &g_sound_waves[channel];
     memset(pcm, 0, sizeof(*pcm));
     pcm->samples = samples;
     pcm->num_samples = num_samples;
 
-    pcm->wave.name = "kengine_sfx";
+    pcm->wave.name = name;
     pcm->wave.bits = 16;
     pcm->wave.channels = 1;
     pcm->wave.frequency = KENGINE_AUDIO_SAMPLE_RATE;
     pcm->wave.len = num_samples;
-    pcm->wave.loop_len = 0;
+    pcm->wave.loop_len = loop ? num_samples : 0;
     pcm->wave.read = kengine_pcm_read;
     pcm->wave.ctx = pcm;
 
     float vol = (float)volume / 255.0f;
-    mixer_ch_set_vol(ch, vol, vol);
-    mixer_ch_play(ch, &pcm->wave);
+    mixer_ch_set_vol(channel, vol, vol);
+    mixer_ch_play(channel, &pcm->wave);
+    return true;
+}
+
+static void kengine_play_sound(int asset_id, int volume) {
+    static int next_channel = KENGINE_AUDIO_FIRST_SOUND_CHANNEL;
+    int ch = next_channel;
+    next_channel++;
+    if (next_channel >= KENGINE_AUDIO_NUM_CHANNELS) {
+        next_channel = KENGINE_AUDIO_FIRST_SOUND_CHANNEL;
+    }
+
+    kengine_play_audio_asset(asset_id, ch, volume, false, "kengine_sfx");
+}
+
+static void kengine_loop_music(int asset_id, int volume) {
+    if (g_current_music_asset_id == asset_id) {
+        if (g_current_music_volume != volume) {
+            float vol = (float)volume / 255.0f;
+            mixer_ch_set_vol(KENGINE_AUDIO_MUSIC_CHANNEL, vol, vol);
+            g_current_music_volume = volume;
+        }
+        return;
+    }
+
+    if (kengine_play_audio_asset(asset_id, KENGINE_AUDIO_MUSIC_CHANNEL, volume, true, "kengine_music")) {
+        g_current_music_asset_id = asset_id;
+        g_current_music_volume = volume;
+    }
+}
+
+static void kengine_stop_music(int asset_id) {
+    if (g_current_music_asset_id == 0) {
+        return;
+    }
+    if (asset_id != 0 && asset_id != g_current_music_asset_id) {
+        return;
+    }
+
+    mixer_ch_stop(KENGINE_AUDIO_MUSIC_CHANNEL);
+    g_current_music_asset_id = 0;
+    g_current_music_volume = -1;
 }
 
 static void execute_audio_commands(int* commands, int command_count) {
@@ -140,13 +184,14 @@ static void execute_audio_commands(int* commands, int command_count) {
         int volume = commands[base + KENGINE_AUDIO_FIELD_VOLUME];
 
         switch (type) {
+            case KENGINE_AUDIO_LOOP_MUSIC:
+                kengine_loop_music(asset_id, volume);
+                break;
             case KENGINE_AUDIO_PLAY_SOUND:
                 kengine_play_sound(asset_id, volume);
                 break;
             case KENGINE_AUDIO_STOP_MUSIC:
-                for (int ch = 0; ch < KENGINE_AUDIO_NUM_CHANNELS; ch++) {
-                    mixer_ch_stop(ch);
-                }
+                kengine_stop_music(asset_id);
                 break;
             default:
                 break;

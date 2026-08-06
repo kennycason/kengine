@@ -325,6 +325,8 @@ data class N64SpriteAssetBuild(
 
 data class N64SoundAssetBuild(
     val asset: KengineN64SoundAsset,
+    val assetKind: String,
+    val stableIdPrefix: String,
     val symbolName: String,
     val pcmFile: Provider<RegularFile>,
     val objectFile: Provider<RegularFile>,
@@ -410,6 +412,8 @@ fun soundManifestInput(builds: List<N64SoundAssetBuild>): List<String> {
         val asset = build.asset
         listOf(
             asset.name,
+            build.assetKind,
+            build.stableIdPrefix,
             asset.id.get(),
             build.symbolName,
             asset.source.get().asFile.absolutePath
@@ -771,31 +775,50 @@ fun registerGameBuildTasks(
     }
 
     val soundBuilds = mutableListOf<N64SoundAssetBuild>()
-    extension.soundAssets.forEach { soundAsset ->
-        val assetName = soundAsset.name
-        val symbolName = "kengine_n64_sound_${cIdentifier(assetName)}"
+
+    fun registerAudioAssetBuild(audioAsset: KengineN64SoundAsset, assetKind: String, stableIdPrefix: String) {
+        val assetName = audioAsset.name
+        val assetKindTaskName = assetKind.replaceFirstChar { it.uppercase() }
+        val assetTaskName = cIdentifier(assetName).replaceFirstChar { it.uppercase() }
+        val symbolName = "kengine_n64_${assetKind}_${cIdentifier(assetName)}"
         val pcmFile = gameOutputDir.map { it.file("assets/sounds/$symbolName.pcm") }
         val objectFile = gameOutputDir.map { it.file("assets/sounds/$symbolName.o") }
-        val convertTaskName = "convert${taskPrefix}Sound${cIdentifier(assetName).replaceFirstChar { it.uppercase() }}"
-        val objcopyTaskName = "objcopy${taskPrefix}Sound${cIdentifier(assetName).replaceFirstChar { it.uppercase() }}"
+        val convertTaskName = "convert${taskPrefix}${assetKindTaskName}${assetTaskName}"
+        val objcopyTaskName = "objcopy${taskPrefix}${assetKindTaskName}${assetTaskName}"
 
         registerPcmConversionTask(
             convertTaskName,
-            "Converts sound $assetName to PCM for $artifactBaseName.",
-            soundAsset.source.get().asFile,
+            "Converts $assetKind $assetName to PCM for $artifactBaseName.",
+            audioAsset.source.get().asFile,
             pcmFile,
-            soundAsset.extraInputs
+            audioAsset.extraInputs
         )
 
         registerObjcopyTask(
             objcopyTaskName,
-            "Converts sound $assetName PCM to MIPS object for $artifactBaseName.",
+            "Converts $assetKind $assetName PCM to MIPS object for $artifactBaseName.",
             convertTaskName,
             pcmFile,
             objectFile
         )
 
-        soundBuilds += N64SoundAssetBuild(soundAsset, symbolName, pcmFile, objectFile, objcopyTaskName)
+        soundBuilds += N64SoundAssetBuild(
+            audioAsset,
+            assetKind,
+            stableIdPrefix,
+            symbolName,
+            pcmFile,
+            objectFile,
+            objcopyTaskName
+        )
+    }
+
+    extension.soundAssets.forEach { soundAsset ->
+        registerAudioAssetBuild(soundAsset, "sound", "sound:")
+    }
+
+    extension.musicAssets.forEach { musicAsset ->
+        registerAudioAssetBuild(musicAsset, "music", "music:")
     }
 
     if (spriteBuilds.isNotEmpty()) {
@@ -900,8 +923,8 @@ fun registerGameBuildTasks(
                     declarations.appendLine("extern const unsigned char _binary_${sym.replace('-', '_')}_pcm_start[];")
                     declarations.appendLine("extern const unsigned char _binary_${sym.replace('-', '_')}_pcm_end[];")
 
-                    val soundId = stableSoundId(build.asset.id.get())
-                    entries.appendLine("    { $soundId, _binary_${sym.replace('-', '_')}_pcm_start, _binary_${sym.replace('-', '_')}_pcm_end },")
+                    val audioId = stableAssetId(build.stableIdPrefix, build.asset.id.get())
+                    entries.appendLine("    { $audioId, _binary_${sym.replace('-', '_')}_pcm_start, _binary_${sym.replace('-', '_')}_pcm_end },")
                 }
 
                 soundManifestSource.get().asFile.apply {

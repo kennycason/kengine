@@ -1,5 +1,9 @@
 package boxxle
 
+import com.kengine.audio.AudioAssetId
+import com.kengine.audio.AudioCommandBuffer
+import com.kengine.audio.AudioCommandType
+import com.kengine.audio.AudioContext
 import com.kengine.input.InputButton
 import com.kengine.input.InputState
 import com.kengine.render.RenderCommandBuffer
@@ -11,6 +15,24 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class BoxxleGameTest {
+    @Test
+    fun requestsLoopedMainMusicThroughPortableAudio() {
+        val game = BoxxleGame()
+        val audio = AudioContext(commandCapacity = 4)
+
+        audio.beginFrame()
+        game.audio(audio)
+
+        assertEquals(1, audio.commandCount)
+        assertEquals(0, audio.droppedCommandCount)
+        assertEquals(AudioCommandType.LOOP_MUSIC, audio.commandField(0, AudioCommandBuffer.FIELD_TYPE))
+        assertEquals(
+            AudioAssetId.music(BoxxleAssets.MAIN_ID),
+            audio.commandField(0, AudioCommandBuffer.FIELD_ASSET_ID)
+        )
+        assertEquals(230, audio.commandField(0, AudioCommandBuffer.FIELD_VOLUME))
+    }
+
     @Test
     fun pushesBoxOnFirstLevel() {
         val game = BoxxleGame()
@@ -37,12 +59,33 @@ class BoxxleGameTest {
     fun shoulderButtonsChangeLevels() {
         val game = BoxxleGame()
 
+        repeat(17) {
+            game.update(input(InputButton.R))
+        }
+        assertContains(game.snapshot(), "level=0")
+
         game.update(input(InputButton.R))
         game.update(input())
         assertContains(game.snapshot(), "level=1")
 
-        game.update(input(InputButton.L))
+        repeat(18) {
+            game.update(input(InputButton.L))
+        }
         assertContains(game.snapshot(), "level=0")
+    }
+
+    @Test
+    fun desktopBriefTapMovesOnlyOneTile() {
+        val game = BoxxleGame()
+
+        repeat(3) {
+            game.update(input(InputButton.RIGHT))
+        }
+        repeat(8) {
+            game.update(input())
+        }
+
+        assertContains(game.snapshot(), "player=2,1")
     }
 
     @Test

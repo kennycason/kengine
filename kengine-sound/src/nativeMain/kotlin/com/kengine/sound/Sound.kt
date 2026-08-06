@@ -54,26 +54,31 @@ class Sound(filePath: String) {
      * Plays the sound once.
      */
     fun play() {
-        prepareTrack(loops = 0)
-        track?.let {
-            MIX_SetTrackGain(it, volume / 100.0f)
-            require(MIX_PlayTrack(it, 0u)) {
-                "Failed to play sound: $fullFilePath (${SDL_GetError()?.toKString()})"
-            }
-        } ?: error("Failed to play sound: $fullFilePath")
+        playWithLoopCount(loops = 0, action = "play")
     }
 
     /**
      * Loops the sound indefinitely.
      */
     fun loop() {
-        prepareTrack(loops = -1)
+        playWithLoopCount(loops = -1, action = "loop")
+    }
+
+    private fun playWithLoopCount(loops: Int, action: String) {
+        prepareTrack()
         track?.let {
-            MIX_SetTrackGain(it, volume / 100.0f)
-            require(MIX_PlayTrack(it, 0u)) {
-                "Failed to loop sound: $fullFilePath (${SDL_GetError()?.toKString()})"
+            require(MIX_SetTrackGain(it, volume / 100.0f)) {
+                "Failed to set track gain: $fullFilePath (${SDL_GetError()?.toKString()})"
             }
-        } ?: error("Failed to loop sound: $fullFilePath")
+            require(MIX_PlayTrack(it, 0u)) {
+                "Failed to $action sound: $fullFilePath (${SDL_GetError()?.toKString()})"
+            }
+            if (loops != 0) {
+                require(MIX_SetTrackLoops(it, loops)) {
+                    "Failed to set track loops: $fullFilePath (${SDL_GetError()?.toKString()})"
+                }
+            }
+        } ?: error("Failed to $action sound: $fullFilePath")
     }
 
     /**
@@ -109,7 +114,7 @@ class Sound(filePath: String) {
         audio = null
     }
 
-    private fun prepareTrack(loops: Int) {
+    private fun prepareTrack() {
         if (track == null) {
             val mixer = getSoundContext().mixer
                 ?: error("SoundContext mixer not initialized")
@@ -119,9 +124,6 @@ class Sound(filePath: String) {
         track?.let {
             require(MIX_SetTrackAudio(it, audio)) {
                 "Failed to set track audio: $fullFilePath (${SDL_GetError()?.toKString()})"
-            }
-            require(MIX_SetTrackLoops(it, loops)) {
-                "Failed to set track loops: $fullFilePath (${SDL_GetError()?.toKString()})"
             }
         }
     }

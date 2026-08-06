@@ -9,6 +9,7 @@ import org.gradle.api.provider.Property
 open class KengineN64GameExtension(private val project: Project) {
     private val mutableSpriteAssets = mutableListOf<KengineN64SpriteAsset>()
     private val mutableSoundAssets = mutableListOf<KengineN64SoundAsset>()
+    private val mutableMusicAssets = mutableListOf<KengineN64SoundAsset>()
     private val mutableGameSourceProjects = mutableListOf<Project>()
 
     val artifactBaseName: Property<String> = project.objects.property(String::class.java)
@@ -25,6 +26,8 @@ open class KengineN64GameExtension(private val project: Project) {
         get() = mutableSpriteAssets.toList()
     val soundAssets: List<KengineN64SoundAsset>
         get() = mutableSoundAssets.toList()
+    val musicAssets: List<KengineN64SoundAsset>
+        get() = mutableMusicAssets.toList()
     val gameSourceProjects: List<Project>
         get() = mutableGameSourceProjects.toList()
 
@@ -44,6 +47,12 @@ open class KengineN64GameExtension(private val project: Project) {
         val asset = KengineN64SoundAsset(name, project)
         configure.execute(asset)
         mutableSoundAssets += asset
+    }
+
+    fun music(name: String, configure: Action<KengineN64SoundAsset>) {
+        val asset = KengineN64SoundAsset(name, project)
+        configure.execute(asset)
+        mutableMusicAssets += asset
     }
 
     fun gameSourceProject(sourceProject: Project) {
@@ -80,7 +89,7 @@ open class KengineN64GameExtension(private val project: Project) {
                     mutableSoundAssets += asset
                 }
                 is KenginePortableMusicAsset -> {
-                    // N64 has very limited audio; music handled separately if at all
+                    // Music is memory-expensive on N64; declare only needed tracks explicitly with music(...).
                 }
             }
         }

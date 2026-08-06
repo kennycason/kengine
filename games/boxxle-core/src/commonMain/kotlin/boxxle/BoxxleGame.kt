@@ -35,6 +35,7 @@ class BoxxleGame(
 
     override fun update(input: InputState) {
         val inputDirection = updateDirectionIntent(input)
+        val newlyPressedDirection = newlyPressedDirection(input)
 
         if (justPressed(input, InputButton.B) || justPressed(input, InputButton.START)) {
             loadLevel(levelNumber)
@@ -44,8 +45,8 @@ class BoxxleGame(
 
         if (moveAnimation != null) {
             resetLevelShortcutHolds()
-            if (inputDirection != null) {
-                queuedDirection = inputDirection
+            if (newlyPressedDirection != null) {
+                queuedDirection = newlyPressedDirection
             }
             advanceMoveAnimation()
             if (moveAnimation == null) {
@@ -53,7 +54,7 @@ class BoxxleGame(
                     previousMask = input.mask
                     return
                 }
-                val nextDirection = queuedDirection
+                val nextDirection = queuedDirection ?: inputDirection
                 queuedDirection = null
                 if (nextDirection != null) {
                     tryMove(nextDirection)
@@ -89,7 +90,7 @@ class BoxxleGame(
     }
 
     override fun audio(audio: AudioContext) {
-        audio.loopMusic(mainMusic, volume = 140)
+        audio.loopMusic(mainMusic, volume = 230)
         if (pendingFinishSound) {
             audio.playSound(finishSound, volume = 190)
             pendingFinishSound = false
@@ -326,6 +327,13 @@ class BoxxleGame(
             .also { directionIntent = it }
     }
 
+    private fun newlyPressedDirection(input: InputState): Direction? {
+        return DIRECTION_PRIORITY.firstOrNull { direction ->
+            input.isPressed(direction.button) &&
+                (previousMask and InputState.bitFor(direction.button)) == 0
+        }
+    }
+
     private fun drawBoardGrid(render: RenderContext, layout: BoardLayout) {
         val boardWidth = level.width * layout.tile
         val boardHeight = level.height * layout.tile
@@ -490,7 +498,7 @@ data class BoxxleTiming(
         val Desktop = BoxxleTiming(
             moveAnimationFrames = 8,
             levelCompleteDelayFrames = 360,
-            levelSwitchHoldFrames = 1
+            levelSwitchHoldFrames = 18
         )
         val Nintendo64 = BoxxleTiming(
             moveAnimationFrames = 2,
