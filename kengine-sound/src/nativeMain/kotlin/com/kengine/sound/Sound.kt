@@ -3,6 +3,8 @@ package com.kengine.sound
 import com.kengine.file.File
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.toKString
+import sdl3.SDL_GetError
 import sdl3.mixer.MIX_CreateTrack
 import sdl3.mixer.MIX_DestroyAudio
 import sdl3.mixer.MIX_DestroyTrack
@@ -55,7 +57,9 @@ class Sound(filePath: String) {
         prepareTrack(loops = 0)
         track?.let {
             MIX_SetTrackGain(it, volume / 100.0f)
-            MIX_PlayTrack(it, 0u)
+            require(MIX_PlayTrack(it, 0u)) {
+                "Failed to play sound: $fullFilePath (${SDL_GetError()?.toKString()})"
+            }
         } ?: error("Failed to play sound: $fullFilePath")
     }
 
@@ -66,7 +70,9 @@ class Sound(filePath: String) {
         prepareTrack(loops = -1)
         track?.let {
             MIX_SetTrackGain(it, volume / 100.0f)
-            MIX_PlayTrack(it, 0u)
+            require(MIX_PlayTrack(it, 0u)) {
+                "Failed to loop sound: $fullFilePath (${SDL_GetError()?.toKString()})"
+            }
         } ?: error("Failed to loop sound: $fullFilePath")
     }
 
@@ -111,8 +117,12 @@ class Sound(filePath: String) {
             requireNotNull(track) { "Failed to create track for: $fullFilePath" }
         }
         track?.let {
-            MIX_SetTrackAudio(it, audio)
-            MIX_SetTrackLoops(it, loops)
+            require(MIX_SetTrackAudio(it, audio)) {
+                "Failed to set track audio: $fullFilePath (${SDL_GetError()?.toKString()})"
+            }
+            require(MIX_SetTrackLoops(it, loops)) {
+                "Failed to set track loops: $fullFilePath (${SDL_GetError()?.toKString()})"
+            }
         }
     }
 }

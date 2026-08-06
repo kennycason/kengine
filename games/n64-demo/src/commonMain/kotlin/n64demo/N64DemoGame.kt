@@ -24,7 +24,6 @@ class N64DemoGame : PortableGame {
     private var previousInputMask = 0
 
     private val pokeball = RenderAssetId.sprite("pokeball")
-    private val beepSound = AudioAssetId.sound("beep")
     private val finishSound = AudioAssetId.sound("finish")
     private val chordSound = AudioAssetId.sound("chord")
 
@@ -66,7 +65,6 @@ class N64DemoGame : PortableGame {
 
         if (aJustPressed) {
             colorIndex = (colorIndex + 1) % trailColors.size
-            pendingSound = beepSound
         }
 
         if (bJustPressed) {
@@ -127,7 +125,7 @@ class N64DemoGame : PortableGame {
 
         render.drawText("Kengine N64", 100, 8, 0xFFFFFFFF.toInt(), 2)
         render.drawText("Score: $score  Hi: $highScore", 20, 30, 0xCCCCCCFF.toInt(), 1)
-        render.drawText("A: beep  B: sprite  X: chord  Y: finish", 10, 214, 0xAAAAAAFF.toInt(), 1)
+        render.drawText("A: color  B: sprite  X: chord  Y: finish", 10, 214, 0xAAAAAAFF.toInt(), 1)
         render.drawText("D-Pad: move", 10, 226, 0xAAAAAAFF.toInt(), 1)
     }
 

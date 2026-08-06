@@ -1,15 +1,16 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    id("kengine.assets")
     id("kengine.packaging")
 }
 
-group = "kengine.boxxle"
+group = "kengine.boxxle-desktop"
 version = "1.0.0"
 
 repositories {
     mavenCentral()
 }
+
+configureKenginePortableGameAssets(project(":games:boxxle-core"))
 
 kotlin {
     jvm()
@@ -51,8 +52,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(libs.kotlinxSerializationJson) // Shared dependencies
-                implementation(libs.kotlinxCoroutinesCore)
+                implementation(project(":games:boxxle-core"))
             }
         }
         val commonTest by getting {

@@ -139,28 +139,35 @@ class BallSpriteEntity : SpriteEntity(
 
 A sample game app to help get started.
 
-### [Boxxle](boxxle/)
+### [Boxxle](games/boxxle-core/)
 
-A more robust example with `keyboard` and `controller` support.
+A portable Sokoban-style game split across desktop and Nintendo 64 targets.
 
 Controls:
-- **WASD or Arrows:** Movement
-- **R:** Reset level
-- **Return:** Next level
-- **Space:** Previous level
+- **D-Pad / WASD / Arrows:** Movement
+- **B / Start / Return:** Reset level
+- **L / R:** Previous / next level
 
 There are 41 levels total.
 
-<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/games/boxxle/screenshot.png" width="50%" />
+<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/games/boxxle-desktop/screenshot.png" width="50%" />
 
 ```kotlin
+import boxxle.BoxxleAssets
+import boxxle.BoxxleGame
+import com.kengine.PortableGameRunner
+import com.kengine.sound.PortableAudioSdlRenderer
+
 fun main() {
     createGameContext(
-        title = "Boxxle",
-        width = 800,
-        height = 600
+        title = "Kengine - Boxxle Desktop",
+        width = 640,
+        height = 480
     ) {
-        GameRunner(frameRate = 60) {
+        PortableGameRunner(
+            frameRate = 60,
+            audioSink = PortableAudioSdlRenderer(BoxxleAssets)
+        ) {
             BoxxleGame()
         }
     }
@@ -900,7 +907,9 @@ kengine/
 ├── buildSrc/                      // Gradle plugins (PlatformConfig, assets, SDL dylibs, packaging)
 └── games/
     ├── antfarm/                   // ant colony simulation
-    ├── boxxle/                    // boxxle - clone of the Gameboy classic
+    ├── boxxle-core/               // portable Boxxle gameplay and assets
+    ├── boxxle-desktop/            // Boxxle SDL desktop launcher
+    ├── boxxle-n64/                // Boxxle Nintendo 64 ROM wrapper
     ├── helloworld/                // a simple example, a good starting point
     ├── hextris/                   // hexagonal tetris variant
     ├── image-shuffle/             // image tile shuffle game
@@ -974,11 +983,14 @@ Build the Nintendo Switch 2D diagnostics NRO:
 ./gradlew -Pkengine.enableNintendoSwitch=true :games:nintendo-switch-2d-diagnostics:buildSwitchNro
 ```
 
-Hextris shows the intended portable game shape:
+Hextris and Boxxle show the intended portable game shape:
 
 - `:games:hextris-core` owns shared Kotlin gameplay, render/audio commands, storage keys, and portable asset declarations.
 - `:games:hextris-desktop` owns only the SDL desktop launcher and desktop packaging.
 - `:games:hextris-switch` owns only Switch artifact metadata and imports source/assets from core.
+- `:games:boxxle-core` owns shared Kotlin gameplay, 2D sprite-sheet rendering commands, music/SFX declarations, and storage keys.
+- `:games:boxxle-desktop` owns only the SDL desktop launcher and desktop packaging.
+- `:games:boxxle-n64` owns only N64 artifact metadata and imports source/assets from core.
 
 Switch configuration is intentionally small:
 

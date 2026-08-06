@@ -45,10 +45,6 @@ kengineN64 {
         source.set(project.file("assets/sprites/pokeball.bmp"))
     }
 
-    sound("beep") {
-        source.set(project.file("assets/sounds/beep.wav"))
-    }
-
     sound("finish") {
         source.set(project.file("assets/sounds/finish.wav"))
     }

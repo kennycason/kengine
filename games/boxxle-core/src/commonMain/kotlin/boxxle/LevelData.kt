@@ -8,7 +8,13 @@ data class LevelData(
     val scale: Double = 1.5
 )
 
-val LEVEL_DATA: List<LevelData> = listOf(
+val LEVEL_DATA: List<LevelData> = levelData0To9() +
+    levelData10To19() +
+    levelData20To29() +
+    levelData30To39() +
+    levelData40()
+
+private fun levelData0To9(): List<LevelData> = listOf(
     LevelData( // 0
         tiles = listOf(
             listOf(1, 1, 1, 1, 1),
@@ -169,6 +175,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
         ),
         start = listOf(3, 7)
     ),
+)
+
+private fun levelData10To19(): List<LevelData> = listOf(
     LevelData( // 10
         tiles = listOf(
             listOf(0, 0, 1, 1, 1, 1, 1, 1, 0),
@@ -383,6 +392,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
         start = listOf(1, 1)
     ),
 
+)
+
+private fun levelData20To29(): List<LevelData> = listOf(
     LevelData( // 20
         tiles = listOf(
             listOf(1, 1, 1, 1, 1, 1, 1, 1, 0),
@@ -624,6 +636,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
         start = listOf(7, 8),
         scale = 1.0
     ),
+)
+
+private fun levelData30To39(): List<LevelData> = listOf(
     LevelData( // 30
         tiles = listOf(
             listOf(0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -908,6 +923,9 @@ val LEVEL_DATA: List<LevelData> = listOf(
         start = listOf(1, 10),
         scale = 0.8
     ),
+)
+
+private fun levelData40(): List<LevelData> = listOf(
     LevelData( // 40
         tiles = listOf(
             listOf(1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0),

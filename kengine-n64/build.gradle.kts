@@ -390,6 +390,33 @@ fun n64ImageDimensions(imageFile: File): N64ImageDimensions {
     throw GradleException("Unable to read sprite asset dimensions: ${imageFile.absolutePath}")
 }
 
+fun spriteManifestInput(builds: List<N64SpriteAssetBuild>): List<String> {
+    return builds.map { build ->
+        val asset = build.asset
+        listOf(
+            asset.name,
+            asset.id.get(),
+            build.symbolName,
+            asset.source.get().asFile.absolutePath,
+            if (asset is KengineN64SpriteSheetAsset) asset.tileWidth.orNull?.toString().orEmpty() else "",
+            if (asset is KengineN64SpriteSheetAsset) asset.tileHeight.orNull?.toString().orEmpty() else "",
+            if (asset is KengineN64SpriteSheetAsset) asset.columns.orNull?.toString().orEmpty() else ""
+        ).joinToString("|")
+    }
+}
+
+fun soundManifestInput(builds: List<N64SoundAssetBuild>): List<String> {
+    return builds.map { build ->
+        val asset = build.asset
+        listOf(
+            asset.name,
+            asset.id.get(),
+            build.symbolName,
+            asset.source.get().asFile.absolutePath
+        ).joinToString("|")
+    }
+}
+
 fun renderGameFactorySource(mainClass: String, artifactBaseName: String): String {
     val factoryClassName = mainClass.substringAfterLast(".")
     val factoryImport = if (mainClass.contains(".")) "import $mainClass\n" else ""
@@ -658,16 +685,19 @@ fun registerGameBuildTasks(
 
     val kotlinSources = mutableListOf<File>()
     kotlinSources.add(file("src/main/kotlin"))
-    extension.gameSourceProjects.forEach { sourceProject ->
+    val gameSourceProjects = (listOf(gameProject) + extension.gameSourceProjects)
+        .distinctBy { it.path }
+    gameSourceProjects.forEach { sourceProject ->
         val commonSrc = sourceProject.file("src/commonMain/kotlin")
         if (commonSrc.isDirectory) {
             kotlinSources.add(commonSrc)
         }
     }
-    val gameProjectSrc = gameProject.file("src/commonMain/kotlin")
-    if (gameProjectSrc.isDirectory) {
-        kotlinSources.add(gameProjectSrc)
+    val portableAssetExtensions = gameSourceProjects.mapNotNull { sourceProject ->
+        sourceProject.extensions.findByName("kenginePortableAssets") as? KenginePortableAssetsExtension
     }
+    val generatedGameSourceDirs = portableAssetExtensions.mapNotNull { it.generatedSourceDir }
+    val generatedAssetTaskPaths = portableAssetExtensions.mapNotNull { it.generateTaskPath }
 
     val generatedDir = gameOutputDir.map { it.dir("generated") }
     val gameFactoryFile = generatedDir.map { it.file("KengineN64GameFactory.kt") }
@@ -677,6 +707,8 @@ fun registerGameBuildTasks(
         group = "n64"
         description = "Generates the N64 game factory source for $artifactBaseName."
 
+        inputs.property("mainClass", mainClass)
+        inputs.property("artifactBaseName", artifactBaseName)
         outputs.file(gameFactoryFile)
 
         doLast {
@@ -776,6 +808,7 @@ fun registerGameBuildTasks(
             description = "Generates the sprite asset manifest for $artifactBaseName."
 
             spriteBuilds.forEach { dependsOn(it.objectTaskName) }
+            inputs.property("spriteAssets", spriteManifestInput(spriteBuilds))
             outputs.file(spriteManifestHeader)
             outputs.file(spriteManifestSource)
 
@@ -849,6 +882,7 @@ fun registerGameBuildTasks(
             description = "Generates the sound asset manifest for $artifactBaseName."
 
             soundBuilds.forEach { dependsOn(it.objectTaskName) }
+            inputs.property("soundAssets", soundManifestInput(soundBuilds))
             outputs.file(soundManifestHeader)
             outputs.file(soundManifestSource)
 
@@ -975,12 +1009,18 @@ fun registerGameBuildTasks(
         description = "Compiles the N64 Kotlin static library for $artifactBaseName."
         dependsOn("generate${taskPrefix}GameFactory")
         dependsOn("compile${taskPrefix}StorageCinterop")
+        dependsOn(generatedAssetTaskPaths)
         if (coreSrcDir != null && coreSrcDir.isDirectory) {
             dependsOn("compile${taskPrefix}CoreKlib")
         }
 
         kotlinSources.forEach { sourceDir ->
             inputs.dir(sourceDir).withPathSensitivity(PathSensitivity.RELATIVE)
+        }
+        generatedGameSourceDirs.forEach { generatedSourceDir ->
+            inputs.dir(generatedSourceDir)
+                .optional()
+                .withPathSensitivity(PathSensitivity.RELATIVE)
         }
         inputs.file(gameFactoryFile)
         inputs.file(storageCinteropKlib)
@@ -1014,6 +1054,14 @@ fun registerGameBuildTasks(
                         sourceDir.walkTopDown()
                             .filter { it.isFile && it.extension == "kt" }
                             .forEach { add(it.absolutePath) }
+                    }
+                    generatedGameSourceDirs.forEach { generatedSourceDir ->
+                        val sourceDir = generatedSourceDir.get().asFile
+                        if (sourceDir.isDirectory) {
+                            sourceDir.walkTopDown()
+                                .filter { it.isFile && it.extension == "kt" }
+                                .forEach { add(it.absolutePath) }
+                        }
                     }
                     add(gameFactoryFile.get().asFile.absolutePath)
                 }
@@ -1176,6 +1224,7 @@ fun registerGameBuildTasks(
         inputs.file(kotlinApiHeader)
         inputs.file(file("src/main/c/main.c"))
         inputs.file(file("src/main/c/kotlin_stubs.c"))
+        outputs.dir(dockerStagingDir)
 
         doLast {
             val staging = dockerStagingDir.get().asFile
@@ -1410,6 +1459,8 @@ fun registerGameBuildTasks(
         dependsOn("stage${taskPrefix}DockerBuild")
 
         val staging = dockerStagingDir.get().asFile
+        inputs.dir(dockerStagingDir)
+            .withPathSensitivity(PathSensitivity.RELATIVE)
         outputs.file(dockerGameZ64)
 
         doFirst {

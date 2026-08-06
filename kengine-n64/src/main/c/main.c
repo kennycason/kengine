@@ -337,10 +337,11 @@ static const unsigned char kengine_font[96][7] = {
 };
 
 static uint32_t kengine_rgba_to_color(int rgba) {
-    uint8_t r = (rgba >> 24) & 0xFF;
-    uint8_t g = (rgba >> 16) & 0xFF;
-    uint8_t b = (rgba >> 8) & 0xFF;
-    return graphics_make_color(r, g, b, 0xFF);
+    uint8_t r = rgba & 0xFF;
+    uint8_t g = (rgba >> 8) & 0xFF;
+    uint8_t b = (rgba >> 16) & 0xFF;
+    uint8_t a = (rgba >> 24) & 0xFF;
+    return graphics_make_color(r, g, b, a);
 }
 
 static void draw_rect(surface_t* disp, int x, int y, int width, int height, int color) {
@@ -408,12 +409,12 @@ static void draw_text_rgba(surface_t* disp, const char* text, int x, int y, int 
 static void draw_vertical_gradient(surface_t* disp, int top_color, int bottom_color, int pulse) {
     (void)pulse;
 
-    uint8_t tr = (top_color >> 24) & 0xFF;
-    uint8_t tg = (top_color >> 16) & 0xFF;
-    uint8_t tb = (top_color >> 8) & 0xFF;
-    uint8_t br = (bottom_color >> 24) & 0xFF;
-    uint8_t bg = (bottom_color >> 16) & 0xFF;
-    uint8_t bb = (bottom_color >> 8) & 0xFF;
+    uint8_t tr = top_color & 0xFF;
+    uint8_t tg = (top_color >> 8) & 0xFF;
+    uint8_t tb = (top_color >> 16) & 0xFF;
+    uint8_t br = bottom_color & 0xFF;
+    uint8_t bg = (bottom_color >> 8) & 0xFF;
+    uint8_t bb = (bottom_color >> 16) & 0xFF;
 
     for (int y = 0; y < FB_HEIGHT; ++y) {
         uint8_t r = tr + (br - tr) * y / FB_HEIGHT;
@@ -430,7 +431,7 @@ static void draw_sprite(surface_t* disp, int sprite_id, int x, int y, int width,
 
     const KengineN64SpriteAsset* asset = kengine_n64_find_sprite_asset(sprite_id);
     if (!asset) {
-        draw_rect(disp, x, y, width > 0 ? width : 16, height > 0 ? height : 16, 0xFF00FFFF);
+        draw_rect(disp, x, y, width > 0 ? width : 16, height > 0 ? height : 16, 0xFFFF00FF);
         return;
     }
 
@@ -452,9 +453,11 @@ static void draw_sprite(surface_t* disp, int sprite_id, int x, int y, int width,
     int draw_w = width > 0 ? width : tile_w;
     int draw_h = height > 0 ? height : tile_h;
 
-    for (int dy = 0; dy < draw_h && dy < tile_h; ++dy) {
-        for (int dx = 0; dx < draw_w && dx < tile_w; ++dx) {
-            int src_pixel = (src_y + dy) * src_stride + (src_x + dx);
+    for (int dy = 0; dy < draw_h; ++dy) {
+        int sample_y = src_y + ((dy * tile_h) / draw_h);
+        for (int dx = 0; dx < draw_w; ++dx) {
+            int sample_x = src_x + ((dx * tile_w) / draw_w);
+            int src_pixel = sample_y * src_stride + sample_x;
             if (src_pixel < 0 || src_pixel >= total_pixels) continue;
 
             int offset = src_pixel * 4;
@@ -478,21 +481,21 @@ static void draw_sprite(surface_t* disp, int sprite_id, int x, int y, int width,
 static int g_render_commands[KENGINE_RENDER_MAX_COMMANDS * KENGINE_RENDER_FIELD_COUNT];
 static int g_audio_commands[KENGINE_AUDIO_MAX_COMMANDS * KENGINE_AUDIO_FIELD_COUNT];
 
-static int translate_input(joypad_inputs_t inputs, joypad_buttons_t held) {
+static int translate_input(joypad_inputs_t inputs, joypad_buttons_t held, joypad_buttons_t pressed) {
     int mask = 0;
 
-    if (held.d_left || inputs.stick_x < -STICK_DEADZONE) mask |= KENGINE_INPUT_LEFT;
-    if (held.d_right || inputs.stick_x > STICK_DEADZONE) mask |= KENGINE_INPUT_RIGHT;
-    if (held.d_up || inputs.stick_y > STICK_DEADZONE) mask |= KENGINE_INPUT_UP;
-    if (held.d_down || inputs.stick_y < -STICK_DEADZONE) mask |= KENGINE_INPUT_DOWN;
-    if (held.a) mask |= KENGINE_INPUT_A;
-    if (held.b) mask |= KENGINE_INPUT_B;
-    if (held.start) mask |= KENGINE_INPUT_START;
-    if (held.c_up) mask |= KENGINE_INPUT_X;
-    if (held.c_down) mask |= KENGINE_INPUT_Y;
-    if (held.l) mask |= KENGINE_INPUT_L;
-    if (held.r) mask |= KENGINE_INPUT_R;
-    if (held.z) mask |= KENGINE_INPUT_SELECT;
+    if (held.d_left || pressed.d_left || inputs.stick_x < -STICK_DEADZONE) mask |= KENGINE_INPUT_LEFT;
+    if (held.d_right || pressed.d_right || inputs.stick_x > STICK_DEADZONE) mask |= KENGINE_INPUT_RIGHT;
+    if (held.d_up || pressed.d_up || inputs.stick_y > STICK_DEADZONE) mask |= KENGINE_INPUT_UP;
+    if (held.d_down || pressed.d_down || inputs.stick_y < -STICK_DEADZONE) mask |= KENGINE_INPUT_DOWN;
+    if (held.a || pressed.a) mask |= KENGINE_INPUT_A;
+    if (held.b || pressed.b) mask |= KENGINE_INPUT_B;
+    if (held.start || pressed.start) mask |= KENGINE_INPUT_START;
+    if (held.c_up || pressed.c_up) mask |= KENGINE_INPUT_X;
+    if (held.c_down || pressed.c_down) mask |= KENGINE_INPUT_Y;
+    if (held.l || pressed.l) mask |= KENGINE_INPUT_L;
+    if (held.r || pressed.r) mask |= KENGINE_INPUT_R;
+    if (held.z || pressed.z) mask |= KENGINE_INPUT_SELECT;
 
     return mask;
 }
@@ -528,7 +531,7 @@ static void execute_render_commands(surface_t* disp, int* commands, int command_
 #ifdef KENGINE_N64_SPRITE_ASSETS
                 draw_sprite(disp, color2, x, y, w, h, color, param);
 #else
-                draw_rect(disp, x, y, w > 0 ? w : 16, h > 0 ? h : 16, 0xFF00FFFF);
+                draw_rect(disp, x, y, w > 0 ? w : 16, h > 0 ? h : 16, 0xFFFF00FF);
 #endif
                 break;
             case KENGINE_RENDER_DRAW_TEXT: {
@@ -671,7 +674,8 @@ int main(void) {
         joypad_poll();
         joypad_inputs_t inputs = joypad_get_inputs(JOYPAD_PORT_1);
         joypad_buttons_t held = joypad_get_buttons_held(JOYPAD_PORT_1);
-        int input_mask = translate_input(inputs, held);
+        joypad_buttons_t pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
+        int input_mask = translate_input(inputs, held, pressed);
 
         kotlin_runtime_update(frame, input_mask);
         kotlin_runtime_audio(frame);

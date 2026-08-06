@@ -27,6 +27,10 @@ The compiler/build target work is the highest-priority N64 work. It should learn
 
 For Nintendo 64, the target name, ABI, linker flow, C host/toolchain, runtime constraints, and packaging format are still open decisions. Until those are resolved, the N64 target work should live in a separate local Kotlin fork, expected to be `kengine-kotlin-n64`, and should stay focused on compiler/runtime feasibility rather than production game code. A unified `kengine-kotlin-console` fork may make sense later, but not before Switch and N64 have both proven their target-specific probes.
 
+### Portable 2D Hardware Track
+
+`games:boxxle-n64` is the first real game-facing N64 ROM wrapper. It imports shared gameplay and assets from `games:boxxle-core`, proving the same `PortableGame` command-buffer surface used by desktop/Switch can also feed the N64 host path. The initial N64 target uses sprite-sheet rendering and SFX; large desktop music assets stay in the core catalog for desktop/Switch but are intentionally ignored by the N64 asset import until compressed or streamed music is designed.
+
 ## Working Principles
 
 - Keep runtime assets in GLB, GLTF, or OBJ. Source formats such as FBX, USD, and USDZ should be exported outside the runtime before Kengine loads them.
@@ -228,6 +232,15 @@ python3 tools/extract_glb_animations.py "$HOME/code/mario64-assets/assets/models
 
 The C-only ROM is built inside Docker using the libdragon toolchain. The Docker volume `kengine-n64-toolchain` persists the built SDK across builds. The output ROM is at `kengine-n64/n64-build/kengine-n64-c-only.z64`.
 
+### Boxxle N64 ROM
+
+```shell
+./gradlew :games:boxxle-n64:buildN64Z64 -Pkengine.enableNintendo64=true
+open -a ares games/boxxle-n64/build/n64/boxxle-n64.z64
+```
+
+`games:boxxle-n64` imports portable source and assets from `games:boxxle-core`. N64 currently embeds the sprite sheet and `finish.wav`; desktop music remains desktop/Switch-oriented until a compressed or streamed N64 music path exists.
+
 ### Manual Docker Build (without Gradle)
 
 ```shell
@@ -275,10 +288,11 @@ kengine-n64/
 4. ~~Validate ROM in emulator.~~ Done: verified in ares with controller input, rendering, and text
 5. Decide the first N64 target feasibility questions: target name, architecture descriptor, ABI/toolchain, runtime artifact path.
 6. Prove a tiny Kotlin/Native static-library target path before expanding any Kengine libraries.
-7. Keep `games:mario-3d` green after the recent engine extractions.
-8. Add richer collision: slope limits, ledges, world bounds, and clearer debug overlays.
-9. Add camera preset/save controls to `kengine-3d-model-viewer`.
-10. Define the first explicit N64-style render preset.
-11. Tighten asset health reporting for bundled Mario, Bowser, Goomba, Ridley, and Battlefield models.
-12. Add small deterministic tests around movement state transitions and collision helpers.
-13. Update this document whenever a workstream graduates into `docs/KENGINE_3D_PLAN.md`, `docs/NINTENDO_SWITCH.md`, or a reusable engine API.
+7. ~~Ship the first portable game-facing N64 ROM wrapper.~~ Done: `games:boxxle-n64`
+8. Keep `games:mario-3d` green after the recent engine extractions.
+9. Add richer collision: slope limits, ledges, world bounds, and clearer debug overlays.
+10. Add camera preset/save controls to `kengine-3d-model-viewer`.
+11. Define the first explicit N64-style render preset.
+12. Tighten asset health reporting for bundled Mario, Bowser, Goomba, Ridley, and Battlefield models.
+13. Add small deterministic tests around movement state transitions and collision helpers.
+14. Update this document whenever a workstream graduates into `docs/KENGINE_3D_PLAN.md`, `docs/NINTENDO_SWITCH.md`, or a reusable engine API.

@@ -42,7 +42,9 @@ if (isPlaydateEnabled) {
 modules.addAll(
     listOf(
         "games:antfarm",
-        "games:boxxle",
+        "games:boxxle-core",
+        "games:boxxle-desktop",
+        "games:boxxle-n64",
         "games:chat-demo",
         "games:kengine-3d-demos",
         "games:kengine-3d-space-shooter",
