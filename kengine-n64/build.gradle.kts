@@ -152,6 +152,16 @@ fun konanLlvmDir(): File {
         ?: throw GradleException("No LLVM distribution found in ${konanDir.absolutePath}. Run kotlinc-native once to install.")
 }
 
+fun konanLlvmDevDir(): File {
+    val konanDir = file(System.getProperty("user.home")).resolve(".konan/dependencies")
+    val candidates = konanDir.listFiles()?.filter {
+        it.isDirectory && it.name.startsWith("llvm-") && it.name.contains("-dev-")
+    }?.sortedByDescending { it.name } ?: emptyList()
+
+    return candidates.firstOrNull()
+        ?: throw GradleException("No LLVM dev distribution found in ${konanDir.absolutePath}.")
+}
+
 fun llvmClang(): File {
     val llvmDir = konanLlvmDir()
     val clang = llvmDir.resolve("bin").listFiles()
@@ -506,8 +516,9 @@ fun ffmpegPcmCommand(source: File, output: File): List<String> {
 }
 
 fun objcopyBinaryCommand(source: File, output: File): List<String> {
+    val objcopyTool = konanLlvmDevDir().resolve("bin/llvm-objcopy")
     return listOf(
-        mips64Tool("mips64-elf-objcopy").absolutePath,
+        objcopyTool.absolutePath,
         "-I", "binary",
         "-O", "elf32-bigmips",
         "-B", "mips",
@@ -1152,11 +1163,11 @@ fun registerGameBuildTasks(
         dependsOn("rebuild${taskPrefix}KotlinArchive")
         dependsOn("generate${taskPrefix}BridgeHeader")
         if (spriteBuilds.isNotEmpty()) {
-            dependsOn("compile${taskPrefix}SpriteAssetManifest")
+            dependsOn("generate${taskPrefix}SpriteAssetManifest")
             spriteBuilds.forEach { dependsOn(it.objectTaskName) }
         }
         if (soundBuilds.isNotEmpty()) {
-            dependsOn("compile${taskPrefix}SoundAssetManifest")
+            dependsOn("generate${taskPrefix}SoundAssetManifest")
             soundBuilds.forEach { dependsOn(it.objectTaskName) }
         }
 
@@ -1191,6 +1202,10 @@ fun registerGameBuildTasks(
                 val spriteSource = gameOutputDir.get().dir("generated").file("kengine_n64_sprite_assets.c").asFile
                 if (spriteHeader.exists()) spriteHeader.copyTo(staging.resolve("src/kengine_n64_sprite_assets.h"), overwrite = true)
                 if (spriteSource.exists()) spriteSource.copyTo(staging.resolve("src/kengine_n64_sprite_assets.c"), overwrite = true)
+                spriteBuilds.forEach { build ->
+                    val objFile = build.objectFile.get().asFile
+                    if (objFile.exists()) objFile.copyTo(staging.resolve("assets/${objFile.name}"), overwrite = true)
+                }
             }
 
             if (soundBuilds.isNotEmpty()) {
@@ -1203,7 +1218,7 @@ fun registerGameBuildTasks(
             val libName = "lib${kotlinOutputBaseName}"
             val spriteObjs = if (spriteBuilds.isNotEmpty()) {
                 "\nOBJS += \$(BUILD_DIR)/kengine_n64_sprite_assets.o" +
-                spriteBuilds.joinToString("") { "\nOBJS += ${it.objectFile.get().asFile.absolutePath}" }
+                spriteBuilds.joinToString("") { "\nOBJS += assets/${it.objectFile.get().asFile.name}" }
             } else ""
             val soundObjs = if (soundBuilds.isNotEmpty()) {
                 "\nOBJS += \$(BUILD_DIR)/kengine_n64_sound_assets.o" +

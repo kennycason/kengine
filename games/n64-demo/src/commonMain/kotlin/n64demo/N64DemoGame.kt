@@ -4,6 +4,7 @@ import com.kengine.PortableGame
 import com.kengine.audio.AudioContext
 import com.kengine.input.InputButton
 import com.kengine.input.InputState
+import com.kengine.render.RenderAssetId
 import com.kengine.render.RenderContext
 import com.kengine.storage.PortableStorage
 
@@ -12,22 +13,24 @@ class N64DemoGame : PortableGame {
 
     private var storage: PortableStorage? = null
 
-    private var squareX = 120
-    private var squareY = 80
-    private var squareSize = 24
+    private var playerX = 152
+    private var playerY = 120
     private var frame = 0
     private var colorIndex = 0
     private var highScore = 0
     private var score = 0
+    private var showSprite = true
 
-    private val colors = intArrayOf(
-        0x00FF00FF.toInt(),
-        0xFF0000FF.toInt(),
-        0x0000FFFF.toInt(),
-        0xFFFF00FF.toInt(),
-        0xFF00FFFF.toInt(),
-        0xFFFFFFFF.toInt()
+    private val pokeball = RenderAssetId.sprite("pokeball")
+
+    private val trailColors = intArrayOf(
+        0xFF000040.toInt(),
+        0x00FF0040.toInt(),
+        0x0000FF40.toInt(),
+        0xFFFF0040.toInt()
     )
+
+    private val trail = ArrayDeque<Pair<Int, Int>>()
 
     override fun attachStorage(storage: PortableStorage) {
         this.storage = storage
@@ -39,23 +42,26 @@ class N64DemoGame : PortableGame {
         val dx = input.axis(InputButton.LEFT, InputButton.RIGHT)
         val dy = input.axis(InputButton.UP, InputButton.DOWN)
 
-        squareX += dx * speed
-        squareY += dy * speed
+        playerX += dx * speed
+        playerY += dy * speed
 
-        if (squareX < 0) squareX = 0
-        if (squareY < 0) squareY = 0
-        if (squareX + squareSize > 320) squareX = 320 - squareSize
-        if (squareY + squareSize > 240) squareY = 240 - squareSize
+        if (playerX < 0) playerX = 0
+        if (playerY < 0) playerY = 0
+        if (playerX + 16 > 320) playerX = 320 - 16
+        if (playerY + 16 > 240) playerY = 240 - 16
 
         if (input.isPressed(InputButton.A)) {
-            colorIndex = (colorIndex + 1) % colors.size
+            colorIndex = (colorIndex + 1) % trailColors.size
         }
 
         if (input.isPressed(InputButton.B)) {
-            squareSize = if (squareSize < 48) squareSize + 2 else 8
+            showSprite = !showSprite
         }
 
         if (dx != 0 || dy != 0) {
+            trail.addLast(Pair(playerX, playerY))
+            if (trail.size > 20) trail.removeFirst()
+
             score++
             if (score > highScore) {
                 highScore = score
@@ -72,17 +78,28 @@ class N64DemoGame : PortableGame {
     override fun draw(render: RenderContext) {
         render.clear(0x101030FF.toInt())
 
-        render.fillRect(squareX, squareY, squareSize, squareSize, colors[colorIndex])
-
         val borderColor = 0x444488FF.toInt()
         render.fillRect(0, 0, 320, 2, borderColor)
         render.fillRect(0, 238, 320, 2, borderColor)
         render.fillRect(0, 0, 2, 240, borderColor)
         render.fillRect(318, 0, 2, 240, borderColor)
 
+        for (i in trail.indices) {
+            val (tx, ty) = trail[i]
+            val alpha = (i * 12).coerceAtMost(255)
+            val color = trailColors[colorIndex] or (alpha shl 24)
+            render.fillRect(tx + 4, ty + 4, 8, 8, color)
+        }
+
+        if (showSprite) {
+            render.drawSprite(pokeball, playerX, playerY, 16, 16)
+        } else {
+            render.fillRect(playerX, playerY, 16, 16, 0x00FF00FF.toInt())
+        }
+
         render.drawText("Kengine N64", 100, 8, 0xFFFFFFFF.toInt(), 2)
-        render.drawText("D-Pad: move  A: color  B: size", 20, 226, 0xAAAAAAFF.toInt(), 1)
         render.drawText("Score: $score  Hi: $highScore", 20, 30, 0xCCCCCCFF.toInt(), 1)
+        render.drawText("D-Pad: move  A: trail  B: sprite", 10, 226, 0xAAAAAAFF.toInt(), 1)
     }
 
     override fun cleanup() {

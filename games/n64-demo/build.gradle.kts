@@ -40,4 +40,8 @@ kengineN64 {
     artifactBaseName.set("n64-demo")
     displayName.set("Kengine N64 Demo")
     mainClass.set("n64demo.N64DemoGame")
+
+    sprite("pokeball") {
+        source.set(project.file("assets/sprites/pokeball.bmp"))
+    }
 }

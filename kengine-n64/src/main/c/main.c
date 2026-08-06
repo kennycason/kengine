@@ -564,23 +564,9 @@ int main(void) {
 
     memset(g_storage_slots, 0, sizeof(g_storage_slots));
 
-    {
-        surface_t* d = display_get();
-        graphics_fill_screen(d, graphics_make_color(0x00, 0x00, 0x80, 0xFF));
-        draw_text(d, "DBG1: pre-init", 10, 10, graphics_make_color(0xFF, 0xFF, 0x00, 0xFF), 1);
-        display_show(d);
-    }
-
     disable_interrupts();
     kotlin_runtime_start();
     enable_interrupts();
-
-    {
-        surface_t* d = display_get();
-        graphics_fill_screen(d, graphics_make_color(0x00, 0x80, 0x00, 0xFF));
-        draw_text(d, "DBG2: post-init OK!", 10, 10, graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 1);
-        display_show(d);
-    }
 
     int frame = 0;
 
