@@ -1,6 +1,7 @@
 package n64demo
 
 import com.kengine.PortableGame
+import com.kengine.audio.AudioAssetId
 import com.kengine.audio.AudioContext
 import com.kengine.input.InputButton
 import com.kengine.input.InputState
@@ -20,8 +21,12 @@ class N64DemoGame : PortableGame {
     private var highScore = 0
     private var score = 0
     private var showSprite = true
+    private var previousInputMask = 0
 
     private val pokeball = RenderAssetId.sprite("pokeball")
+    private val beepSound = AudioAssetId.sound("beep")
+    private val finishSound = AudioAssetId.sound("finish")
+    private val chordSound = AudioAssetId.sound("chord")
 
     private val trailColors = intArrayOf(
         0xFF000040.toInt(),
@@ -31,6 +36,7 @@ class N64DemoGame : PortableGame {
     )
 
     private val trail = ArrayDeque<Pair<Int, Int>>()
+    private var pendingSound: Int? = null
 
     override fun attachStorage(storage: PortableStorage) {
         this.storage = storage
@@ -41,6 +47,14 @@ class N64DemoGame : PortableGame {
         val speed = 2
         val dx = input.axis(InputButton.LEFT, InputButton.RIGHT)
         val dy = input.axis(InputButton.UP, InputButton.DOWN)
+        val aPressed = input.isPressed(InputButton.A)
+        val bPressed = input.isPressed(InputButton.B)
+        val xPressed = input.isPressed(InputButton.X)
+        val yPressed = input.isPressed(InputButton.Y)
+        val aJustPressed = aPressed && (previousInputMask and InputState.bitFor(InputButton.A)) == 0
+        val bJustPressed = bPressed && (previousInputMask and InputState.bitFor(InputButton.B)) == 0
+        val xJustPressed = xPressed && (previousInputMask and InputState.bitFor(InputButton.X)) == 0
+        val yJustPressed = yPressed && (previousInputMask and InputState.bitFor(InputButton.Y)) == 0
 
         playerX += dx * speed
         playerY += dy * speed
@@ -50,12 +64,21 @@ class N64DemoGame : PortableGame {
         if (playerX + 16 > 320) playerX = 320 - 16
         if (playerY + 16 > 240) playerY = 240 - 16
 
-        if (input.isPressed(InputButton.A)) {
+        if (aJustPressed) {
             colorIndex = (colorIndex + 1) % trailColors.size
+            pendingSound = beepSound
         }
 
-        if (input.isPressed(InputButton.B)) {
+        if (bJustPressed) {
             showSprite = !showSprite
+        }
+
+        if (xJustPressed) {
+            pendingSound = chordSound
+        }
+
+        if (yJustPressed) {
+            pendingSound = finishSound
         }
 
         if (dx != 0 || dy != 0) {
@@ -70,9 +93,14 @@ class N64DemoGame : PortableGame {
         }
 
         frame++
+        previousInputMask = input.mask
     }
 
     override fun audio(audio: AudioContext) {
+        pendingSound?.let { sound ->
+            audio.playSound(sound)
+            pendingSound = null
+        }
     }
 
     override fun draw(render: RenderContext) {
@@ -99,7 +127,8 @@ class N64DemoGame : PortableGame {
 
         render.drawText("Kengine N64", 100, 8, 0xFFFFFFFF.toInt(), 2)
         render.drawText("Score: $score  Hi: $highScore", 20, 30, 0xCCCCCCFF.toInt(), 1)
-        render.drawText("D-Pad: move  A: trail  B: sprite", 10, 226, 0xAAAAAAFF.toInt(), 1)
+        render.drawText("A: beep  B: sprite  X: chord  Y: finish", 10, 214, 0xAAAAAAFF.toInt(), 1)
+        render.drawText("D-Pad: move", 10, 226, 0xAAAAAAFF.toInt(), 1)
     }
 
     override fun cleanup() {

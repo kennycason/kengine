@@ -63,6 +63,98 @@
 
 #define STICK_DEADZONE 20
 
+#define KENGINE_AUDIO_SAMPLE_RATE 22050
+#define KENGINE_AUDIO_NUM_CHANNELS 4
+
+/* In-memory PCM waveform for the mixer */
+#ifdef KENGINE_N64_SOUND_ASSETS
+typedef struct {
+    waveform_t wave;
+    const int16_t* samples;
+    int num_samples;
+} kengine_pcm_wave_t;
+
+static void kengine_pcm_read(void* ctx, samplebuffer_t* sbuf, int wpos, int wlen, bool seeking) {
+    (void)seeking;
+    kengine_pcm_wave_t* pcm = (kengine_pcm_wave_t*)ctx;
+    int16_t* dest = (int16_t*)samplebuffer_append(sbuf, wlen);
+    for (int i = 0; i < wlen; i++) {
+        int idx = wpos + i;
+        dest[i] = idx < pcm->num_samples ? pcm->samples[idx] : 0;
+    }
+}
+
+static kengine_pcm_wave_t g_sound_waves[KENGINE_AUDIO_NUM_CHANNELS];
+
+static void kengine_audio_callback(int16_t* buffer, size_t nsamples) {
+    mixer_poll(buffer, nsamples);
+}
+
+static void kengine_audio_init(void) {
+    audio_init(KENGINE_AUDIO_SAMPLE_RATE, 4);
+    mixer_init(KENGINE_AUDIO_NUM_CHANNELS);
+    audio_set_buffer_callback(kengine_audio_callback);
+    audio_write_silence();
+}
+
+static void kengine_play_sound(int asset_id, int volume) {
+    const KengineN64SoundAsset* asset = kengine_n64_find_sound_asset(asset_id);
+    if (!asset) return;
+
+    const int16_t* samples = (const int16_t*)asset->data_start;
+    int byte_count = (int)(asset->data_end - asset->data_start);
+    int num_samples = byte_count / 2;
+
+    /* Find a free mixer channel */
+    static int next_channel = 0;
+    int ch = next_channel;
+    next_channel = (next_channel + 1) % KENGINE_AUDIO_NUM_CHANNELS;
+
+    mixer_ch_stop(ch);
+
+    /* Set up a resident PCM waveform for the mixer */
+    kengine_pcm_wave_t* pcm = &g_sound_waves[ch];
+    memset(pcm, 0, sizeof(*pcm));
+    pcm->samples = samples;
+    pcm->num_samples = num_samples;
+
+    pcm->wave.name = "kengine_sfx";
+    pcm->wave.bits = 16;
+    pcm->wave.channels = 1;
+    pcm->wave.frequency = KENGINE_AUDIO_SAMPLE_RATE;
+    pcm->wave.len = num_samples;
+    pcm->wave.loop_len = 0;
+    pcm->wave.read = kengine_pcm_read;
+    pcm->wave.ctx = pcm;
+
+    float vol = (float)volume / 255.0f;
+    mixer_ch_set_vol(ch, vol, vol);
+    mixer_ch_play(ch, &pcm->wave);
+}
+
+static void execute_audio_commands(int* commands, int command_count) {
+    for (int i = 0; i < command_count; i++) {
+        int base = i * KENGINE_AUDIO_FIELD_COUNT;
+        int type = commands[base + KENGINE_AUDIO_FIELD_TYPE];
+        int asset_id = commands[base + KENGINE_AUDIO_FIELD_ASSET_ID];
+        int volume = commands[base + KENGINE_AUDIO_FIELD_VOLUME];
+
+        switch (type) {
+            case KENGINE_AUDIO_PLAY_SOUND:
+                kengine_play_sound(asset_id, volume);
+                break;
+            case KENGINE_AUDIO_STOP_MUSIC:
+                for (int ch = 0; ch < KENGINE_AUDIO_NUM_CHANNELS; ch++) {
+                    mixer_ch_stop(ch);
+                }
+                break;
+            default:
+                break;
+        }
+    }
+}
+#endif
+
 /* Storage: backed by in-memory slots (EEPROM/SRAM persistence TODO) */
 typedef struct {
     char key[KENGINE_N64_STORAGE_KEY_MAX];
@@ -561,6 +653,9 @@ static int kotlin_copy_audio_commands(int* destination, int max_commands) {
 int main(void) {
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
     joypad_init();
+#ifdef KENGINE_N64_SOUND_ASSETS
+    kengine_audio_init();
+#endif
 
     memset(g_storage_slots, 0, sizeof(g_storage_slots));
 
@@ -584,6 +679,13 @@ int main(void) {
 
         int render_count = kotlin_copy_commands(g_render_commands, KENGINE_RENDER_MAX_COMMANDS);
         execute_render_commands(disp, g_render_commands, render_count);
+
+#ifdef KENGINE_N64_SOUND_ASSETS
+        int audio_count = kotlin_copy_audio_commands(g_audio_commands, KENGINE_AUDIO_MAX_COMMANDS);
+        if (audio_count > 0) {
+            execute_audio_commands(g_audio_commands, audio_count);
+        }
+#endif
 
         display_show(disp);
         frame++;

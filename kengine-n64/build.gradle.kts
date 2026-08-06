@@ -510,7 +510,7 @@ fun ffmpegPcmCommand(source: File, output: File): List<String> {
         "-i", source.absolutePath,
         "-ac", "1",
         "-ar", "22050",
-        "-f", "s16le",
+        "-f", "s16be",
         output.absolutePath
     )
 }
@@ -742,8 +742,8 @@ fun registerGameBuildTasks(
     extension.soundAssets.forEach { soundAsset ->
         val assetName = soundAsset.name
         val symbolName = "kengine_n64_sound_${cIdentifier(assetName)}"
-        val pcmFile = gameOutputDir.map { it.file("assets/sounds/$assetName.pcm") }
-        val objectFile = gameOutputDir.map { it.file("assets/sounds/$assetName.o") }
+        val pcmFile = gameOutputDir.map { it.file("assets/sounds/$symbolName.pcm") }
+        val objectFile = gameOutputDir.map { it.file("assets/sounds/$symbolName.o") }
         val convertTaskName = "convert${taskPrefix}Sound${cIdentifier(assetName).replaceFirstChar { it.uppercase() }}"
         val objcopyTaskName = "objcopy${taskPrefix}Sound${cIdentifier(assetName).replaceFirstChar { it.uppercase() }}"
 
@@ -1213,6 +1213,10 @@ fun registerGameBuildTasks(
                 val soundSource = gameOutputDir.get().dir("generated").file("kengine_n64_sound_assets.c").asFile
                 if (soundHeader.exists()) soundHeader.copyTo(staging.resolve("src/kengine_n64_sound_assets.h"), overwrite = true)
                 if (soundSource.exists()) soundSource.copyTo(staging.resolve("src/kengine_n64_sound_assets.c"), overwrite = true)
+                soundBuilds.forEach { build ->
+                    val objFile = build.objectFile.get().asFile
+                    if (objFile.exists()) objFile.copyTo(staging.resolve("assets/${objFile.name}"), overwrite = true)
+                }
             }
 
             val libName = "lib${kotlinOutputBaseName}"
@@ -1222,7 +1226,7 @@ fun registerGameBuildTasks(
             } else ""
             val soundObjs = if (soundBuilds.isNotEmpty()) {
                 "\nOBJS += \$(BUILD_DIR)/kengine_n64_sound_assets.o" +
-                soundBuilds.joinToString("") { "\nOBJS += ${it.objectFile.get().asFile.absolutePath}" }
+                soundBuilds.joinToString("") { "\nOBJS += assets/${it.objectFile.get().asFile.name}" }
             } else ""
             val spriteDefs = if (spriteBuilds.isNotEmpty()) "\nCFLAGS += -DKENGINE_N64_SPRITE_ASSETS=1" else ""
             val soundDefs = if (soundBuilds.isNotEmpty()) "\nCFLAGS += -DKENGINE_N64_SOUND_ASSETS=1" else ""
