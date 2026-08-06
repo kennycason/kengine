@@ -163,9 +163,10 @@ com.kengine/
 ├── input/         Keyboard, mouse, and controller (with per-device mappings)
 ├── log/           Logger with configurable levels and stream builder
 ├── map/tiled/     Tiled map loader (TMJ/TMX format)
-├── math/          Vec2, Vec3, Rect, IntVec2, IntRect, math extensions
 ├── particle/      Particle effects (smoke, rainbow, waveform, sacred geometry)
 ├── sdl/           Low-level SDL3 wrapper (context, events, colors)
 ├── time/          Clock, delta time, useInterval, useTimer
 └── ui/            Flex-based layout (View, Button, Slider, Knob, TextView, SpriteView)
 ```
+
+Shared math primitives live in `kengine-math`, including `Vec2`, `Vec3`, `Rect`, `IntVec2`, `IntRect`, rectangular grid helpers, and numeric extensions. `kengine-core` exposes that module as an API dependency so engine and game modules can use the same lightweight types.

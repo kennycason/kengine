@@ -4,6 +4,7 @@ plugins {
 }
 
 val kengineLibraryProjects = setOf(
+    "kengine-math",
     "kengine",
     "kengine-3d",
     "kengine-reactive",

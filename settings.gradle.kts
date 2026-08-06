@@ -20,6 +20,7 @@ println("N64 tasks enabled: $isN64Enabled")
 
 val modules = mutableListOf(
     "kengine-kotlin",
+    "kengine-math",
     "kengine-core",
     "kengine",
     "kengine-test",

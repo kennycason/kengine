@@ -820,7 +820,7 @@ logger.error(e) { "An error occurred." }
 
 #### Math Utilities
 
-Kengine includes math utilities such as Vec2 and Rect for vector and rectangle operations.
+Kengine exposes shared math utilities from `kengine-math`, including `Vec2`, `Vec3`, `Rect`, `IntVec2`, `IntRect`, and 2D grid containers.
 
 Example: Using Vectors
 
@@ -904,7 +904,8 @@ Controls:
 
 ```shell
 kengine/
-├── kengine/                       // core engine (graphics, input, entity, UI, maps, particles, math)
+├── kengine/                       // core engine (graphics, input, entity, UI, maps, particles)
+├── kengine-math/                  // shared math primitives and grid containers
 ├── kengine-reactive/              // hooks system (useState, useEffect, useContext, useMemo, useReducer)
 ├── kengine-test/                  // fluent assertion testing framework
 ├── kengine-network/               // networking via SDL3_net (TCP/UDP)

@@ -965,17 +965,55 @@ fun registerGameBuildTasks(
     val kotlinOutputBaseName = artifactBaseName.replace('-', '_')
     val kotlinStaticLib = gameOutputDir.map { it.file("lib/lib${kotlinOutputBaseName}.a") }
     val kotlinApiHeader = gameOutputDir.map { it.file("lib/${kotlinOutputBaseName}_api.h") }
+    val mathKlib = gameOutputDir.map { it.file("klib/kengine_math.klib") }
     val coreKlib = gameOutputDir.map { it.file("klib/kengine_core.klib") }
 
+    val mathProject = rootProject.findProject(":kengine-math")
+    val mathSrcDir = mathProject?.file("src/commonMain/kotlin")
     val coreProject = rootProject.findProject(":kengine-core")
     val coreSrcDir = coreProject?.file("src/commonMain/kotlin")
+
+    if (mathSrcDir != null && mathSrcDir.isDirectory) {
+        tasks.register<Exec>("compile${taskPrefix}MathKlib") {
+            group = "n64"
+            description = "Compiles the kengine-math klib for $artifactBaseName."
+
+            inputs.dir(mathSrcDir).withPathSensitivity(PathSensitivity.RELATIVE)
+            outputs.file(mathKlib)
+
+            doFirst {
+                mathKlib.get().asFile.parentFile.mkdirs()
+                val target = kotlinTarget.get()
+                commandLine(
+                    buildList {
+                        add(kotlincNative().absolutePath)
+                        add("-target")
+                        add(target)
+                        add("-produce")
+                        add("library")
+                        add("-output")
+                        add(mathKlib.get().asFile.absolutePath)
+                        mathSrcDir.walkTopDown()
+                            .filter { it.isFile && it.extension == "kt" }
+                            .forEach { add(it.absolutePath) }
+                    }
+                )
+            }
+        }
+    }
 
     if (coreSrcDir != null && coreSrcDir.isDirectory) {
         tasks.register<Exec>("compile${taskPrefix}CoreKlib") {
             group = "n64"
             description = "Compiles the kengine-core klib for $artifactBaseName."
+            if (mathSrcDir != null && mathSrcDir.isDirectory) {
+                dependsOn("compile${taskPrefix}MathKlib")
+            }
 
             inputs.dir(coreSrcDir).withPathSensitivity(PathSensitivity.RELATIVE)
+            if (mathSrcDir != null && mathSrcDir.isDirectory) {
+                inputs.file(mathKlib)
+            }
             outputs.file(coreKlib)
 
             doFirst {
@@ -990,6 +1028,10 @@ fun registerGameBuildTasks(
                         add("library")
                         add("-output")
                         add(coreKlib.get().asFile.absolutePath)
+                        if (mathKlib.get().asFile.exists()) {
+                            add("-library")
+                            add(mathKlib.get().asFile.absolutePath)
+                        }
                         coreSrcDir.walkTopDown()
                             .filter { it.isFile && it.extension == "kt" }
                             .forEach { add(it.absolutePath) }
@@ -1033,6 +1075,9 @@ fun registerGameBuildTasks(
         dependsOn("generate${taskPrefix}GameFactory")
         dependsOn("compile${taskPrefix}StorageCinterop")
         dependsOn(generatedAssetTaskPaths)
+        if (mathSrcDir != null && mathSrcDir.isDirectory) {
+            dependsOn("compile${taskPrefix}MathKlib")
+        }
         if (coreSrcDir != null && coreSrcDir.isDirectory) {
             dependsOn("compile${taskPrefix}CoreKlib")
         }
@@ -1047,6 +1092,9 @@ fun registerGameBuildTasks(
         }
         inputs.file(gameFactoryFile)
         inputs.file(storageCinteropKlib)
+        if (mathSrcDir != null && mathSrcDir.isDirectory) {
+            inputs.file(mathKlib)
+        }
         if (coreSrcDir != null && coreSrcDir.isDirectory) {
             inputs.file(coreKlib)
         }
@@ -1062,12 +1110,16 @@ fun registerGameBuildTasks(
                     add("-target")
                     add(target)
                     add("-produce")
-                    add("static")
-                    add("-output")
-                    add(kotlinStaticLib.get().asFile.parentFile.resolve(kotlinOutputBaseName).absolutePath)
-                    if (coreKlib.get().asFile.exists()) {
-                        add("-library")
-                        add(coreKlib.get().asFile.absolutePath)
+                        add("static")
+                        add("-output")
+                        add(kotlinStaticLib.get().asFile.parentFile.resolve(kotlinOutputBaseName).absolutePath)
+                        if (mathKlib.get().asFile.exists()) {
+                            add("-library")
+                            add(mathKlib.get().asFile.absolutePath)
+                        }
+                        if (coreKlib.get().asFile.exists()) {
+                            add("-library")
+                            add(coreKlib.get().asFile.absolutePath)
                     }
                     add("-library")
                     add(storageCinteropKlib.get().asFile.absolutePath)

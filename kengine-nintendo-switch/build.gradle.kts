@@ -787,6 +787,9 @@ fun registerSwitchGameBuild(
     val switchKotlinSources = project.fileTree("src/main/kotlin") {
         include("**/*.kt")
     }
+    val kengineMathSources = rootProject.fileTree("kengine-math/src/commonMain/kotlin") {
+        include("**/*.kt")
+    }
     val kengineCoreSources = rootProject.fileTree("kengine-core/src/commonMain/kotlin") {
         include("**/*.kt")
     }
@@ -804,6 +807,7 @@ fun registerSwitchGameBuild(
     val generatedAssetTaskPaths = portableAssetExtensions.mapNotNull { it.generateTaskPath }
     val kotlinSources = providers.provider {
         (switchKotlinSources.files +
+            kengineMathSources.files +
             kengineCoreSources.files +
             gameSourceTrees.flatMap { it.files } +
             generatedGameSourceDirs.flatMap { generatedSourceDir ->
@@ -872,7 +876,7 @@ fun registerSwitchGameBuild(
         description = "Compiles $displayName, shared kengine core sources, and the Switch runtime as a Kotlin/Native static library."
         dependsOn(listOf(generateFactoryTaskName, generateStorageInteropTaskName) + generatedAssetTaskPaths)
 
-        inputs.files(switchKotlinSources, kengineCoreSources)
+        inputs.files(switchKotlinSources, kengineMathSources, kengineCoreSources)
         inputs.files(gameSourceTrees)
         inputs.file(storageInteropKlib)
         generatedGameSourceDirs.forEach { generatedSourceDir ->

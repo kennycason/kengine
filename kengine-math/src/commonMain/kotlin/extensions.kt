@@ -1,4 +1,3 @@
-// squares
 val Float.squared: Float
     get() = this * this
 
@@ -15,7 +14,7 @@ val Long.squared: Long
     get() = this * this
 
 val UShort.squared: UInt
-    get() = this.toUInt() * this.toUInt()
+    get() = toUInt() * toUInt()
 
 val UInt.squared: UInt
     get() = this * this
@@ -27,10 +26,8 @@ val Byte.squared: Int
     get() = this * this
 
 val Number.squared: Double
-    get() = this.toDouble() * this.toDouble()
+    get() = toDouble() * toDouble()
 
-
-// cubes
 val Float.cubed: Float
     get() = this * this * this
 
@@ -47,7 +44,7 @@ val Long.cubed: Long
     get() = this * this * this
 
 val UShort.cubed: UInt
-    get() = this.toUInt() * this.toUInt() * this.toUInt()
+    get() = toUInt() * toUInt() * toUInt()
 
 val UInt.cubed: UInt
     get() = this * this * this
@@ -59,10 +56,8 @@ val Byte.cubed: Int
     get() = this * this * this
 
 val Number.cubed: Double
-    get() = this.toDouble() * this.toDouble() * this.toDouble()
+    get() = toDouble() * toDouble() * toDouble()
 
-
-// roots
 val Float.root: Float
     get() = kotlin.math.sqrt(this)
 
@@ -70,10 +65,8 @@ val Double.root: Double
     get() = kotlin.math.sqrt(this)
 
 val Number.root: Double
-    get() = kotlin.math.sqrt(this.toDouble())
+    get() = kotlin.math.sqrt(toDouble())
 
-
-// even/odd
 val Byte.isEven: Boolean
     get() = this % 2 == 0
 
@@ -116,8 +109,6 @@ val ULong.isEven: Boolean
 val ULong.isOdd: Boolean
     get() = this % 2uL != 0uL
 
-
-// clamp
 fun Double.clamp(min: Double, max: Double): Double = when {
     this < min -> min
     this > max -> max
@@ -148,34 +139,38 @@ fun ULong.clamp(min: ULong, max: ULong): ULong = when {
     else -> this
 }
 
-
-// factorial
 val Short.factorial: Long
-    get() = if (this < 0) throw IllegalArgumentException("Negative numbers don't have factorials")
-    else (2..this.toInt()).fold(1L) { acc, i -> acc * i }
+    get() = if (this < 0) {
+        throw IllegalArgumentException("Negative numbers don't have factorials")
+    } else {
+        (2..toInt()).fold(1L) { acc, i -> acc * i }
+    }
 
 val Int.factorial: Long
-    get() = if (this < 0) throw IllegalArgumentException("Negative numbers don't have factorials")
-    else if (this == 0 || this == 1) 1
-    else (2..this).fold(1L) { acc, i -> acc * i }
+    get() = if (this < 0) {
+        throw IllegalArgumentException("Negative numbers don't have factorials")
+    } else if (this == 0 || this == 1) {
+        1L
+    } else {
+        (2..this).fold(1L) { acc, i -> acc * i }
+    }
 
 val UInt.factorial: ULong
-    get() = if (this == 0u || this == 1u) 1uL
-    else (2u..this).fold(1uL) { acc, i -> acc * i.toULong() }
+    get() = if (this == 0u || this == 1u) {
+        1uL
+    } else {
+        (2u..this).fold(1uL) { acc, i -> acc * i.toULong() }
+    }
 
 val Byte.factorial: Long
-    get() = this.toInt().factorial
+    get() = toInt().factorial
 
-
-// reciprocal
 val Float.reciprocal: Float
     get() = if (this == 0f) throw ArithmeticException("Cannot divide by zero") else 1f / this
 
 val Double.reciprocal: Double
     get() = if (this == 0.0) throw ArithmeticException("Cannot divide by zero") else 1.0 / this
 
-
-// abs
 val Double.abs: Double
     get() = if (this < 0.0) -this else this
 
@@ -183,10 +178,10 @@ val Float.abs: Float
     get() = if (this < 0f) -this else this
 
 val Byte.abs: Int
-    get() = if (this < 0) -this else this.toInt()
+    get() = if (this < 0) -this else toInt()
 
 val Short.abs: Int
-    get() = if (this < 0) -this else this.toInt()
+    get() = if (this < 0) -this else toInt()
 
 val Int.abs: Int
     get() = if (this < 0) -this else this
@@ -194,9 +189,8 @@ val Int.abs: Int
 val Long.abs: Long
     get() = if (this < 0L) -this else this
 
-
 inline fun <T> Iterable<T>.sumOf(selector: (T) -> Float): Float {
-    var sum: Float = 0.toFloat()
+    var sum = 0f
     for (element in this) {
         sum += selector(element)
     }

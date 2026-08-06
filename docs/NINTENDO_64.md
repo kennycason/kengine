@@ -19,6 +19,7 @@ The engine work behind that demo lives mostly in:
 - `kengine-3d-ui`: GPU-compatible UI controls and text rendering for 3D windows.
 - `kengine-3d-model-viewer`: model inspection, preset loading, animation playback, lighting/background tuning, and asset diagnostics.
 - `kengine-3d-importer`: preflight boundary for runtime-ready model formats versus source formats that must be exported externally.
+- `kengine-math`: common math primitives shared by core, desktop 3D, Switch, and N64 harness code.
 - `tools/extract_glb_animations.py`: extracts the repo-safe animated Mario GLB from the larger local source asset.
 
 ### Kotlin/Native Target Track
@@ -42,6 +43,7 @@ For Nintendo 64, the target name, ABI, linker flow, C host/toolchain, runtime co
 - Do not destabilize `switch_arm64` while experimenting with an N64 target. Shared fork/tooling changes should make both targets easier to maintain.
 - Keep any real N64 backend on the portable `:kengine-core` surface first. Do not depend on SDL, desktop `:kengine`, or modern GPU APIs for the hardware-target path.
 - Treat a standalone `kengine-n64` or `kengine-nintendo-64` module as acceptable, even if it is separated from desktop Kengine and Switch internals. Reuse should be earned by constraints, not forced.
+- Keep shared math in `:kengine-math` so low-level renderer, model, collision, and command-buffer code can use the same types without depending on SDL or desktop engine modules.
 
 ## Emulator Compatibility
 
@@ -131,6 +133,14 @@ python3 tools/extract_glb_animations.py "$HOME/code/mario64-assets/assets/models
 - Add clear asset provenance notes for anything that is bundled.
 - Avoid checking in ROMs, proprietary source dumps, or assets that we cannot redistribute.
 
+### 6.5 Shared Math Foundation
+
+- Keep `Vec2` and `Vec3` as the preferred public names for common vector math.
+- Keep longer `Vector2` and `Vector3` names only as compatibility aliases unless a future API has a strong readability reason.
+- Move repeated 3D math into `:kengine-math` only when it is useful to both desktop 3D and eventual N64/backend code.
+- Add matrix and rotation types incrementally as renderer work demands them: start with `Mat4` extraction or a new common matrix type only after the N64 3D probes need transforms outside `:kengine-3d`.
+- Keep target-specific renderer structures separate when hardware constraints make reuse awkward; shared math should support both paths without forcing one renderer abstraction.
+
 ### 7. Gameplay Slice
 
 - Keep the current Mario 3D slice playable: exploration, movement, coins, Goombas, Bowser encounter, energy, and HUD.
@@ -179,7 +189,7 @@ python3 tools/extract_glb_animations.py "$HOME/code/mario64-assets/assets/models
 
 ### Milestone 2: Reusable 3D Gameplay Helpers
 
-- Camera, controller calibration, animation state playback, terrain actor movement, trigger volumes, collectibles, enemy stomp handling, and actor-to-node sync move behind reusable APIs where the demo has proven them.
+- Camera, controller calibration, shared math types, animation state playback, terrain actor movement, trigger volumes, collectibles, enemy stomp handling, and actor-to-node sync move behind reusable APIs where the demo has proven them.
 - `games:mario-3d` keeps game-specific rules but stops owning generic engine glue.
 
 ### Milestone 3: Asset Pipeline Discipline
@@ -289,10 +299,12 @@ kengine-n64/
 5. Decide the first N64 target feasibility questions: target name, architecture descriptor, ABI/toolchain, runtime artifact path.
 6. Prove a tiny Kotlin/Native static-library target path before expanding any Kengine libraries.
 7. ~~Ship the first portable game-facing N64 ROM wrapper.~~ Done: `games:boxxle-n64`
-8. Keep `games:mario-3d` green after the recent engine extractions.
-9. Add richer collision: slope limits, ledges, world bounds, and clearer debug overlays.
-10. Add camera preset/save controls to `kengine-3d-model-viewer`.
-11. Define the first explicit N64-style render preset.
-12. Tighten asset health reporting for bundled Mario, Bowser, Goomba, Ridley, and Battlefield models.
-13. Add small deterministic tests around movement state transitions and collision helpers.
-14. Update this document whenever a workstream graduates into `docs/KENGINE_3D_PLAN.md`, `docs/NINTENDO_SWITCH.md`, or a reusable engine API.
+8. ~~Create the first `:kengine-math` module and move shared `Vec2` / `Vec3` ownership there.~~ Done.
+9. Keep `games:mario-3d` green after the recent engine extractions.
+10. Start the N64 3D renderer path incrementally: 3D viewer/probe, primitive shapes, camera math, rotation/transforms, then model data.
+11. Add richer collision: slope limits, ledges, world bounds, and clearer debug overlays.
+12. Add camera preset/save controls to `kengine-3d-model-viewer`.
+13. Define the first explicit N64-style render preset.
+14. Tighten asset health reporting for bundled Mario, Bowser, Goomba, Ridley, and Battlefield models.
+15. Add small deterministic tests around movement state transitions and collision helpers.
+16. Update this document whenever a workstream graduates into `docs/KENGINE_3D_PLAN.md`, `docs/NINTENDO_SWITCH.md`, or a reusable engine API.

@@ -278,23 +278,17 @@ This is intentionally small. We should not start with a full scene graph.
 
 ## Math Layer
 
-Add or extend math primitives:
+The shared math home is now `kengine-math`, which is dependency-light enough for `:kengine-core`, desktop 3D, Switch, and N64 harness code. `Vec2` and `Vec3` are the preferred public names; `Vector2` and `Vector3` remain compatibility aliases.
 
-- `Vec2`
-- `Vec3`
+Add or extend primitives only as renderer/gameplay work proves the need:
+
 - `Vec4`
 - `Quat`
-- `Mat4`
-- `Transform3D`
+- common matrix/transform helpers where they can be shared cleanly with `kengine-3d`
 - projection helpers
 - view matrix helpers
 
-Keep these in Kotlin unless performance proves otherwise.
-
-Potential location:
-
-- `kengine/src/nativeMain/kotlin/com/kengine/math`
-- or a new common math package if we want 2D and 3D to share it
+`kengine-3d` can keep SDL GPU-specific `Mat4` / `Transform3D` details until N64 or another backend needs the same shape. Move those pieces down only when the shared API is clear.
 
 ## Shader Strategy
 
