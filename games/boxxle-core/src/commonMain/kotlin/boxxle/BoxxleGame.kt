@@ -208,7 +208,7 @@ class BoxxleGame(
         val width = textWidth("CLEAR!", uiScale) + 36
         val height = 14 * uiScale + 14
         val x = (render.width - width) / 2
-        val y = (render.height - height) / 2
+        val y = (render.height - height) / 2 - 4
         render.fillRect(x, y, width, height, rgba(42, 52, 45))
         render.drawText("CLEAR!", x + 18, y + 7, rgba(236, 238, 218), uiScale)
     }
