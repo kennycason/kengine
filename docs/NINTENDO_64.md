@@ -32,6 +32,10 @@ For Nintendo 64, the target name, ABI, linker flow, C host/toolchain, runtime co
 
 `games:boxxle-n64` is the first real game-facing N64 ROM wrapper. It imports shared gameplay and assets from `games:boxxle-core`, proving the same `PortableGame` command-buffer surface used by desktop/Switch can also feed the N64 host path. The initial N64 target uses sprite-sheet rendering and SFX; large desktop music assets stay in the core catalog for desktop/Switch but are intentionally ignored by the N64 asset import until compressed or streamed music is designed.
 
+### N64 3D Foundation Probe
+
+`games:n64-demo` now carries the first N64 3D gameplay probe: a wireframe 3D shape-snake game that projects `Vec3` geometry into the existing 2D command buffer. This is intentionally not a final renderer. It proves camera math, projection, shape definitions, movement, pickup spawning, growth, and command-budget discipline before we add RDP/RSP-specific 3D rendering paths.
+
 ## Working Principles
 
 - Keep runtime assets in GLB, GLTF, or OBJ. Source formats such as FBX, USD, and USDZ should be exported outside the runtime before Kengine loads them.
@@ -44,6 +48,7 @@ For Nintendo 64, the target name, ABI, linker flow, C host/toolchain, runtime co
 - Keep any real N64 backend on the portable `:kengine-core` surface first. Do not depend on SDL, desktop `:kengine`, or modern GPU APIs for the hardware-target path.
 - Treat a standalone `kengine-n64` or `kengine-nintendo-64` module as acceptable, even if it is separated from desktop Kengine and Switch internals. Reuse should be earned by constraints, not forced.
 - Keep shared math in `:kengine-math` so low-level renderer, model, collision, and command-buffer code can use the same types without depending on SDL or desktop engine modules.
+- Use software-projected wireframe demos as cheap N64 3D design probes, then promote only the stable parts into reusable N64 renderer code.
 
 ## Emulator Compatibility
 
@@ -251,6 +256,15 @@ open -a ares games/boxxle-n64/build/n64/boxxle-n64.z64
 
 `games:boxxle-n64` imports portable source and assets from `games:boxxle-core`. N64 currently embeds the sprite sheet and `finish.wav`; desktop music remains desktop/Switch-oriented until a compressed or streamed N64 music path exists.
 
+### N64 3D Shape Snake Probe
+
+```shell
+./gradlew :games:n64-demo:buildN64Z64 -Pkengine.enableNintendo64=true
+open -a ares games/n64-demo/build/n64/n64-demo.z64
+```
+
+Controls: Left/Right steer, Up/A boost, Down brakes, L/R orbit the camera, START resets, B toggles the legacy sprite probe, and X/Y trigger the existing demo sounds.
+
 ### Manual Docker Build (without Gradle)
 
 ```shell
@@ -300,11 +314,12 @@ kengine-n64/
 6. Prove a tiny Kotlin/Native static-library target path before expanding any Kengine libraries.
 7. ~~Ship the first portable game-facing N64 ROM wrapper.~~ Done: `games:boxxle-n64`
 8. ~~Create the first `:kengine-math` module and move shared `Vec2` / `Vec3` ownership there.~~ Done.
-9. Keep `games:mario-3d` green after the recent engine extractions.
-10. Start the N64 3D renderer path incrementally: 3D viewer/probe, primitive shapes, camera math, rotation/transforms, then model data.
-11. Add richer collision: slope limits, ledges, world bounds, and clearer debug overlays.
-12. Add camera preset/save controls to `kengine-3d-model-viewer`.
-13. Define the first explicit N64-style render preset.
-14. Tighten asset health reporting for bundled Mario, Bowser, Goomba, Ridley, and Battlefield models.
-15. Add small deterministic tests around movement state transitions and collision helpers.
-16. Update this document whenever a workstream graduates into `docs/KENGINE_3D_PLAN.md`, `docs/NINTENDO_SWITCH.md`, or a reusable engine API.
+9. ~~Start the N64 3D renderer path incrementally with a wireframe shape-snake probe in `games:n64-demo`.~~ Done.
+10. Keep `games:mario-3d` green after the recent engine extractions.
+11. Continue the N64 3D renderer path incrementally: better primitive shapes, camera math, rotation/transforms, then model data.
+12. Add richer collision: slope limits, ledges, world bounds, and clearer debug overlays.
+13. Add camera preset/save controls to `kengine-3d-model-viewer`.
+14. Define the first explicit N64-style render preset.
+15. Tighten asset health reporting for bundled Mario, Bowser, Goomba, Ridley, and Battlefield models.
+16. Add small deterministic tests around movement state transitions and collision helpers.
+17. Update this document whenever a workstream graduates into `docs/KENGINE_3D_PLAN.md`, `docs/NINTENDO_SWITCH.md`, or a reusable engine API.
