@@ -256,14 +256,19 @@ open -a ares games/boxxle-n64/build/n64/boxxle-n64.z64
 
 `games:boxxle-n64` imports portable source and assets from `games:boxxle-core`. N64 currently embeds the sprite sheet and `finish.wav`; desktop music remains desktop/Switch-oriented until a compressed or streamed N64 music path exists.
 
-### N64 3D Shape Snake Probe
+### Snake 64 ROM
 
 ```shell
-./gradlew :games:n64-demo:buildN64Z64 -Pkengine.enableNintendo64=true
-open -a ares games/n64-demo/build/n64/n64-demo.z64
+./gradlew :games:snake-n64:runN64 -Pkengine.enableNintendo64=true
 ```
 
-Controls: Left/Right steer, Up/A boost, Down brakes, L/R orbit the camera, START resets, B toggles the legacy sprite probe, and X/Y trigger the existing demo sounds.
+`games:snake-n64` is the first standalone N64 3D shape-snake game probe. It uses software-projected wireframe shapes through the portable 2D command buffer while we build toward a proper N64 3D renderer path.
+
+<img src="../games/snake-n64/screenshot.png" width="65%" />
+
+Controls: Stick/D-pad Left/Right steer, Up/A climb, Down/B dive, C-Up/C-Down zoom, Z/L/R orbit the camera, and START resets.
+
+[Watch the Snake 64 demo on YouTube](https://youtu.be/ylaNiM8IkDs)
 
 ### Manual Docker Build (without Gradle)
 

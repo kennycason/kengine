@@ -15,6 +15,7 @@ This has also been an experiment with ChatGPT + Claude to help with coding + des
   - [Example Games](#example-games)
     - [Hello, World](#hello-world)
     - [Boxxle](#boxxle)
+    - [Snake 64](#snake-64)
     - [Hextris](#hextris)
     - [Osc3x Synth](#osc3x-synth)
   - [Documentation](#documentation)
@@ -178,6 +179,18 @@ fun main() {
 <img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/games/boxxle-n64/screenshot.png" width="50%" />
 
 The Nintendo 64 ROM target lives in [`games/boxxle-n64/`](games/boxxle-n64/) and runs the shared [`boxxle-core`](games/boxxle-core/) game logic and assets.
+
+### [Snake 64](games/snake-n64/)
+
+A Nintendo 64 wireframe 3D shape-snake demo built on Kengine's portable command-buffer runtime.
+
+<img src="https://raw.githubusercontent.com/kennycason/kengine/refs/heads/main/games/snake-n64/screenshot.png" width="50%" />
+
+```shell
+./gradlew :games:snake-n64:runN64 -Pkengine.enableNintendo64=true
+```
+
+[Watch the Snake 64 demo on YouTube](https://youtu.be/ylaNiM8IkDs)
 
 ### [Hextris](games/hextris-core/)
 
