@@ -61,7 +61,8 @@ modules.addAll(
         "games:physics-demo",
         "games:rubiks-cube-3d",
         "games:nintendo-switch-2d-diagnostics",
-        "games:n64-demo"
+        "games:n64-demo",
+        "games:snake-n64"
     )
 )
 

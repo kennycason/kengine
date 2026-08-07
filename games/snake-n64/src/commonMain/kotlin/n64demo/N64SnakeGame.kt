@@ -9,8 +9,8 @@ import com.kengine.render.RenderAssetId
 import com.kengine.render.RenderContext
 import com.kengine.storage.PortableStorage
 
-class N64DemoGame : PortableGame {
-    override val storageNamespace: String = "n64demo"
+class N64SnakeGame : PortableGame {
+    override val storageNamespace: String = "snake64"
 
     private var storage: PortableStorage? = null
 
@@ -20,10 +20,10 @@ class N64DemoGame : PortableGame {
     private var colorIndex = 0
     private var highScore = 0
     private var score = 0
-    private var showSprite = true
     private var previousInputMask = 0
+    private val snake3D = N64ShapeSnake3D()
 
-    private val pokeball = RenderAssetId.sprite("pokeball")
+//    private val pokeball = RenderAssetId.sprite("pokeball")
     private val finishSound = AudioAssetId.sound("finish")
     private val chordSound = AudioAssetId.sound("chord")
 
@@ -34,10 +34,6 @@ class N64DemoGame : PortableGame {
         rgba(255, 224, 70, 70)
     )
 
-    private val trailX = IntArray(TRAIL_CAPACITY)
-    private val trailY = IntArray(TRAIL_CAPACITY)
-    private var trailStart = 0
-    private var trailCount = 0
     private var pendingSound = NO_SOUND
 
     override fun attachStorage(storage: PortableStorage) {
@@ -72,10 +68,6 @@ class N64DemoGame : PortableGame {
             colorIndex = (colorIndex + 1) % trailColors.size
         }
 
-        if (bJustPressed) {
-            showSprite = !showSprite
-        }
-
         if (xJustPressed) {
             pendingSound = chordSound
         }
@@ -85,12 +77,19 @@ class N64DemoGame : PortableGame {
         }
 
         if (startJustPressed) {
+            snake3D.reset()
             score = 0
             pendingSound = finishSound
         }
 
-        if (dx != 0 || dy != 0) {
-            recordTrail()
+        snake3D.update(input, frame)
+        score = snake3D.score
+        if (snake3D.consumedThisFrame) {
+            pendingSound = chordSound
+            if (score > highScore) {
+                highScore = score
+                saveHighScore()
+            }
         }
 
         frame++
@@ -113,18 +112,13 @@ class N64DemoGame : PortableGame {
         render.fillRect(0, 0, 2, 240, borderColor)
         render.fillRect(318, 0, 2, 240, borderColor)
 
-        drawTrail(render)
+        snake3D.draw(render, frame)
 
-        if (showSprite) {
-            render.drawSprite(pokeball, playerX, playerY, 16, 16)
-        } else {
-            render.fillRect(playerX, playerY, 16, 16, rgba(0, 255, 0))
-        }
-
-        render.drawText("N64 Demo", 64, 8, rgba(255, 255, 255), 2)
-        render.drawText("Score: $score  Hi: $highScore", 12, 28, rgba(218, 228, 255), 1)
-        render.drawText("Joystick / D-pad Move", 10, 214, rgba(186, 194, 218), 1)
-        render.drawText("B sprite  C sfx", 10, 226, rgba(186, 194, 218), 1)
+        render.drawText("SNAKE 64", 12, 8, rgba(255, 255, 255), 2)
+        render.drawText("Score: $score", 140, 8, rgba(218, 228, 255), 1)
+        render.drawText("Hi: $highScore", 230, 8, rgba(218, 228, 255), 1)
+      //  render.drawText("LEFT/RIGHT steer  UP/A boost  DOWN brake", 10, 214, rgba(186, 194, 218), 1)
+      //  render.drawText("L/R camera  START reset  C sfx", 10, 226, rgba(186, 194, 218), 1)
     }
 
     override fun cleanup() {
@@ -150,37 +144,6 @@ class N64DemoGame : PortableGame {
         storage?.save("high-score", data)
     }
 
-    private fun recordTrail() {
-        val writeIndex = trailSlot(trailCount)
-        trailX[writeIndex] = playerX
-        trailY[writeIndex] = playerY
-        if (trailCount < TRAIL_CAPACITY) {
-            trailCount += 1
-        } else {
-            trailStart += 1
-            if (trailStart >= TRAIL_CAPACITY) {
-                trailStart = 0
-            }
-        }
-    }
-
-    private fun drawTrail(render: RenderContext) {
-        val baseColor = trailColors[colorIndex]
-        var index = 0
-        while (index < trailCount) {
-            val slot = trailSlot(index)
-            val alpha = ((index + 1) * 18).coerceAtMost(220)
-            val color = rgba(baseColor and 0xFF, (baseColor shr 8) and 0xFF, (baseColor shr 16) and 0xFF, alpha)
-            render.fillRect(trailX[slot] + 4, trailY[slot] + 4, 8, 8, color)
-            index += 1
-        }
-    }
-
-    private fun trailSlot(offset: Int): Int {
-        val slot = trailStart + offset
-        return if (slot >= TRAIL_CAPACITY) slot - TRAIL_CAPACITY else slot
-    }
-
     private fun rgba(red: Int, green: Int, blue: Int, alpha: Int = 255): Int {
         return clampColor(red) or
             (clampColor(green) shl 8) or
@@ -197,7 +160,6 @@ class N64DemoGame : PortableGame {
     }
 
     private companion object {
-        const val TRAIL_CAPACITY = 12
         const val NO_SOUND = 0
     }
 }
