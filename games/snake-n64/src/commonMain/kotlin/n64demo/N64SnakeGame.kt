@@ -5,7 +5,6 @@ import com.kengine.audio.AudioAssetId
 import com.kengine.audio.AudioContext
 import com.kengine.input.InputButton
 import com.kengine.input.InputState
-import com.kengine.render.RenderAssetId
 import com.kengine.render.RenderContext
 import com.kengine.storage.PortableStorage
 
@@ -14,25 +13,13 @@ class N64SnakeGame : PortableGame {
 
     private var storage: PortableStorage? = null
 
-    private var playerX = 152
-    private var playerY = 120
     private var frame = 0
-    private var colorIndex = 0
     private var highScore = 0
     private var score = 0
     private var previousInputMask = 0
     private val snake3D = N64ShapeSnake3D()
 
-//    private val pokeball = RenderAssetId.sprite("pokeball")
-    private val finishSound = AudioAssetId.sound("finish")
-    private val chordSound = AudioAssetId.sound("chord")
-
-    private val trailColors = intArrayOf(
-        rgba(255, 64, 96, 70),
-        rgba(72, 240, 130, 70),
-        rgba(74, 164, 255, 70),
-        rgba(255, 224, 70, 70)
-    )
+    private val collectSound = AudioAssetId.sound("collect")
 
     private var pendingSound = NO_SOUND
 
@@ -42,50 +29,18 @@ class N64SnakeGame : PortableGame {
     }
 
     override fun update(input: InputState) {
-        val speed = 2
-        val dx = input.axis(InputButton.LEFT, InputButton.RIGHT)
-        val dy = input.axis(InputButton.UP, InputButton.DOWN)
-        val aPressed = input.isPressed(InputButton.A)
-        val bPressed = input.isPressed(InputButton.B)
-        val xPressed = input.isPressed(InputButton.X)
-        val yPressed = input.isPressed(InputButton.Y)
         val startPressed = input.isPressed(InputButton.START)
-        val aJustPressed = aPressed && (previousInputMask and InputState.bitFor(InputButton.A)) == 0
-        val bJustPressed = bPressed && (previousInputMask and InputState.bitFor(InputButton.B)) == 0
-        val xJustPressed = xPressed && (previousInputMask and InputState.bitFor(InputButton.X)) == 0
-        val yJustPressed = yPressed && (previousInputMask and InputState.bitFor(InputButton.Y)) == 0
         val startJustPressed = startPressed && (previousInputMask and InputState.bitFor(InputButton.START)) == 0
-
-        playerX += dx * speed
-        playerY += dy * speed
-
-        if (playerX < 0) playerX = 0
-        if (playerY < 0) playerY = 0
-        if (playerX + 16 > 320) playerX = 320 - 16
-        if (playerY + 16 > 240) playerY = 240 - 16
-
-        if (aJustPressed) {
-            colorIndex = (colorIndex + 1) % trailColors.size
-        }
-
-        if (xJustPressed) {
-            pendingSound = chordSound
-        }
-
-        if (yJustPressed) {
-            pendingSound = finishSound
-        }
 
         if (startJustPressed) {
             snake3D.reset()
             score = 0
-            pendingSound = finishSound
         }
 
         snake3D.update(input, frame)
         score = snake3D.score
         if (snake3D.consumedThisFrame) {
-            pendingSound = chordSound
+            pendingSound = collectSound
             if (score > highScore) {
                 highScore = score
                 saveHighScore()
@@ -117,8 +72,8 @@ class N64SnakeGame : PortableGame {
         render.drawText("SNAKE 64", 12, 8, rgba(255, 255, 255), 2)
         render.drawText("Score: $score", 140, 8, rgba(218, 228, 255), 1)
         render.drawText("Hi: $highScore", 230, 8, rgba(218, 228, 255), 1)
-      //  render.drawText("LEFT/RIGHT steer  UP/A boost  DOWN brake", 10, 214, rgba(186, 194, 218), 1)
-      //  render.drawText("L/R camera  START reset  C sfx", 10, 226, rgba(186, 194, 218), 1)
+//        render.drawText("Stick/D-pad turn  A/B height", 10, 216, rgba(186, 194, 218), 1)
+//        render.drawText("C-UP/DN zoom  Z/L/R camera", 10, 228, rgba(186, 194, 218), 1)
     }
 
     override fun cleanup() {

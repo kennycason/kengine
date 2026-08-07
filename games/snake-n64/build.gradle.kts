@@ -41,12 +41,7 @@ kengineN64 {
     displayName.set("Kengine Snake N64")
     mainClass.set("n64demo.N64SnakeGame")
 
-
-    sound("finish") {
-        source.set(project.file("assets/sounds/finish.wav"))
-    }
-
-    sound("chord") {
-        source.set(project.file("assets/sounds/chord.wav"))
+    sound("collect") {
+        source.set(project.file("assets/sounds/collect.wav"))
     }
 }

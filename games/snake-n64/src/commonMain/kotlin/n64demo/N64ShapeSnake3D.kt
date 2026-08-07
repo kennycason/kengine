@@ -12,12 +12,15 @@ class N64ShapeSnake3D {
         private set
 
     private var headX = 0
+    private var headY = START_HEAD_Y
     private var headZ = 0
     private var heading = 0
     private var cameraOrbit = 0
+    private var cameraZoom = 0
     private var rng = 0x4E643D
     private var segmentCount = 0
     private var historyHead = 0
+    private var itemsCollected = 0
 
     private val wireframe = N64Wireframe3D()
     private val segmentShapeTypes = IntArray(MAX_SEGMENTS)
@@ -25,9 +28,11 @@ class N64ShapeSnake3D {
     private val segmentSizes = IntArray(MAX_SEGMENTS)
     private val segmentSpinOffsets = IntArray(MAX_SEGMENTS)
     private val historyX = IntArray(MAX_HISTORY)
+    private val historyY = IntArray(MAX_HISTORY)
     private val historyZ = IntArray(MAX_HISTORY)
     private val historyHeading = IntArray(MAX_HISTORY)
     private val pickupX = IntArray(PICKUP_COUNT)
+    private val pickupY = IntArray(PICKUP_COUNT)
     private val pickupZ = IntArray(PICKUP_COUNT)
     private val pickupShapeTypes = IntArray(PICKUP_COUNT)
     private val pickupColors = IntArray(PICKUP_COUNT)
@@ -41,12 +46,15 @@ class N64ShapeSnake3D {
         score = 0
         consumedThisFrame = false
         headX = 0
+        headY = START_HEAD_Y
         headZ = 0
         heading = 0
         cameraOrbit = 0
+        cameraZoom = 0
         rng = 0x4E643D
         segmentCount = STARTING_SEGMENTS
         historyHead = 0
+        itemsCollected = 0
 
         setSegment(0, ShapeType.DIAMOND, rgba(248, 244, 112), 210, 0)
         setSegment(1, ShapeType.CUBE, rgba(70, 218, 255), 184, 72)
@@ -57,6 +65,7 @@ class N64ShapeSnake3D {
         var historyIndex = 0
         while (historyIndex < MAX_HISTORY) {
             historyX[historyIndex] = 0
+            historyY[historyIndex] = headY
             historyZ[historyIndex] = -historyIndex * HISTORY_STEP
             historyHeading[historyIndex] = heading
             historyIndex += 1
@@ -74,20 +83,24 @@ class N64ShapeSnake3D {
 
         heading = wrapAngle(heading + input.axis(InputButton.LEFT, InputButton.RIGHT) * TURN_SPEED)
 
-        if (input.isPressed(InputButton.L)) {
+        if (input.isPressed(InputButton.L) || input.isPressed(InputButton.SELECT)) {
             cameraOrbit = wrapAngle(cameraOrbit - CAMERA_ORBIT_SPEED)
         }
         if (input.isPressed(InputButton.R)) {
             cameraOrbit = wrapAngle(cameraOrbit + CAMERA_ORBIT_SPEED)
         }
-
-        val speed = when {
-            input.isPressed(InputButton.A) || input.isPressed(InputButton.UP) -> BOOST_SPEED
-            input.isPressed(InputButton.DOWN) -> SLOW_SPEED
-            else -> CRUISE_SPEED
+        if (input.isPressed(InputButton.X)) {
+            cameraZoom = clampInt(cameraZoom - CAMERA_ZOOM_SPEED, CAMERA_ZOOM_IN_LIMIT, CAMERA_ZOOM_OUT_LIMIT)
+        }
+        if (input.isPressed(InputButton.Y)) {
+            cameraZoom = clampInt(cameraZoom + CAMERA_ZOOM_SPEED, CAMERA_ZOOM_IN_LIMIT, CAMERA_ZOOM_OUT_LIMIT)
         }
 
+        val speed = currentForwardSpeed()
+        val verticalInput = verticalAxis(input)
+
         headX += trigMul(speed, sinAngle(heading))
+        headY = clampInt(headY + verticalInput * currentVerticalSpeed(), MIN_HEAD_Y, MAX_HEAD_Y)
         headZ += trigMul(speed, cosAngle(heading))
         keepHeadInsideArena()
         recordHistory()
@@ -95,8 +108,9 @@ class N64ShapeSnake3D {
         var pickupIndex = 0
         while (pickupIndex < PICKUP_COUNT) {
             val dx = pickupX[pickupIndex] - headX
+            val dy = pickupY[pickupIndex] - headY
             val dz = pickupZ[pickupIndex] - headZ
-            if (dx * dx + dz * dz <= PICKUP_RADIUS * PICKUP_RADIUS) {
+            if (dx * dx + dy * dy + dz * dz <= PICKUP_RADIUS * PICKUP_RADIUS) {
                 consumePickup(pickupIndex)
             }
             pickupIndex += 1
@@ -112,11 +126,11 @@ class N64ShapeSnake3D {
         wireframe.configure(
             render = render,
             targetX = headX,
-            targetY = HEAD_Y,
+            targetY = headY,
             targetZ = headZ,
             yaw = wrapAngle(heading + cameraOrbit),
             pitch = CAMERA_PITCH,
-            cameraDistance = CAMERA_DISTANCE,
+            cameraDistance = CAMERA_DISTANCE + cameraZoom,
             projectionDistance = PROJECTION_DISTANCE,
             centerX = render.width / 2,
             centerY = 140
@@ -129,10 +143,20 @@ class N64ShapeSnake3D {
         while (pickupIndex < PICKUP_COUNT) {
             val phase = pickupPhases[pickupIndex]
             val bob = trigMul(PICKUP_BOB_HEIGHT, sinAngle((frame * 11 + phase) and 1023))
+            val centerY = clampInt(pickupY[pickupIndex] + bob, MIN_PICKUP_Y, MAX_PICKUP_Y)
+            wireframe.drawLine3D(
+                pickupX[pickupIndex],
+                0,
+                pickupZ[pickupIndex],
+                pickupX[pickupIndex],
+                centerY,
+                pickupZ[pickupIndex],
+                rgba(255, 255, 255, 42)
+            )
             wireframe.drawShape(
                 type = pickupShapeTypes[pickupIndex],
                 centerX = pickupX[pickupIndex],
-                centerY = PICKUP_Y + bob,
+                centerY = centerY,
                 centerZ = pickupZ[pickupIndex],
                 size = PICKUP_SIZE,
                 rotationX = wrapAngle(frame * 3 + phase),
@@ -147,16 +171,18 @@ class N64ShapeSnake3D {
         while (index >= 0) {
             val slot = historySlot(index * SEGMENT_HISTORY_SPACING)
             val sampleX = historyX[slot]
+            val sampleY = historyY[slot]
             val sampleZ = historyZ[slot]
             val sampleHeading = historyHeading[slot]
             val bob = trigMul(SEGMENT_BOB_HEIGHT, sinAngle((frame * 19 + index * 47) and 1023))
+            val centerY = clampInt(sampleY + bob, MIN_HEAD_Y, MAX_HEAD_Y)
             val spin = wrapAngle(frame * (4 + index) + segmentSpinOffsets[index])
             val size = if (index == 0) segmentSizes[index] + 30 else segmentSizes[index]
 
             wireframe.drawShape(
                 type = segmentShapeTypes[index],
                 centerX = sampleX,
-                centerY = HEAD_Y + bob,
+                centerY = centerY,
                 centerZ = sampleZ,
                 size = size,
                 rotationX = wrapAngle(spin / 2),
@@ -167,12 +193,14 @@ class N64ShapeSnake3D {
 
             if (index > 0) {
                 val nextSlot = historySlot((index - 1) * SEGMENT_HISTORY_SPACING)
+                val connectorY = clampInt(centerY - CONNECTOR_DROP, 0, MAX_HEAD_Y)
+                val nextConnectorY = clampInt(historyY[nextSlot] - CONNECTOR_DROP, 0, MAX_HEAD_Y)
                 wireframe.drawLine3D(
                     sampleX,
-                    HEAD_Y - CONNECTOR_DROP,
+                    connectorY,
                     sampleZ,
                     historyX[nextSlot],
-                    HEAD_Y - CONNECTOR_DROP,
+                    nextConnectorY,
                     historyZ[nextSlot],
                     rgba(255, 255, 255, 78)
                 )
@@ -187,6 +215,7 @@ class N64ShapeSnake3D {
             historyHead = MAX_HISTORY - 1
         }
         historyX[historyHead] = headX
+        historyY[historyHead] = headY
         historyZ[historyHead] = headZ
         historyHeading[historyHead] = heading
     }
@@ -198,6 +227,7 @@ class N64ShapeSnake3D {
     }
 
     private fun consumePickup(index: Int) {
+        itemsCollected += 1
         score += 100 + segmentCount * 7
         consumedThisFrame = true
 
@@ -242,17 +272,39 @@ class N64ShapeSnake3D {
         }
     }
 
+    private fun currentForwardSpeed(): Int {
+        return CRUISE_SPEED + clampInt(itemsCollected * SPEED_BONUS_PER_PICKUP, 0, MAX_SPEED_BONUS)
+    }
+
+    private fun currentVerticalSpeed(): Int {
+        return currentForwardSpeed()
+    }
+
+    private fun verticalAxis(input: InputState): Int {
+        var axis = input.axis(InputButton.DOWN, InputButton.UP)
+        if (input.isPressed(InputButton.A)) {
+            axis += 1
+        }
+        if (input.isPressed(InputButton.B)) {
+            axis -= 1
+        }
+        return clampInt(axis, -1, 1)
+    }
+
     private fun respawnPickup(index: Int) {
         var x: Int
+        var y: Int
         var z: Int
         var attempts = 0
         do {
             x = randomBetween(-ARENA_HALF_SIZE + WORLD_SCALE, ARENA_HALF_SIZE - WORLD_SCALE)
+            y = randomBetween(MIN_PICKUP_Y, MAX_PICKUP_Y)
             z = randomBetween(-ARENA_HALF_SIZE + WORLD_SCALE, ARENA_HALF_SIZE - WORLD_SCALE)
             attempts += 1
-        } while ((distanceSquaredToHead(x, z) < PICKUP_SAFE_DISTANCE_SQUARED) && attempts < 8)
+        } while ((distanceSquaredToHead(x, y, z) < PICKUP_SAFE_DISTANCE_SQUARED) && attempts < 8)
 
         pickupX[index] = x
+        pickupY[index] = y
         pickupZ[index] = z
         pickupShapeTypes[index] = nextRandom8() % 3
         pickupColors[index] = PICKUP_COLORS[nextRandom8() % PICKUP_COLORS.size]
@@ -266,10 +318,11 @@ class N64ShapeSnake3D {
         segmentSpinOffsets[index] = spinOffset
     }
 
-    private fun distanceSquaredToHead(x: Int, z: Int): Int {
+    private fun distanceSquaredToHead(x: Int, y: Int, z: Int): Int {
         val dx = x - headX
+        val dy = y - headY
         val dz = z - headZ
-        return dx * dx + dz * dz
+        return dx * dx + dy * dy + dz * dz
     }
 
     private fun randomBetween(min: Int, max: Int): Int {
@@ -306,24 +359,30 @@ class N64ShapeSnake3D {
         const val MAX_HISTORY = 180
         const val SEGMENT_HISTORY_SPACING = 9
         const val HISTORY_STEP = 27
-        const val ARENA_HALF_SIZE = 7 * WORLD_SCALE
+        const val ARENA_HALF_SIZE = 9 * WORLD_SCALE
         const val GRID_STEP = 2 * WORLD_SCALE
-        const val HEAD_Y = 159
-        const val PICKUP_Y = 220
+        const val MIN_HEAD_Y = 192
+        const val START_HEAD_Y = 240
+        const val MAX_HEAD_Y = 4 * WORLD_SCALE
+        const val MIN_PICKUP_Y = 224
+        const val MAX_PICKUP_Y = 3 * WORLD_SCALE + WORLD_SCALE / 2
         const val PICKUP_SIZE = 184
         const val PICKUP_BOB_HEIGHT = 46
         const val SEGMENT_BOB_HEIGHT = 18
         const val CONNECTOR_DROP = 67
-        const val PICKUP_RADIUS = 194
+        const val PICKUP_RADIUS = 288
         const val PICKUP_SAFE_DISTANCE_SQUARED = 10 * WORLD_SCALE * WORLD_SCALE
         const val TURN_SPEED = 12
         const val CRUISE_SPEED = 27
-        const val BOOST_SPEED = 42
-        const val SLOW_SPEED = 14
+        const val SPEED_BONUS_PER_PICKUP = 5
+        const val MAX_SPEED_BONUS = 36
         const val CAMERA_ORBIT_SPEED = 6
-        const val CAMERA_PITCH = -100
-        const val CAMERA_DISTANCE = 12 * WORLD_SCALE + WORLD_SCALE / 2
-        const val PROJECTION_DISTANCE = 122
+        const val CAMERA_PITCH = -110
+        const val CAMERA_DISTANCE = 15 * WORLD_SCALE
+        const val CAMERA_ZOOM_SPEED = WORLD_SCALE / 10
+        const val CAMERA_ZOOM_IN_LIMIT = -8 * WORLD_SCALE
+        const val CAMERA_ZOOM_OUT_LIMIT = 8 * WORLD_SCALE
+        const val PROJECTION_DISTANCE = 112
 
         val PICKUP_COLORS = intArrayOf(
             rgba(255, 75, 122),
