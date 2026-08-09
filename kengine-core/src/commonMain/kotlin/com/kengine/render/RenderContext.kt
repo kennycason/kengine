@@ -33,6 +33,10 @@ class RenderContext(commandCapacity: Int = 128) {
         commands.drawLine(startX, startY, endX, endY, color)
     }
 
+    fun drawTriangle(x1: Int, y1: Int, x2: Int, y2: Int, x3: Int, y3: Int, color: Int) {
+        commands.drawTriangle(x1, y1, x2, y2, x3, y3, color)
+    }
+
     fun drawSprite(
         spriteId: Int,
         x: Int,

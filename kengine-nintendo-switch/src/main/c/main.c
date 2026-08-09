@@ -38,6 +38,7 @@
 #define KENGINE_RENDER_DRAW_LINE 4
 #define KENGINE_RENDER_DRAW_SPRITE 5
 #define KENGINE_RENDER_DRAW_TEXT 6
+#define KENGINE_RENDER_DRAW_TRIANGLE 7
 
 #define KENGINE_RENDER_FIELD_TYPE 0
 #define KENGINE_RENDER_FIELD_X 1
@@ -538,6 +539,80 @@ static void draw_line(u32* framebuf, u32 stride_pixels, int start_x, int start_y
     }
 }
 
+static void swap_int(int* a, int* b) {
+    int value = *a;
+    *a = *b;
+    *b = value;
+}
+
+static int interpolate_triangle_x(int x0, int y0, int x1, int y1, int y) {
+    if (y0 == y1) return x0;
+    return x0 + (int)((((long long)x1 - (long long)x0) * ((long long)y - (long long)y0)) / ((long long)y1 - (long long)y0));
+}
+
+static void draw_triangle_span(u32* framebuf, u32 stride_pixels, int y, int x0, int x1, u32 color) {
+    if (y < 0 || y >= FB_HEIGHT) return;
+    if (x0 > x1) swap_int(&x0, &x1);
+    if (x1 < 0 || x0 >= FB_WIDTH) return;
+
+    x0 = clamp_int(x0, 0, FB_WIDTH - 1);
+    x1 = clamp_int(x1, 0, FB_WIDTH - 1);
+
+    u32* row = framebuf + y * stride_pixels;
+    for (int x = x0; x <= x1; ++x) {
+        row[x] = color_over(row[x], color);
+    }
+}
+
+static void draw_triangle(
+    u32* framebuf,
+    u32 stride_pixels,
+    int x0,
+    int y0,
+    int x1,
+    int y1,
+    int x2,
+    int y2,
+    u32 color
+) {
+    if ((y0 < 0 && y1 < 0 && y2 < 0) || (y0 >= FB_HEIGHT && y1 >= FB_HEIGHT && y2 >= FB_HEIGHT)) return;
+    if ((x0 < 0 && x1 < 0 && x2 < 0) || (x0 >= FB_WIDTH && x1 >= FB_WIDTH && x2 >= FB_WIDTH)) return;
+
+    if (y0 > y1) {
+        swap_int(&x0, &x1);
+        swap_int(&y0, &y1);
+    }
+    if (y1 > y2) {
+        swap_int(&x1, &x2);
+        swap_int(&y1, &y2);
+    }
+    if (y0 > y1) {
+        swap_int(&x0, &x1);
+        swap_int(&y0, &y1);
+    }
+
+    if (y0 == y2) {
+        int left = x0;
+        int right = x0;
+        if (x1 < left) left = x1;
+        if (x2 < left) left = x2;
+        if (x1 > right) right = x1;
+        if (x2 > right) right = x2;
+        draw_triangle_span(framebuf, stride_pixels, y0, left, right, color);
+        return;
+    }
+
+    int y_start = clamp_int(y0, 0, FB_HEIGHT - 1);
+    int y_end = clamp_int(y2, 0, FB_HEIGHT - 1);
+    for (int y = y_start; y <= y_end; ++y) {
+        int long_x = interpolate_triangle_x(x0, y0, x2, y2, y);
+        int short_x = y < y1
+            ? interpolate_triangle_x(x0, y0, x1, y1, y)
+            : interpolate_triangle_x(x1, y1, x2, y2, y);
+        draw_triangle_span(framebuf, stride_pixels, y, long_x, short_x, color);
+    }
+}
+
 #ifdef KENGINE_SWITCH_SPRITE_ASSETS
 static void draw_sprite_asset(
     u32* framebuf,
@@ -827,6 +902,9 @@ static void execute_render_command(
             break;
         case KENGINE_RENDER_DRAW_LINE:
             draw_line(framebuf, stride_pixels, x, y, width, height, color);
+            break;
+        case KENGINE_RENDER_DRAW_TRIANGLE:
+            draw_triangle(framebuf, stride_pixels, x, y, width, height, (int)color2, param, color);
             break;
         case KENGINE_RENDER_DRAW_SPRITE:
             draw_sprite(framebuf, stride_pixels, x, y, width, height, color, (int)color2, param);

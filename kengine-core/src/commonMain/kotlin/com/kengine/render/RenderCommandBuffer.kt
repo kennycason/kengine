@@ -34,6 +34,10 @@ class RenderCommandBuffer(capacity: Int = 128) {
         add(RenderCommandType.DRAW_LINE, startX, startY, endX, endY, color, 0, 0)
     }
 
+    fun drawTriangle(x1: Int, y1: Int, x2: Int, y2: Int, x3: Int, y3: Int, color: Int) {
+        add(RenderCommandType.DRAW_TRIANGLE, x1, y1, x2, y2, color, x3, y3)
+    }
+
     fun drawSprite(spriteId: Int, x: Int, y: Int, width: Int, height: Int, tint: Int, frame: Int = 0) {
         if (width <= 0 || height <= 0) return
         add(RenderCommandType.DRAW_SPRITE, x, y, width, height, tint, spriteId, frame)

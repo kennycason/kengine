@@ -31,6 +31,17 @@ class RenderContextSdlRenderer(
                 endY = render.commandField(commandIndex, RenderCommandBuffer.FIELD_HEIGHT),
                 color = render.commandField(commandIndex, RenderCommandBuffer.FIELD_COLOR)
             )
+            RenderCommandType.DRAW_TRIANGLE -> fillTriangle(
+                x1 = render.commandField(commandIndex, RenderCommandBuffer.FIELD_X),
+                y1 = render.commandField(commandIndex, RenderCommandBuffer.FIELD_Y),
+                x2 = render.commandField(commandIndex, RenderCommandBuffer.FIELD_WIDTH),
+                y2 = render.commandField(commandIndex, RenderCommandBuffer.FIELD_HEIGHT),
+                x3 = render.commandField(commandIndex, RenderCommandBuffer.FIELD_COLOR2),
+                y3 = render.commandField(commandIndex, RenderCommandBuffer.FIELD_PARAM),
+                color = render.commandField(commandIndex, RenderCommandBuffer.FIELD_COLOR),
+                screenWidth = render.width,
+                screenHeight = render.height
+            )
             RenderCommandType.DRAW_SPRITE -> drawSprite(
                 x = render.commandField(commandIndex, RenderCommandBuffer.FIELD_X),
                 y = render.commandField(commandIndex, RenderCommandBuffer.FIELD_Y),
@@ -146,6 +157,85 @@ class RenderContextSdlRenderer(
                 a = alpha(color)
             )
         }
+    }
+
+    private fun fillTriangle(
+        x1: Int,
+        y1: Int,
+        x2: Int,
+        y2: Int,
+        x3: Int,
+        y3: Int,
+        color: Int,
+        screenWidth: Int,
+        screenHeight: Int
+    ) {
+        var ax = x1
+        var ay = y1
+        var bx = x2
+        var by = y2
+        var cx = x3
+        var cy = y3
+
+        if (ay > by) {
+            val swapX = ax
+            val swapY = ay
+            ax = bx
+            ay = by
+            bx = swapX
+            by = swapY
+        }
+        if (by > cy) {
+            val swapX = bx
+            val swapY = by
+            bx = cx
+            by = cy
+            cx = swapX
+            cy = swapY
+        }
+        if (ay > by) {
+            val swapX = ax
+            val swapY = ay
+            ax = bx
+            ay = by
+            bx = swapX
+            by = swapY
+        }
+
+        if (cy < 0 || ay >= screenHeight || screenWidth <= 0 || screenHeight <= 0) return
+
+        if (ay == cy) {
+            drawHorizontalSpan(ay, minOf(ax, bx, cx), maxOf(ax, bx, cx), color, screenWidth, screenHeight)
+            return
+        }
+
+        var row = ay.coerceAtLeast(0)
+        val lastRow = cy.coerceAtMost(screenHeight - 1)
+        while (row <= lastRow) {
+            val longX = interpolateX(ax, ay, cx, cy, row)
+            val shortX = if (row < by) {
+                interpolateX(ax, ay, bx, by, row)
+            } else {
+                interpolateX(bx, by, cx, cy, row)
+            }
+            drawHorizontalSpan(row, longX, shortX, color, screenWidth, screenHeight)
+            row += 1
+        }
+    }
+
+    private fun interpolateX(x1: Int, y1: Int, x2: Int, y2: Int, y: Int): Int {
+        if (y1 == y2) return x1
+        return x1 + (((x2.toLong() - x1.toLong()) * (y.toLong() - y1.toLong())) / (y2.toLong() - y1.toLong())).toInt()
+    }
+
+    private fun drawHorizontalSpan(y: Int, x1: Int, x2: Int, color: Int, screenWidth: Int, screenHeight: Int) {
+        if (y < 0 || y >= screenHeight) return
+        var left = minOf(x1, x2)
+        var right = maxOf(x1, x2)
+        if (right < 0 || left >= screenWidth) return
+        left = left.coerceAtLeast(0)
+        right = right.coerceAtMost(screenWidth - 1)
+        drawLine(left, y, right, y, color)
     }
 
     private fun verticalGradient(render: RenderContext, topColor: Int, bottomColor: Int, pulseSeed: Int) {
