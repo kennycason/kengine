@@ -189,13 +189,15 @@ class BoxxleGameTest {
     }
 
     @Test
-    fun n64TimingChainsHeldDirectionFaster() {
+    fun n64TimingUsesModerateHeldDirectionCadence() {
         val game = BoxxleGame(BoxxleTiming.Nintendo64)
 
-        repeat(2) {
+        repeat(4) {
             game.update(input(InputButton.RIGHT))
         }
+        assertContains(game.snapshot(), "player=2,1")
 
+        game.update(input(InputButton.RIGHT))
         assertContains(game.snapshot(), "player=3,1")
     }
 
@@ -217,7 +219,9 @@ class BoxxleGameTest {
 
         game.update(input(InputButton.RIGHT))
         game.update(input(InputButton.DOWN))
-        game.update(input())
+        repeat(3) {
+            game.update(input())
+        }
 
         assertContains(game.snapshot(), "player=2,2")
     }
@@ -253,7 +257,9 @@ class BoxxleGameTest {
 
         game.update(input(InputButton.RIGHT))
         game.update(input(InputButton.RIGHT, InputButton.DOWN))
-        game.update(input(InputButton.RIGHT, InputButton.DOWN))
+        repeat(3) {
+            game.update(input(InputButton.RIGHT, InputButton.DOWN))
+        }
 
         assertContains(game.snapshot(), "player=2,2")
     }

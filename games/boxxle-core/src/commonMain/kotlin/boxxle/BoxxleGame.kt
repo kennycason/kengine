@@ -640,7 +640,7 @@ data class BoxxleTiming(
             levelSwitchHoldFrames = 18
         )
         val Nintendo64 = BoxxleTiming(
-            moveAnimationFrames = 2,
+            moveAnimationFrames = 5,
             levelCompleteDelayFrames = 72,
             levelSwitchHoldFrames = 5
         )
