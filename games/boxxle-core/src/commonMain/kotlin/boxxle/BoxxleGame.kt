@@ -28,6 +28,7 @@ class BoxxleGame(
     private var queuedDirection: Direction? = null
     private var leftLevelHoldFrames = 0
     private var rightLevelHoldFrames = 0
+    private val boardLayout = BoardLayout()
 
     private val tileSheet = RenderAssetId.sprite(BoxxleAssets.TILES_ID)
     private val finishSound = AudioAssetId.sound(BoxxleAssets.FINISH_ID)
@@ -108,14 +109,13 @@ class BoxxleGame(
     override fun draw(render: RenderContext) {
         render.clear(rgba(236, 238, 218))
 
-        val layout = layout(render)
+        updateLayout(render, boardLayout)
         val uiScale = uiScale(render)
         val titleColor = rgba(42, 52, 45)
-        val levelText = "LVL ${levelNumber + 1}/${LEVEL_DATA.size}"
         render.drawText("BOXXLE", HUD_MARGIN, 8, titleColor, uiScale)
-        render.drawText(levelText, render.width - textWidth(levelText, uiScale) - HUD_MARGIN, 10, titleColor, uiScale)
+        drawLevelText(render, uiScale, titleColor)
 
-        drawBoard(render, layout)
+        drawBoard(render, boardLayout)
         drawHud(render, uiScale)
 
         if (completeFrames > 0) {
@@ -137,8 +137,10 @@ class BoxxleGame(
         render.fillRect(layout.left, layout.top, boardWidth, boardHeight, floorColor)
         drawBoardGrid(render, layout)
 
-        for (y in 0 until level.height) {
-            for (x in 0 until level.width) {
+        var y = 0
+        while (y < level.height) {
+            var x = 0
+            while (x < level.width) {
                 if (level.tileAt(x, y) == Tiles.BRICK) {
                     render.drawSprite(
                         tileSheet,
@@ -149,10 +151,14 @@ class BoxxleGame(
                         frame = FRAME_BRICK
                     )
                 }
+                x += 1
             }
+            y += 1
         }
 
-        level.goals.forEach { goal ->
+        var goalIndex = 0
+        while (goalIndex < level.goals.size) {
+            val goal = level.goals[goalIndex]
             render.drawSprite(
                 tileSheet,
                 layout.left + goal.x * layout.tile,
@@ -161,12 +167,15 @@ class BoxxleGame(
                 layout.tile,
                 frame = FRAME_GOAL
             )
+            goalIndex += 1
         }
 
         val animation = moveAnimation
-        level.boxes.forEachIndexed { index, box ->
+        var boxIndex = 0
+        while (boxIndex < level.boxes.size) {
+            val box = level.boxes[boxIndex]
             val frame = if (level.isGoal(box)) FRAME_BOX_PLACED else FRAME_BOX
-            if (animation != null && animation.hasBox && animation.boxIndex == index) {
+            if (animation != null && animation.hasBox && animation.boxIndex == boxIndex) {
                 drawAnimatedTile(
                     render = render,
                     layout = layout,
@@ -180,6 +189,7 @@ class BoxxleGame(
             } else {
                 drawTile(render, layout, box, frame)
             }
+            boxIndex += 1
         }
 
         if (animation != null) {
@@ -199,8 +209,7 @@ class BoxxleGame(
     }
 
     private fun drawHud(render: RenderContext, uiScale: Int) {
-        val placed = level.boxes.count { level.isGoal(it) }
-        render.drawText("BOXES $placed/${level.goals.size}", HUD_MARGIN, 8 + 12 * uiScale, rgba(67, 84, 70), uiScale)
+        drawBoxesText(render, placedBoxCount(), uiScale)
         render.drawText("B RESET  L/R LEVEL", HUD_MARGIN, render.height - 8 * uiScale - 4, rgba(67, 84, 70), uiScale)
     }
 
@@ -213,7 +222,7 @@ class BoxxleGame(
         render.drawText("CLEAR!", x + 18, y + 7, rgba(236, 238, 218), uiScale)
     }
 
-    private fun layout(render: RenderContext): BoardLayout {
+    private fun updateLayout(render: RenderContext, layout: BoardLayout) {
         val uiScale = uiScale(render)
         val topHudHeight = if (uiScale == 1) 38 else 58
         val bottomHudHeight = if (uiScale == 1) 30 else 34
@@ -224,11 +233,9 @@ class BoxxleGame(
         val tile = minOf(preferredTile, fitTile).coerceAtLeast(6)
         val boardWidth = level.width * tile
         val boardHeight = level.height * tile
-        return BoardLayout(
-            left = (render.width - boardWidth) / 2,
-            top = topHudHeight + ((availableHeight - boardHeight) / 2).coerceAtLeast(0),
-            tile = tile
-        )
+        layout.left = (render.width - boardWidth) / 2
+        layout.top = topHudHeight + ((availableHeight - boardHeight) / 2).coerceAtLeast(0)
+        layout.tile = tile
     }
 
     private fun tryMove(direction: Direction) {
@@ -285,7 +292,24 @@ class BoxxleGame(
     }
 
     private fun isLevelComplete(): Boolean {
-        return level.goals.all { goal -> level.boxes.any { it == goal } }
+        var goalIndex = 0
+        while (goalIndex < level.goals.size) {
+            val goal = level.goals[goalIndex]
+            var boxIndex = 0
+            var found = false
+            while (boxIndex < level.boxes.size) {
+                if (level.boxes[boxIndex] == goal) {
+                    found = true
+                    break
+                }
+                boxIndex += 1
+            }
+            if (!found) {
+                return false
+            }
+            goalIndex += 1
+        }
+        return true
     }
 
     private fun startLevelCompleteIfNeeded(): Boolean {
@@ -321,10 +345,7 @@ class BoxxleGame(
     private fun previousLevelNumber(): Int = positiveModulo(levelNumber - 1, LEVEL_DATA.size)
 
     private fun updateDirectionIntent(input: InputState): Direction? {
-        val newlyPressed = DIRECTION_PRIORITY.firstOrNull { direction ->
-            input.isPressed(direction.button) &&
-                (previousMask and InputState.bitFor(direction.button)) == 0
-        }
+        val newlyPressed = newlyPressedDirection(input)
         if (newlyPressed != null) {
             directionIntent = newlyPressed
             return newlyPressed
@@ -335,28 +356,47 @@ class BoxxleGame(
             return currentIntent
         }
 
-        return DIRECTION_PRIORITY.firstOrNull { input.isPressed(it.button) }
-            .also { directionIntent = it }
+        val pressed = pressedDirection(input)
+        directionIntent = pressed
+        return pressed
     }
 
     private fun newlyPressedDirection(input: InputState): Direction? {
-        return DIRECTION_PRIORITY.firstOrNull { direction ->
-            input.isPressed(direction.button) &&
-                (previousMask and InputState.bitFor(direction.button)) == 0
-        }
+        if (isNewlyPressed(input, Direction.LEFT)) return Direction.LEFT
+        if (isNewlyPressed(input, Direction.RIGHT)) return Direction.RIGHT
+        if (isNewlyPressed(input, Direction.UP)) return Direction.UP
+        if (isNewlyPressed(input, Direction.DOWN)) return Direction.DOWN
+        return null
+    }
+
+    private fun pressedDirection(input: InputState): Direction? {
+        if (input.isPressed(Direction.LEFT.button)) return Direction.LEFT
+        if (input.isPressed(Direction.RIGHT.button)) return Direction.RIGHT
+        if (input.isPressed(Direction.UP.button)) return Direction.UP
+        if (input.isPressed(Direction.DOWN.button)) return Direction.DOWN
+        return null
+    }
+
+    private fun isNewlyPressed(input: InputState, direction: Direction): Boolean {
+        return input.isPressed(direction.button) &&
+            (previousMask and InputState.bitFor(direction.button)) == 0
     }
 
     private fun drawBoardGrid(render: RenderContext, layout: BoardLayout) {
         val boardWidth = level.width * layout.tile
         val boardHeight = level.height * layout.tile
 
-        for (x in 0..level.width) {
+        var x = 0
+        while (x <= level.width) {
             val px = layout.left + x * layout.tile
             render.drawLine(px, layout.top, px, layout.top + boardHeight, floorGridColor)
+            x += 1
         }
-        for (y in 0..level.height) {
+        var y = 0
+        while (y <= level.height) {
             val py = layout.top + y * layout.tile
             render.drawLine(layout.left, py, layout.left + boardWidth, py, floorGridColor)
+            y += 1
         }
     }
 
@@ -390,6 +430,89 @@ class BoxxleGame(
     private fun resetLevelShortcutHolds() {
         leftLevelHoldFrames = 0
         rightLevelHoldFrames = 0
+    }
+
+    private fun drawLevelText(render: RenderContext, uiScale: Int, color: Int) {
+        val x = render.width - levelTextWidth(uiScale) - HUD_MARGIN
+        var nextX = drawTextAndAdvance(render, "LVL ", x, 10, color, uiScale)
+        nextX = drawNumberAndAdvance(render, levelNumber + 1, nextX, 10, color, uiScale)
+        nextX = drawTextAndAdvance(render, "/", nextX, 10, color, uiScale)
+        drawNumberAndAdvance(render, LEVEL_DATA.size, nextX, 10, color, uiScale)
+    }
+
+    private fun drawBoxesText(render: RenderContext, placed: Int, uiScale: Int) {
+        val color = rgba(67, 84, 70)
+        val y = 8 + 12 * uiScale
+        var nextX = drawTextAndAdvance(render, "BOXES ", HUD_MARGIN, y, color, uiScale)
+        nextX = drawNumberAndAdvance(render, placed, nextX, y, color, uiScale)
+        nextX = drawTextAndAdvance(render, "/", nextX, y, color, uiScale)
+        drawNumberAndAdvance(render, level.goals.size, nextX, y, color, uiScale)
+    }
+
+    private fun drawTextAndAdvance(render: RenderContext, text: String, x: Int, y: Int, color: Int, scale: Int): Int {
+        render.drawText(text, x, y, color, scale)
+        return x + textWidth(text, scale)
+    }
+
+    private fun drawNumberAndAdvance(render: RenderContext, value: Int, x: Int, y: Int, color: Int, scale: Int): Int {
+        var nextX = x
+        val clamped = value.coerceIn(0, 999)
+        if (clamped >= 100) {
+            nextX = drawDigitAndAdvance(render, clamped / 100, nextX, y, color, scale)
+            nextX = drawDigitAndAdvance(render, (clamped / 10) % 10, nextX, y, color, scale)
+            return drawDigitAndAdvance(render, clamped % 10, nextX, y, color, scale)
+        }
+        if (clamped >= 10) {
+            nextX = drawDigitAndAdvance(render, clamped / 10, nextX, y, color, scale)
+            return drawDigitAndAdvance(render, clamped % 10, nextX, y, color, scale)
+        }
+        return drawDigitAndAdvance(render, clamped, nextX, y, color, scale)
+    }
+
+    private fun drawDigitAndAdvance(render: RenderContext, digit: Int, x: Int, y: Int, color: Int, scale: Int): Int {
+        val text = digitText(digit)
+        render.drawText(text, x, y, color, scale)
+        return x + textWidth(text, scale)
+    }
+
+    private fun levelTextWidth(scale: Int): Int {
+        return textWidth("LVL ", scale) +
+            numberWidth(levelNumber + 1, scale) +
+            textWidth("/", scale) +
+            numberWidth(LEVEL_DATA.size, scale)
+    }
+
+    private fun numberWidth(value: Int, scale: Int): Int {
+        val clamped = value.coerceIn(0, 999)
+        val digits = if (clamped >= 100) 3 else if (clamped >= 10) 2 else 1
+        return digits * 6 * scale
+    }
+
+    private fun digitText(digit: Int): String {
+        return when (digit) {
+            0 -> "0"
+            1 -> "1"
+            2 -> "2"
+            3 -> "3"
+            4 -> "4"
+            5 -> "5"
+            6 -> "6"
+            7 -> "7"
+            8 -> "8"
+            else -> "9"
+        }
+    }
+
+    private fun placedBoxCount(): Int {
+        var placed = 0
+        var index = 0
+        while (index < level.boxes.size) {
+            if (level.isGoal(level.boxes[index])) {
+                placed += 1
+            }
+            index += 1
+        }
+        return placed
     }
 
     private fun drawTile(render: RenderContext, layout: BoardLayout, position: TilePosition, frame: Int) {
@@ -484,7 +607,11 @@ private data class TilePosition(val x: Int, val y: Int) {
 
 private data class TileDelta(val x: Int, val y: Int)
 
-private data class BoardLayout(val left: Int, val top: Int, val tile: Int)
+private class BoardLayout(
+    var left: Int = 0,
+    var top: Int = 0,
+    var tile: Int = 0
+)
 
 private data class MoveAnimation(
     val playerFromX: Int,
@@ -520,8 +647,6 @@ data class BoxxleTiming(
     }
 }
 
-private val DIRECTION_PRIORITY = listOf(Direction.LEFT, Direction.RIGHT, Direction.UP, Direction.DOWN)
-
 private enum class Direction(val delta: TileDelta, val frame: Int, val button: InputButton) {
     UP(TileDelta(0, -1), 4, InputButton.UP),
     DOWN(TileDelta(0, 1), 5, InputButton.DOWN),
@@ -543,20 +668,29 @@ private class BoxxleLevel private constructor(
     val height: Int = data.tiles.size
 
     fun tileAt(x: Int, y: Int): Int {
-        if (y !in data.tiles.indices) return Tiles.BRICK
+        if (y < 0 || y >= data.tiles.size) return Tiles.BRICK
         val row = data.tiles[y]
-        if (x !in row.indices) return Tiles.BRICK
+        if (x < 0 || x >= row.size) return Tiles.BRICK
         return row[x]
     }
 
     fun isWalkable(position: TilePosition): Boolean {
-        return position.x in 0 until width &&
-            position.y in 0 until height &&
+        return position.x >= 0 &&
+            position.x < width &&
+            position.y >= 0 &&
+            position.y < height &&
             tileAt(position.x, position.y) != Tiles.BRICK
     }
 
     fun boxIndexAt(position: TilePosition): Int {
-        return boxes.indexOfFirst { it == position }
+        var index = 0
+        while (index < boxes.size) {
+            if (boxes[index] == position) {
+                return index
+            }
+            index += 1
+        }
+        return -1
     }
 
     fun canMoveBoxTo(position: TilePosition): Boolean {
@@ -564,7 +698,14 @@ private class BoxxleLevel private constructor(
     }
 
     fun isGoal(position: TilePosition): Boolean {
-        return goals.any { it == position }
+        var index = 0
+        while (index < goals.size) {
+            if (goals[index] == position) {
+                return true
+            }
+            index += 1
+        }
+        return false
     }
 
     companion object {

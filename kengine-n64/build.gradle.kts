@@ -1249,9 +1249,19 @@ fun registerGameBuildTasks(
                     appendLine("static inline ${kotlinOutputBaseName}_ExportedSymbols* _kengine_syms(void) {")
                     appendLine("    return ${kotlinOutputBaseName}_symbols();")
                     appendLine("}")
+                    appendLine()
+                    appendLine("static inline void kengine_n64_kotlin_DisposeString(const char* string) {")
+                    appendLine("    if (string) {")
+                    appendLine("        _kengine_syms()->DisposeString(string);")
+                    appendLine("    }")
+                    appendLine("}")
+                    appendLine()
+                    appendLine("static inline void kengine_n64_kotlin_kengineN64RuntimeStart() {")
+                    appendLine("    const char* message = _kengine_syms()->kotlin.root.kengineN64RuntimeStart();")
+                    appendLine("    kengine_n64_kotlin_DisposeString(message);")
+                    appendLine("}")
 
                     val functions = listOf(
-                        Triple("void", "kengineN64RuntimeStart", ""),
                         Triple("int", "kengineN64RuntimeUpdate", "int hostFrame, int inputMask"),
                         Triple("int", "kengineN64RuntimeAudio", "int hostFrame"),
                         Triple("int", "kengineN64RuntimeDraw", "int hostFrame, int screenWidth, int screenHeight"),

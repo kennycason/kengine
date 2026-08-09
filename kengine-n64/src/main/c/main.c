@@ -643,6 +643,7 @@ static void execute_render_commands(surface_t* disp, int* commands, int command_
                 const char* text = (const char*)kengine_n64_kotlin_kengineN64RuntimeCommandText(i);
                 int scale = param > 0 ? param : 1;
                 draw_text_rgba(disp, text, x, y, color, scale);
+                kengine_n64_kotlin_DisposeString(text);
 #endif
                 break;
             }
@@ -799,7 +800,8 @@ int main(void) {
         frame++;
     }
 
-    kengine_n64_kotlin_kengineN64RuntimeCleanup();
+    const char* cleanup_message = kengine_n64_kotlin_kengineN64RuntimeCleanup();
+    kengine_n64_kotlin_DisposeString(cleanup_message);
     return 0;
 }
 
