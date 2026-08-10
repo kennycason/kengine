@@ -21,8 +21,19 @@ data class N64DemoObjEdge(
     val start: Int,
     val end: Int,
     val colorIndex: Int,
-    val lengthSquared: Int
+    val firstTriangle: Int,
+    val secondTriangle: Int,
+    val lengthSquared: Int,
+    val kind: N64DemoObjEdgeKind,
+    val sharpnessScore: Int
 )
+
+enum class N64DemoObjEdgeKind(val priority: Int) {
+    BOUNDARY(0),
+    MATERIAL_SEAM(1),
+    STRONG_CREASE(2),
+    FALLBACK(3)
+}
 
 data class N64DemoObjTriangle(
     val a: Int,
@@ -32,6 +43,7 @@ data class N64DemoObjTriangle(
 )
 
 data class N64DemoObjTriangleNormal(
+    val triangleIndex: Int,
     val triangle: N64DemoObjTriangle,
     val nx: Long,
     val ny: Long,
@@ -53,6 +65,38 @@ val n64DemoModelSpecs = listOf(
     )
 )
 
+val n64StrongCreaseCosine = 0.72
+
+val n64DemoAssetPreflightSpecs = listOf(
+    N64DemoAssetPreflightSpec(
+        displayName = "N64 Demo / Craft Racer",
+        assetFile = file("assets/models/kenney-space-kit/craft_racer.obj"),
+        sourceNote = "Kenney Space Kit, CC0",
+        includeInDefaultRom = true
+    ),
+    N64DemoAssetPreflightSpec(
+        displayName = "N64 Demo / Meteor Detailed",
+        assetFile = file("assets/models/kenney-space-kit/meteor_detailed.obj"),
+        sourceNote = "Kenney Space Kit, CC0",
+        includeInDefaultRom = true
+    ),
+    N64DemoAssetPreflightSpec(
+        displayName = "Mario 3D / Bob-Omb Battlefield",
+        assetFile = file("../mario-3d/assets/models/Super Mario 64 Bob-Omb Battlefield.glb"),
+        sourceNote = "local compatibility benchmark; not included in the N64 demo ROM"
+    ),
+    N64DemoAssetPreflightSpec(
+        displayName = "Mario 3D / Mario Static Model",
+        assetFile = file("../mario-3d/assets/models/Mario 64 Model.glb"),
+        sourceNote = "local compatibility benchmark; not included in the N64 demo ROM"
+    ),
+    N64DemoAssetPreflightSpec(
+        displayName = "Metroid 3D / Samus OBJ",
+        assetFile = file("../kengine-3d-demos/assets/models/metroid3d/Samus Super Smash Bros N64/samus.obj"),
+        sourceNote = "local compatibility benchmark; not included in the N64 demo ROM"
+    )
+)
+
 val generateN64DemoModelAssets by tasks.registering {
     group = "n64"
     description = "Bakes N64 demo OBJ/MTL model sources into compact common Kotlin arrays."
@@ -68,6 +112,45 @@ val generateN64DemoModelAssets by tasks.registering {
         val output = outputFile.asFile
         output.parentFile.mkdirs()
         writeTextIfChanged(output, renderN64DemoModelAssets(n64DemoModelSpecs))
+    }
+}
+
+val preflightN64DemoAssets by tasks.registering {
+    group = "n64"
+    description = "Writes a hardware-budget report for N64 candidate OBJ/GLB assets."
+
+    inputs.files(n64DemoAssetPreflightSpecs.map { it.assetFile }.filter { it.exists() })
+    val reportFile = layout.buildDirectory.file("reports/n64-demo-assets/preflight.md")
+    outputs.file(reportFile)
+
+    doLast {
+        val reports = n64DemoAssetPreflightSpecs.map { spec ->
+            inspectN64DemoAssetBudget(spec, rootDir)
+        }
+        val output = reportFile.get().asFile
+        output.parentFile.mkdirs()
+        writeTextIfChanged(output, renderN64DemoAssetBudgetReport(reports))
+        println("N64 asset preflight report: ${output.relativeTo(rootDir).invariantSeparatorsPath}")
+    }
+}
+
+val downresN64DemoTextures by tasks.registering {
+    group = "n64"
+    description = "Creates N64-sized texture previews for candidate assets under build/."
+
+    inputs.files(n64DemoAssetPreflightSpecs.map { it.assetFile }.filter { it.exists() })
+    val outputDir = layout.buildDirectory.dir("n64-demo-assets/downres")
+    outputs.dir(outputDir)
+
+    doLast {
+        val output = outputDir.get().asFile
+        output.mkdirs()
+
+        val reports = n64DemoAssetPreflightSpecs.map { spec ->
+            inspectN64DemoAssetBudget(spec, rootDir)
+        }
+        writeN64DemoDownresTexturePreviews(reports, output, projectDir)
+        println("N64 down-res texture previews: ${output.relativeTo(rootDir).invariantSeparatorsPath}")
     }
 }
 
@@ -257,7 +340,7 @@ fun bakeN64DemoObj(
         )
     }
 
-    val triangleNormals = sourceTriangles.map { triangle ->
+    val triangleNormals = sourceTriangles.mapIndexed { triangleIndex, triangle ->
         val ab = triangle.a * 3
         val bb = triangle.b * 3
         val cb = triangle.c * 3
@@ -277,6 +360,7 @@ fun bakeN64DemoObj(
         val vy = (cy - ay).toLong()
         val vz = (cz - az).toLong()
         N64DemoObjTriangleNormal(
+            triangleIndex = triangleIndex,
             triangle = triangle,
             nx = uy * vz - uz * vy,
             ny = uz * vx - ux * vz,
@@ -293,14 +377,24 @@ fun bakeN64DemoObj(
     }
 
     val featureEdges = edgeUses.mapNotNull { (key, adjacentTriangles) ->
-        if (!shouldKeepN64DemoEdge(adjacentTriangles)) return@mapNotNull null
+        val edgeKind = classifyN64DemoEdge(adjacentTriangles)
+        if (edgeKind == N64DemoObjEdgeKind.FALLBACK) return@mapNotNull null
         val startBase = key.first * 3
         val endBase = key.second * 3
         val dx = bakedVertices[startBase] - bakedVertices[endBase]
         val dy = bakedVertices[startBase + 1] - bakedVertices[endBase + 1]
         val dz = bakedVertices[startBase + 2] - bakedVertices[endBase + 2]
         val colorIndex = adjacentTriangles.firstOrNull()?.triangle?.colorIndex ?: 0
-        N64DemoObjEdge(key.first, key.second, colorIndex, dx * dx + dy * dy + dz * dz)
+        N64DemoObjEdge(
+            start = key.first,
+            end = key.second,
+            colorIndex = colorIndex,
+            firstTriangle = adjacentTriangles.getOrNull(0)?.triangleIndex ?: -1,
+            secondTriangle = adjacentTriangles.getOrNull(1)?.triangleIndex ?: -1,
+            lengthSquared = dx * dx + dy * dy + dz * dz,
+            kind = edgeKind,
+            sharpnessScore = edgeSharpnessScore(adjacentTriangles)
+        )
     }
 
     val edgesForOverlay = if (featureEdges.isNotEmpty()) {
@@ -313,18 +407,29 @@ fun bakeN64DemoObj(
             val dy = bakedVertices[startBase + 1] - bakedVertices[endBase + 1]
             val dz = bakedVertices[startBase + 2] - bakedVertices[endBase + 2]
             val colorIndex = adjacentTriangles.firstOrNull()?.triangle?.colorIndex ?: 0
-            N64DemoObjEdge(key.first, key.second, colorIndex, dx * dx + dy * dy + dz * dz)
+            N64DemoObjEdge(
+                start = key.first,
+                end = key.second,
+                colorIndex = colorIndex,
+                firstTriangle = adjacentTriangles.getOrNull(0)?.triangleIndex ?: -1,
+                secondTriangle = adjacentTriangles.getOrNull(1)?.triangleIndex ?: -1,
+                lengthSquared = dx * dx + dy * dy + dz * dz,
+                kind = N64DemoObjEdgeKind.FALLBACK,
+                sharpnessScore = 0
+            )
         }
     }
 
     val sortedEdges = edgesForOverlay.sortedWith(
-        compareByDescending<N64DemoObjEdge> { it.lengthSquared }
+        compareBy<N64DemoObjEdge> { it.kind.priority }
+            .thenByDescending { it.sharpnessScore }
+            .thenBy { it.lengthSquared }
             .thenBy { it.start }
             .thenBy { it.end }
     )
 
     val bakedEdges = sortedEdges.flatMap { edge ->
-        listOf(edge.start, edge.end, edge.colorIndex)
+        listOf(edge.start, edge.end, edge.colorIndex, edge.firstTriangle, edge.secondTriangle)
     }
 
     val bakedTriangles = sourceTriangles.flatMap { triangle ->
@@ -350,26 +455,46 @@ fun addN64DemoEdgeUse(
     edgeUses.getOrPut(key) { mutableListOf() } += triangle
 }
 
-fun shouldKeepN64DemoEdge(adjacentTriangles: List<N64DemoObjTriangleNormal>): Boolean {
+fun classifyN64DemoEdge(adjacentTriangles: List<N64DemoObjTriangleNormal>): N64DemoObjEdgeKind {
     if (adjacentTriangles.size != 2) {
-        return true
+        return N64DemoObjEdgeKind.BOUNDARY
     }
 
     val first = adjacentTriangles[0]
     val second = adjacentTriangles[1]
     if (first.triangle.colorIndex != second.triangle.colorIndex) {
-        return true
+        return N64DemoObjEdgeKind.MATERIAL_SEAM
     }
 
+    val cosine = normalCosine(first, second)
+    if (cosine == null) {
+        return N64DemoObjEdgeKind.STRONG_CREASE
+    }
+
+    return if (cosine < n64StrongCreaseCosine) {
+        N64DemoObjEdgeKind.STRONG_CREASE
+    } else {
+        N64DemoObjEdgeKind.FALLBACK
+    }
+}
+
+fun edgeSharpnessScore(adjacentTriangles: List<N64DemoObjTriangleNormal>): Int {
+    if (adjacentTriangles.size != 2) {
+        return 1_000_000
+    }
+    val cosine = normalCosine(adjacentTriangles[0], adjacentTriangles[1]) ?: return 900_000
+    return ((1.0 - cosine.coerceIn(-1.0, 1.0)) * 100_000.0).roundToInt()
+}
+
+fun normalCosine(first: N64DemoObjTriangleNormal, second: N64DemoObjTriangleNormal): Double? {
     val firstLength = normalLength(first)
     val secondLength = normalLength(second)
     if (firstLength <= 0.0001 || secondLength <= 0.0001) {
-        return true
+        return null
     }
 
     val dot = (first.nx * second.nx + first.ny * second.ny + first.nz * second.nz).toDouble()
-    val cosine = dot / (firstLength * secondLength)
-    return cosine < 0.92
+    return dot / (firstLength * secondLength)
 }
 
 fun normalLength(normal: N64DemoObjTriangleNormal): Double {

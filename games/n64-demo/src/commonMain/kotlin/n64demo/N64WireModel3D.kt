@@ -21,7 +21,7 @@ class N64BakedWireModel3D(
         get() = triangles.size / TRIANGLE_FIELD_COUNT
 
     companion object {
-        const val EDGE_FIELD_COUNT = 3
+        const val EDGE_FIELD_COUNT = 5
         const val TRIANGLE_FIELD_COUNT = 4
     }
 }
@@ -59,10 +59,19 @@ class N64WireModelRenderer3D {
     private var preparedRotationX = 0
     private var preparedRotationY = 0
     private var preparedRotationZ = 0
+    private var preparedDepthMin = 0
+    private var preparedDepthMax = 0
+    private var drawnTriangleStamp = 1
+    private var selectedTriangleStamp = 1
+    private var drawnEdgeStamp = 1
+    private var drawnTriangleCountForEdges = 0
     private val preparedScreenX = IntArray(MODEL_VERTEX_CAPACITY)
     private val preparedScreenY = IntArray(MODEL_VERTEX_CAPACITY)
     private val preparedScreenZ = IntArray(MODEL_VERTEX_CAPACITY)
     private val preparedVisible = IntArray(MODEL_VERTEX_CAPACITY)
+    private val drawnTriangleMarkers = IntArray(TRIANGLE_SORT_CAPACITY)
+    private val selectedTriangleMarkers = IntArray(TRIANGLE_SORT_CAPACITY)
+    private val drawnEdgeMarkers = IntArray(MODEL_EDGE_CAPACITY)
     private val visibleTriangleIndexes = IntArray(TRIANGLE_SORT_CAPACITY)
     private val visibleTriangleDepths = IntArray(TRIANGLE_SORT_CAPACITY)
     private val visibleTriangleAreas = IntArray(TRIANGLE_SORT_CAPACITY)
@@ -96,6 +105,7 @@ class N64WireModelRenderer3D {
         this.centerY = centerY
         lastDrawnEdges = 0
         lastDrawnTriangles = 0
+        drawnTriangleCountForEdges = 0
         preparedModel = null
         return this
     }
@@ -126,18 +136,24 @@ class N64WireModelRenderer3D {
         rotationX: Int,
         rotationY: Int,
         rotationZ: Int,
-        triangleBudget: Int
+        triangleBudget: Int,
+        overlayEdgeBudget: Int = 0
     ): Int {
         val output = render ?: return 0
         if (triangleBudget <= 0) {
             lastDrawnTriangles = 0
+            if (overlayEdgeBudget > 0) lastDrawnEdges = 0
+            drawnTriangleCountForEdges = 0
             return 0
         }
 
         if (!prepareModel(model, centerX, centerY, centerZ, size, rotationX, rotationY, rotationZ)) {
             lastDrawnTriangles = 0
+            if (overlayEdgeBudget > 0) lastDrawnEdges = 0
+            drawnTriangleCountForEdges = 0
             return 0
         }
+        beginTriangleDrawTracking(overlayEdgeBudget > 0)
 
         var visibleCount = 0
         var triangleIndex = 0
@@ -192,6 +208,11 @@ class N64WireModelRenderer3D {
             selectedCount += 1
         }
 
+        if (overlayEdgeBudget > 0) {
+            lastDrawnEdges = 0
+            markSelectedTrianglesForFrame(selectedCount)
+        }
+
         var drawn = 0
         var processed = 0
         while (processed < selectedCount) {
@@ -208,13 +229,18 @@ class N64WireModelRenderer3D {
             }
             if (farthestIndex < 0) break
 
+            val triangleIndexToDraw = selectedTriangleIndexes[farthestIndex]
             if (drawModelTriangle(
                 model = model,
-                triangleIndex = selectedTriangleIndexes[farthestIndex],
+                triangleIndex = triangleIndexToDraw,
                 depth = farthestDepth,
                 screenArea = selectedTriangleAreas[farthestIndex]
             )) {
+                markTriangleDrawn(triangleIndexToDraw)
                 drawn += 1
+                if (overlayEdgeBudget > 0 && lastDrawnEdges < overlayEdgeBudget) {
+                    lastDrawnEdges += drawPreparedModelEdgesForTriangle(model, triangleIndexToDraw, overlayEdgeBudget)
+                }
             }
             selectedTriangleDepths[farthestIndex] = -1
             processed += 1
@@ -252,13 +278,15 @@ class N64WireModelRenderer3D {
             val start = model.edges[edgeBase]
             val end = model.edges[edgeBase + 1]
             val colorIndex = model.edges[edgeBase + 2]
+            val firstTriangle = model.edges[edgeBase + 3]
+            val secondTriangle = model.edges[edgeBase + 4]
 
             val color = if (colorIndex in model.colors.indices) {
                 overlayColor(model.colors[colorIndex])
             } else {
                 n64Rgba(156, 196, 224, 190)
             }
-            if (drawPreparedModelEdge(start, end, color)) {
+            if (drawPreparedModelEdge(start, end, firstTriangle, secondTriangle, color)) {
                 drawn += 1
             }
             edgeIndex += 1
@@ -339,6 +367,8 @@ class N64WireModelRenderer3D {
         val sinY = sinAngle(rotationY)
         val cosZ = cosAngle(rotationZ)
         val sinZ = sinAngle(rotationZ)
+        var depthMin = Int.MAX_VALUE
+        var depthMax = Int.MIN_VALUE
 
         var vertexIndex = 0
         while (vertexIndex < model.vertexCount) {
@@ -348,6 +378,8 @@ class N64WireModelRenderer3D {
                 preparedScreenY[vertexIndex] = projectedY
                 preparedScreenZ[vertexIndex] = projectedZ
                 preparedVisible[vertexIndex] = 1
+                if (projectedZ < depthMin) depthMin = projectedZ
+                if (projectedZ > depthMax) depthMax = projectedZ
             } else {
                 preparedVisible[vertexIndex] = 0
             }
@@ -362,6 +394,8 @@ class N64WireModelRenderer3D {
         preparedRotationX = rotationX
         preparedRotationY = rotationY
         preparedRotationZ = rotationZ
+        preparedDepthMin = if (depthMin == Int.MAX_VALUE) 0 else depthMin
+        preparedDepthMax = if (depthMax == Int.MIN_VALUE) 0 else depthMax
         return true
     }
 
@@ -372,7 +406,14 @@ class N64WireModelRenderer3D {
             y < PROJECTED_COORD_LIMIT
     }
 
-    private fun drawPreparedModelEdge(start: Int, end: Int, color: Int): Boolean {
+    private fun drawPreparedModelEdge(
+        start: Int,
+        end: Int,
+        firstTriangle: Int,
+        secondTriangle: Int,
+        color: Int,
+        allowRearDepthOverlay: Boolean = false
+    ): Boolean {
         val output = render ?: return false
         if (!isPreparedVertexVisible(start) || !isPreparedVertexVisible(end)) {
             return false
@@ -382,6 +423,12 @@ class N64WireModelRenderer3D {
         val ay = preparedScreenY[start]
         val bx = preparedScreenX[end]
         val by = preparedScreenY[end]
+        if (!isPreparedEdgeReferencedByDrawnTriangle(firstTriangle, secondTriangle)) {
+            return false
+        }
+        if (!allowRearDepthOverlay && isPreparedEdgeLikelyHidden(start, end)) {
+            return false
+        }
         if (isFarOutside(ax, ay, output.width, output.height) &&
             isFarOutside(bx, by, output.width, output.height)
         ) {
@@ -390,6 +437,131 @@ class N64WireModelRenderer3D {
 
         output.drawLine(ax, ay, bx, by, color)
         return true
+    }
+
+    private fun beginTriangleDrawTracking(trackEdges: Boolean) {
+        drawnTriangleStamp += 1
+        if (drawnTriangleStamp == Int.MAX_VALUE) {
+            drawnTriangleMarkers.fill(0)
+            drawnTriangleStamp = 1
+        }
+        selectedTriangleStamp += 1
+        if (selectedTriangleStamp == Int.MAX_VALUE) {
+            selectedTriangleMarkers.fill(0)
+            selectedTriangleStamp = 1
+        }
+        if (trackEdges) {
+            drawnEdgeStamp += 1
+            if (drawnEdgeStamp == Int.MAX_VALUE) {
+                drawnEdgeMarkers.fill(0)
+                drawnEdgeStamp = 1
+            }
+        }
+        drawnTriangleCountForEdges = 0
+    }
+
+    private fun markTriangleDrawn(triangleIndex: Int) {
+        if (triangleIndex !in 0 until TRIANGLE_SORT_CAPACITY) {
+            return
+        }
+        if (drawnTriangleMarkers[triangleIndex] != drawnTriangleStamp) {
+            drawnTriangleMarkers[triangleIndex] = drawnTriangleStamp
+            drawnTriangleCountForEdges += 1
+        }
+    }
+
+    private fun isPreparedEdgeReferencedByDrawnTriangle(firstTriangle: Int, secondTriangle: Int): Boolean {
+        if (drawnTriangleCountForEdges <= 0) {
+            return true
+        }
+        return isTriangleMarkedDrawn(firstTriangle) || isTriangleMarkedDrawn(secondTriangle)
+    }
+
+    private fun isTriangleMarkedDrawn(triangleIndex: Int): Boolean {
+        return triangleIndex in 0 until TRIANGLE_SORT_CAPACITY &&
+            drawnTriangleMarkers[triangleIndex] == drawnTriangleStamp
+    }
+
+    private fun markSelectedTrianglesForFrame(selectedCount: Int) {
+        var index = 0
+        while (index < selectedCount) {
+            val triangleIndex = selectedTriangleIndexes[index]
+            if (triangleIndex in 0 until TRIANGLE_SORT_CAPACITY) {
+                selectedTriangleMarkers[triangleIndex] = selectedTriangleStamp
+            }
+            index += 1
+        }
+    }
+
+    private fun isTriangleSelectedForFrame(triangleIndex: Int): Boolean {
+        return triangleIndex in 0 until TRIANGLE_SORT_CAPACITY &&
+            selectedTriangleMarkers[triangleIndex] == selectedTriangleStamp
+    }
+
+    private fun drawPreparedModelEdgesForTriangle(
+        model: N64BakedWireModel3D,
+        triangleIndex: Int,
+        edgeBudget: Int
+    ): Int {
+        var drawn = 0
+        var edgeIndex = 0
+        while (edgeIndex < model.edgeCount && lastDrawnEdges + drawn < edgeBudget) {
+            val edgeBase = edgeIndex * N64BakedWireModel3D.EDGE_FIELD_COUNT
+            val firstTriangle = model.edges[edgeBase + 3]
+            val secondTriangle = model.edges[edgeBase + 4]
+            if (!isEdgeMarkedDrawn(edgeIndex) &&
+                shouldDrawEdgeForTriangleTurn(triangleIndex, firstTriangle, secondTriangle)
+            ) {
+                val start = model.edges[edgeBase]
+                val end = model.edges[edgeBase + 1]
+                val colorIndex = model.edges[edgeBase + 2]
+                val color = if (colorIndex in model.colors.indices) {
+                    overlayColor(model.colors[colorIndex])
+                } else {
+                    n64Rgba(156, 196, 224, 190)
+                }
+                if (drawPreparedModelEdge(start, end, firstTriangle, secondTriangle, color, allowRearDepthOverlay = true)) {
+                    markEdgeDrawn(edgeIndex)
+                    drawn += 1
+                }
+            }
+            edgeIndex += 1
+        }
+        return drawn
+    }
+
+    private fun shouldDrawEdgeForTriangleTurn(currentTriangle: Int, firstTriangle: Int, secondTriangle: Int): Boolean {
+        if (currentTriangle != firstTriangle && currentTriangle != secondTriangle) {
+            return false
+        }
+
+        val otherTriangle = if (currentTriangle == firstTriangle) secondTriangle else firstTriangle
+        if (!isTriangleSelectedForFrame(otherTriangle)) {
+            return true
+        }
+        return isTriangleMarkedDrawn(otherTriangle)
+    }
+
+    private fun markEdgeDrawn(edgeIndex: Int) {
+        if (edgeIndex in 0 until MODEL_EDGE_CAPACITY) {
+            drawnEdgeMarkers[edgeIndex] = drawnEdgeStamp
+        }
+    }
+
+    private fun isEdgeMarkedDrawn(edgeIndex: Int): Boolean {
+        return edgeIndex in 0 until MODEL_EDGE_CAPACITY &&
+            drawnEdgeMarkers[edgeIndex] == drawnEdgeStamp
+    }
+
+    private fun isPreparedEdgeLikelyHidden(start: Int, end: Int): Boolean {
+        val depthSpan = preparedDepthMax - preparedDepthMin
+        if (depthSpan <= WORLD_SCALE / 8) {
+            return false
+        }
+
+        val edgeDepth = (preparedScreenZ[start] + preparedScreenZ[end]) / 2
+        val rearOverlayLimit = preparedDepthMin + (depthSpan * EDGE_OVERLAY_DEPTH_PERCENT) / 100
+        return edgeDepth > rearOverlayLimit
     }
 
     private fun isPreparedVertexVisible(vertexIndex: Int): Boolean {
@@ -518,14 +690,14 @@ class N64WireModelRenderer3D {
 
     private fun triangleLight(a: Int, b: Int, c: Int, screenArea: Int): Int {
         val averageY = (preparedScreenY[a] + preparedScreenY[b] + preparedScreenY[c]) / 3
-        val heightLight = clampInt((centerY - averageY) / 3, -30, 44)
-        val areaLight = clampInt(absInt(screenArea) / 140, 0, 44)
-        val windingLight = if (screenArea >= 0) 10 else -8
-        return 58 + heightLight + areaLight + windingLight
+        val heightLight = clampInt((centerY - averageY) / 2, -42, 58)
+        val areaLight = clampInt(absInt(screenArea) / 105, 0, 56)
+        val windingLight = if (screenArea >= 0) 16 else -18
+        return 52 + heightLight + areaLight + windingLight
     }
 
     private fun shadedColor(color: Int, depth: Int, faceLight: Int): Int {
-        val shade = clampInt(130 + faceLight - ((depth - cameraDistance) / 34), 82, 255)
+        val shade = clampInt(120 + faceLight - ((depth - cameraDistance) / 25), 68, 255)
         return n64Rgba(
             red = ((color and 0xff) * shade) / 255,
             green = (((color ushr 8) and 0xff) * shade) / 255,
@@ -555,7 +727,9 @@ class N64WireModelRenderer3D {
         private const val PROJECTED_COORD_LIMIT = 1024
         private const val MODEL_VERTEX_CAPACITY = 512
         private const val TRIANGLE_SORT_CAPACITY = 768
+        private const val MODEL_EDGE_CAPACITY = 1024
         private const val DEGENERATE_TRIANGLE_AREA = 3
+        private const val EDGE_OVERLAY_DEPTH_PERCENT = 62
     }
 }
 

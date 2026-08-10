@@ -134,18 +134,8 @@ class N64DemoGame : PortableGame {
             rotationX = modelPitch,
             rotationY = modelYaw,
             rotationZ = 0,
-            triangleBudget = MODEL_TRIANGLE_BUDGET
-        )
-        renderer.drawModel(
-            model = model,
-            centerX = 0,
-            centerY = MODEL_CENTER_Y,
-            centerZ = 0,
-            size = MODEL_SIZE,
-            rotationX = modelPitch,
-            rotationY = modelYaw,
-            rotationZ = 0,
-            edgeBudget = MODEL_EDGE_BUDGET
+            triangleBudget = MODEL_TRIANGLE_BUDGET,
+            overlayEdgeBudget = MODEL_EDGE_BUDGET
         )
 
         drawHud(render, model)
@@ -159,6 +149,7 @@ class N64DemoGame : PortableGame {
         render.drawText("N64 OBJ LAB", 10, 8, n64Rgba(248, 252, 255), 1)
         render.drawText(model.name, 10, 20, n64Rgba(255, 214, 108), 1)
         render.drawText(modelStats[modelIndex], 10, 32, n64Rgba(184, 210, 230), 1)
+        render.drawText("${renderer.lastDrawnTriangles}t ${renderer.lastDrawnEdges}e drawn", 10, 44, n64Rgba(142, 178, 204), 1)
         render.drawText(spinModeText(), 222, 8, n64Rgba(184, 210, 230), 1)
         render.drawText("A model  B spin  Start reset", 10, 214, n64Rgba(184, 210, 230), 1)
         render.drawText("Dpad orbit/pitch  L/R spin  C zoom", 10, 226, n64Rgba(184, 210, 230), 1)
@@ -219,17 +210,17 @@ class N64DemoGame : PortableGame {
         const val DEFAULT_CAMERA_PITCH = -108
         const val MIN_CAMERA_PITCH = -180
         const val MAX_CAMERA_PITCH = 40
-        const val CAMERA_ORBIT_SPEED = 9
-        const val CAMERA_PITCH_SPEED = 5
+        const val CAMERA_ORBIT_SPEED = 13
+        const val CAMERA_PITCH_SPEED = 7
         const val PROJECTION_DISTANCE = 136
         const val SCREEN_CENTER_Y = 132
 
         const val MODEL_CENTER_Y = 2 * WORLD_SCALE
         const val MODEL_SIZE = 5 * WORLD_SCALE
         const val MODEL_TRIANGLE_BUDGET = 96
-        const val MODEL_EDGE_BUDGET = 22
+        const val MODEL_EDGE_BUDGET = 14
         const val DEFAULT_MODEL_PITCH = 36
-        const val MODEL_AUTO_SPIN_SPEED = 5
-        const val MODEL_MANUAL_SPIN_SPEED = 12
+        const val MODEL_AUTO_SPIN_SPEED = 7
+        const val MODEL_MANUAL_SPIN_SPEED = 18
     }
 }
