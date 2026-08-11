@@ -78,6 +78,9 @@ class N64WireModelRenderer3D {
     private val selectedTriangleIndexes = IntArray(TRIANGLE_SORT_CAPACITY)
     private val selectedTriangleDepths = IntArray(TRIANGLE_SORT_CAPACITY)
     private val selectedTriangleAreas = IntArray(TRIANGLE_SORT_CAPACITY)
+    private val depthBucketHeads = IntArray(DEPTH_BUCKET_COUNT)
+    private val depthBucketTails = IntArray(DEPTH_BUCKET_COUNT)
+    private val depthBucketLinks = IntArray(TRIANGLE_SORT_CAPACITY)
 
     fun configure(
         render: RenderContext,
@@ -250,6 +253,97 @@ class N64WireModelRenderer3D {
         return drawn
     }
 
+    fun drawModelTrianglesFast(
+        model: N64BakedWireModel3D,
+        centerX: Int,
+        centerY: Int,
+        centerZ: Int,
+        size: Int,
+        rotationX: Int,
+        rotationY: Int,
+        rotationZ: Int,
+        triangleBudget: Int
+    ): Int {
+        val output = render ?: return 0
+        if (triangleBudget <= 0) {
+            lastDrawnTriangles = 0
+            lastDrawnEdges = 0
+            drawnTriangleCountForEdges = 0
+            return 0
+        }
+
+        if (!prepareModel(model, centerX, centerY, centerZ, size, rotationX, rotationY, rotationZ)) {
+            lastDrawnTriangles = 0
+            lastDrawnEdges = 0
+            drawnTriangleCountForEdges = 0
+            return 0
+        }
+
+        var bucketIndex = 0
+        while (bucketIndex < DEPTH_BUCKET_COUNT) {
+            depthBucketHeads[bucketIndex] = -1
+            depthBucketTails[bucketIndex] = -1
+            bucketIndex += 1
+        }
+
+        val depthSpan = maxOf(1, preparedDepthMax - preparedDepthMin)
+        var visibleCount = 0
+        var triangleIndex = 0
+        while (triangleIndex < model.triangleCount && visibleCount < TRIANGLE_SORT_CAPACITY) {
+            val triangleBase = triangleIndex * N64BakedWireModel3D.TRIANGLE_FIELD_COUNT
+            val a = model.triangles[triangleBase]
+            val b = model.triangles[triangleBase + 1]
+            val c = model.triangles[triangleBase + 2]
+
+            if (isPreparedVertexVisible(a) && isPreparedVertexVisible(b) && isPreparedVertexVisible(c)) {
+                val ax = preparedScreenX[a]
+                val ay = preparedScreenY[a]
+                val bx = preparedScreenX[b]
+                val by = preparedScreenY[b]
+                val cx = preparedScreenX[c]
+                val cy = preparedScreenY[c]
+                val area = triangleArea(ax, ay, bx, by, cx, cy)
+                if (absInt(area) > DEGENERATE_TRIANGLE_AREA &&
+                    !isTriangleFarOutside(ax, ay, bx, by, cx, cy, output.width, output.height)
+                ) {
+                    val depth = (preparedScreenZ[a] + preparedScreenZ[b] + preparedScreenZ[c]) / 3
+                    val clampedDepth = clampInt(depth, preparedDepthMin, preparedDepthMax) - preparedDepthMin
+                    val bucket = scaleValue(clampedDepth, DEPTH_BUCKET_COUNT - 1, depthSpan)
+                    visibleTriangleIndexes[visibleCount] = triangleIndex
+                    visibleTriangleDepths[visibleCount] = depth
+                    visibleTriangleAreas[visibleCount] = area
+                    appendDepthBucket(bucket, visibleCount)
+                    visibleCount += 1
+                }
+            }
+
+            triangleIndex += 1
+        }
+
+        var drawn = 0
+        bucketIndex = DEPTH_BUCKET_COUNT - 1
+        while (bucketIndex >= 0 && drawn < triangleBudget) {
+            var visibleIndex = depthBucketHeads[bucketIndex]
+            while (visibleIndex >= 0 && drawn < triangleBudget) {
+                if (drawModelTriangle(
+                    model = model,
+                    triangleIndex = visibleTriangleIndexes[visibleIndex],
+                    depth = visibleTriangleDepths[visibleIndex],
+                    screenArea = visibleTriangleAreas[visibleIndex]
+                )) {
+                    drawn += 1
+                }
+                visibleIndex = depthBucketLinks[visibleIndex]
+            }
+            bucketIndex -= 1
+        }
+
+        lastDrawnTriangles = drawn
+        lastDrawnEdges = 0
+        drawnTriangleCountForEdges = 0
+        return drawn
+    }
+
     fun drawModel(
         model: N64BakedWireModel3D,
         centerX: Int,
@@ -333,6 +427,18 @@ class N64WireModelRenderer3D {
         }
         output.drawTriangle(ax, ay, bx, by, cx, cy, color)
         return true
+    }
+
+    private fun appendDepthBucket(bucket: Int, visibleIndex: Int) {
+        val clampedBucket = clampInt(bucket, 0, DEPTH_BUCKET_COUNT - 1)
+        depthBucketLinks[visibleIndex] = -1
+        val tail = depthBucketTails[clampedBucket]
+        if (tail >= 0) {
+            depthBucketLinks[tail] = visibleIndex
+        } else {
+            depthBucketHeads[clampedBucket] = visibleIndex
+        }
+        depthBucketTails[clampedBucket] = visibleIndex
     }
 
     private fun prepareModel(
@@ -727,6 +833,7 @@ class N64WireModelRenderer3D {
         private const val PROJECTED_COORD_LIMIT = 1024
         private const val MODEL_VERTEX_CAPACITY = 512
         private const val TRIANGLE_SORT_CAPACITY = 768
+        private const val DEPTH_BUCKET_COUNT = 64
         private const val MODEL_EDGE_CAPACITY = 1024
         private const val DEGENERATE_TRIANGLE_AREA = 3
         private const val EDGE_OVERLAY_DEPTH_PERCENT = 62

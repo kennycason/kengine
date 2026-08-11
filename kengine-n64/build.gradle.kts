@@ -1265,8 +1265,11 @@ fun registerGameBuildTasks(
                         Triple("int", "kengineN64RuntimeUpdate", "int hostFrame, int inputMask"),
                         Triple("int", "kengineN64RuntimeAudio", "int hostFrame"),
                         Triple("int", "kengineN64RuntimeDraw", "int hostFrame, int screenWidth, int screenHeight"),
+                        Triple("int", "kengineN64RuntimeStep", "int hostFrame, int inputMask, int screenWidth, int screenHeight"),
                         Triple("int", "kengineN64RuntimeCopyCommands", "void* destination, int maxCommands"),
                         Triple("int", "kengineN64RuntimeCopyAudioCommands", "void* destination, int maxCommands"),
+                        Triple("int", "kengineN64RuntimeDroppedRenderCommands", ""),
+                        Triple("int", "kengineN64RuntimeDroppedAudioCommands", ""),
                         Triple("const char*", "kengineN64RuntimeCommandText", "int commandIndex"),
                         Triple("const char*", "kengineN64RuntimeCleanup", ""),
                         Triple("const char*", "kengineN64RuntimeSnapshot", "")

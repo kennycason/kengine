@@ -17,12 +17,14 @@ private const val INPUT_DOWN = 1 shl 3
 private const val INPUT_A = 1 shl 4
 private const val INPUT_B = 1 shl 5
 private const val INPUT_START = 1 shl 6
-private const val INPUT_X = 1 shl 7
-private const val INPUT_Y = 1 shl 8
+private const val INPUT_C_UP = 1 shl 7
+private const val INPUT_C_DOWN = 1 shl 8
 private const val INPUT_L = 1 shl 9
 private const val INPUT_R = 1 shl 10
-private const val INPUT_SELECT = 1 shl 11
-private const val COMMAND_CAPACITY = 256
+private const val INPUT_Z = 1 shl 11
+private const val INPUT_C_LEFT = 1 shl 12
+private const val INPUT_C_RIGHT = 1 shl 13
+private const val COMMAND_CAPACITY = 512
 private const val AUDIO_COMMAND_CAPACITY = 16
 
 private class KengineN64Runtime {
@@ -66,6 +68,29 @@ private class KengineN64Runtime {
         activeGame.draw(render)
         checksum = mix(checksum + render.commandCount, render.droppedCommandCount xor hostFrame)
         return checksum
+    }
+
+    fun step(
+        hostFrame: Int,
+        inputMask: Int,
+        screenWidth: Int,
+        screenHeight: Int
+    ): Int {
+        val activeGame = game ?: return -1
+
+        inputFromMask(inputMask)
+        activeGame.update(input)
+        checksum = mix(checksum xor input.mask, hostFrame)
+
+        audio.beginFrame()
+        activeGame.audio(audio)
+        checksum = mix(checksum + audio.commandCount, audio.droppedCommandCount xor hostFrame)
+
+        render.beginFrame(screenWidth, screenHeight)
+        activeGame.draw(render)
+        checksum = mix(checksum + render.commandCount, render.droppedCommandCount xor hostFrame)
+
+        return render.commandCount
     }
 
     fun snapshot(): String {
@@ -127,20 +152,30 @@ private class KengineN64Runtime {
         return render.commandText(commandIndex)
     }
 
+    fun droppedRenderCommands(): Int {
+        return render.droppedCommandCount
+    }
+
+    fun droppedAudioCommands(): Int {
+        return audio.droppedCommandCount
+    }
+
     private fun inputFromMask(inputMask: Int) {
         input.reset()
-        input.set(InputButton.LEFT, (inputMask and INPUT_LEFT) != 0)
-        input.set(InputButton.RIGHT, (inputMask and INPUT_RIGHT) != 0)
-        input.set(InputButton.UP, (inputMask and INPUT_UP) != 0)
-        input.set(InputButton.DOWN, (inputMask and INPUT_DOWN) != 0)
+        input.set(InputButton.DPAD_LEFT, (inputMask and INPUT_LEFT) != 0)
+        input.set(InputButton.DPAD_RIGHT, (inputMask and INPUT_RIGHT) != 0)
+        input.set(InputButton.DPAD_UP, (inputMask and INPUT_UP) != 0)
+        input.set(InputButton.DPAD_DOWN, (inputMask and INPUT_DOWN) != 0)
         input.set(InputButton.A, (inputMask and INPUT_A) != 0)
         input.set(InputButton.B, (inputMask and INPUT_B) != 0)
         input.set(InputButton.START, (inputMask and INPUT_START) != 0)
-        input.set(InputButton.X, (inputMask and INPUT_X) != 0)
-        input.set(InputButton.Y, (inputMask and INPUT_Y) != 0)
+        input.set(InputButton.C_UP, (inputMask and INPUT_C_UP) != 0)
+        input.set(InputButton.C_DOWN, (inputMask and INPUT_C_DOWN) != 0)
+        input.set(InputButton.C_LEFT, (inputMask and INPUT_C_LEFT) != 0)
+        input.set(InputButton.C_RIGHT, (inputMask and INPUT_C_RIGHT) != 0)
         input.set(InputButton.L, (inputMask and INPUT_L) != 0)
         input.set(InputButton.R, (inputMask and INPUT_R) != 0)
-        input.set(InputButton.SELECT, (inputMask and INPUT_SELECT) != 0)
+        input.set(InputButton.Z, (inputMask and INPUT_Z) != 0)
     }
 
     private fun snapshotPayload(): String {
@@ -170,6 +205,20 @@ fun kengineN64RuntimeDraw(hostFrame: Int, screenWidth: Int, screenHeight: Int): 
     return kengineN64Runtime.draw(hostFrame, screenWidth, screenHeight)
 }
 
+fun kengineN64RuntimeStep(
+    hostFrame: Int,
+    inputMask: Int,
+    screenWidth: Int,
+    screenHeight: Int
+): Int {
+    return kengineN64Runtime.step(
+        hostFrame = hostFrame,
+        inputMask = inputMask,
+        screenWidth = screenWidth,
+        screenHeight = screenHeight
+    )
+}
+
 fun kengineN64RuntimeSnapshot(): String {
     return kengineN64Runtime.snapshot()
 }
@@ -190,4 +239,12 @@ fun kengineN64RuntimeCopyAudioCommands(destination: CPointer<IntVar>?, maxComman
 
 fun kengineN64RuntimeCommandText(commandIndex: Int): String {
     return kengineN64Runtime.commandText(commandIndex)
+}
+
+fun kengineN64RuntimeDroppedRenderCommands(): Int {
+    return kengineN64Runtime.droppedRenderCommands()
+}
+
+fun kengineN64RuntimeDroppedAudioCommands(): Int {
+    return kengineN64Runtime.droppedAudioCommands()
 }

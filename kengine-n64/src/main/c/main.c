@@ -2,6 +2,16 @@
 #include <stdbool.h>
 #include <string.h>
 #include <libdragon.h>
+#ifndef KENGINE_N64_USE_RDPQ_RENDER
+#define KENGINE_N64_USE_RDPQ_RENDER 0
+#endif
+#if KENGINE_N64_USE_RDPQ_RENDER
+#include <rdpq.h>
+#include <rdpq_attach.h>
+#include <rdpq_mode.h>
+#include <rdpq_rect.h>
+#include <rdpq_tri.h>
+#endif
 
 #ifndef KENGINE_N64_C_ONLY
 #include "kengine_n64_kotlin_api.h"
@@ -23,11 +33,13 @@
 #define KENGINE_INPUT_A (1 << 4)
 #define KENGINE_INPUT_B (1 << 5)
 #define KENGINE_INPUT_START (1 << 6)
-#define KENGINE_INPUT_X (1 << 7)
-#define KENGINE_INPUT_Y (1 << 8)
+#define KENGINE_INPUT_C_UP (1 << 7)
+#define KENGINE_INPUT_C_DOWN (1 << 8)
 #define KENGINE_INPUT_L (1 << 9)
 #define KENGINE_INPUT_R (1 << 10)
-#define KENGINE_INPUT_SELECT (1 << 11)
+#define KENGINE_INPUT_Z (1 << 11)
+#define KENGINE_INPUT_C_LEFT (1 << 12)
+#define KENGINE_INPUT_C_RIGHT (1 << 13)
 
 #define KENGINE_RENDER_CLEAR 1
 #define KENGINE_RENDER_FILL_RECT 2
@@ -46,7 +58,7 @@
 #define KENGINE_RENDER_FIELD_COLOR2 6
 #define KENGINE_RENDER_FIELD_PARAM 7
 #define KENGINE_RENDER_FIELD_COUNT 8
-#define KENGINE_RENDER_MAX_COMMANDS 256
+#define KENGINE_RENDER_MAX_COMMANDS 512
 
 #define KENGINE_AUDIO_LOOP_MUSIC 1
 #define KENGINE_AUDIO_STOP_MUSIC 2
@@ -69,6 +81,11 @@
 #define KENGINE_AUDIO_NUM_CHANNELS 4
 #define KENGINE_AUDIO_MUSIC_CHANNEL 0
 #define KENGINE_AUDIO_FIRST_SOUND_CHANNEL 1
+#define KENGINE_PERF_OVERLAY_X 8
+#define KENGINE_PERF_OVERLAY_Y 56
+#define KENGINE_PERF_OVERLAY_WIDTH 152
+#define KENGINE_PERF_OVERLAY_HEIGHT 56
+#define KENGINE_PERF_OVERLAY_LINE_HEIGHT 10
 
 /* In-memory PCM waveform for the mixer */
 #ifdef KENGINE_N64_SOUND_ASSETS
@@ -405,6 +422,82 @@ static void draw_rect(surface_t* disp, int x, int y, int width, int height, int 
     graphics_draw_box(disp, x0, y0, x1 - x0, y1 - y0, c);
 }
 
+#if KENGINE_N64_USE_RDPQ_RENDER
+static color_t kengine_rgba_to_rdpq_color(int rgba) {
+    uint8_t r = rgba & 0xFF;
+    uint8_t g = (rgba >> 8) & 0xFF;
+    uint8_t b = (rgba >> 16) & 0xFF;
+    uint8_t a = (rgba >> 24) & 0xFF;
+    return RGBA32(r, g, b, a);
+}
+
+typedef enum {
+    KENGINE_RDPQ_MODE_NONE = 0,
+    KENGINE_RDPQ_MODE_FILL = 1,
+    KENGINE_RDPQ_MODE_FLAT_TRIANGLE = 2,
+} KengineRdpqMode;
+
+static int g_rdpq_attached = 0;
+static KengineRdpqMode g_rdpq_mode = KENGINE_RDPQ_MODE_NONE;
+
+static void rdpq_begin(surface_t* disp) {
+    if (g_rdpq_attached) {
+        return;
+    }
+    rdpq_attach(disp, NULL);
+    g_rdpq_attached = 1;
+    g_rdpq_mode = KENGINE_RDPQ_MODE_NONE;
+}
+
+static void rdpq_flush(void) {
+    if (!g_rdpq_attached) {
+        return;
+    }
+    rdpq_detach_wait();
+    g_rdpq_attached = 0;
+    g_rdpq_mode = KENGINE_RDPQ_MODE_NONE;
+}
+
+static void rdpq_prepare_fill(color_t color) {
+    if (g_rdpq_mode != KENGINE_RDPQ_MODE_FILL) {
+        rdpq_set_mode_fill(color);
+        g_rdpq_mode = KENGINE_RDPQ_MODE_FILL;
+    } else {
+        rdpq_set_fill_color(color);
+    }
+}
+
+static void rdpq_prepare_flat_triangle(void) {
+    if (g_rdpq_mode == KENGINE_RDPQ_MODE_FLAT_TRIANGLE) {
+        return;
+    }
+    rdpq_set_mode_standard();
+    rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+    g_rdpq_mode = KENGINE_RDPQ_MODE_FLAT_TRIANGLE;
+}
+
+static void draw_rect_rdpq(surface_t* disp, int x, int y, int width, int height, int color) {
+    int x0 = x < 0 ? 0 : x;
+    int y0 = y < 0 ? 0 : y;
+    int x1 = x + width;
+    int y1 = y + height;
+    if (x1 > FB_WIDTH) x1 = FB_WIDTH;
+    if (y1 > FB_HEIGHT) y1 = FB_HEIGHT;
+
+    if (x0 >= x1 || y0 >= y1) return;
+
+    rdpq_begin(disp);
+    rdpq_prepare_fill(kengine_rgba_to_rdpq_color(color));
+    rdpq_fill_rectangle(x0, y0, x1, y1);
+}
+
+static void clear_rdpq(surface_t* disp, int color) {
+    rdpq_begin(disp);
+    rdpq_prepare_fill(kengine_rgba_to_rdpq_color(color));
+    rdpq_fill_rectangle(0, 0, FB_WIDTH, FB_HEIGHT);
+}
+#endif
+
 static int line_clip_outcode(int x, int y) {
     int code = 0;
     if (x < 0) code |= 1;
@@ -536,6 +629,22 @@ static void draw_triangle(surface_t* disp, int x0, int y0, int x1, int y1, int x
     }
 }
 
+#if KENGINE_N64_USE_RDPQ_RENDER
+static void draw_triangle_rdpq(surface_t* disp, int x0, int y0, int x1, int y1, int x2, int y2, int color) {
+    if ((y0 < 0 && y1 < 0 && y2 < 0) || (y0 >= FB_HEIGHT && y1 >= FB_HEIGHT && y2 >= FB_HEIGHT)) return;
+    if ((x0 < 0 && x1 < 0 && x2 < 0) || (x0 >= FB_WIDTH && x1 >= FB_WIDTH && x2 >= FB_WIDTH)) return;
+
+    rdpq_begin(disp);
+    rdpq_prepare_flat_triangle();
+    rdpq_set_prim_color(kengine_rgba_to_rdpq_color(color));
+
+    float v1[] = { (float)x0, (float)y0 };
+    float v2[] = { (float)x1, (float)y1 };
+    float v3[] = { (float)x2, (float)y2 };
+    rdpq_triangle(&TRIFMT_FILL, v1, v2, v3);
+}
+#endif
+
 static void draw_text(surface_t* disp, const char* text, int x, int y, uint32_t color, int scale) {
     if (!text) return;
     if (scale < 1) scale = 1;
@@ -578,6 +687,110 @@ static void draw_text_rgba(surface_t* disp, const char* text, int x, int y, int 
     draw_text(disp, text, x, y, kengine_rgba_to_color(color), scale);
 }
 
+typedef struct {
+    int kotlin_us;
+    int render_us;
+    int native_audio_us;
+    int total_us;
+} KengineFrameTiming;
+
+static int ticks_to_us(long long ticks) {
+    return (int)TIMER_MICROS_LL(ticks);
+}
+
+static int us_to_ms_rounded(int us) {
+    return (us + 500) / 1000;
+}
+
+static void draw_perf_overlay_line(surface_t* disp, const char* text, int line, uint32_t color) {
+    draw_text(
+        disp,
+        text,
+        KENGINE_PERF_OVERLAY_X,
+        KENGINE_PERF_OVERLAY_Y + line * KENGINE_PERF_OVERLAY_LINE_HEIGHT,
+        color,
+        1
+    );
+}
+
+static void draw_perf_overlay(
+    surface_t* disp,
+    int frame,
+    int step_count,
+    int render_count,
+    int render_dropped,
+    int audio_count,
+    int audio_dropped,
+    KengineFrameTiming timing
+) {
+    char buf[80];
+    uint32_t color = graphics_make_color(0x9A, 0xF0, 0xB8, 0xFF);
+    uint32_t panel_color = graphics_make_color(0x00, 0x00, 0x00, 0xFF);
+    int fps_x10 = (int)(display_get_fps() * 10.0f + 0.5f);
+    int fps = (fps_x10 + 5) / 10;
+    heap_stats_t heap;
+    sys_get_heap_stats(&heap);
+    unsigned long heap_used_k = (unsigned long)(heap.used / 1024);
+    unsigned long heap_total_k = (unsigned long)(heap.total / 1024);
+
+    graphics_draw_box(
+        disp,
+        KENGINE_PERF_OVERLAY_X - 4,
+        KENGINE_PERF_OVERLAY_Y - 4,
+        KENGINE_PERF_OVERLAY_WIDTH,
+        KENGINE_PERF_OVERLAY_HEIGHT,
+        panel_color
+    );
+
+    snprintf(
+        buf,
+        sizeof(buf),
+        "FPS=%d CPU=%d",
+        fps,
+        us_to_ms_rounded(timing.total_us)
+    );
+    draw_perf_overlay_line(disp, buf, 0, color);
+
+    snprintf(
+        buf,
+        sizeof(buf),
+        "K=%d R=%d S=%d",
+        us_to_ms_rounded(timing.kotlin_us),
+        us_to_ms_rounded(timing.render_us),
+        us_to_ms_rounded(timing.native_audio_us)
+    );
+    draw_perf_overlay_line(disp, buf, 1, color);
+
+    snprintf(
+        buf,
+        sizeof(buf),
+        "CMD=%d+%d AUD=%d+%d",
+        render_count,
+        render_dropped,
+        audio_count,
+        audio_dropped
+    );
+    draw_perf_overlay_line(disp, buf, 2, color);
+
+    snprintf(
+        buf,
+        sizeof(buf),
+        "F=%d ST=%d",
+        frame,
+        step_count
+    );
+    draw_perf_overlay_line(disp, buf, 3, color);
+
+    snprintf(
+        buf,
+        sizeof(buf),
+        "H=%lu/%luK",
+        heap_used_k,
+        heap_total_k
+    );
+    draw_perf_overlay_line(disp, buf, 4, color);
+}
+
 static void draw_vertical_gradient(surface_t* disp, int top_color, int bottom_color, int pulse) {
     (void)pulse;
 
@@ -596,6 +809,31 @@ static void draw_vertical_gradient(surface_t* disp, int top_color, int bottom_co
         graphics_draw_line(disp, 0, y, FB_WIDTH - 1, y, c);
     }
 }
+
+#if KENGINE_N64_USE_RDPQ_RENDER
+static void draw_vertical_gradient_rdpq(surface_t* disp, int top_color, int bottom_color, int pulse) {
+    (void)pulse;
+
+    uint8_t tr = top_color & 0xFF;
+    uint8_t tg = (top_color >> 8) & 0xFF;
+    uint8_t tb = (top_color >> 16) & 0xFF;
+    uint8_t br = bottom_color & 0xFF;
+    uint8_t bg = (bottom_color >> 8) & 0xFF;
+    uint8_t bb = (bottom_color >> 16) & 0xFF;
+
+    const int band_height = 12;
+    for (int y = 0; y < FB_HEIGHT; y += band_height) {
+        int y1 = y + band_height;
+        if (y1 > FB_HEIGHT) y1 = FB_HEIGHT;
+        uint8_t r = tr + (br - tr) * y / FB_HEIGHT;
+        uint8_t g = tg + (bg - tg) * y / FB_HEIGHT;
+        uint8_t b = tb + (bb - tb) * y / FB_HEIGHT;
+        rdpq_begin(disp);
+        rdpq_prepare_fill(RGBA32(r, g, b, 0xFF));
+        rdpq_fill_rectangle(0, y, FB_WIDTH, y1);
+    }
+}
+#endif
 
 #ifdef KENGINE_N64_SPRITE_ASSETS
 static void draw_sprite(surface_t* disp, int sprite_id, int x, int y, int width, int height, int tint, int frame) {
@@ -663,11 +901,13 @@ static int translate_input(joypad_inputs_t inputs, joypad_buttons_t held, joypad
     if (held.a || pressed.a) mask |= KENGINE_INPUT_A;
     if (held.b || pressed.b) mask |= KENGINE_INPUT_B;
     if (held.start || pressed.start) mask |= KENGINE_INPUT_START;
-    if (held.c_up || pressed.c_up) mask |= KENGINE_INPUT_X;
-    if (held.c_down || pressed.c_down) mask |= KENGINE_INPUT_Y;
+    if (held.c_up || pressed.c_up) mask |= KENGINE_INPUT_C_UP;
+    if (held.c_down || pressed.c_down) mask |= KENGINE_INPUT_C_DOWN;
+    if (held.c_left || pressed.c_left) mask |= KENGINE_INPUT_C_LEFT;
+    if (held.c_right || pressed.c_right) mask |= KENGINE_INPUT_C_RIGHT;
     if (held.l || pressed.l) mask |= KENGINE_INPUT_L;
     if (held.r || pressed.r) mask |= KENGINE_INPUT_R;
-    if (held.z || pressed.z) mask |= KENGINE_INPUT_SELECT;
+    if (held.z || pressed.z) mask |= KENGINE_INPUT_Z;
 
     return mask;
 }
@@ -686,23 +926,45 @@ static void execute_render_commands(surface_t* disp, int* commands, int command_
 
         switch (type) {
             case KENGINE_RENDER_CLEAR: {
+#if KENGINE_N64_USE_RDPQ_RENDER
+                clear_rdpq(disp, color);
+#else
                 uint32_t c = kengine_rgba_to_color(color);
                 graphics_fill_screen(disp, c);
+#endif
                 break;
             }
             case KENGINE_RENDER_FILL_RECT:
+#if KENGINE_N64_USE_RDPQ_RENDER
+                draw_rect_rdpq(disp, x, y, w, h, color);
+#else
                 draw_rect(disp, x, y, w, h, color);
+#endif
                 break;
             case KENGINE_RENDER_VERTICAL_GRADIENT:
+#if KENGINE_N64_USE_RDPQ_RENDER
+                draw_vertical_gradient_rdpq(disp, color, color2, param);
+#else
                 draw_vertical_gradient(disp, color, color2, param);
+#endif
                 break;
             case KENGINE_RENDER_DRAW_LINE:
+#if KENGINE_N64_USE_RDPQ_RENDER
+                rdpq_flush();
+#endif
                 draw_line(disp, x, y, w, h, color);
                 break;
             case KENGINE_RENDER_DRAW_TRIANGLE:
+#if KENGINE_N64_USE_RDPQ_RENDER
+                draw_triangle_rdpq(disp, x, y, w, h, color2, param, color);
+#else
                 draw_triangle(disp, x, y, w, h, color2, param, color);
+#endif
                 break;
             case KENGINE_RENDER_DRAW_SPRITE:
+#if KENGINE_N64_USE_RDPQ_RENDER
+                rdpq_flush();
+#endif
 #ifdef KENGINE_N64_SPRITE_ASSETS
                 draw_sprite(disp, color2, x, y, w, h, color, param);
 #else
@@ -710,6 +972,9 @@ static void execute_render_commands(surface_t* disp, int* commands, int command_
 #endif
                 break;
             case KENGINE_RENDER_DRAW_TEXT: {
+#if KENGINE_N64_USE_RDPQ_RENDER
+                rdpq_flush();
+#endif
 #ifndef KENGINE_N64_C_ONLY
                 const char* text = (const char*)kengine_n64_kotlin_kengineN64RuntimeCommandText(i);
                 int scale = param > 0 ? param : 1;
@@ -722,13 +987,20 @@ static void execute_render_commands(surface_t* disp, int* commands, int command_
                 break;
         }
     }
+#if KENGINE_N64_USE_RDPQ_RENDER
+    rdpq_flush();
+#endif
 }
 
 #ifdef KENGINE_N64_C_ONLY
 
 int main(void) {
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
+#if KENGINE_N64_USE_RDPQ_RENDER
+    rdpq_init();
+#endif
     joypad_init();
+    timer_init();
 
     int frame = 0;
     int square_x = 120;
@@ -809,16 +1081,16 @@ static void kotlin_runtime_start(void) {
     kengine_n64_kotlin_kengineN64RuntimeStart();
 }
 
-static int kotlin_runtime_update(int host_frame, int input_mask) {
-    return kengine_n64_kotlin_kengineN64RuntimeUpdate(host_frame, input_mask);
-}
-
-static int kotlin_runtime_audio(int host_frame) {
-    return kengine_n64_kotlin_kengineN64RuntimeAudio(host_frame);
-}
-
-static int kotlin_runtime_draw(int host_frame) {
-    return kengine_n64_kotlin_kengineN64RuntimeDraw(host_frame, FB_WIDTH, FB_HEIGHT);
+static int kotlin_runtime_step(
+    int host_frame,
+    int input_mask
+) {
+    return kengine_n64_kotlin_kengineN64RuntimeStep(
+        host_frame,
+        input_mask,
+        FB_WIDTH,
+        FB_HEIGHT
+    );
 }
 
 static int kotlin_copy_commands(int* destination, int max_commands) {
@@ -831,7 +1103,11 @@ static int kotlin_copy_audio_commands(int* destination, int max_commands) {
 
 int main(void) {
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
+#if KENGINE_N64_USE_RDPQ_RENDER
+    rdpq_init();
+#endif
     joypad_init();
+    timer_init();
 #ifdef KENGINE_N64_SOUND_ASSETS
     kengine_audio_init();
 #endif
@@ -846,6 +1122,9 @@ int main(void) {
 
     while (1) {
         surface_t* disp = display_get();
+        long long work_start = timer_ticks();
+        KengineFrameTiming timing;
+        memset(&timing, 0, sizeof(timing));
 
         joypad_poll();
         joypad_inputs_t inputs = joypad_get_inputs(JOYPAD_PORT_1);
@@ -853,19 +1132,46 @@ int main(void) {
         joypad_buttons_t pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
         int input_mask = translate_input(inputs, held, pressed);
 
-        kotlin_runtime_update(frame, input_mask);
-        kotlin_runtime_audio(frame);
-        kotlin_runtime_draw(frame);
+        long long phase_start = timer_ticks();
+        int step_count = kotlin_runtime_step(frame, input_mask);
+        int render_count = 0;
+        int render_dropped = 0;
+        int audio_count = 0;
+        int audio_dropped = 0;
+        if (step_count >= 0) {
+            render_count = kotlin_copy_commands(g_render_commands, KENGINE_RENDER_MAX_COMMANDS);
+            render_dropped = kengine_n64_kotlin_kengineN64RuntimeDroppedRenderCommands();
+            audio_count = kotlin_copy_audio_commands(g_audio_commands, KENGINE_AUDIO_MAX_COMMANDS);
+            audio_dropped = kengine_n64_kotlin_kengineN64RuntimeDroppedAudioCommands();
+        }
+        long long phase_end = timer_ticks();
+        timing.kotlin_us = ticks_to_us(phase_end - phase_start);
 
-        int render_count = kotlin_copy_commands(g_render_commands, KENGINE_RENDER_MAX_COMMANDS);
+        phase_start = phase_end;
         execute_render_commands(disp, g_render_commands, render_count);
+        phase_end = timer_ticks();
+        timing.render_us = ticks_to_us(phase_end - phase_start);
 
+        phase_start = phase_end;
 #ifdef KENGINE_N64_SOUND_ASSETS
-        int audio_count = kotlin_copy_audio_commands(g_audio_commands, KENGINE_AUDIO_MAX_COMMANDS);
         if (audio_count > 0) {
             execute_audio_commands(g_audio_commands, audio_count);
         }
 #endif
+        phase_end = timer_ticks();
+        timing.native_audio_us = ticks_to_us(phase_end - phase_start);
+
+        timing.total_us = ticks_to_us(timer_ticks() - work_start);
+        draw_perf_overlay(
+            disp,
+            frame,
+            step_count,
+            render_count,
+            render_dropped,
+            audio_count,
+            audio_dropped,
+            timing
+        );
 
         display_show(disp);
         frame++;

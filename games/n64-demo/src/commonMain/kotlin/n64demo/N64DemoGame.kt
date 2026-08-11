@@ -19,7 +19,8 @@ class N64DemoGame : PortableGame {
     private var cameraPitch = DEFAULT_CAMERA_PITCH
     private var cameraZoom = 0
     private var modelYaw = 0
-    private var modelPitch = DEFAULT_MODEL_PITCH
+    private var modelPitch = CRAFT_RACER_BASE_PITCH
+    private var spinSpeedIndex = DEFAULT_SPIN_SPEED_INDEX
     private var autoSpin = true
     private var pendingSound = NO_SOUND
 
@@ -42,10 +43,13 @@ class N64DemoGame : PortableGame {
         val aJustPressed = input.justPressed(InputButton.A)
         val bJustPressed = input.justPressed(InputButton.B)
         val startJustPressed = input.justPressed(InputButton.START)
+        val cLeftJustPressed = input.justPressed(InputButton.C_LEFT)
+        val cRightJustPressed = input.justPressed(InputButton.C_RIGHT)
 
         if (aJustPressed) {
             modelIndex += 1
             if (modelIndex >= models.size) modelIndex = 0
+            modelPitch = modelPitchBase()
             pendingSound = chordSound
             saveSelectedModel()
         }
@@ -60,32 +64,41 @@ class N64DemoGame : PortableGame {
             pendingSound = finishSound
         }
 
-        cameraYaw = wrapAngle(cameraYaw + input.axis(InputButton.LEFT, InputButton.RIGHT) * CAMERA_ORBIT_SPEED)
+        if (cLeftJustPressed) {
+            adjustSpinSpeed(-1)
+            pendingSound = chordSound
+        }
+        if (cRightJustPressed) {
+            adjustSpinSpeed(1)
+            pendingSound = chordSound
+        }
+
+        cameraYaw = wrapAngle(cameraYaw + input.axis(InputButton.DPAD_LEFT, InputButton.DPAD_RIGHT) * CAMERA_ORBIT_SPEED)
         cameraPitch = clampInt(
-            cameraPitch + input.axis(InputButton.DOWN, InputButton.UP) * CAMERA_PITCH_SPEED,
+            cameraPitch + input.axis(InputButton.DPAD_DOWN, InputButton.DPAD_UP) * CAMERA_PITCH_SPEED,
             MIN_CAMERA_PITCH,
             MAX_CAMERA_PITCH
         )
 
-        if (input.isPressed(InputButton.X)) {
+        if (input.isPressed(InputButton.C_UP)) {
             cameraZoom = clampInt(cameraZoom - CAMERA_ZOOM_SPEED, MIN_CAMERA_ZOOM, MAX_CAMERA_ZOOM)
         }
-        if (input.isPressed(InputButton.Y)) {
+        if (input.isPressed(InputButton.C_DOWN)) {
             cameraZoom = clampInt(cameraZoom + CAMERA_ZOOM_SPEED, MIN_CAMERA_ZOOM, MAX_CAMERA_ZOOM)
         }
 
-        if (input.isPressed(InputButton.L) || input.isPressed(InputButton.SELECT)) {
-            modelYaw = wrapAngle(modelYaw - MODEL_MANUAL_SPIN_SPEED)
+        if (input.isPressed(InputButton.L) || input.isPressed(InputButton.Z)) {
+            modelYaw = wrapAngle(modelYaw - currentManualSpinSpeed())
             autoSpin = false
         }
         if (input.isPressed(InputButton.R)) {
-            modelYaw = wrapAngle(modelYaw + MODEL_MANUAL_SPIN_SPEED)
+            modelYaw = wrapAngle(modelYaw + currentManualSpinSpeed())
             autoSpin = false
         }
 
         if (autoSpin) {
-            modelYaw = wrapAngle(modelYaw + MODEL_AUTO_SPIN_SPEED)
-            modelPitch = wrapAngle(DEFAULT_MODEL_PITCH + sinAngle((frame * 3) and ANGLE_MASK) / 28)
+            modelYaw = wrapAngle(modelYaw + currentAutoSpinSpeed())
+            modelPitch = modelPitchBase() + sinAngle((frame * 3) and ANGLE_MASK) / MODEL_PITCH_WOBBLE_DIVISOR
         }
 
         frame += 1
@@ -100,7 +113,7 @@ class N64DemoGame : PortableGame {
     }
 
     override fun draw(render: RenderContext) {
-        render.verticalGradient(n64Rgba(6, 9, 18), n64Rgba(20, 31, 48), frame)
+        render.clear(n64Rgba(10, 14, 24))
         drawBorder(render)
 
         val model = models[modelIndex]
@@ -118,45 +131,68 @@ class N64DemoGame : PortableGame {
             centerY = SCREEN_CENTER_Y
         )
 
-        renderer.drawGroundGrid(
-            halfSize = ARENA_HALF_SIZE,
-            step = GRID_STEP,
-            color = n64Rgba(38, 54, 76, 150),
-            axisColor = n64Rgba(86, 124, 160, 210)
-        )
+        if (DRAW_GROUND_GRID) {
+            renderer.drawGroundGrid(
+                halfSize = ARENA_HALF_SIZE,
+                step = GRID_STEP,
+                color = n64Rgba(38, 54, 76, 150),
+                axisColor = n64Rgba(86, 124, 160, 210)
+            )
+        }
         renderer.drawArenaBounds(ARENA_HALF_SIZE, n64Rgba(214, 232, 248, 170))
-        renderer.drawModelTriangles(
-            model = model,
-            centerX = 0,
-            centerY = MODEL_CENTER_Y,
-            centerZ = 0,
-            size = MODEL_SIZE,
-            rotationX = modelPitch,
-            rotationY = modelYaw,
-            rotationZ = 0,
-            triangleBudget = MODEL_TRIANGLE_BUDGET,
-            overlayEdgeBudget = MODEL_EDGE_BUDGET
-        )
+        val triangleBudget = modelTriangleBudget(model)
+        if (FAST_TRIANGLE_SELECTION) {
+            renderer.drawModelTrianglesFast(
+                model = model,
+                centerX = 0,
+                centerY = MODEL_CENTER_Y,
+                centerZ = 0,
+                size = MODEL_SIZE,
+                rotationX = modelPitch,
+                rotationY = modelYaw,
+                rotationZ = 0,
+                triangleBudget = triangleBudget
+            )
+        } else {
+            renderer.drawModelTriangles(
+                model = model,
+                centerX = 0,
+                centerY = MODEL_CENTER_Y,
+                centerZ = 0,
+                size = MODEL_SIZE,
+                rotationX = modelPitch,
+                rotationY = modelYaw,
+                rotationZ = 0,
+                triangleBudget = triangleBudget,
+                overlayEdgeBudget = MODEL_EDGE_BUDGET
+            )
+        }
 
-        drawHud(render, model)
+        if (DRAW_HUD_TEXT) {
+            drawHud(render, model)
+        }
     }
 
     override fun cleanup() {
         saveSelectedModel()
     }
 
+    internal fun debugSpinSpeedLevel(): Int {
+        return spinSpeedIndex + 1
+    }
+
     private fun drawHud(render: RenderContext, model: N64BakedWireModel3D) {
         render.drawText("N64 OBJ LAB", 10, 8, n64Rgba(248, 252, 255), 1)
         render.drawText(model.name, 10, 20, n64Rgba(255, 214, 108), 1)
         render.drawText(modelStats[modelIndex], 10, 32, n64Rgba(184, 210, 230), 1)
-        render.drawText("${renderer.lastDrawnTriangles}t ${renderer.lastDrawnEdges}e drawn", 10, 44, n64Rgba(142, 178, 204), 1)
+        render.drawText("${renderer.lastDrawnTriangles}t ${renderer.lastDrawnEdges}e spd ${spinSpeedIndex + 1}", 10, 44, n64Rgba(142, 178, 204), 1)
         render.drawText(spinModeText(), 222, 8, n64Rgba(184, 210, 230), 1)
-        render.drawText("A model  B spin  Start reset", 10, 214, n64Rgba(184, 210, 230), 1)
-        render.drawText("Dpad orbit/pitch  L/R spin  C zoom", 10, 226, n64Rgba(184, 210, 230), 1)
+        render.drawText("A model  B auto  Start reset", 10, 214, n64Rgba(184, 210, 230), 1)
+        render.drawText("Dpad orbit  C zoom/speed  Z/L/R spin", 10, 226, n64Rgba(184, 210, 230), 1)
     }
 
     private fun spinModeText(): String {
-        return if (autoSpin) "auto spin" else "manual"
+        return if (autoSpin) "auto ${spinSpeedIndex + 1}" else "manual ${spinSpeedIndex + 1}"
     }
 
     private fun drawBorder(render: RenderContext) {
@@ -172,7 +208,8 @@ class N64DemoGame : PortableGame {
         cameraPitch = DEFAULT_CAMERA_PITCH
         cameraZoom = 0
         modelYaw = 0
-        modelPitch = DEFAULT_MODEL_PITCH
+        modelPitch = modelPitchBase()
+        spinSpeedIndex = DEFAULT_SPIN_SPEED_INDEX
         autoSpin = true
     }
 
@@ -180,6 +217,7 @@ class N64DemoGame : PortableGame {
         val data = storage?.load("model-index") ?: return
         if (data.isNotEmpty() && data[0].toInt() in models.indices) {
             modelIndex = data[0].toInt()
+            modelPitch = modelPitchBase()
         }
     }
 
@@ -194,18 +232,43 @@ class N64DemoGame : PortableGame {
         return (mask and bit) != 0 && (previousInputMask and bit) == 0
     }
 
+    private fun adjustSpinSpeed(delta: Int) {
+        spinSpeedIndex = clampInt(spinSpeedIndex + delta, 0, MODEL_AUTO_SPIN_SPEEDS.lastIndex)
+    }
+
+    private fun currentAutoSpinSpeed(): Int {
+        return MODEL_AUTO_SPIN_SPEEDS[spinSpeedIndex]
+    }
+
+    private fun currentManualSpinSpeed(): Int {
+        return currentAutoSpinSpeed() * MODEL_MANUAL_SPIN_MULTIPLIER
+    }
+
+    private fun modelPitchBase(): Int {
+        return if (models[modelIndex] === N64DemoModelAssets.craftRacer) {
+            CRAFT_RACER_BASE_PITCH
+        } else {
+            DEFAULT_MODEL_PITCH
+        }
+    }
+
+    private fun modelTriangleBudget(model: N64BakedWireModel3D): Int {
+        return if (DRAW_ALL_MODEL_TRIANGLES) model.triangleCount else MODEL_TRIANGLE_BUDGET
+    }
+
     private companion object {
         const val NO_SOUND = 0
         const val WORLD_SCALE = N64WireModelRenderer3D.WORLD_SCALE
-        const val ANGLE_MASK = N64WireModelRenderer3D.ANGLE_FULL - 1
+        const val ANGLE_FULL = N64WireModelRenderer3D.ANGLE_FULL
+        const val ANGLE_MASK = ANGLE_FULL - 1
 
         const val ARENA_HALF_SIZE = 7 * WORLD_SCALE
         const val GRID_STEP = WORLD_SCALE
         const val CAMERA_TARGET_Y = WORLD_SCALE
         const val CAMERA_DISTANCE = 11 * WORLD_SCALE
-        const val CAMERA_ZOOM_SPEED = WORLD_SCALE / 8
-        const val MIN_CAMERA_ZOOM = -4 * WORLD_SCALE
-        const val MAX_CAMERA_ZOOM = 5 * WORLD_SCALE
+        const val CAMERA_ZOOM_SPEED = WORLD_SCALE / 4
+        const val MIN_CAMERA_ZOOM = -7 * WORLD_SCALE
+        const val MAX_CAMERA_ZOOM = 6 * WORLD_SCALE
         const val DEFAULT_CAMERA_YAW = 96
         const val DEFAULT_CAMERA_PITCH = -108
         const val MIN_CAMERA_PITCH = -180
@@ -217,10 +280,17 @@ class N64DemoGame : PortableGame {
 
         const val MODEL_CENTER_Y = 2 * WORLD_SCALE
         const val MODEL_SIZE = 5 * WORLD_SCALE
-        const val MODEL_TRIANGLE_BUDGET = 96
-        const val MODEL_EDGE_BUDGET = 14
-        const val DEFAULT_MODEL_PITCH = 36
-        const val MODEL_AUTO_SPIN_SPEED = 7
-        const val MODEL_MANUAL_SPIN_SPEED = 18
+        const val MODEL_TRIANGLE_BUDGET = 160
+        const val MODEL_EDGE_BUDGET = 0
+        const val DRAW_ALL_MODEL_TRIANGLES = true
+        const val DRAW_GROUND_GRID = false
+        const val DRAW_HUD_TEXT = false
+        const val FAST_TRIANGLE_SELECTION = true
+        const val DEFAULT_MODEL_PITCH = 0
+        const val CRAFT_RACER_BASE_PITCH = -ANGLE_FULL / 8
+        const val MODEL_PITCH_WOBBLE_DIVISOR = 80
+        const val DEFAULT_SPIN_SPEED_INDEX = 2
+        const val MODEL_MANUAL_SPIN_MULTIPLIER = 3
+        val MODEL_AUTO_SPIN_SPEEDS = intArrayOf(6, 9, 12, 18, 26)
     }
 }

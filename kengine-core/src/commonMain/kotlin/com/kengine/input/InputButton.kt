@@ -12,5 +12,14 @@ enum class InputButton {
     Y,
     L,
     R,
-    SELECT
+    SELECT,
+    DPAD_LEFT,
+    DPAD_RIGHT,
+    DPAD_UP,
+    DPAD_DOWN,
+    C_UP,
+    C_DOWN,
+    C_LEFT,
+    C_RIGHT,
+    Z
 }

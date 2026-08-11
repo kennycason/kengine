@@ -72,13 +72,13 @@ class N64DemoGameTest {
     @Test
     fun drawFrameFitsN64RenderCommandCapacity() {
         val game = N64DemoGame()
-        val render = RenderContext(256)
+        val render = RenderContext(N64_RENDER_COMMAND_CAPACITY)
 
         render.beginFrame(320, 240)
         game.draw(render)
 
         assertEquals(0, render.droppedCommandCount)
-        assertTrue(render.commandCount <= 256)
+        assertTrue(render.commandCount <= N64_RENDER_COMMAND_CAPACITY)
         assertTrue(render.containsType(RenderCommandType.DRAW_TRIANGLE), "N64 demo should render filled model triangles")
         assertTriangleCommandCoordinatesStayReasonable(render)
 
@@ -90,9 +90,20 @@ class N64DemoGameTest {
         game.draw(render)
 
         assertEquals(0, render.droppedCommandCount)
-        assertTrue(render.commandCount <= 256)
+        assertTrue(render.commandCount <= N64_RENDER_COMMAND_CAPACITY)
         assertTrue(render.containsType(RenderCommandType.DRAW_TRIANGLE), "N64 demo should render filled model triangles")
         assertTriangleCommandCoordinatesStayReasonable(render)
+    }
+
+    @Test
+    fun cRightIncreasesDemoSpinSpeed() {
+        val game = N64DemoGame()
+        val input = InputState()
+
+        input.set(InputButton.C_RIGHT)
+        game.update(input)
+
+        assertEquals(4, game.debugSpinSpeedLevel(), "C-right should increase the model spin speed")
     }
 
     @Test
@@ -143,6 +154,57 @@ class N64DemoGameTest {
         )
     }
 
+    @Test
+    fun fastTrianglePathDrawsFartherTrianglesFirst() {
+        val renderer = N64WireModelRenderer3D()
+        val render = RenderContext(16)
+        val nearColor = n64Rgba(220, 60, 80)
+        val farColor = n64Rgba(40, 90, 220)
+        val model = N64BakedWireModel3D(
+            name = "Depth Probe",
+            source = "depth-probe.obj",
+            license = "test",
+            vertices = intArrayOf(
+                -160, -120, 0,
+                160, -120, 0,
+                0, 160, 0,
+                -160, -120, 512,
+                160, -120, 512,
+                0, 160, 512
+            ),
+            edges = intArrayOf(),
+            triangles = intArrayOf(
+                0, 1, 2, 0,
+                3, 4, 5, 1
+            ),
+            colors = intArrayOf(nearColor, farColor)
+        )
+
+        render.beginFrame(320, 240)
+        renderer.configure(
+            render = render,
+            targetX = 0,
+            targetY = 0,
+            targetZ = 0,
+            yaw = 0,
+            pitch = 0,
+            cameraDistance = 4 * N64WireModelRenderer3D.WORLD_SCALE,
+            projectionDistance = 128,
+            centerX = 160,
+            centerY = 120
+        )
+
+        assertEquals(2, renderer.drawModelTrianglesFast(model, 0, 0, 0, 256, 0, 0, 0, 2))
+        assertColorIsBlueDominant(
+            render.commandField(render.firstCommandIndex(RenderCommandType.DRAW_TRIANGLE), RenderCommandBuffer.FIELD_COLOR),
+            "fast triangle path should submit rear triangles first for painter-style fill"
+        )
+        assertColorIsRedDominant(
+            render.commandField(render.lastCommandIndex(RenderCommandType.DRAW_TRIANGLE), RenderCommandBuffer.FIELD_COLOR),
+            "near triangles should be submitted last so they cover rear faces"
+        )
+    }
+
     private fun assertTriangleCommandCoordinatesStayReasonable(render: RenderContext) {
         var index = 0
         while (index < render.commandCount) {
@@ -160,6 +222,14 @@ class N64DemoGameTest {
 
     private fun assertReasonableScreenCoordinate(value: Int) {
         assertTrue(value in -1024..1024, "triangle coordinate should stay fenced, was $value")
+    }
+
+    private fun assertColorIsRedDominant(color: Int, message: String) {
+        assertTrue((color and 0xff) > ((color ushr 16) and 0xff), message)
+    }
+
+    private fun assertColorIsBlueDominant(color: Int, message: String) {
+        assertTrue(((color ushr 16) and 0xff) > (color and 0xff), message)
     }
 
     private fun N64BakedWireModel3D.edgeLengthsSquared(): List<Int> {
@@ -214,6 +284,7 @@ class N64DemoGameTest {
     }
 
     private companion object {
+        const val N64_RENDER_COMMAND_CAPACITY = 512
         const val N64_EDGE_PREVIEW_BUDGET = 14
     }
 }

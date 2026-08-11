@@ -3,6 +3,7 @@ typedef int ssize_t;
 
 extern void* malloc(size_t size);
 extern void free(void* ptr);
+extern void* memalign(size_t alignment, size_t size);
 extern void* memcpy(void* dst, const void* src, size_t n);
 extern void* memset(void* s, int c, size_t n);
 
@@ -12,13 +13,13 @@ unsigned int sleep(unsigned int seconds) {
 }
 
 int posix_memalign(void** memptr, size_t alignment, size_t size) {
+    if (!memptr) return -1;
     if (alignment < sizeof(void*)) alignment = sizeof(void*);
-    size_t total = size + alignment + sizeof(void*);
-    void* raw = malloc(total);
-    if (!raw) return -1;
-    size_t addr = ((size_t)raw + sizeof(void*) + alignment - 1) & ~(alignment - 1);
-    ((void**)addr)[-1] = raw;
-    *memptr = (void*)addr;
+    if ((alignment & (alignment - 1)) != 0) return -1;
+
+    void* ptr = memalign(alignment, size);
+    if (!ptr) return -1;
+    *memptr = ptr;
     return 0;
 }
 

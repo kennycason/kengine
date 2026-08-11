@@ -71,5 +71,27 @@ class InputStateTest {
         assertEquals(1 shl 9, InputState.bitFor(InputButton.L))
         assertEquals(1 shl 10, InputState.bitFor(InputButton.R))
         assertEquals(1 shl 11, InputState.bitFor(InputButton.SELECT))
+        assertEquals(1, InputState.bitFor(InputButton.DPAD_LEFT))
+        assertEquals(1 shl 1, InputState.bitFor(InputButton.DPAD_RIGHT))
+        assertEquals(1 shl 2, InputState.bitFor(InputButton.DPAD_UP))
+        assertEquals(1 shl 3, InputState.bitFor(InputButton.DPAD_DOWN))
+        assertEquals(1 shl 7, InputState.bitFor(InputButton.C_UP))
+        assertEquals(1 shl 8, InputState.bitFor(InputButton.C_DOWN))
+        assertEquals(1 shl 11, InputState.bitFor(InputButton.Z))
+        assertEquals(1 shl 12, InputState.bitFor(InputButton.C_LEFT))
+        assertEquals(1 shl 13, InputState.bitFor(InputButton.C_RIGHT))
+    }
+
+    @Test
+    fun n64ButtonAliasesShareCompatibleBits() {
+        val input = InputState()
+
+        input.set(InputButton.DPAD_LEFT)
+        input.set(InputButton.C_UP)
+        input.set(InputButton.Z)
+
+        assertTrue(input.isPressed(InputButton.LEFT))
+        assertTrue(input.isPressed(InputButton.X))
+        assertTrue(input.isPressed(InputButton.SELECT))
     }
 }
