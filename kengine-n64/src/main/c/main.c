@@ -749,11 +749,17 @@ static int us_to_ms_rounded(int us) {
 #define WORLD3D_DEGENERATE_AREA 2
 #define WORLD3D_MAX_VERTICES 3200
 #define WORLD3D_MAX_VISIBLE 2200
+#define WORLD3D_DEPTH_BUCKETS 64
 
 static int w3d_screen_x[WORLD3D_MAX_VERTICES];
 static int w3d_screen_y[WORLD3D_MAX_VERTICES];
 static int w3d_screen_z[WORLD3D_MAX_VERTICES];
 static int w3d_visible[WORLD3D_MAX_VERTICES];
+static int w3d_vis_tri[WORLD3D_MAX_VISIBLE];
+static int w3d_vis_area[WORLD3D_MAX_VISIBLE];
+static int w3d_bucket_head[WORLD3D_DEPTH_BUCKETS];
+static int w3d_bucket_tail[WORLD3D_DEPTH_BUCKETS];
+static int w3d_bucket_next[WORLD3D_MAX_VISIBLE];
 
 static int w3d_quarter_sin(int v) {
     if (v < 0) v = 0;
@@ -829,104 +835,93 @@ static void draw_world_3d(
     const int* tris = mesh->triangles;
     const int* colors = mesh->colors;
     int drawn = 0;
+    int depthSpan = depthMax - depthMin;
+    if (depthSpan < 1) depthSpan = 1;
 
-    int depth_split = (depthMin + depthMax) / 2;
+    /* Bucket sort: assign each visible triangle to a depth bucket */
+    for (int i = 0; i < WORLD3D_DEPTH_BUCKETS; i++) {
+        w3d_bucket_head[i] = -1;
+        w3d_bucket_tail[i] = -1;
+    }
+    int vis_count = 0;
 
+    for (int ti = 0; ti < tc && vis_count < WORLD3D_MAX_VISIBLE; ti++) {
+        int tb = ti * 4;
+        int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2];
+        if (!w3d_visible[a] || !w3d_visible[b] || !w3d_visible[c]) continue;
+
+        int ax = w3d_screen_x[a], ay = w3d_screen_y[a];
+        int bx = w3d_screen_x[b], by = w3d_screen_y[b];
+        int cx = w3d_screen_x[c], cy = w3d_screen_y[c];
+
+        int area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+        if (w3d_abs(area) <= WORLD3D_DEGENERATE_AREA) continue;
+        if ((ax < -WORLD3D_OFFSCREEN && bx < -WORLD3D_OFFSCREEN && cx < -WORLD3D_OFFSCREEN) ||
+            (ax > FB_WIDTH + WORLD3D_OFFSCREEN && bx > FB_WIDTH + WORLD3D_OFFSCREEN && cx > FB_WIDTH + WORLD3D_OFFSCREEN) ||
+            (ay < -WORLD3D_OFFSCREEN && by < -WORLD3D_OFFSCREEN && cy < -WORLD3D_OFFSCREEN) ||
+            (ay > FB_HEIGHT + WORLD3D_OFFSCREEN && by > FB_HEIGHT + WORLD3D_OFFSCREEN && cy > FB_HEIGHT + WORLD3D_OFFSCREEN))
+            continue;
+
+        int avg_z = (w3d_screen_z[a] + w3d_screen_z[b] + w3d_screen_z[c]) / 3;
+        int clamped = w3d_clamp(avg_z - depthMin, 0, depthSpan);
+        int bucket = (clamped * (WORLD3D_DEPTH_BUCKETS - 1)) / depthSpan;
+        bucket = w3d_clamp(bucket, 0, WORLD3D_DEPTH_BUCKETS - 1);
+
+        w3d_vis_tri[vis_count] = ti;
+        w3d_vis_area[vis_count] = area;
+        w3d_bucket_next[vis_count] = -1;
+        int tail = w3d_bucket_tail[bucket];
+        if (tail >= 0) {
+            w3d_bucket_next[tail] = vis_count;
+        } else {
+            w3d_bucket_head[bucket] = vis_count;
+        }
+        w3d_bucket_tail[bucket] = vis_count;
+        vis_count++;
+    }
+
+    /* Draw from farthest bucket to nearest — painter's algorithm */
 #if KENGINE_N64_USE_RDPQ_RENDER
     rdpq_begin(disp);
     rdpq_prepare_flat_triangle();
 #endif
 
-    /* Pass 1: far triangles (depth >= split) */
-    for (int ti = 0; ti < tc; ti++) {
-        int tb = ti * 4;
-        int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2], ci = tris[tb + 3];
-        if (!w3d_visible[a] || !w3d_visible[b] || !w3d_visible[c]) continue;
+    for (int bi = WORLD3D_DEPTH_BUCKETS - 1; bi >= 0; bi--) {
+        int vi = w3d_bucket_head[bi];
+        while (vi >= 0) {
+            int ti = w3d_vis_tri[vi];
+            int area = w3d_vis_area[vi];
+            int tb = ti * 4;
+            int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2], ci = tris[tb + 3];
+            int ax = w3d_screen_x[a], ay = w3d_screen_y[a];
+            int bx = w3d_screen_x[b], by = w3d_screen_y[b];
+            int cx = w3d_screen_x[c], cy = w3d_screen_y[c];
 
-        int avg_z = (w3d_screen_z[a] + w3d_screen_z[b] + w3d_screen_z[c]) / 3;
-        if (avg_z < depth_split) continue;
+            int avg_y = (ay + by + cy) / 3;
+            int light = 80 + w3d_clamp((center_y - avg_y) / 3, -30, 40)
+                           + w3d_clamp(w3d_abs(area) / 200, 0, 40)
+                           + (area >= 0 ? 12 : -12);
+            int shade = w3d_clamp(light, 40, 255);
 
-        int ax = w3d_screen_x[a], ay = w3d_screen_y[a];
-        int bx = w3d_screen_x[b], by = w3d_screen_y[b];
-        int cx = w3d_screen_x[c], cy = w3d_screen_y[c];
-
-        int area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
-        if (w3d_abs(area) <= WORLD3D_DEGENERATE_AREA) continue;
-        if ((ax < -WORLD3D_OFFSCREEN && bx < -WORLD3D_OFFSCREEN && cx < -WORLD3D_OFFSCREEN) ||
-            (ax > FB_WIDTH + WORLD3D_OFFSCREEN && bx > FB_WIDTH + WORLD3D_OFFSCREEN && cx > FB_WIDTH + WORLD3D_OFFSCREEN) ||
-            (ay < -WORLD3D_OFFSCREEN && by < -WORLD3D_OFFSCREEN && cy < -WORLD3D_OFFSCREEN) ||
-            (ay > FB_HEIGHT + WORLD3D_OFFSCREEN && by > FB_HEIGHT + WORLD3D_OFFSCREEN && cy > FB_HEIGHT + WORLD3D_OFFSCREEN))
-            continue;
-
-        int avg_y = (ay + by + cy) / 3;
-        int light = 80 + w3d_clamp((center_y - avg_y) / 3, -30, 40)
-                       + w3d_clamp(w3d_abs(area) / 200, 0, 40)
-                       + (area >= 0 ? 12 : -12);
-        int shade = w3d_clamp(light, 40, 255);
-
-        int base_color = (ci >= 0 && ci < mesh->color_count) ? colors[ci] : 0xFFB4B4B4;
-        int sr = ((base_color & 0xFF) * shade) / 255;
-        int sg = (((base_color >> 8) & 0xFF) * shade) / 255;
-        int sb = (((base_color >> 16) & 0xFF) * shade) / 255;
-        int sa = (base_color >> 24) & 0xFF;
-        int final_color = sr | (sg << 8) | (sb << 16) | (sa << 24);
+            int base_color = (ci >= 0 && ci < mesh->color_count) ? colors[ci] : 0xFFB4B4B4;
+            int sr = ((base_color & 0xFF) * shade) / 255;
+            int sg = (((base_color >> 8) & 0xFF) * shade) / 255;
+            int sb = (((base_color >> 16) & 0xFF) * shade) / 255;
+            int sa = (base_color >> 24) & 0xFF;
+            int final_color = sr | (sg << 8) | (sb << 16) | (sa << 24);
 
 #if KENGINE_N64_USE_RDPQ_RENDER
-        rdpq_set_prim_color(kengine_rgba_to_rdpq_color(final_color));
-        float v1[] = { (float)ax, (float)ay };
-        float v2[] = { (float)bx, (float)by };
-        float v3[] = { (float)cx, (float)cy };
-        rdpq_triangle(&TRIFMT_FILL, v1, v2, v3);
+            rdpq_set_prim_color(kengine_rgba_to_rdpq_color(final_color));
+            float v1[] = { (float)ax, (float)ay };
+            float v2[] = { (float)bx, (float)by };
+            float v3[] = { (float)cx, (float)cy };
+            rdpq_triangle(&TRIFMT_FILL, v1, v2, v3);
 #else
-        draw_triangle(disp, ax, ay, bx, by, cx, cy, final_color);
+            draw_triangle(disp, ax, ay, bx, by, cx, cy, final_color);
 #endif
-        drawn++;
-    }
-
-    /* Pass 2: near triangles (depth < split) — drawn last so they cover far ones */
-    for (int ti = 0; ti < tc; ti++) {
-        int tb = ti * 4;
-        int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2], ci = tris[tb + 3];
-        if (!w3d_visible[a] || !w3d_visible[b] || !w3d_visible[c]) continue;
-
-        int avg_z = (w3d_screen_z[a] + w3d_screen_z[b] + w3d_screen_z[c]) / 3;
-        if (avg_z >= depth_split) continue;
-
-        int ax = w3d_screen_x[a], ay = w3d_screen_y[a];
-        int bx = w3d_screen_x[b], by = w3d_screen_y[b];
-        int cx = w3d_screen_x[c], cy = w3d_screen_y[c];
-
-        int area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
-        if (w3d_abs(area) <= WORLD3D_DEGENERATE_AREA) continue;
-        if ((ax < -WORLD3D_OFFSCREEN && bx < -WORLD3D_OFFSCREEN && cx < -WORLD3D_OFFSCREEN) ||
-            (ax > FB_WIDTH + WORLD3D_OFFSCREEN && bx > FB_WIDTH + WORLD3D_OFFSCREEN && cx > FB_WIDTH + WORLD3D_OFFSCREEN) ||
-            (ay < -WORLD3D_OFFSCREEN && by < -WORLD3D_OFFSCREEN && cy < -WORLD3D_OFFSCREEN) ||
-            (ay > FB_HEIGHT + WORLD3D_OFFSCREEN && by > FB_HEIGHT + WORLD3D_OFFSCREEN && cy > FB_HEIGHT + WORLD3D_OFFSCREEN))
-            continue;
-
-        int avg_y = (ay + by + cy) / 3;
-        int light = 80 + w3d_clamp((center_y - avg_y) / 3, -30, 40)
-                       + w3d_clamp(w3d_abs(area) / 200, 0, 40)
-                       + (area >= 0 ? 12 : -12);
-        int shade = w3d_clamp(light, 40, 255);
-
-        int base_color = (ci >= 0 && ci < mesh->color_count) ? colors[ci] : 0xFFB4B4B4;
-        int sr = ((base_color & 0xFF) * shade) / 255;
-        int sg = (((base_color >> 8) & 0xFF) * shade) / 255;
-        int sb = (((base_color >> 16) & 0xFF) * shade) / 255;
-        int sa = (base_color >> 24) & 0xFF;
-        int final_color = sr | (sg << 8) | (sb << 16) | (sa << 24);
-
-#if KENGINE_N64_USE_RDPQ_RENDER
-        rdpq_set_prim_color(kengine_rgba_to_rdpq_color(final_color));
-        float v1[] = { (float)ax, (float)ay };
-        float v2[] = { (float)bx, (float)by };
-        float v3[] = { (float)cx, (float)cy };
-        rdpq_triangle(&TRIFMT_FILL, v1, v2, v3);
-#else
-        draw_triangle(disp, ax, ay, bx, by, cx, cy, final_color);
-#endif
-        drawn++;
+            drawn++;
+            vi = w3d_bucket_next[vi];
+        }
     }
 
 #if KENGINE_N64_USE_RDPQ_RENDER
