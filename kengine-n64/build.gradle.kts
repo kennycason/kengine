@@ -1356,6 +1356,11 @@ fun registerGameBuildTasks(
                 }
             }
 
+            val worldMeshHeader = gameProject.file("src/main/c/kengine_n64_world_mesh.h")
+            if (worldMeshHeader.exists()) {
+                worldMeshHeader.copyTo(staging.resolve("src/kengine_n64_world_mesh.h"), overwrite = true)
+            }
+
             val libName = "lib${kotlinOutputBaseName}"
             val spriteObjs = if (spriteBuilds.isNotEmpty()) {
                 "\nOBJS += \$(BUILD_DIR)/kengine_n64_sprite_assets.o" +
@@ -1367,6 +1372,8 @@ fun registerGameBuildTasks(
             } else ""
             val spriteDefs = if (spriteBuilds.isNotEmpty()) "\nCFLAGS += -DKENGINE_N64_SPRITE_ASSETS=1" else ""
             val soundDefs = if (soundBuilds.isNotEmpty()) "\nCFLAGS += -DKENGINE_N64_SOUND_ASSETS=1" else ""
+            val worldMeshDefs = if (gameProject.file("src/main/c/kengine_n64_world_mesh.h").exists())
+                "\nCFLAGS += -DKENGINE_N64_WORLD_MESH=1 -DKENGINE_N64_USE_RDPQ_RENDER=1" else ""
 
             staging.resolve("Makefile").writeText(
                 """
@@ -1379,7 +1386,7 @@ fun registerGameBuildTasks(
                 |.PHONY: all
                 |
                 |CFLAGS += -I${'$'}(CURDIR)/kotlin -I${'$'}(CURDIR)/src
-                |LDFLAGS += --noinhibit-exec --no-warn-mismatch$spriteDefs$soundDefs
+                |LDFLAGS += --noinhibit-exec --no-warn-mismatch$spriteDefs$soundDefs$worldMeshDefs
                 |OBJS = ${'$'}(BUILD_DIR)/main.o ${'$'}(BUILD_DIR)/kotlin_stubs.o$spriteObjs$soundObjs
                 |KOTLIN_LIB = ${'$'}(CURDIR)/kotlin/$libName.a
                 |

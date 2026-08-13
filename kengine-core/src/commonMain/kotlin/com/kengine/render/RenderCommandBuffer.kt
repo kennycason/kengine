@@ -52,6 +52,10 @@ class RenderCommandBuffer(capacity: Int = 128) {
         add(RenderCommandType.VERTICAL_GRADIENT, 0, 0, 0, 0, topColor, bottomColor, pulse)
     }
 
+    fun drawWorld3D(meshId: Int, cameraX: Int, cameraY: Int, cameraZ: Int, cameraYaw: Int, cameraPitch: Int, projectionDistance: Int) {
+        add(RenderCommandType.DRAW_WORLD_3D, cameraX, cameraY, cameraZ, cameraYaw, cameraPitch, meshId, projectionDistance)
+    }
+
     fun field(commandIndex: Int, fieldIndex: Int): Int {
         if (commandIndex !in 0 until count || fieldIndex !in 0 until FIELD_COUNT) {
             return 0

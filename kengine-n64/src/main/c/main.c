@@ -22,6 +22,9 @@
 #ifdef KENGINE_N64_SOUND_ASSETS
 #include "kengine_n64_sound_assets.h"
 #endif
+#ifdef KENGINE_N64_WORLD_MESH
+#include "kengine_n64_world_mesh.h"
+#endif
 
 #define FB_WIDTH 320
 #define FB_HEIGHT 240
@@ -48,6 +51,7 @@
 #define KENGINE_RENDER_DRAW_SPRITE 5
 #define KENGINE_RENDER_DRAW_TEXT 6
 #define KENGINE_RENDER_DRAW_TRIANGLE 7
+#define KENGINE_RENDER_DRAW_WORLD_3D 8
 
 #define KENGINE_RENDER_FIELD_TYPE 0
 #define KENGINE_RENDER_FIELD_X 1
@@ -81,10 +85,8 @@
 #define KENGINE_AUDIO_NUM_CHANNELS 4
 #define KENGINE_AUDIO_MUSIC_CHANNEL 0
 #define KENGINE_AUDIO_FIRST_SOUND_CHANNEL 1
-#define KENGINE_PERF_OVERLAY_X 8
-#define KENGINE_PERF_OVERLAY_Y 56
-#define KENGINE_PERF_OVERLAY_WIDTH 152
-#define KENGINE_PERF_OVERLAY_HEIGHT 56
+#define KENGINE_PERF_OVERLAY_X 4
+#define KENGINE_PERF_OVERLAY_Y 2
 #define KENGINE_PERF_OVERLAY_LINE_HEIGHT 10
 
 /* In-memory PCM waveform for the mixer */
@@ -702,6 +704,155 @@ static int us_to_ms_rounded(int us) {
     return (us + 500) / 1000;
 }
 
+/* ---------------------------------------------------------------------------
+ * Native 3D world renderer — projects vertices in C, renders via rdpq/software
+ * --------------------------------------------------------------------------- */
+#ifdef KENGINE_N64_WORLD_MESH
+
+#define WORLD3D_TRIG_SCALE 4096
+#define WORLD3D_ANGLE_FULL 1024
+#define WORLD3D_ANGLE_RIGHT (WORLD3D_ANGLE_FULL / 4)
+#define WORLD3D_NEAR_PLANE 20
+#define WORLD3D_OFFSCREEN 128
+#define WORLD3D_COORD_LIMIT 2048
+#define WORLD3D_DEGENERATE_AREA 2
+#define WORLD3D_MAX_VERTICES 3200
+#define WORLD3D_MAX_VISIBLE 2200
+
+static int w3d_screen_x[WORLD3D_MAX_VERTICES];
+static int w3d_screen_y[WORLD3D_MAX_VERTICES];
+static int w3d_screen_z[WORLD3D_MAX_VERTICES];
+static int w3d_visible[WORLD3D_MAX_VERTICES];
+
+static int w3d_quarter_sin(int v) {
+    if (v < 0) v = 0;
+    if (v > WORLD3D_ANGLE_RIGHT) v = WORLD3D_ANGLE_RIGHT;
+    int num = v * (WORLD3D_ANGLE_RIGHT * 2 - v);
+    int den = WORLD3D_ANGLE_RIGHT * WORLD3D_ANGLE_RIGHT;
+    int scaled = num * WORLD3D_TRIG_SCALE;
+    return scaled >= 0 ? (scaled + den / 2) / den : (scaled - den / 2) / den;
+}
+
+static int w3d_sin(int angle) {
+    int w = angle & (WORLD3D_ANGLE_FULL - 1);
+    if (w < WORLD3D_ANGLE_RIGHT) return w3d_quarter_sin(w);
+    if (w < WORLD3D_ANGLE_RIGHT * 2) return w3d_quarter_sin(WORLD3D_ANGLE_RIGHT * 2 - w);
+    if (w < WORLD3D_ANGLE_RIGHT * 3) return -w3d_quarter_sin(w - WORLD3D_ANGLE_RIGHT * 2);
+    return -w3d_quarter_sin(WORLD3D_ANGLE_FULL - w);
+}
+
+static int w3d_cos(int angle) { return w3d_sin(angle + WORLD3D_ANGLE_RIGHT); }
+
+static inline int w3d_abs(int v) { return v < 0 ? -v : v; }
+static inline int w3d_clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+static void draw_world_3d(
+    surface_t* disp,
+    const KengineWorldMesh* mesh,
+    int cam_x, int cam_y, int cam_z,
+    int yaw, int pitch,
+    int proj_dist
+) {
+    if (!mesh || mesh->vertex_count > WORLD3D_MAX_VERTICES) return;
+
+    int yaw_cos = w3d_cos(yaw), yaw_sin = w3d_sin(yaw);
+    int pitch_cos = w3d_cos(pitch), pitch_sin = w3d_sin(pitch);
+    int center_x = FB_WIDTH / 2, center_y = FB_HEIGHT / 2;
+    int vc = mesh->vertex_count;
+    const int* verts = mesh->vertices;
+
+    for (int vi = 0; vi < vc; vi++) {
+        int base = vi * 3;
+        int rx = verts[base] - cam_x;
+        int ry = verts[base + 1] - cam_y;
+        int rz = verts[base + 2] - cam_z;
+
+        int vx = (rx * yaw_cos - rz * yaw_sin) / WORLD3D_TRIG_SCALE;
+        int yz = (rx * yaw_sin + rz * yaw_cos) / WORLD3D_TRIG_SCALE;
+        int vy = (ry * pitch_cos - yz * pitch_sin) / WORLD3D_TRIG_SCALE;
+        int vz = (ry * pitch_sin + yz * pitch_cos) / WORLD3D_TRIG_SCALE;
+
+        if (vz <= WORLD3D_NEAR_PLANE) {
+            w3d_visible[vi] = 0;
+            continue;
+        }
+
+        int sx = center_x + (vx * proj_dist + vz / 2) / vz;
+        int sy = center_y - (vy * proj_dist + vz / 2) / vz;
+
+        if (sx < -WORLD3D_COORD_LIMIT || sx > WORLD3D_COORD_LIMIT ||
+            sy < -WORLD3D_COORD_LIMIT || sy > WORLD3D_COORD_LIMIT) {
+            w3d_visible[vi] = 0;
+            continue;
+        }
+        w3d_screen_x[vi] = sx;
+        w3d_screen_y[vi] = sy;
+        w3d_screen_z[vi] = vz;
+        w3d_visible[vi] = 1;
+    }
+
+    int tc = mesh->triangle_count;
+    const int* tris = mesh->triangles;
+    const int* colors = mesh->colors;
+    int drawn = 0;
+
+#if KENGINE_N64_USE_RDPQ_RENDER
+    rdpq_begin(disp);
+    rdpq_prepare_flat_triangle();
+#endif
+
+    for (int ti = 0; ti < tc; ti++) {
+        int tb = ti * 4;
+        int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2], ci = tris[tb + 3];
+
+        if (!w3d_visible[a] || !w3d_visible[b] || !w3d_visible[c]) continue;
+
+        int ax = w3d_screen_x[a], ay = w3d_screen_y[a];
+        int bx = w3d_screen_x[b], by = w3d_screen_y[b];
+        int cx = w3d_screen_x[c], cy = w3d_screen_y[c];
+
+        int area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+        if (w3d_abs(area) <= WORLD3D_DEGENERATE_AREA) continue;
+
+        if ((ax < -WORLD3D_OFFSCREEN && bx < -WORLD3D_OFFSCREEN && cx < -WORLD3D_OFFSCREEN) ||
+            (ax > FB_WIDTH + WORLD3D_OFFSCREEN && bx > FB_WIDTH + WORLD3D_OFFSCREEN && cx > FB_WIDTH + WORLD3D_OFFSCREEN) ||
+            (ay < -WORLD3D_OFFSCREEN && by < -WORLD3D_OFFSCREEN && cy < -WORLD3D_OFFSCREEN) ||
+            (ay > FB_HEIGHT + WORLD3D_OFFSCREEN && by > FB_HEIGHT + WORLD3D_OFFSCREEN && cy > FB_HEIGHT + WORLD3D_OFFSCREEN))
+            continue;
+
+        int depth = (w3d_screen_z[a] + w3d_screen_z[b] + w3d_screen_z[c]) / 3;
+        int avg_y = (ay + by + cy) / 3;
+        int light = 80 + w3d_clamp((center_y - avg_y) / 3, -30, 40)
+                       + w3d_clamp(w3d_abs(area) / 200, 0, 40)
+                       + (area >= 0 ? 12 : -12);
+        int shade = w3d_clamp(light, 40, 255);
+
+        int base_color = (ci >= 0 && ci < mesh->color_count) ? colors[ci] : 0xFFB4B4B4;
+        int sr = ((base_color & 0xFF) * shade) / 255;
+        int sg = (((base_color >> 8) & 0xFF) * shade) / 255;
+        int sb = (((base_color >> 16) & 0xFF) * shade) / 255;
+        int sa = (base_color >> 24) & 0xFF;
+        int final_color = sr | (sg << 8) | (sb << 16) | (sa << 24);
+
+#if KENGINE_N64_USE_RDPQ_RENDER
+        rdpq_set_prim_color(kengine_rgba_to_rdpq_color(final_color));
+        float v1[] = { (float)ax, (float)ay };
+        float v2[] = { (float)bx, (float)by };
+        float v3[] = { (float)cx, (float)cy };
+        rdpq_triangle(&TRIFMT_FILL, v1, v2, v3);
+#else
+        draw_triangle(disp, ax, ay, bx, by, cx, cy, final_color);
+#endif
+        drawn++;
+    }
+
+#if KENGINE_N64_USE_RDPQ_RENDER
+    rdpq_flush();
+#endif
+}
+
+#endif /* KENGINE_N64_WORLD_MESH */
+
 static void draw_perf_overlay_line(surface_t* disp, const char* text, int line, uint32_t color) {
     draw_text(
         disp,
@@ -724,8 +875,7 @@ static void draw_perf_overlay(
     KengineFrameTiming timing
 ) {
     char buf[80];
-    uint32_t color = graphics_make_color(0x9A, 0xF0, 0xB8, 0xFF);
-    uint32_t panel_color = graphics_make_color(0x00, 0x00, 0x00, 0xFF);
+    uint32_t color = graphics_make_color(0x9A, 0xF0, 0xB8, 0xC0);
     int fps_x10 = (int)(display_get_fps() * 10.0f + 0.5f);
     int fps = (fps_x10 + 5) / 10;
     heap_stats_t heap;
@@ -733,62 +883,27 @@ static void draw_perf_overlay(
     unsigned long heap_used_k = (unsigned long)(heap.used / 1024);
     unsigned long heap_total_k = (unsigned long)(heap.total / 1024);
 
-    graphics_draw_box(
-        disp,
-        KENGINE_PERF_OVERLAY_X - 4,
-        KENGINE_PERF_OVERLAY_Y - 4,
-        KENGINE_PERF_OVERLAY_WIDTH,
-        KENGINE_PERF_OVERLAY_HEIGHT,
-        panel_color
-    );
-
     snprintf(
         buf,
         sizeof(buf),
-        "FPS=%d CPU=%d",
+        "FPS=%d CMD=%d+%d K=%d R=%d",
         fps,
-        us_to_ms_rounded(timing.total_us)
+        render_count,
+        render_dropped,
+        us_to_ms_rounded(timing.kotlin_us),
+        us_to_ms_rounded(timing.render_us)
     );
     draw_perf_overlay_line(disp, buf, 0, color);
 
     snprintf(
         buf,
         sizeof(buf),
-        "K=%d R=%d S=%d",
-        us_to_ms_rounded(timing.kotlin_us),
-        us_to_ms_rounded(timing.render_us),
-        us_to_ms_rounded(timing.native_audio_us)
-    );
-    draw_perf_overlay_line(disp, buf, 1, color);
-
-    snprintf(
-        buf,
-        sizeof(buf),
-        "CMD=%d+%d AUD=%d+%d",
-        render_count,
-        render_dropped,
-        audio_count,
-        audio_dropped
-    );
-    draw_perf_overlay_line(disp, buf, 2, color);
-
-    snprintf(
-        buf,
-        sizeof(buf),
-        "F=%d ST=%d",
+        "F=%d H=%lu/%luK",
         frame,
-        step_count
-    );
-    draw_perf_overlay_line(disp, buf, 3, color);
-
-    snprintf(
-        buf,
-        sizeof(buf),
-        "H=%lu/%luK",
         heap_used_k,
         heap_total_k
     );
-    draw_perf_overlay_line(disp, buf, 4, color);
+    draw_perf_overlay_line(disp, buf, 1, color);
 }
 
 static void draw_vertical_gradient(surface_t* disp, int top_color, int bottom_color, int pulse) {
@@ -961,6 +1076,22 @@ static void execute_render_commands(surface_t* disp, int* commands, int command_
                 draw_triangle(disp, x, y, w, h, color2, param, color);
 #endif
                 break;
+            case KENGINE_RENDER_DRAW_WORLD_3D: {
+#ifdef KENGINE_N64_WORLD_MESH
+                int cam_x = x, cam_y = y, cam_z = w;
+                int cam_yaw = h, cam_pitch = color;
+                int mesh_id = color2;
+                int proj_dist = param;
+#if KENGINE_N64_USE_RDPQ_RENDER
+                rdpq_flush();
+#endif
+                const KengineWorldMesh* mesh = kengine_find_world_mesh(mesh_id);
+                if (mesh) {
+                    draw_world_3d(disp, mesh, cam_x, cam_y, cam_z, cam_yaw, cam_pitch, proj_dist);
+                }
+#endif
+                break;
+            }
             case KENGINE_RENDER_DRAW_SPRITE:
 #if KENGINE_N64_USE_RDPQ_RENDER
                 rdpq_flush();

@@ -55,6 +55,7 @@ modules.addAll(
         "games:hextris-switch",
         "games:image-shuffle",
         "games:mario-3d",
+        "games:mario-n64",
         "games:nintendo-switch-demo",
         "games:osc3x-synth",
         "games:osc3x-synth-v2",

@@ -1,0 +1,103 @@
+<?xml version="1.0"?>
+<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
+    <asset>
+        <contributor>
+            <authoring_tool>Supear Mardian SixDaeFour</authoring_tool>
+        </contributor>
+        <created>2026-03-12T01:19:41.281Z</created>
+        <modified>2026-03-12T01:19:41.281Z</modified>
+		<unit meter="0.01" name="centimeter" />
+        <up_axis>Y_UP</up_axis>
+    </asset>
+    <library_images>
+        <image id="tex_0">
+            <init_from>tex_9008800.png</init_from>
+        </image>
+    </library_images>
+    <library_effects>
+        <effect id="effect0">
+            <profile_COMMON>
+                <newparam sid="surface0">
+                    <surface type="2D">
+                        <init_from>tex_0</init_from>
+                    </surface>
+                </newparam>
+                <newparam sid="sampler0">
+                    <sampler2D>
+                        <source>surface0</source>
+                    </sampler2D>
+                </newparam>
+                <technique sid="COMMON">
+                    <blinn>
+                        <diffuse>
+                            <texture texture="sampler0" texcoord="UVSET0"></texture>
+                        </diffuse>
+                    </blinn>
+                </technique>
+            </profile_COMMON>
+        </effect>
+    </library_effects>
+    <library_materials>
+        <material id="mat0" name="Mat0">
+            <instance_effect url="#effect0"/>
+        </material>
+    </library_materials>
+    <library_geometries>
+        <geometry id="meshMesh0_1">
+            <mesh>
+                <source id="pointsMesh0_1">
+                    <float_array id="pointarrayMesh0_1" count="12">512 0 0 512 640 0 -511 640 0 -511 0 0</float_array>
+                    <technique_common>
+                        <accessor count="4" source="#pointarrayMesh0_1" stride="3">
+                            <param name="X" type="float"/>
+                            <param name="Y" type="float"/>
+                            <param name="Z" type="float"/>
+                        </accessor>
+                    </technique_common>
+                </source>
+                <source id="uvsMesh0_1">
+                    <float_array id="uvarrayMesh0_1" count="8">-7.015625 6.021484375 -7.015625 0.033203125 0.966796875 0.033203125 0.966796875 6.021484375</float_array>
+                    <technique_common>
+                        <accessor count="4" source="#uvarrayMesh0_1" stride="2">
+                            <param name="S" type="float"/>
+                            <param name="T" type="float"/>
+                        </accessor>
+                    </technique_common>
+                </source>
+                <vertices id="verticesMesh0_1">
+                    <input semantic="POSITION" source="#pointsMesh0_1"/>
+                </vertices>
+                <polylist count="2" material="Material1">
+                    <input offset="0" semantic="VERTEX" source="#verticesMesh0_1"/>
+                    <input offset="1" semantic="TEXCOORD" source="#uvsMesh0_1" set="0"/>
+                    <vcount>3 3</vcount>
+                    <p>0 0 1 1 2 2 3 3 0 0 2 2</p>
+                </polylist>
+            </mesh>
+        </geometry>
+    </library_geometries>
+    <library_visual_scenes>
+        <visual_scene id="VisualSceneNode">
+            <node id="node_Node0" name="Node0_culling">
+                <node id="node_Node1" name="Node1_display">
+                    <node id="node_Node2" name="Node2_display">
+                        <node id="node_Mesh0_1" name="Mesh0">
+                            <instance_geometry url="#meshMesh0_1">
+                                <bind_material>
+                                    <technique_common>
+                                        <instance_material symbol="Material1" target="#mat0">
+                                            <bind_vertex_input semantic="UVSET0" input_semantic="TEXCOORD" input_set="0"/>
+                                        </instance_material>
+                                    </technique_common>
+                                </bind_material>
+                            </instance_geometry>
+                        </node>
+                    </node>
+                </node>
+            </node>
+        </visual_scene>
+    </library_visual_scenes>
+    <scene>
+        <instance_visual_scene url="#VisualSceneNode"/>
+    </scene>
+</COLLADA>

@@ -57,6 +57,18 @@ class RenderContext(commandCapacity: Int = 128) {
         commands.verticalGradient(topColor, bottomColor, pulse)
     }
 
+    fun drawWorld3D(
+        meshId: Int,
+        cameraX: Int,
+        cameraY: Int,
+        cameraZ: Int,
+        cameraYaw: Int,
+        cameraPitch: Int,
+        projectionDistance: Int = 200
+    ) {
+        commands.drawWorld3D(meshId, cameraX, cameraY, cameraZ, cameraYaw, cameraPitch, projectionDistance)
+    }
+
     fun commandField(commandIndex: Int, fieldIndex: Int): Int {
         return commands.field(commandIndex, fieldIndex)
     }

@@ -5,6 +5,10 @@ object RenderAssetId {
         return stableId("sprite:$name")
     }
 
+    fun mesh(name: String): Int {
+        return stableId("mesh:$name")
+    }
+
     private fun stableId(value: String): Int {
         var hash = FNV_OFFSET_BASIS
         for (char in value) {
