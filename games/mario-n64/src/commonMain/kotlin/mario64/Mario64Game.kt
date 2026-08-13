@@ -85,11 +85,11 @@ class Mario64Game : PortableGame {
         private const val VERTICAL_SPEED = 20
         private const val YAW_SPEED = 18
         private const val PITCH_SPEED = 9
-        private const val INITIAL_YAW = 0
-        private const val INITIAL_PITCH = -64
+        private const val INITIAL_YAW = 640
+        private const val INITIAL_PITCH = -80
         private const val MIN_PITCH = -200
         private const val MAX_PITCH = 200
-        private const val PLAYER_START_Y = 600
-        private const val PROJECTION_DISTANCE = 200
+        private const val PLAYER_START_Y = 800
+        private const val PROJECTION_DISTANCE = 300
     }
 }

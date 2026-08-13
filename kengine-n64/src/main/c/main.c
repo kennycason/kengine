@@ -796,7 +796,7 @@ static void w3d_clip_project(int vx0, int vy0, int vz0, int vx1, int vy1, int vz
     int cx = vx0 + (vx1 - vx0) * t_num / dz;
     int cy = vy0 + (vy1 - vy0) * t_num / dz;
     int cz = WORLD3D_NEAR_PLANE + 1;
-    *out_sx = center_x + (cx * proj_dist + cz / 2) / cz;
+    *out_sx = center_x - (cx * proj_dist + cz / 2) / cz;
     *out_sy = center_y - (cy * proj_dist + cz / 2) / cz;
     *out_sz = cz;
 }
@@ -837,7 +837,7 @@ static void draw_world_3d(
             continue;
         }
 
-        int sx = center_x + (vx * proj_dist + vz / 2) / vz;
+        int sx = center_x - (vx * proj_dist + vz / 2) / vz;
         int sy = center_y - (vy * proj_dist + vz / 2) / vz;
 
         if (sx < -WORLD3D_COORD_LIMIT || sx > WORLD3D_COORD_LIMIT ||
@@ -871,41 +871,26 @@ static void draw_world_3d(
         int tb = ti * 4;
         int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2];
         int va = w3d_visible[a], vb = w3d_visible[b], vc2 = w3d_visible[c];
-        int behind = (!va) + (!vb) + (!vc2);
-        if (behind == 3) continue;
-        if (behind > 0 && (w3d_view_z[a] < -200 || w3d_view_z[b] < -200 || w3d_view_z[c] < -200)) continue;
+        int vis_sum = va + vb + vc2;
+        if (vis_sum == 0) continue;
 
         int ax, ay, bx, by, cx, cy;
         int az_depth, bz_depth, cz_depth;
 
-        if (behind == 0) {
-            ax = w3d_screen_x[a]; ay = w3d_screen_y[a]; az_depth = w3d_screen_z[a];
-            bx = w3d_screen_x[b]; by = w3d_screen_y[b]; bz_depth = w3d_screen_z[b];
-            cx = w3d_screen_x[c]; cy = w3d_screen_y[c]; cz_depth = w3d_screen_z[c];
-        } else {
-            if (va) { ax = w3d_screen_x[a]; ay = w3d_screen_y[a]; az_depth = w3d_screen_z[a]; }
-            else { w3d_clip_project(w3d_view_x[a], w3d_view_y[a], w3d_view_z[a],
-                       w3d_view_x[va ? a : (vb ? b : c)], w3d_view_y[va ? a : (vb ? b : c)], w3d_view_z[va ? a : (vb ? b : c)],
-                       proj_dist, center_x, center_y, &ax, &ay, &az_depth);
-                   /* find a visible neighbor to clip toward */
-                   int nb = vb ? b : (vc2 ? c : a);
-                   w3d_clip_project(w3d_view_x[a], w3d_view_y[a], w3d_view_z[a],
-                       w3d_view_x[nb], w3d_view_y[nb], w3d_view_z[nb],
-                       proj_dist, center_x, center_y, &ax, &ay, &az_depth);
-                 }
-            if (vb) { bx = w3d_screen_x[b]; by = w3d_screen_y[b]; bz_depth = w3d_screen_z[b]; }
-            else { int nb = va ? a : (vc2 ? c : b);
-                   w3d_clip_project(w3d_view_x[b], w3d_view_y[b], w3d_view_z[b],
-                       w3d_view_x[nb], w3d_view_y[nb], w3d_view_z[nb],
-                       proj_dist, center_x, center_y, &bx, &by, &bz_depth);
-                 }
-            if (vc2) { cx = w3d_screen_x[c]; cy = w3d_screen_y[c]; cz_depth = w3d_screen_z[c]; }
-            else { int nb = va ? a : (vb ? b : c);
-                   w3d_clip_project(w3d_view_x[c], w3d_view_y[c], w3d_view_z[c],
-                       w3d_view_x[nb], w3d_view_y[nb], w3d_view_z[nb],
-                       proj_dist, center_x, center_y, &cx, &cy, &cz_depth);
-                 }
-        }
+        /* Helper macro: get screen coords for visible vertex, clip for behind vertex */
+        #define GET_VERT(idx, is_vis, sx, sy, sz) \
+            if (is_vis) { sx = w3d_screen_x[idx]; sy = w3d_screen_y[idx]; sz = w3d_screen_z[idx]; } \
+            else { \
+                int nb_idx = va ? a : (vb ? b : c); \
+                w3d_clip_project(w3d_view_x[idx], w3d_view_y[idx], w3d_view_z[idx], \
+                    w3d_view_x[nb_idx], w3d_view_y[nb_idx], w3d_view_z[nb_idx], \
+                    proj_dist, center_x, center_y, &sx, &sy, &sz); \
+            }
+
+        GET_VERT(a, va, ax, ay, az_depth)
+        GET_VERT(b, vb, bx, by, bz_depth)
+        GET_VERT(c, vc2, cx, cy, cz_depth)
+        #undef GET_VERT
 
         int area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
         if (w3d_abs(area) <= WORLD3D_DEGENERATE_AREA) continue;
@@ -998,9 +983,11 @@ static void draw_world_3d(
 
                 int ab = a * vstride, bb2 = b * vstride, cb = c * vstride;
                 const int* vdata = mesh->vertices;
-                float s0 = (float)vdata[ab + 3] / 32.0f, t0 = (float)vdata[ab + 4] / 32.0f;
-                float s1 = (float)vdata[bb2 + 3] / 32.0f, t1 = (float)vdata[bb2 + 4] / 32.0f;
-                float s2 = (float)vdata[cb + 3] / 32.0f, t2 = (float)vdata[cb + 4] / 32.0f;
+                const KengineWorldTexture* wt2 = &mesh->textures[tex_idx];
+                float tw = (float)wt2->width, th = (float)wt2->height;
+                float s0 = (float)vdata[ab + 3] * tw / 1024.0f, t0 = (float)vdata[ab + 4] * th / 1024.0f;
+                float s1 = (float)vdata[bb2 + 3] * tw / 1024.0f, t1 = (float)vdata[bb2 + 4] * th / 1024.0f;
+                float s2 = (float)vdata[cb + 3] * tw / 1024.0f, t2 = (float)vdata[cb + 4] * th / 1024.0f;
 
                 float v1[] = { (float)ax, (float)ay, s0, t0, 1.0f };
                 float v2[] = { (float)bx, (float)by, s1, t1, 1.0f };
