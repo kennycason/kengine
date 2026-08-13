@@ -28,8 +28,8 @@ class Mario64Game : PortableGame {
             val fwdCos = cosAngle(cameraYaw)
             val fwdSin = sinAngle(cameraYaw)
             val speed = if (input.isPressed(InputButton.B)) RUN_SPEED else WALK_SPEED
-            playerX += trigMul(strafeAxis * speed, fwdCos) + trigMul(forwardAxis * speed, fwdSin)
-            playerZ += trigMul(-strafeAxis * speed, fwdSin) + trigMul(forwardAxis * speed, fwdCos)
+            playerX += trigMul(-strafeAxis * speed, fwdCos) + trigMul(forwardAxis * speed, fwdSin)
+            playerZ += trigMul(strafeAxis * speed, fwdSin) + trigMul(forwardAxis * speed, fwdCos)
         }
 
         cameraYaw = wrapAngle(

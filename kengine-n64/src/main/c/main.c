@@ -870,27 +870,11 @@ static void draw_world_3d(
     for (int ti = 0; ti < tc && vis_count < WORLD3D_MAX_VISIBLE; ti++) {
         int tb = ti * 4;
         int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2];
-        int va = w3d_visible[a], vb = w3d_visible[b], vc2 = w3d_visible[c];
-        int vis_sum = va + vb + vc2;
-        if (vis_sum == 0) continue;
+        if (!w3d_visible[a] || !w3d_visible[b] || !w3d_visible[c]) continue;
 
-        int ax, ay, bx, by, cx, cy;
-        int az_depth, bz_depth, cz_depth;
-
-        /* Helper macro: get screen coords for visible vertex, clip for behind vertex */
-        #define GET_VERT(idx, is_vis, sx, sy, sz) \
-            if (is_vis) { sx = w3d_screen_x[idx]; sy = w3d_screen_y[idx]; sz = w3d_screen_z[idx]; } \
-            else { \
-                int nb_idx = va ? a : (vb ? b : c); \
-                w3d_clip_project(w3d_view_x[idx], w3d_view_y[idx], w3d_view_z[idx], \
-                    w3d_view_x[nb_idx], w3d_view_y[nb_idx], w3d_view_z[nb_idx], \
-                    proj_dist, center_x, center_y, &sx, &sy, &sz); \
-            }
-
-        GET_VERT(a, va, ax, ay, az_depth)
-        GET_VERT(b, vb, bx, by, bz_depth)
-        GET_VERT(c, vc2, cx, cy, cz_depth)
-        #undef GET_VERT
+        int ax = w3d_screen_x[a], ay = w3d_screen_y[a], az_depth = w3d_screen_z[a];
+        int bx = w3d_screen_x[b], by = w3d_screen_y[b], bz_depth = w3d_screen_z[b];
+        int cx = w3d_screen_x[c], cy = w3d_screen_y[c], cz_depth = w3d_screen_z[c];
 
         int area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
         if (w3d_abs(area) <= WORLD3D_DEGENERATE_AREA) continue;
@@ -967,6 +951,7 @@ static void draw_world_3d(
                     rdpq_sync_pipe();
                     rdpq_set_mode_standard();
                     rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
+                    rdpq_mode_persp(true);
                     const KengineWorldTexture* wt = &mesh->textures[tex_idx];
                     rdpq_tex_upload(TILE0, &tex_surfaces[tex_idx], NULL);
                     current_tex = tex_idx;
@@ -989,9 +974,12 @@ static void draw_world_3d(
                 float s1 = (float)vdata[bb2 + 3] * tw / 1024.0f, t1 = (float)vdata[bb2 + 4] * th / 1024.0f;
                 float s2 = (float)vdata[cb + 3] * tw / 1024.0f, t2 = (float)vdata[cb + 4] * th / 1024.0f;
 
-                float v1[] = { (float)ax, (float)ay, s0, t0, 1.0f };
-                float v2[] = { (float)bx, (float)by, s1, t1, 1.0f };
-                float v3[] = { (float)cx, (float)cy, s2, t2, 1.0f };
+                float iw0 = 1.0f / (float)w3d_screen_z[a];
+                float iw1 = 1.0f / (float)w3d_screen_z[b];
+                float iw2 = 1.0f / (float)w3d_screen_z[c];
+                float v1[] = { (float)ax, (float)ay, s0, t0, iw0 };
+                float v2[] = { (float)bx, (float)by, s1, t1, iw1 };
+                float v3[] = { (float)cx, (float)cy, s2, t2, iw2 };
                 rdpq_triangle(&TRIFMT_TEX, v1, v2, v3);
             } else {
                 if (using_texture) {
