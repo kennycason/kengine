@@ -80,11 +80,11 @@ class Mario64Game : PortableGame {
     companion object {
         val BATTLEFIELD_MESH_ID = RenderAssetId.mesh("battlefield")
 
-        private const val WALK_SPEED = 160
-        private const val RUN_SPEED = 400
-        private const val VERTICAL_SPEED = 120
-        private const val YAW_SPEED = 24
-        private const val PITCH_SPEED = 12
+        private const val WALK_SPEED = 24
+        private const val RUN_SPEED = 64
+        private const val VERTICAL_SPEED = 20
+        private const val YAW_SPEED = 18
+        private const val PITCH_SPEED = 9
         private const val INITIAL_YAW = 0
         private const val INITIAL_PITCH = -64
         private const val MIN_PITCH = -200

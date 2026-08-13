@@ -437,16 +437,37 @@ typedef enum {
     KENGINE_RDPQ_MODE_NONE = 0,
     KENGINE_RDPQ_MODE_FILL = 1,
     KENGINE_RDPQ_MODE_FLAT_TRIANGLE = 2,
+    KENGINE_RDPQ_MODE_ZBUF_TRIANGLE = 3,
 } KengineRdpqMode;
 
 static int g_rdpq_attached = 0;
 static KengineRdpqMode g_rdpq_mode = KENGINE_RDPQ_MODE_NONE;
+static surface_t g_zbuffer;
+static int g_zbuffer_allocated = 0;
+
+static void kengine_ensure_zbuffer(void) {
+    if (!g_zbuffer_allocated) {
+        g_zbuffer = surface_alloc(FMT_RGBA16, FB_WIDTH, FB_HEIGHT);
+        g_zbuffer_allocated = 1;
+    }
+}
 
 static void rdpq_begin(surface_t* disp) {
     if (g_rdpq_attached) {
         return;
     }
     rdpq_attach(disp, NULL);
+    g_rdpq_attached = 1;
+    g_rdpq_mode = KENGINE_RDPQ_MODE_NONE;
+}
+
+static void rdpq_begin_zbuf(surface_t* disp) {
+    if (g_rdpq_attached) {
+        return;
+    }
+    kengine_ensure_zbuffer();
+    rdpq_attach(disp, &g_zbuffer);
+    rdpq_clear_z(0xFFFC);
     g_rdpq_attached = 1;
     g_rdpq_mode = KENGINE_RDPQ_MODE_NONE;
 }
@@ -476,6 +497,16 @@ static void rdpq_prepare_flat_triangle(void) {
     rdpq_set_mode_standard();
     rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
     g_rdpq_mode = KENGINE_RDPQ_MODE_FLAT_TRIANGLE;
+}
+
+static void rdpq_prepare_zbuf_triangle(void) {
+    if (g_rdpq_mode == KENGINE_RDPQ_MODE_ZBUF_TRIANGLE) {
+        return;
+    }
+    rdpq_set_mode_standard();
+    rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+    rdpq_mode_zbuf(true, true);
+    g_rdpq_mode = KENGINE_RDPQ_MODE_ZBUF_TRIANGLE;
 }
 
 static void draw_rect_rdpq(surface_t* disp, int x, int y, int width, int height, int color) {
@@ -760,6 +791,7 @@ static void draw_world_3d(
     int center_x = FB_WIDTH / 2, center_y = FB_HEIGHT / 2;
     int vc = mesh->vertex_count;
     const int* verts = mesh->vertices;
+    int depthMin = 0x7FFFFFFF, depthMax = 0;
 
     for (int vi = 0; vi < vc; vi++) {
         int base = vi * 3;
@@ -789,6 +821,8 @@ static void draw_world_3d(
         w3d_screen_y[vi] = sy;
         w3d_screen_z[vi] = vz;
         w3d_visible[vi] = 1;
+        if (vz < depthMin) depthMin = vz;
+        if (vz > depthMax) depthMax = vz;
     }
 
     int tc = mesh->triangle_count;
@@ -796,16 +830,21 @@ static void draw_world_3d(
     const int* colors = mesh->colors;
     int drawn = 0;
 
+    int depth_split = (depthMin + depthMax) / 2;
+
 #if KENGINE_N64_USE_RDPQ_RENDER
     rdpq_begin(disp);
     rdpq_prepare_flat_triangle();
 #endif
 
+    /* Pass 1: far triangles (depth >= split) */
     for (int ti = 0; ti < tc; ti++) {
         int tb = ti * 4;
         int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2], ci = tris[tb + 3];
-
         if (!w3d_visible[a] || !w3d_visible[b] || !w3d_visible[c]) continue;
+
+        int avg_z = (w3d_screen_z[a] + w3d_screen_z[b] + w3d_screen_z[c]) / 3;
+        if (avg_z < depth_split) continue;
 
         int ax = w3d_screen_x[a], ay = w3d_screen_y[a];
         int bx = w3d_screen_x[b], by = w3d_screen_y[b];
@@ -813,14 +852,58 @@ static void draw_world_3d(
 
         int area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
         if (w3d_abs(area) <= WORLD3D_DEGENERATE_AREA) continue;
-
         if ((ax < -WORLD3D_OFFSCREEN && bx < -WORLD3D_OFFSCREEN && cx < -WORLD3D_OFFSCREEN) ||
             (ax > FB_WIDTH + WORLD3D_OFFSCREEN && bx > FB_WIDTH + WORLD3D_OFFSCREEN && cx > FB_WIDTH + WORLD3D_OFFSCREEN) ||
             (ay < -WORLD3D_OFFSCREEN && by < -WORLD3D_OFFSCREEN && cy < -WORLD3D_OFFSCREEN) ||
             (ay > FB_HEIGHT + WORLD3D_OFFSCREEN && by > FB_HEIGHT + WORLD3D_OFFSCREEN && cy > FB_HEIGHT + WORLD3D_OFFSCREEN))
             continue;
 
-        int depth = (w3d_screen_z[a] + w3d_screen_z[b] + w3d_screen_z[c]) / 3;
+        int avg_y = (ay + by + cy) / 3;
+        int light = 80 + w3d_clamp((center_y - avg_y) / 3, -30, 40)
+                       + w3d_clamp(w3d_abs(area) / 200, 0, 40)
+                       + (area >= 0 ? 12 : -12);
+        int shade = w3d_clamp(light, 40, 255);
+
+        int base_color = (ci >= 0 && ci < mesh->color_count) ? colors[ci] : 0xFFB4B4B4;
+        int sr = ((base_color & 0xFF) * shade) / 255;
+        int sg = (((base_color >> 8) & 0xFF) * shade) / 255;
+        int sb = (((base_color >> 16) & 0xFF) * shade) / 255;
+        int sa = (base_color >> 24) & 0xFF;
+        int final_color = sr | (sg << 8) | (sb << 16) | (sa << 24);
+
+#if KENGINE_N64_USE_RDPQ_RENDER
+        rdpq_set_prim_color(kengine_rgba_to_rdpq_color(final_color));
+        float v1[] = { (float)ax, (float)ay };
+        float v2[] = { (float)bx, (float)by };
+        float v3[] = { (float)cx, (float)cy };
+        rdpq_triangle(&TRIFMT_FILL, v1, v2, v3);
+#else
+        draw_triangle(disp, ax, ay, bx, by, cx, cy, final_color);
+#endif
+        drawn++;
+    }
+
+    /* Pass 2: near triangles (depth < split) — drawn last so they cover far ones */
+    for (int ti = 0; ti < tc; ti++) {
+        int tb = ti * 4;
+        int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2], ci = tris[tb + 3];
+        if (!w3d_visible[a] || !w3d_visible[b] || !w3d_visible[c]) continue;
+
+        int avg_z = (w3d_screen_z[a] + w3d_screen_z[b] + w3d_screen_z[c]) / 3;
+        if (avg_z >= depth_split) continue;
+
+        int ax = w3d_screen_x[a], ay = w3d_screen_y[a];
+        int bx = w3d_screen_x[b], by = w3d_screen_y[b];
+        int cx = w3d_screen_x[c], cy = w3d_screen_y[c];
+
+        int area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+        if (w3d_abs(area) <= WORLD3D_DEGENERATE_AREA) continue;
+        if ((ax < -WORLD3D_OFFSCREEN && bx < -WORLD3D_OFFSCREEN && cx < -WORLD3D_OFFSCREEN) ||
+            (ax > FB_WIDTH + WORLD3D_OFFSCREEN && bx > FB_WIDTH + WORLD3D_OFFSCREEN && cx > FB_WIDTH + WORLD3D_OFFSCREEN) ||
+            (ay < -WORLD3D_OFFSCREEN && by < -WORLD3D_OFFSCREEN && cy < -WORLD3D_OFFSCREEN) ||
+            (ay > FB_HEIGHT + WORLD3D_OFFSCREEN && by > FB_HEIGHT + WORLD3D_OFFSCREEN && cy > FB_HEIGHT + WORLD3D_OFFSCREEN))
+            continue;
+
         int avg_y = (ay + by + cy) / 3;
         int light = 80 + w3d_clamp((center_y - avg_y) / 3, -30, 40)
                        + w3d_clamp(w3d_abs(area) / 200, 0, 40)
