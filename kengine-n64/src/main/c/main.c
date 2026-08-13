@@ -11,6 +11,7 @@
 #include <rdpq_mode.h>
 #include <rdpq_rect.h>
 #include <rdpq_tri.h>
+#include <rdpq_tex.h>
 #endif
 
 #ifndef KENGINE_N64_C_ONLY
@@ -747,7 +748,7 @@ static int us_to_ms_rounded(int us) {
 #define WORLD3D_OFFSCREEN 128
 #define WORLD3D_COORD_LIMIT 2048
 #define WORLD3D_DEGENERATE_AREA 2
-#define WORLD3D_MAX_VERTICES 3200
+#define WORLD3D_MAX_VERTICES 6500
 #define WORLD3D_MAX_VISIBLE 2200
 #define WORLD3D_DEPTH_BUCKETS 64
 
@@ -817,7 +818,7 @@ static void draw_world_3d(
     int depthMin = 0x7FFFFFFF, depthMax = 0;
 
     for (int vi = 0; vi < vc; vi++) {
-        int base = vi * 3;
+        int base = vi * mesh->vertex_stride;
         int rx = verts[base] - cam_x;
         int ry = verts[base + 1] - cam_y;
         int rz = verts[base + 2] - cam_z;
@@ -932,11 +933,35 @@ static void draw_world_3d(
         vis_count++;
     }
 
+    /* Build material→texture lookup */
+    surface_t tex_surfaces[32];
+    int tex_mat_map[32];
+    int tex_surface_count = 0;
+    memset(tex_mat_map, -1, sizeof(tex_mat_map));
+
+#if KENGINE_N64_USE_RDPQ_RENDER
+    if (mesh->textures && mesh->texture_count > 0) {
+        for (int ti2 = 0; ti2 < mesh->texture_count && tex_surface_count < 32; ti2++) {
+            const KengineWorldTexture* wt = &mesh->textures[ti2];
+            tex_surfaces[tex_surface_count] = surface_make_linear(
+                (void*)wt->data, FMT_RGBA16, wt->width, wt->height
+            );
+            if (wt->material_index >= 0 && wt->material_index < 32) {
+                tex_mat_map[wt->material_index] = tex_surface_count;
+            }
+            tex_surface_count++;
+        }
+    }
+#endif
+
     /* Draw from farthest bucket to nearest — painter's algorithm */
 #if KENGINE_N64_USE_RDPQ_RENDER
     rdpq_begin(disp);
-    rdpq_prepare_flat_triangle();
+    int current_tex = -1;
+    int using_texture = 0;
 #endif
+
+    int vstride = mesh->vertex_stride;
 
     for (int bi = WORLD3D_DEPTH_BUCKETS - 1; bi >= 0; bi--) {
         int vi = w3d_bucket_head[bi];
@@ -949,6 +974,66 @@ static void draw_world_3d(
             int bx = w3d_screen_x[b], by = w3d_screen_y[b];
             int cx = w3d_screen_x[c], cy = w3d_screen_y[c];
 
+#if KENGINE_N64_USE_RDPQ_RENDER
+            int tex_idx = (ci >= 0 && ci < 32) ? tex_mat_map[ci] : -1;
+
+            if (tex_idx >= 0 && vstride >= 5) {
+                if (tex_idx != current_tex || !using_texture) {
+                    rdpq_sync_pipe();
+                    rdpq_set_mode_standard();
+                    rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
+                    const KengineWorldTexture* wt = &mesh->textures[tex_idx];
+                    rdpq_tex_upload(TILE0, &tex_surfaces[tex_idx], NULL);
+                    current_tex = tex_idx;
+                    using_texture = 1;
+                    g_rdpq_mode = KENGINE_RDPQ_MODE_NONE;
+                }
+
+                int avg_y = (ay + by + cy) / 3;
+                int light = 80 + w3d_clamp((center_y - avg_y) / 3, -30, 40)
+                               + w3d_clamp(w3d_abs(area) / 200, 0, 40)
+                               + (area >= 0 ? 12 : -12);
+                int shade = w3d_clamp(light, 40, 255);
+                rdpq_set_prim_color(RGBA32(shade, shade, shade, 255));
+
+                int ab = a * vstride, bb2 = b * vstride, cb = c * vstride;
+                const int* vdata = mesh->vertices;
+                float s0 = (float)vdata[ab + 3] / 32.0f, t0 = (float)vdata[ab + 4] / 32.0f;
+                float s1 = (float)vdata[bb2 + 3] / 32.0f, t1 = (float)vdata[bb2 + 4] / 32.0f;
+                float s2 = (float)vdata[cb + 3] / 32.0f, t2 = (float)vdata[cb + 4] / 32.0f;
+
+                float v1[] = { (float)ax, (float)ay, s0, t0, 1.0f };
+                float v2[] = { (float)bx, (float)by, s1, t1, 1.0f };
+                float v3[] = { (float)cx, (float)cy, s2, t2, 1.0f };
+                rdpq_triangle(&TRIFMT_TEX, v1, v2, v3);
+            } else {
+                if (using_texture) {
+                    rdpq_sync_pipe();
+                    rdpq_prepare_flat_triangle();
+                    using_texture = 0;
+                    current_tex = -1;
+                }
+
+                int avg_y = (ay + by + cy) / 3;
+                int light = 80 + w3d_clamp((center_y - avg_y) / 3, -30, 40)
+                               + w3d_clamp(w3d_abs(area) / 200, 0, 40)
+                               + (area >= 0 ? 12 : -12);
+                int shade = w3d_clamp(light, 40, 255);
+
+                int base_color = (ci >= 0 && ci < mesh->color_count) ? colors[ci] : 0xFFB4B4B4;
+                int sr = ((base_color & 0xFF) * shade) / 255;
+                int sg = (((base_color >> 8) & 0xFF) * shade) / 255;
+                int sb = (((base_color >> 16) & 0xFF) * shade) / 255;
+                int sa = (base_color >> 24) & 0xFF;
+                int final_color = sr | (sg << 8) | (sb << 16) | (sa << 24);
+
+                rdpq_set_prim_color(kengine_rgba_to_rdpq_color(final_color));
+                float v1[] = { (float)ax, (float)ay };
+                float v2[] = { (float)bx, (float)by };
+                float v3[] = { (float)cx, (float)cy };
+                rdpq_triangle(&TRIFMT_FILL, v1, v2, v3);
+            }
+#else
             int avg_y = (ay + by + cy) / 3;
             int light = 80 + w3d_clamp((center_y - avg_y) / 3, -30, 40)
                            + w3d_clamp(w3d_abs(area) / 200, 0, 40)
@@ -961,14 +1046,6 @@ static void draw_world_3d(
             int sb = (((base_color >> 16) & 0xFF) * shade) / 255;
             int sa = (base_color >> 24) & 0xFF;
             int final_color = sr | (sg << 8) | (sb << 16) | (sa << 24);
-
-#if KENGINE_N64_USE_RDPQ_RENDER
-            rdpq_set_prim_color(kengine_rgba_to_rdpq_color(final_color));
-            float v1[] = { (float)ax, (float)ay };
-            float v2[] = { (float)bx, (float)by };
-            float v3[] = { (float)cx, (float)cy };
-            rdpq_triangle(&TRIFMT_FILL, v1, v2, v3);
-#else
             draw_triangle(disp, ax, ay, bx, by, cx, cy, final_color);
 #endif
             drawn++;

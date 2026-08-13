@@ -109,10 +109,22 @@ data class BakedMario64World(
     val triangles: List<Int>,
     val colors: List<Int>,
     val vertexCount: Int,
-    val triangleCount: Int
+    val triangleCount: Int,
+    val hasUVs: Boolean,
+    val textures: List<BakedMario64Texture>
+)
+
+data class BakedMario64Texture(
+    val materialIndex: Int,
+    val filename: String,
+    val width: Int,
+    val height: Int,
+    val rgba16Data: ShortArray
 )
 
 private val NS = "http://www.collada.org/2005/11/COLLADASchema"
+
+data class DaeVertex(val posIndex: Int, val uvIndex: Int)
 
 fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
     val factory = DocumentBuilderFactory.newInstance()
@@ -123,19 +135,75 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
     val effects = parseDaeEffects(doc)
     val materials = parseDaeMaterials(doc)
     val geometryMaterialMap = parseDaeGeometryMaterialMap(doc)
-
     val materialColors = resolveMaterialColors(materials, effects, images, textureDir)
+    val materialTextures = resolveMaterialTextureFiles(materials, effects, images)
 
-    val allVertices = mutableListOf<DoubleArray>()
+    val allPositions = mutableListOf<DoubleArray>()
+    val allUVs = mutableListOf<DoubleArray>()
+    val deduplicatedVertices = mutableListOf<DoubleArray>()
+    val vertexMap = linkedMapOf<Long, Int>()
     val colors = mutableListOf<Int>()
     val colorIndexes = linkedMapOf<Int, Int>()
+    val materialIndexes = linkedMapOf<String, Int>()
     val allTriangles = mutableListOf<IntArray>()
 
-    fun colorIndex(color: Int): Int {
-        return colorIndexes.getOrPut(color) {
-            colors += color
-            colors.lastIndex
+    fun colorIndex(color: Int): Int = colorIndexes.getOrPut(color) { colors += color; colors.lastIndex }
+
+    fun materialIndex(matId: String, color: Int): Int {
+        return materialIndexes.getOrPut(matId) { colorIndex(color) }
+    }
+
+    fun deduplicateVertex(px: Double, py: Double, pz: Double, u: Double, v: Double): Int {
+        val uBits = (u * 65536.0).toLong()
+        val vBits = (v * 65536.0).toLong()
+        val key = (deduplicatedVertices.size.toLong() shl 48) or ((uBits and 0xFFFF) shl 32) or ((vBits and 0xFFFF) shl 16) or
+            ((px * 1000).toLong() and 0xFFFF)
+        val existing = vertexMap[key]
+        if (existing != null) return existing
+        val idx = deduplicatedVertices.size
+        deduplicatedVertices += doubleArrayOf(px, py, pz, u, v)
+        vertexMap[key] = idx
+        return idx
+    }
+
+    fun addVertex(posIndex: Int, uvIndex: Int, positions: DoubleArray, uvs: DoubleArray): Int {
+        val px = if (posIndex * 3 + 2 < positions.size) positions[posIndex * 3] else 0.0
+        val py = if (posIndex * 3 + 2 < positions.size) positions[posIndex * 3 + 1] else 0.0
+        val pz = if (posIndex * 3 + 2 < positions.size) positions[posIndex * 3 + 2] else 0.0
+        val u = if (uvs.isNotEmpty() && uvIndex * 2 + 1 < uvs.size) uvs[uvIndex * 2] else 0.0
+        val v = if (uvs.isNotEmpty() && uvIndex * 2 + 1 < uvs.size) uvs[uvIndex * 2 + 1] else 0.0
+        val idx = deduplicatedVertices.size
+        deduplicatedVertices += doubleArrayOf(px, py, pz, u, v)
+        return idx
+    }
+
+    fun parsePolylistInputs(parent: Element): Triple<Int, Int, Int> {
+        val inputs = parent.getElementsByTagNameNS(NS, "input")
+        var stride = 0
+        var vertexOffset = 0
+        var texcoordOffset = -1
+        for (ii in 0 until inputs.length) {
+            val input = inputs.item(ii) as? Element ?: continue
+            val offset = input.getAttribute("offset")?.toIntOrNull() ?: 0
+            if (offset + 1 > stride) stride = offset + 1
+            when (input.getAttribute("semantic")) {
+                "VERTEX" -> vertexOffset = offset
+                "TEXCOORD" -> texcoordOffset = offset
+            }
         }
+        if (stride == 0) stride = 1
+        return Triple(stride, vertexOffset, texcoordOffset)
+    }
+
+    fun resolveUVSourceId(mesh: Element, parent: Element): String {
+        val inputs = parent.getElementsByTagNameNS(NS, "input")
+        for (ii in 0 until inputs.length) {
+            val input = inputs.item(ii) as? Element ?: continue
+            if (input.getAttribute("semantic") == "TEXCOORD") {
+                return input.getAttribute("source")?.removePrefix("#") ?: ""
+            }
+        }
+        return ""
     }
 
     val geometries = doc.getElementsByTagNameNS(NS, "geometry")
@@ -146,37 +214,18 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
 
         val matId = geometryMaterialMap[geomId] ?: ""
         val geomColor = materialColors[matId] ?: rgba(180, 180, 180)
+        val ci = materialIndex(matId, geomColor)
 
         val positionSourceId = resolvePositionSourceId(mesh)
-        val positionFloats = parseFloatArray(mesh, positionSourceId)
-        if (positionFloats.isEmpty()) continue
-
-        val vertexOffset = allVertices.size
-        for (vi in positionFloats.indices step 3) {
-            allVertices += doubleArrayOf(
-                positionFloats[vi],
-                positionFloats[vi + 1],
-                positionFloats[vi + 2]
-            )
-        }
+        val positions = parseFloatArray(mesh, positionSourceId)
+        if (positions.isEmpty()) continue
 
         val polylists = mesh.getElementsByTagNameNS(NS, "polylist")
         for (pi in 0 until polylists.length) {
             val polylist = polylists.item(pi) as? Element ?: continue
-            val ci = colorIndex(geomColor)
-
-            val inputs = polylist.getElementsByTagNameNS(NS, "input")
-            var stride = 0
-            var vertexInputOffset = 0
-            for (ii in 0 until inputs.length) {
-                val input = inputs.item(ii) as? Element ?: continue
-                val offset = input.getAttribute("offset")?.toIntOrNull() ?: 0
-                if (offset + 1 > stride) stride = offset + 1
-                if (input.getAttribute("semantic") == "VERTEX") {
-                    vertexInputOffset = offset
-                }
-            }
-            if (stride == 0) stride = 1
+            val (stride, vertOff, texOff) = parsePolylistInputs(polylist)
+            val uvSourceId = resolveUVSourceId(mesh, polylist)
+            val uvs = if (uvSourceId.isNotEmpty()) parseFloatArray(mesh, uvSourceId) else doubleArrayOf()
 
             val vcountText = childElement(polylist, "vcount")?.textContent?.trim() ?: continue
             val pText = childElement(polylist, "p")?.textContent?.trim() ?: continue
@@ -185,81 +234,95 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
 
             var pIndex = 0
             for (faceVertexCount in vcounts) {
-                if (faceVertexCount < 3) {
-                    pIndex += faceVertexCount * stride
-                    continue
-                }
-                val faceIndices = mutableListOf<Int>()
+                if (faceVertexCount < 3) { pIndex += faceVertexCount * stride; continue }
+                val faceVerts = mutableListOf<Int>()
                 for (fvi in 0 until faceVertexCount) {
-                    val globalIndex = pValues[pIndex + vertexInputOffset] + vertexOffset
-                    faceIndices += globalIndex
+                    val posIdx = pValues[pIndex + vertOff]
+                    val uvIdx = if (texOff >= 0) pValues[pIndex + texOff] else 0
+                    faceVerts += addVertex(posIdx, uvIdx, positions, uvs)
                     pIndex += stride
                 }
-                for (ti in 1 until faceIndices.size - 1) {
-                    val a = faceIndices[0]
-                    val b = faceIndices[ti]
-                    val c = faceIndices[ti + 1]
-                    if (a != b && b != c && c != a) {
-                        allTriangles += intArrayOf(a, b, c, ci)
-                    }
+                for (ti in 1 until faceVerts.size - 1) {
+                    val a = faceVerts[0]; val b = faceVerts[ti]; val c = faceVerts[ti + 1]
+                    if (a != b && b != c && c != a) allTriangles += intArrayOf(a, b, c, ci)
                 }
             }
         }
 
         val triangleLists = mesh.getElementsByTagNameNS(NS, "triangles")
         for (ti in 0 until triangleLists.length) {
-            val trianglesElem = triangleLists.item(ti) as? Element ?: continue
-            val ci = colorIndex(geomColor)
+            val triElem = triangleLists.item(ti) as? Element ?: continue
+            val (stride, vertOff, texOff) = parsePolylistInputs(triElem)
+            val uvSourceId = resolveUVSourceId(mesh, triElem)
+            val uvs = if (uvSourceId.isNotEmpty()) parseFloatArray(mesh, uvSourceId) else doubleArrayOf()
 
-            val inputs = trianglesElem.getElementsByTagNameNS(NS, "input")
-            var stride = 0
-            var vertexInputOffset = 0
-            for (ii in 0 until inputs.length) {
-                val input = inputs.item(ii) as? Element ?: continue
-                val offset = input.getAttribute("offset")?.toIntOrNull() ?: 0
-                if (offset + 1 > stride) stride = offset + 1
-                if (input.getAttribute("semantic") == "VERTEX") {
-                    vertexInputOffset = offset
-                }
-            }
-            if (stride == 0) stride = 1
-
-            val count = trianglesElem.getAttribute("count")?.toIntOrNull() ?: 0
-            val pText = childElement(trianglesElem, "p")?.textContent?.trim() ?: continue
+            val count = triElem.getAttribute("count")?.toIntOrNull() ?: 0
+            val pText = childElement(triElem, "p")?.textContent?.trim() ?: continue
             val pValues = pText.split(Regex("\\s+")).map { it.toInt() }
 
             for (tri in 0 until count) {
                 val base = tri * 3 * stride
-                val a = pValues[base + vertexInputOffset] + vertexOffset
-                val b = pValues[base + stride + vertexInputOffset] + vertexOffset
-                val c = pValues[base + 2 * stride + vertexInputOffset] + vertexOffset
-                if (a != b && b != c && c != a) {
-                    allTriangles += intArrayOf(a, b, c, ci)
+                val verts = (0 until 3).map { vi ->
+                    val posIdx = pValues[base + vi * stride + vertOff]
+                    val uvIdx = if (texOff >= 0) pValues[base + vi * stride + texOff] else 0
+                    addVertex(posIdx, uvIdx, positions, uvs)
+                }
+                if (verts[0] != verts[1] && verts[1] != verts[2] && verts[2] != verts[0]) {
+                    allTriangles += intArrayOf(verts[0], verts[1], verts[2], ci)
                 }
             }
         }
     }
 
-    require(allTriangles.isNotEmpty()) { "DAE model has no faces ($daeFile): parsed ${geometries.length} geometries, ${allVertices.size} vertices" }
+    require(allTriangles.isNotEmpty()) { "DAE model has no faces ($daeFile)" }
 
-    val minX = allVertices.minOf { it[0] }
-    val maxX = allVertices.maxOf { it[0] }
-    val minY = allVertices.minOf { it[1] }
-    val maxY = allVertices.maxOf { it[1] }
-    val minZ = allVertices.minOf { it[2] }
-    val maxZ = allVertices.maxOf { it[2] }
+    val minX = deduplicatedVertices.minOf { it[0] }
+    val maxX = deduplicatedVertices.maxOf { it[0] }
+    val minY = deduplicatedVertices.minOf { it[1] }
+    val maxY = deduplicatedVertices.maxOf { it[1] }
+    val minZ = deduplicatedVertices.minOf { it[2] }
+    val maxZ = deduplicatedVertices.maxOf { it[2] }
     val centerX = (minX + maxX) / 2.0
     val centerZ = (minZ + maxZ) / 2.0
     val maxExtent = maxOf(maxX - minX, maxY - minY, maxZ - minZ).coerceAtLeast(0.0001)
     val worldSize = 8192.0
     val scale = worldSize / maxExtent
 
-    val bakedVertices = allVertices.flatMap { v ->
+    val bakedVertices = deduplicatedVertices.flatMap { v ->
+        val u16 = (v[3] * 1024.0).roundToInt()
+        val v16 = ((1.0 - v[4]) * 1024.0).roundToInt()
         listOf(
             ((v[0] - centerX) * scale).roundToInt(),
             (v[1] * scale).roundToInt(),
-            ((v[2] - centerZ) * scale).roundToInt()
+            ((v[2] - centerZ) * scale).roundToInt(),
+            u16,
+            v16
         )
+    }
+
+    val textures = mutableListOf<BakedMario64Texture>()
+    for ((matId, matIdx) in materialIndexes) {
+        val texFilename = materialTextures[matId]
+        if (texFilename != null) {
+            val texFile = File(textureDir, texFilename)
+            if (texFile.exists()) {
+                val img = ImageIO.read(texFile)
+                if (img != null) {
+                    val rgba16 = ShortArray(img.width * img.height)
+                    for (py in 0 until img.height) {
+                        for (px in 0 until img.width) {
+                            val pixel = img.getRGB(px, py)
+                            val r = ((pixel ushr 16) and 0xFF) shr 3
+                            val g = ((pixel ushr 8) and 0xFF) shr 3
+                            val b = (pixel and 0xFF) shr 3
+                            val a = if (((pixel ushr 24) and 0xFF) > 127) 1 else 0
+                            rgba16[py * img.width + px] = ((r shl 11) or (g shl 6) or (b shl 1) or a).toShort()
+                        }
+                    }
+                    textures += BakedMario64Texture(matIdx, texFilename, img.width, img.height, rgba16)
+                }
+            }
+        }
     }
 
     val bakedTriangles = allTriangles.flatMap { it.toList() }
@@ -268,8 +331,10 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
         vertices = bakedVertices,
         triangles = bakedTriangles,
         colors = colors,
-        vertexCount = allVertices.size,
-        triangleCount = allTriangles.size
+        vertexCount = deduplicatedVertices.size,
+        triangleCount = allTriangles.size,
+        hasUVs = true,
+        textures = textures
     )
 }
 
@@ -338,6 +403,20 @@ fun resolveMaterialColors(
             continue
         }
         result[matId] = averageImageColor(imageFile)
+    }
+    return result
+}
+
+fun resolveMaterialTextureFiles(
+    materials: Map<String, String>,
+    effects: Map<String, String>,
+    images: Map<String, String>
+): Map<String, String> {
+    val result = linkedMapOf<String, String>()
+    for ((matId, effectId) in materials) {
+        val imageId = effects[effectId] ?: continue
+        val filename = images[imageId] ?: continue
+        result[matId] = filename
     }
     return result
 }
@@ -427,6 +506,7 @@ fun renderMario64ModelAssets(model: BakedMario64World): String {
         appendLine()
         appendLine("// Generated by :games:mario-n64:generateMario64ModelAssets")
         appendLine("// Source: Bob-Omb Battlefield (Area1.dae)")
+        appendLine("// ${model.vertexCount} vertices (stride 5: x,y,z,u,v), ${model.triangleCount} triangles, ${model.colors.size} materials, ${model.textures.size} textures")
         appendLine("object Mario64ModelAssets {")
         appendLine("    val battlefield = Mario64BakedWorld(")
         appendLine("        name = \"Bob-Omb Battlefield\",")
@@ -458,10 +538,14 @@ fun renderMario64MeshC(model: BakedMario64World): String {
         appendLine("#ifndef KENGINE_N64_WORLD_MESH_H")
         appendLine("#define KENGINE_N64_WORLD_MESH_H")
         appendLine()
+        appendLine("#include <stdint.h>")
+        appendLine()
         appendLine("#define KENGINE_WORLD_MESH_BATTLEFIELD_ID $meshId")
         appendLine("#define KENGINE_WORLD_MESH_BATTLEFIELD_VERTEX_COUNT ${model.vertexCount}")
         appendLine("#define KENGINE_WORLD_MESH_BATTLEFIELD_TRIANGLE_COUNT ${model.triangleCount}")
         appendLine("#define KENGINE_WORLD_MESH_BATTLEFIELD_COLOR_COUNT ${model.colors.size}")
+        appendLine("#define KENGINE_WORLD_MESH_BATTLEFIELD_VERTEX_STRIDE 5")
+        appendLine("#define KENGINE_WORLD_MESH_BATTLEFIELD_TEXTURE_COUNT ${model.textures.size}")
         appendLine()
         appendCIntArray("kengine_world_mesh_battlefield_vertices", model.vertices)
         appendLine()
@@ -469,25 +553,61 @@ fun renderMario64MeshC(model: BakedMario64World): String {
         appendLine()
         appendCIntArray("kengine_world_mesh_battlefield_colors", model.colors)
         appendLine()
+
+        for ((idx, tex) in model.textures.withIndex()) {
+            appendLine("// Texture $idx: ${tex.filename} (${tex.width}x${tex.height})")
+            append("static const uint16_t kengine_world_tex_${idx}[] = {\n")
+            tex.rgba16Data.toList().chunked(16).forEach { chunk ->
+                appendLine("    ${chunk.joinToString(", ") { "0x${(it.toInt() and 0xFFFF).toString(16).padStart(4, '0')}" }},")
+            }
+            appendLine("};")
+            appendLine()
+        }
+
+        appendLine("typedef struct {")
+        appendLine("    int material_index;")
+        appendLine("    int width;")
+        appendLine("    int height;")
+        appendLine("    const uint16_t* data;")
+        appendLine("} KengineWorldTexture;")
+        appendLine()
         appendLine("typedef struct {")
         appendLine("    int mesh_id;")
         appendLine("    int vertex_count;")
         appendLine("    int triangle_count;")
         appendLine("    int color_count;")
+        appendLine("    int vertex_stride;")
+        appendLine("    int texture_count;")
         appendLine("    const int* vertices;")
         appendLine("    const int* triangles;")
         appendLine("    const int* colors;")
+        appendLine("    const KengineWorldTexture* textures;")
         appendLine("} KengineWorldMesh;")
         appendLine()
+
+        if (model.textures.isNotEmpty()) {
+            appendLine("static const KengineWorldTexture kengine_world_mesh_battlefield_textures[] = {")
+            for ((idx, tex) in model.textures.withIndex()) {
+                appendLine("    { ${tex.materialIndex}, ${tex.width}, ${tex.height}, kengine_world_tex_$idx },")
+            }
+            appendLine("};")
+        } else {
+            appendLine("static const KengineWorldTexture* kengine_world_mesh_battlefield_textures = 0;")
+        }
+        appendLine()
+
         appendLine("static const KengineWorldMesh kengine_world_meshes[] = {")
         appendLine("    {")
         appendLine("        $meshId,")
         appendLine("        KENGINE_WORLD_MESH_BATTLEFIELD_VERTEX_COUNT,")
         appendLine("        KENGINE_WORLD_MESH_BATTLEFIELD_TRIANGLE_COUNT,")
         appendLine("        KENGINE_WORLD_MESH_BATTLEFIELD_COLOR_COUNT,")
+        appendLine("        KENGINE_WORLD_MESH_BATTLEFIELD_VERTEX_STRIDE,")
+        appendLine("        KENGINE_WORLD_MESH_BATTLEFIELD_TEXTURE_COUNT,")
         appendLine("        kengine_world_mesh_battlefield_vertices,")
         appendLine("        kengine_world_mesh_battlefield_triangles,")
-        appendLine("        kengine_world_mesh_battlefield_colors")
+        appendLine("        kengine_world_mesh_battlefield_colors,")
+        appendLine("        kengine_world_mesh_battlefield_textures")
         appendLine("    }")
         appendLine("};")
         appendLine("#define KENGINE_WORLD_MESH_COUNT 1")
