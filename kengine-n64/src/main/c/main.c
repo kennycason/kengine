@@ -754,6 +754,9 @@ static int us_to_ms_rounded(int us) {
 static int w3d_screen_x[WORLD3D_MAX_VERTICES];
 static int w3d_screen_y[WORLD3D_MAX_VERTICES];
 static int w3d_screen_z[WORLD3D_MAX_VERTICES];
+static int w3d_view_x[WORLD3D_MAX_VERTICES];
+static int w3d_view_y[WORLD3D_MAX_VERTICES];
+static int w3d_view_z[WORLD3D_MAX_VERTICES];
 static int w3d_visible[WORLD3D_MAX_VERTICES];
 static int w3d_vis_tri[WORLD3D_MAX_VISIBLE];
 static int w3d_vis_area[WORLD3D_MAX_VISIBLE];
@@ -783,6 +786,20 @@ static int w3d_cos(int angle) { return w3d_sin(angle + WORLD3D_ANGLE_RIGHT); }
 static inline int w3d_abs(int v) { return v < 0 ? -v : v; }
 static inline int w3d_clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
+static void w3d_clip_project(int vx0, int vy0, int vz0, int vx1, int vy1, int vz1,
+                              int proj_dist, int center_x, int center_y,
+                              int* out_sx, int* out_sy, int* out_sz) {
+    int dz = vz1 - vz0;
+    if (dz == 0) dz = 1;
+    int t_num = WORLD3D_NEAR_PLANE + 1 - vz0;
+    int cx = vx0 + (vx1 - vx0) * t_num / dz;
+    int cy = vy0 + (vy1 - vy0) * t_num / dz;
+    int cz = WORLD3D_NEAR_PLANE + 1;
+    *out_sx = center_x + (cx * proj_dist + cz / 2) / cz;
+    *out_sy = center_y - (cy * proj_dist + cz / 2) / cz;
+    *out_sz = cz;
+}
+
 static void draw_world_3d(
     surface_t* disp,
     const KengineWorldMesh* mesh,
@@ -809,6 +826,10 @@ static void draw_world_3d(
         int yz = (rx * yaw_sin + rz * yaw_cos) / WORLD3D_TRIG_SCALE;
         int vy = (ry * pitch_cos - yz * pitch_sin) / WORLD3D_TRIG_SCALE;
         int vz = (ry * pitch_sin + yz * pitch_cos) / WORLD3D_TRIG_SCALE;
+
+        w3d_view_x[vi] = vx;
+        w3d_view_y[vi] = vy;
+        w3d_view_z[vi] = vz;
 
         if (vz <= WORLD3D_NEAR_PLANE) {
             w3d_visible[vi] = 0;
@@ -848,11 +869,42 @@ static void draw_world_3d(
     for (int ti = 0; ti < tc && vis_count < WORLD3D_MAX_VISIBLE; ti++) {
         int tb = ti * 4;
         int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2];
-        if (!w3d_visible[a] || !w3d_visible[b] || !w3d_visible[c]) continue;
+        int va = w3d_visible[a], vb = w3d_visible[b], vc2 = w3d_visible[c];
+        int behind = (!va) + (!vb) + (!vc2);
+        if (behind == 3) continue;
+        if (behind > 0 && (w3d_view_z[a] < -200 || w3d_view_z[b] < -200 || w3d_view_z[c] < -200)) continue;
 
-        int ax = w3d_screen_x[a], ay = w3d_screen_y[a];
-        int bx = w3d_screen_x[b], by = w3d_screen_y[b];
-        int cx = w3d_screen_x[c], cy = w3d_screen_y[c];
+        int ax, ay, bx, by, cx, cy;
+        int az_depth, bz_depth, cz_depth;
+
+        if (behind == 0) {
+            ax = w3d_screen_x[a]; ay = w3d_screen_y[a]; az_depth = w3d_screen_z[a];
+            bx = w3d_screen_x[b]; by = w3d_screen_y[b]; bz_depth = w3d_screen_z[b];
+            cx = w3d_screen_x[c]; cy = w3d_screen_y[c]; cz_depth = w3d_screen_z[c];
+        } else {
+            if (va) { ax = w3d_screen_x[a]; ay = w3d_screen_y[a]; az_depth = w3d_screen_z[a]; }
+            else { w3d_clip_project(w3d_view_x[a], w3d_view_y[a], w3d_view_z[a],
+                       w3d_view_x[va ? a : (vb ? b : c)], w3d_view_y[va ? a : (vb ? b : c)], w3d_view_z[va ? a : (vb ? b : c)],
+                       proj_dist, center_x, center_y, &ax, &ay, &az_depth);
+                   /* find a visible neighbor to clip toward */
+                   int nb = vb ? b : (vc2 ? c : a);
+                   w3d_clip_project(w3d_view_x[a], w3d_view_y[a], w3d_view_z[a],
+                       w3d_view_x[nb], w3d_view_y[nb], w3d_view_z[nb],
+                       proj_dist, center_x, center_y, &ax, &ay, &az_depth);
+                 }
+            if (vb) { bx = w3d_screen_x[b]; by = w3d_screen_y[b]; bz_depth = w3d_screen_z[b]; }
+            else { int nb = va ? a : (vc2 ? c : b);
+                   w3d_clip_project(w3d_view_x[b], w3d_view_y[b], w3d_view_z[b],
+                       w3d_view_x[nb], w3d_view_y[nb], w3d_view_z[nb],
+                       proj_dist, center_x, center_y, &bx, &by, &bz_depth);
+                 }
+            if (vc2) { cx = w3d_screen_x[c]; cy = w3d_screen_y[c]; cz_depth = w3d_screen_z[c]; }
+            else { int nb = va ? a : (vb ? b : c);
+                   w3d_clip_project(w3d_view_x[c], w3d_view_y[c], w3d_view_z[c],
+                       w3d_view_x[nb], w3d_view_y[nb], w3d_view_z[nb],
+                       proj_dist, center_x, center_y, &cx, &cy, &cz_depth);
+                 }
+        }
 
         int area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
         if (w3d_abs(area) <= WORLD3D_DEGENERATE_AREA) continue;
@@ -862,7 +914,7 @@ static void draw_world_3d(
             (ay > FB_HEIGHT + WORLD3D_OFFSCREEN && by > FB_HEIGHT + WORLD3D_OFFSCREEN && cy > FB_HEIGHT + WORLD3D_OFFSCREEN))
             continue;
 
-        int avg_z = (w3d_screen_z[a] + w3d_screen_z[b] + w3d_screen_z[c]) / 3;
+        int avg_z = (az_depth + bz_depth + cz_depth) / 3;
         int clamped = w3d_clamp(avg_z - depthMin, 0, depthSpan);
         int bucket = (clamped * (WORLD3D_DEPTH_BUCKETS - 1)) / depthSpan;
         bucket = w3d_clamp(bucket, 0, WORLD3D_DEPTH_BUCKETS - 1);
