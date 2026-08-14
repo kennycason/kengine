@@ -13,6 +13,12 @@
 #include <rdpq_tri.h>
 #include <rdpq_tex.h>
 #endif
+#ifdef KENGINE_N64_USE_GL
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <GL/gl_integration.h>
+#include <math.h>
+#endif
 
 #ifndef KENGINE_N64_C_ONLY
 #include "kengine_n64_kotlin_api.h"
@@ -744,7 +750,7 @@ static int us_to_ms_rounded(int us) {
 #define WORLD3D_TRIG_SCALE 4096
 #define WORLD3D_ANGLE_FULL 1024
 #define WORLD3D_ANGLE_RIGHT (WORLD3D_ANGLE_FULL / 4)
-#define WORLD3D_NEAR_PLANE 20
+#define WORLD3D_NEAR_PLANE 8
 #define WORLD3D_OFFSCREEN 128
 #define WORLD3D_COORD_LIMIT 2048
 #define WORLD3D_DEGENERATE_AREA 2
@@ -765,6 +771,164 @@ static int w3d_bucket_head[WORLD3D_DEPTH_BUCKETS];
 static int w3d_bucket_tail[WORLD3D_DEPTH_BUCKETS];
 static int w3d_bucket_next[WORLD3D_MAX_VISIBLE];
 
+/* GL-based 3D world renderer — hardware vertex transform, clipping, Z-buffer */
+#ifdef KENGINE_N64_USE_GL
+
+static GLuint w3d_gl_textures[32];
+static int w3d_gl_tex_count = 0;
+static int w3d_gl_initialized = 0;
+static int w3d_gl_rendered_frame = 0;
+static int w3d_gl_projection_set = 0;
+
+static void w3d_gl_setup_projection(void) {
+    if (w3d_gl_projection_set) return;
+    float aspect = 320.0f / 240.0f;
+    float near = 1.0f;
+    float far = 200.0f;
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glFrustum(-near * aspect, near * aspect, -near, near, near, far);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    w3d_gl_projection_set = 1;
+}
+
+static void w3d_gl_init_textures(const KengineWorldMesh* mesh) {
+    if (w3d_gl_initialized || !mesh->textures) return;
+    w3d_gl_tex_count = mesh->texture_count < 32 ? mesh->texture_count : 32;
+    glGenTextures(w3d_gl_tex_count, w3d_gl_textures);
+    for (int i = 0; i < w3d_gl_tex_count; i++) {
+        const KengineWorldTexture* wt = &mesh->textures[i];
+        glBindTexture(GL_TEXTURE_2D, w3d_gl_textures[i]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wt->width, wt->height, 0,
+                     GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1_EXT, wt->data);
+    }
+    w3d_gl_initialized = 1;
+}
+
+static void draw_world_3d(
+    surface_t* disp,
+    const KengineWorldMesh* mesh,
+    int cam_x, int cam_y, int cam_z,
+    int yaw, int pitch,
+    int proj_dist
+) {
+    if (!mesh) return;
+
+    w3d_gl_init_textures(mesh);
+    w3d_gl_rendered_frame = 1;
+
+    #define W3D_SCALE (1.0f / 100.0f)
+    float yaw_rad = (float)yaw * 6.283185f / (float)WORLD3D_ANGLE_FULL;
+    float pitch_rad = (float)pitch * 6.283185f / (float)WORLD3D_ANGLE_FULL;
+    float fx = sinf(yaw_rad) * cosf(pitch_rad);
+    float fy = sinf(pitch_rad);
+    float fz = cosf(yaw_rad) * cosf(pitch_rad);
+
+    w3d_gl_setup_projection();
+
+    surface_t *zbuf = display_get_zbuf();
+    rdpq_attach(disp, zbuf);
+    gl_context_begin();
+
+    glClearColor(0.36f, 0.58f, 0.99f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    gluLookAt(
+        (double)cam_x * W3D_SCALE, (double)cam_y * W3D_SCALE, (double)cam_z * W3D_SCALE,
+        ((double)cam_x + (double)fx * 1000.0) * W3D_SCALE,
+        ((double)cam_y + (double)fy * 1000.0) * W3D_SCALE,
+        ((double)cam_z + (double)fz * 1000.0) * W3D_SCALE,
+        0.0, 1.0, 0.0
+    );
+
+    int tc = mesh->triangle_count;
+    const int* tris = mesh->triangles;
+    const int* verts = mesh->vertices;
+    const int* colors = mesh->colors;
+    int vstride = mesh->vertex_stride;
+
+    int tex_mat_map[32];
+    memset(tex_mat_map, -1, sizeof(tex_mat_map));
+    if (mesh->textures) {
+        for (int i = 0; i < mesh->texture_count && i < 32; i++) {
+            int mi = mesh->textures[i].material_index;
+            if (mi >= 0 && mi < 32) tex_mat_map[mi] = i;
+        }
+    }
+
+    /* Scale factor: world coords are large, RSP needs smaller values */
+    /* Test: draw a red triangle at origin */
+    glDisable(GL_TEXTURE_2D);
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glBegin(GL_TRIANGLES);
+    glVertex3f(-5.0f, 0.0f, -5.0f);
+    glVertex3f(5.0f, 0.0f, -5.0f);
+    glVertex3f(0.0f, 0.0f, 5.0f);
+    glEnd();
+
+    int current_mat = -1;
+    int using_tex = 0;
+    int batch_count = 0;
+
+    for (int ti = 0; ti < tc; ti++) {
+        int tb = ti * 4;
+        int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2], ci = tris[tb + 3];
+
+        if (ci != current_mat || batch_count >= 32) {
+            if (batch_count > 0) glEnd();
+            batch_count = 0;
+            current_mat = ci;
+            int tex_idx = (ci >= 0 && ci < 32) ? tex_mat_map[ci] : -1;
+            if (tex_idx >= 0 && tex_idx < w3d_gl_tex_count) {
+                glEnable(GL_TEXTURE_2D);
+                glBindTexture(GL_TEXTURE_2D, w3d_gl_textures[tex_idx]);
+                glColor3f(1.0f, 1.0f, 1.0f);
+                using_tex = 1;
+            } else {
+                glDisable(GL_TEXTURE_2D);
+                int bc = (ci >= 0 && ci < mesh->color_count) ? colors[ci] : 0xFFB4B4B4;
+                float r = (float)(bc & 0xFF) / 255.0f;
+                float g = (float)((bc >> 8) & 0xFF) / 255.0f;
+                float bl = (float)((bc >> 16) & 0xFF) / 255.0f;
+                glColor3f(r, g, bl);
+                using_tex = 0;
+            }
+            glBegin(GL_TRIANGLES);
+        }
+
+        int ab = a * vstride, bb2 = b * vstride, cb = c * vstride;
+        if (using_tex && vstride >= 5) {
+            glTexCoord2f((float)verts[ab+3] / 1024.0f, (float)verts[ab+4] / 1024.0f);
+        }
+        glVertex3f((float)verts[ab] * W3D_SCALE, (float)verts[ab+1] * W3D_SCALE, (float)verts[ab+2] * W3D_SCALE);
+        if (using_tex && vstride >= 5) {
+            glTexCoord2f((float)verts[bb2+3] / 1024.0f, (float)verts[bb2+4] / 1024.0f);
+        }
+        glVertex3f((float)verts[bb2] * W3D_SCALE, (float)verts[bb2+1] * W3D_SCALE, (float)verts[bb2+2] * W3D_SCALE);
+        if (using_tex && vstride >= 5) {
+            glTexCoord2f((float)verts[cb+3] / 1024.0f, (float)verts[cb+4] / 1024.0f);
+        }
+        glVertex3f((float)verts[cb] * W3D_SCALE, (float)verts[cb+1] * W3D_SCALE, (float)verts[cb+2] * W3D_SCALE);
+        batch_count++;
+    }
+    if (batch_count > 0) glEnd();
+
+    gl_context_end();
+    rdpq_detach_show();
+}
+
+#else
+/* Software fallback renderer */
 static int w3d_quarter_sin(int v) {
     if (v < 0) v = 0;
     if (v > WORLD3D_ANGLE_RIGHT) v = WORLD3D_ANGLE_RIGHT;
@@ -773,7 +937,6 @@ static int w3d_quarter_sin(int v) {
     int scaled = num * WORLD3D_TRIG_SCALE;
     return scaled >= 0 ? (scaled + den / 2) / den : (scaled - den / 2) / den;
 }
-
 static int w3d_sin(int angle) {
     int w = angle & (WORLD3D_ANGLE_FULL - 1);
     if (w < WORLD3D_ANGLE_RIGHT) return w3d_quarter_sin(w);
@@ -781,25 +944,9 @@ static int w3d_sin(int angle) {
     if (w < WORLD3D_ANGLE_RIGHT * 3) return -w3d_quarter_sin(w - WORLD3D_ANGLE_RIGHT * 2);
     return -w3d_quarter_sin(WORLD3D_ANGLE_FULL - w);
 }
-
 static int w3d_cos(int angle) { return w3d_sin(angle + WORLD3D_ANGLE_RIGHT); }
-
 static inline int w3d_abs(int v) { return v < 0 ? -v : v; }
 static inline int w3d_clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
-
-static void w3d_clip_project(int vx0, int vy0, int vz0, int vx1, int vy1, int vz1,
-                              int proj_dist, int center_x, int center_y,
-                              int* out_sx, int* out_sy, int* out_sz) {
-    int dz = vz1 - vz0;
-    if (dz == 0) dz = 1;
-    int t_num = WORLD3D_NEAR_PLANE + 1 - vz0;
-    int cx = vx0 + (vx1 - vx0) * t_num / dz;
-    int cy = vy0 + (vy1 - vy0) * t_num / dz;
-    int cz = WORLD3D_NEAR_PLANE + 1;
-    *out_sx = center_x - (cx * proj_dist + cz / 2) / cz;
-    *out_sy = center_y - (cy * proj_dist + cz / 2) / cz;
-    *out_sz = cz;
-}
 
 static void draw_world_3d(
     surface_t* disp,
@@ -815,223 +962,45 @@ static void draw_world_3d(
     int center_x = FB_WIDTH / 2, center_y = FB_HEIGHT / 2;
     int vc = mesh->vertex_count;
     const int* verts = mesh->vertices;
-    int depthMin = 0x7FFFFFFF, depthMax = 0;
 
     for (int vi = 0; vi < vc; vi++) {
         int base = vi * mesh->vertex_stride;
-        int rx = verts[base] - cam_x;
-        int ry = verts[base + 1] - cam_y;
-        int rz = verts[base + 2] - cam_z;
-
+        int rx = verts[base] - cam_x, ry = verts[base+1] - cam_y, rz = verts[base+2] - cam_z;
         int vx = (rx * yaw_cos - rz * yaw_sin) / WORLD3D_TRIG_SCALE;
         int yz = (rx * yaw_sin + rz * yaw_cos) / WORLD3D_TRIG_SCALE;
         int vy = (ry * pitch_cos - yz * pitch_sin) / WORLD3D_TRIG_SCALE;
         int vz = (ry * pitch_sin + yz * pitch_cos) / WORLD3D_TRIG_SCALE;
-
-        w3d_view_x[vi] = vx;
-        w3d_view_y[vi] = vy;
-        w3d_view_z[vi] = vz;
-
-        if (vz <= WORLD3D_NEAR_PLANE) {
-            w3d_visible[vi] = 0;
-            continue;
-        }
-
+        if (vz <= WORLD3D_NEAR_PLANE) { w3d_visible[vi] = 0; continue; }
         int sx = center_x - (vx * proj_dist + vz / 2) / vz;
         int sy = center_y - (vy * proj_dist + vz / 2) / vz;
-
         if (sx < -WORLD3D_COORD_LIMIT || sx > WORLD3D_COORD_LIMIT ||
-            sy < -WORLD3D_COORD_LIMIT || sy > WORLD3D_COORD_LIMIT) {
-            w3d_visible[vi] = 0;
-            continue;
-        }
-        w3d_screen_x[vi] = sx;
-        w3d_screen_y[vi] = sy;
-        w3d_screen_z[vi] = vz;
+            sy < -WORLD3D_COORD_LIMIT || sy > WORLD3D_COORD_LIMIT) { w3d_visible[vi] = 0; continue; }
+        w3d_screen_x[vi] = sx; w3d_screen_y[vi] = sy; w3d_screen_z[vi] = vz;
         w3d_visible[vi] = 1;
-        if (vz < depthMin) depthMin = vz;
-        if (vz > depthMax) depthMax = vz;
     }
 
     int tc = mesh->triangle_count;
     const int* tris = mesh->triangles;
     const int* colors = mesh->colors;
-    int drawn = 0;
-    int depthSpan = depthMax - depthMin;
-    if (depthSpan < 1) depthSpan = 1;
 
-    /* Bucket sort: assign each visible triangle to a depth bucket */
-    for (int i = 0; i < WORLD3D_DEPTH_BUCKETS; i++) {
-        w3d_bucket_head[i] = -1;
-        w3d_bucket_tail[i] = -1;
-    }
-    int vis_count = 0;
-
-    for (int ti = 0; ti < tc && vis_count < WORLD3D_MAX_VISIBLE; ti++) {
+    for (int ti = 0; ti < tc; ti++) {
         int tb = ti * 4;
-        int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2];
+        int a = tris[tb], b = tris[tb+1], c = tris[tb+2], ci = tris[tb+3];
         if (!w3d_visible[a] || !w3d_visible[b] || !w3d_visible[c]) continue;
-
-        int ax = w3d_screen_x[a], ay = w3d_screen_y[a], az_depth = w3d_screen_z[a];
-        int bx = w3d_screen_x[b], by = w3d_screen_y[b], bz_depth = w3d_screen_z[b];
-        int cx = w3d_screen_x[c], cy = w3d_screen_y[c], cz_depth = w3d_screen_z[c];
-
-        int area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+        int ax = w3d_screen_x[a], ay = w3d_screen_y[a];
+        int bx = w3d_screen_x[b], by = w3d_screen_y[b];
+        int cx = w3d_screen_x[c], cy = w3d_screen_y[c];
+        int area = (bx-ax)*(cy-ay) - (by-ay)*(cx-ax);
         if (w3d_abs(area) <= WORLD3D_DEGENERATE_AREA) continue;
-        if ((ax < -WORLD3D_OFFSCREEN && bx < -WORLD3D_OFFSCREEN && cx < -WORLD3D_OFFSCREEN) ||
-            (ax > FB_WIDTH + WORLD3D_OFFSCREEN && bx > FB_WIDTH + WORLD3D_OFFSCREEN && cx > FB_WIDTH + WORLD3D_OFFSCREEN) ||
-            (ay < -WORLD3D_OFFSCREEN && by < -WORLD3D_OFFSCREEN && cy < -WORLD3D_OFFSCREEN) ||
-            (ay > FB_HEIGHT + WORLD3D_OFFSCREEN && by > FB_HEIGHT + WORLD3D_OFFSCREEN && cy > FB_HEIGHT + WORLD3D_OFFSCREEN))
-            continue;
-
-        int avg_z = (az_depth + bz_depth + cz_depth) / 3;
-        int clamped = w3d_clamp(avg_z - depthMin, 0, depthSpan);
-        int bucket = (clamped * (WORLD3D_DEPTH_BUCKETS - 1)) / depthSpan;
-        bucket = w3d_clamp(bucket, 0, WORLD3D_DEPTH_BUCKETS - 1);
-
-        w3d_vis_tri[vis_count] = ti;
-        w3d_vis_area[vis_count] = area;
-        w3d_bucket_next[vis_count] = -1;
-        int tail = w3d_bucket_tail[bucket];
-        if (tail >= 0) {
-            w3d_bucket_next[tail] = vis_count;
-        } else {
-            w3d_bucket_head[bucket] = vis_count;
-        }
-        w3d_bucket_tail[bucket] = vis_count;
-        vis_count++;
+        int base_color = (ci >= 0 && ci < mesh->color_count) ? colors[ci] : 0xFFB4B4B4;
+        int shade = w3d_clamp(80 + w3d_clamp(w3d_abs(area)/200,0,40), 40, 255);
+        int sr = ((base_color&0xFF)*shade)/255;
+        int sg = (((base_color>>8)&0xFF)*shade)/255;
+        int sb = (((base_color>>16)&0xFF)*shade)/255;
+        draw_triangle(disp, ax, ay, bx, by, cx, cy, sr|(sg<<8)|(sb<<16)|(0xFF<<24));
     }
-
-    /* Build material→texture lookup */
-    surface_t tex_surfaces[32];
-    int tex_mat_map[32];
-    int tex_surface_count = 0;
-    memset(tex_mat_map, -1, sizeof(tex_mat_map));
-
-#if KENGINE_N64_USE_RDPQ_RENDER
-    if (mesh->textures && mesh->texture_count > 0) {
-        for (int ti2 = 0; ti2 < mesh->texture_count && tex_surface_count < 32; ti2++) {
-            const KengineWorldTexture* wt = &mesh->textures[ti2];
-            tex_surfaces[tex_surface_count] = surface_make_linear(
-                (void*)wt->data, FMT_RGBA16, wt->width, wt->height
-            );
-            if (wt->material_index >= 0 && wt->material_index < 32) {
-                tex_mat_map[wt->material_index] = tex_surface_count;
-            }
-            tex_surface_count++;
-        }
-    }
-#endif
-
-    /* Draw from farthest bucket to nearest — painter's algorithm */
-#if KENGINE_N64_USE_RDPQ_RENDER
-    rdpq_begin(disp);
-    int current_tex = -1;
-    int using_texture = 0;
-#endif
-
-    int vstride = mesh->vertex_stride;
-
-    for (int bi = WORLD3D_DEPTH_BUCKETS - 1; bi >= 0; bi--) {
-        int vi = w3d_bucket_head[bi];
-        while (vi >= 0) {
-            int ti = w3d_vis_tri[vi];
-            int area = w3d_vis_area[vi];
-            int tb = ti * 4;
-            int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2], ci = tris[tb + 3];
-            int ax = w3d_screen_x[a], ay = w3d_screen_y[a];
-            int bx = w3d_screen_x[b], by = w3d_screen_y[b];
-            int cx = w3d_screen_x[c], cy = w3d_screen_y[c];
-
-#if KENGINE_N64_USE_RDPQ_RENDER
-            int tex_idx = (ci >= 0 && ci < 32) ? tex_mat_map[ci] : -1;
-
-            if (tex_idx >= 0 && vstride >= 5) {
-                if (tex_idx != current_tex || !using_texture) {
-                    rdpq_sync_pipe();
-                    rdpq_set_mode_standard();
-                    rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                    rdpq_mode_persp(true);
-                    const KengineWorldTexture* wt = &mesh->textures[tex_idx];
-                    rdpq_tex_upload(TILE0, &tex_surfaces[tex_idx], NULL);
-                    current_tex = tex_idx;
-                    using_texture = 1;
-                    g_rdpq_mode = KENGINE_RDPQ_MODE_NONE;
-                }
-
-                int avg_y = (ay + by + cy) / 3;
-                int light = 80 + w3d_clamp((center_y - avg_y) / 3, -30, 40)
-                               + w3d_clamp(w3d_abs(area) / 200, 0, 40)
-                               + (area >= 0 ? 12 : -12);
-                int shade = w3d_clamp(light, 40, 255);
-                rdpq_set_prim_color(RGBA32(shade, shade, shade, 255));
-
-                int ab = a * vstride, bb2 = b * vstride, cb = c * vstride;
-                const int* vdata = mesh->vertices;
-                const KengineWorldTexture* wt2 = &mesh->textures[tex_idx];
-                float tw = (float)wt2->width, th = (float)wt2->height;
-                float s0 = (float)vdata[ab + 3] * tw / 1024.0f, t0 = (float)vdata[ab + 4] * th / 1024.0f;
-                float s1 = (float)vdata[bb2 + 3] * tw / 1024.0f, t1 = (float)vdata[bb2 + 4] * th / 1024.0f;
-                float s2 = (float)vdata[cb + 3] * tw / 1024.0f, t2 = (float)vdata[cb + 4] * th / 1024.0f;
-
-                float iw0 = 1.0f / (float)w3d_screen_z[a];
-                float iw1 = 1.0f / (float)w3d_screen_z[b];
-                float iw2 = 1.0f / (float)w3d_screen_z[c];
-                float v1[] = { (float)ax, (float)ay, s0, t0, iw0 };
-                float v2[] = { (float)bx, (float)by, s1, t1, iw1 };
-                float v3[] = { (float)cx, (float)cy, s2, t2, iw2 };
-                rdpq_triangle(&TRIFMT_TEX, v1, v2, v3);
-            } else {
-                if (using_texture) {
-                    rdpq_sync_pipe();
-                    rdpq_prepare_flat_triangle();
-                    using_texture = 0;
-                    current_tex = -1;
-                }
-
-                int avg_y = (ay + by + cy) / 3;
-                int light = 80 + w3d_clamp((center_y - avg_y) / 3, -30, 40)
-                               + w3d_clamp(w3d_abs(area) / 200, 0, 40)
-                               + (area >= 0 ? 12 : -12);
-                int shade = w3d_clamp(light, 40, 255);
-
-                int base_color = (ci >= 0 && ci < mesh->color_count) ? colors[ci] : 0xFFB4B4B4;
-                int sr = ((base_color & 0xFF) * shade) / 255;
-                int sg = (((base_color >> 8) & 0xFF) * shade) / 255;
-                int sb = (((base_color >> 16) & 0xFF) * shade) / 255;
-                int sa = (base_color >> 24) & 0xFF;
-                int final_color = sr | (sg << 8) | (sb << 16) | (sa << 24);
-
-                rdpq_set_prim_color(kengine_rgba_to_rdpq_color(final_color));
-                float v1[] = { (float)ax, (float)ay };
-                float v2[] = { (float)bx, (float)by };
-                float v3[] = { (float)cx, (float)cy };
-                rdpq_triangle(&TRIFMT_FILL, v1, v2, v3);
-            }
-#else
-            int avg_y = (ay + by + cy) / 3;
-            int light = 80 + w3d_clamp((center_y - avg_y) / 3, -30, 40)
-                           + w3d_clamp(w3d_abs(area) / 200, 0, 40)
-                           + (area >= 0 ? 12 : -12);
-            int shade = w3d_clamp(light, 40, 255);
-
-            int base_color = (ci >= 0 && ci < mesh->color_count) ? colors[ci] : 0xFFB4B4B4;
-            int sr = ((base_color & 0xFF) * shade) / 255;
-            int sg = (((base_color >> 8) & 0xFF) * shade) / 255;
-            int sb = (((base_color >> 16) & 0xFF) * shade) / 255;
-            int sa = (base_color >> 24) & 0xFF;
-            int final_color = sr | (sg << 8) | (sb << 16) | (sa << 24);
-            draw_triangle(disp, ax, ay, bx, by, cx, cy, final_color);
-#endif
-            drawn++;
-            vi = w3d_bucket_next[vi];
-        }
-    }
-
-#if KENGINE_N64_USE_RDPQ_RENDER
-    rdpq_flush();
-#endif
 }
+#endif /* KENGINE_N64_USE_GL */
 
 #endif /* KENGINE_N64_WORLD_MESH */
 
@@ -1416,8 +1385,12 @@ static int kotlin_copy_audio_commands(int* destination, int max_commands) {
 
 int main(void) {
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
-#if KENGINE_N64_USE_RDPQ_RENDER
+#if KENGINE_N64_USE_RDPQ_RENDER || defined(KENGINE_N64_USE_GL)
     rdpq_init();
+#endif
+#ifdef KENGINE_N64_USE_GL
+    gl_init();
+    w3d_gl_setup_projection();
 #endif
     joypad_init();
     timer_init();
@@ -1461,9 +1434,43 @@ int main(void) {
         timing.kotlin_us = ticks_to_us(phase_end - phase_start);
 
         phase_start = phase_end;
+
+#if defined(KENGINE_N64_USE_GL) && defined(KENGINE_N64_WORLD_MESH)
+        /* GL path: extract camera from DRAW_WORLD_3D command, render directly */
+        {
+            int gl_rendered = 0;
+            for (int ci = 0; ci < render_count && !gl_rendered; ci++) {
+                int* cmd = &g_render_commands[ci * KENGINE_RENDER_FIELD_COUNT];
+                if (cmd[KENGINE_RENDER_FIELD_TYPE] == KENGINE_RENDER_DRAW_WORLD_3D) {
+                    int cam_x = cmd[KENGINE_RENDER_FIELD_X];
+                    int cam_y = cmd[KENGINE_RENDER_FIELD_Y];
+                    int cam_z = cmd[KENGINE_RENDER_FIELD_WIDTH];
+                    int cam_yaw = cmd[KENGINE_RENDER_FIELD_HEIGHT];
+                    int cam_pitch = cmd[KENGINE_RENDER_FIELD_COLOR];
+                    int mesh_id = cmd[KENGINE_RENDER_FIELD_COLOR2];
+                    int proj_dist = cmd[KENGINE_RENDER_FIELD_PARAM];
+                    const KengineWorldMesh* mesh = kengine_find_world_mesh(mesh_id);
+                    if (mesh) {
+                        draw_world_3d(disp, mesh, cam_x, cam_y, cam_z, cam_yaw, cam_pitch, proj_dist);
+                        gl_rendered = 1;
+                    }
+                }
+            }
+            if (!gl_rendered) {
+                execute_render_commands(disp, g_render_commands, render_count);
+                display_show(disp);
+            }
+        }
+#else
         execute_render_commands(disp, g_render_commands, render_count);
         phase_end = timer_ticks();
         timing.render_us = ticks_to_us(phase_end - phase_start);
+
+        timing.total_us = ticks_to_us(timer_ticks() - work_start);
+        draw_perf_overlay(disp, frame, step_count, render_count, render_dropped,
+                          audio_count, audio_dropped, timing);
+        display_show(disp);
+#endif
 
         phase_start = phase_end;
 #ifdef KENGINE_N64_SOUND_ASSETS
@@ -1471,22 +1478,6 @@ int main(void) {
             execute_audio_commands(g_audio_commands, audio_count);
         }
 #endif
-        phase_end = timer_ticks();
-        timing.native_audio_us = ticks_to_us(phase_end - phase_start);
-
-        timing.total_us = ticks_to_us(timer_ticks() - work_start);
-        draw_perf_overlay(
-            disp,
-            frame,
-            step_count,
-            render_count,
-            render_dropped,
-            audio_count,
-            audio_dropped,
-            timing
-        );
-
-        display_show(disp);
         frame++;
     }
 

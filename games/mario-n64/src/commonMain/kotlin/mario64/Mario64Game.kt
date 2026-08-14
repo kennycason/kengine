@@ -14,9 +14,9 @@ class Mario64Game : PortableGame {
     private var frame = 0
     private var previousInputMask = 0
 
-    private var playerX = 0
+    private var playerX = -3000
     private var playerY = PLAYER_START_Y
-    private var playerZ = 0
+    private var playerZ = -3000
     private var cameraYaw = INITIAL_YAW
     private var cameraPitch = INITIAL_PITCH
 
@@ -51,9 +51,9 @@ class Mario64Game : PortableGame {
         val startJustPressed = (input.mask and InputState.bitFor(InputButton.START)) != 0 &&
             (previousInputMask and InputState.bitFor(InputButton.START)) == 0
         if (startJustPressed) {
-            playerX = 0
+            playerX = -3000
             playerY = PLAYER_START_Y
-            playerZ = 0
+            playerZ = -3000
             cameraYaw = INITIAL_YAW
             cameraPitch = INITIAL_PITCH
         }
@@ -85,11 +85,11 @@ class Mario64Game : PortableGame {
         private const val VERTICAL_SPEED = 20
         private const val YAW_SPEED = 18
         private const val PITCH_SPEED = 9
-        private const val INITIAL_YAW = 640
-        private const val INITIAL_PITCH = -80
-        private const val MIN_PITCH = -200
-        private const val MAX_PITCH = 200
-        private const val PLAYER_START_Y = 800
+        private const val INITIAL_YAW = 128
+        private const val INITIAL_PITCH = -60
+        private const val MIN_PITCH = -250
+        private const val MAX_PITCH = 250
+        private const val PLAYER_START_Y = 2500
         private const val PROJECTION_DISTANCE = 300
     }
 }
