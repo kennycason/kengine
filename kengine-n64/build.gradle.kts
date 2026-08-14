@@ -672,6 +672,18 @@ fun registerDockerToolchainTask() {
                 )
                 isIgnoreExitValue = true
             }
+            exec {
+                commandLine(
+                    "docker", "run", "--rm", "--platform", "linux/amd64",
+                    "-v", "$n64DockerVolume:/n64_toolchain",
+                    n64DockerImage,
+                    "bash", "-c",
+                    "git clone --depth 1 -b unstable https://github.com/DragonMinded/libdragon.git /tmp/libdragon && " +
+                    "cd /tmp/libdragon && N64_INST=/n64_toolchain make -j4 install && " +
+                    "N64_INST=/n64_toolchain make tools-install -j4"
+                )
+                isIgnoreExitValue = true
+            }
         }
     }
 }

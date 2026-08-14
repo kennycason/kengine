@@ -867,15 +867,6 @@ static void draw_world_3d(
     }
 
     /* Scale factor: world coords are large, RSP needs smaller values */
-    /* Test: draw a red triangle at origin */
-    glDisable(GL_TEXTURE_2D);
-    glColor3f(1.0f, 0.0f, 0.0f);
-    glBegin(GL_TRIANGLES);
-    glVertex3f(-5.0f, 0.0f, -5.0f);
-    glVertex3f(5.0f, 0.0f, -5.0f);
-    glVertex3f(0.0f, 0.0f, 5.0f);
-    glEnd();
-
     int current_mat = -1;
     int using_tex = 0;
     int batch_count = 0;
