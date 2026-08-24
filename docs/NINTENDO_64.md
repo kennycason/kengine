@@ -7,6 +7,8 @@ This document tracks two related Nintendo 64 efforts in Kengine:
 
 The goal is not to ship ROMs, proprietary SDK content, or an emulator in this repo. The goal is to keep the game-facing N64-style work productive on desktop while we separately investigate whether our Kotlin/Native fork and portable runtime architecture can target actual N64 homebrew-style builds.
 
+For the current `games/mario-n64` hardware-rendering audit and the concrete plan for grounded movement, jumping, and collision, see [Mario N64 Physics Follow-Up](MARIO_N64_PHYSICS.md).
+
 ## Current Direction
 
 ### N64-Style 3D Track

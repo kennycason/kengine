@@ -124,7 +124,28 @@ data class BakedMario64Texture(
 
 private val NS = "http://www.collada.org/2005/11/COLLADASchema"
 
-data class DaeVertex(val posIndex: Int, val uvIndex: Int)
+data class DaeVertexKey(
+    val xBits: Long,
+    val yBits: Long,
+    val zBits: Long,
+    val uBits: Long,
+    val vBits: Long
+)
+
+data class DaeTriangleKey(
+    val materialIndex: Int,
+    val vertex0: Int,
+    val vertex1: Int,
+    val vertex2: Int
+)
+
+data class BakedVertexKey(
+    val x: Int,
+    val y: Int,
+    val z: Int,
+    val u: Int,
+    val v: Int
+)
 
 fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
     val factory = DocumentBuilderFactory.newInstance()
@@ -138,14 +159,13 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
     val materialColors = resolveMaterialColors(materials, effects, images, textureDir)
     val materialTextures = resolveMaterialTextureFiles(materials, effects, images)
 
-    val allPositions = mutableListOf<DoubleArray>()
-    val allUVs = mutableListOf<DoubleArray>()
     val deduplicatedVertices = mutableListOf<DoubleArray>()
-    val vertexMap = linkedMapOf<Long, Int>()
+    val vertexMap = linkedMapOf<DaeVertexKey, Int>()
     val colors = mutableListOf<Int>()
     val colorIndexes = linkedMapOf<Int, Int>()
     val materialIndexes = linkedMapOf<String, Int>()
     val allTriangles = mutableListOf<IntArray>()
+    val triangleKeys = linkedSetOf<DaeTriangleKey>()
 
     fun colorIndex(color: Int): Int = colorIndexes.getOrPut(color) { colors += color; colors.lastIndex }
 
@@ -154,10 +174,14 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
     }
 
     fun deduplicateVertex(px: Double, py: Double, pz: Double, u: Double, v: Double): Int {
-        val uBits = (u * 65536.0).toLong()
-        val vBits = (v * 65536.0).toLong()
-        val key = (deduplicatedVertices.size.toLong() shl 48) or ((uBits and 0xFFFF) shl 32) or ((vBits and 0xFFFF) shl 16) or
-            ((px * 1000).toLong() and 0xFFFF)
+        fun normalizedBits(value: Double): Long = if (value == 0.0) 0.0.toBits() else value.toBits()
+        val key = DaeVertexKey(
+            normalizedBits(px),
+            normalizedBits(py),
+            normalizedBits(pz),
+            normalizedBits(u),
+            normalizedBits(v)
+        )
         val existing = vertexMap[key]
         if (existing != null) return existing
         val idx = deduplicatedVertices.size
@@ -172,9 +196,21 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
         val pz = if (posIndex * 3 + 2 < positions.size) positions[posIndex * 3 + 2] else 0.0
         val u = if (uvs.isNotEmpty() && uvIndex * 2 + 1 < uvs.size) uvs[uvIndex * 2] else 0.0
         val v = if (uvs.isNotEmpty() && uvIndex * 2 + 1 < uvs.size) uvs[uvIndex * 2 + 1] else 0.0
-        val idx = deduplicatedVertices.size
-        deduplicatedVertices += doubleArrayOf(px, py, pz, u, v)
-        return idx
+        return deduplicateVertex(px, py, pz, u, v)
+    }
+
+    fun addTriangle(a: Int, b: Int, c: Int, materialIndex: Int) {
+        if (a == b || b == c || c == a) return
+
+        // Cyclic rotations preserve winding, so reversed two-sided faces remain distinct.
+        val key = when {
+            a <= b && a <= c -> DaeTriangleKey(materialIndex, a, b, c)
+            b <= a && b <= c -> DaeTriangleKey(materialIndex, b, c, a)
+            else -> DaeTriangleKey(materialIndex, c, a, b)
+        }
+        if (triangleKeys.add(key)) {
+            allTriangles += intArrayOf(a, b, c, materialIndex)
+        }
     }
 
     fun parsePolylistInputs(parent: Element): Triple<Int, Int, Int> {
@@ -195,7 +231,7 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
         return Triple(stride, vertexOffset, texcoordOffset)
     }
 
-    fun resolveUVSourceId(mesh: Element, parent: Element): String {
+    fun resolveUVSourceId(parent: Element): String {
         val inputs = parent.getElementsByTagNameNS(NS, "input")
         for (ii in 0 until inputs.length) {
             val input = inputs.item(ii) as? Element ?: continue
@@ -224,7 +260,7 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
         for (pi in 0 until polylists.length) {
             val polylist = polylists.item(pi) as? Element ?: continue
             val (stride, vertOff, texOff) = parsePolylistInputs(polylist)
-            val uvSourceId = resolveUVSourceId(mesh, polylist)
+            val uvSourceId = resolveUVSourceId(polylist)
             val uvs = if (uvSourceId.isNotEmpty()) parseFloatArray(mesh, uvSourceId) else doubleArrayOf()
 
             val vcountText = childElement(polylist, "vcount")?.textContent?.trim() ?: continue
@@ -244,7 +280,7 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
                 }
                 for (ti in 1 until faceVerts.size - 1) {
                     val a = faceVerts[0]; val b = faceVerts[ti]; val c = faceVerts[ti + 1]
-                    if (a != b && b != c && c != a) allTriangles += intArrayOf(a, b, c, ci)
+                    addTriangle(a, b, c, ci)
                 }
             }
         }
@@ -253,7 +289,7 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
         for (ti in 0 until triangleLists.length) {
             val triElem = triangleLists.item(ti) as? Element ?: continue
             val (stride, vertOff, texOff) = parsePolylistInputs(triElem)
-            val uvSourceId = resolveUVSourceId(mesh, triElem)
+            val uvSourceId = resolveUVSourceId(triElem)
             val uvs = if (uvSourceId.isNotEmpty()) parseFloatArray(mesh, uvSourceId) else doubleArrayOf()
 
             val count = triElem.getAttribute("count")?.toIntOrNull() ?: 0
@@ -267,9 +303,7 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
                     val uvIdx = if (texOff >= 0) pValues[base + vi * stride + texOff] else 0
                     addVertex(posIdx, uvIdx, positions, uvs)
                 }
-                if (verts[0] != verts[1] && verts[1] != verts[2] && verts[2] != verts[0]) {
-                    allTriangles += intArrayOf(verts[0], verts[1], verts[2], ci)
-                }
+                addTriangle(verts[0], verts[1], verts[2], ci)
             }
         }
     }
@@ -288,7 +322,7 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
     val worldSize = 8192.0
     val scale = worldSize / maxExtent
 
-    val bakedVertices = deduplicatedVertices.flatMap { v ->
+    val bakedVertexRows = deduplicatedVertices.map { v ->
         val u16 = (v[3] * 1024.0).roundToInt()
         val v16 = ((1.0 - v[4]) * 1024.0).roundToInt()
         listOf(
@@ -299,6 +333,37 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
             v16
         )
     }
+
+    val compactVertexRows = mutableListOf<List<Int>>()
+    val compactVertexMap = linkedMapOf<BakedVertexKey, Int>()
+    val oldToCompactVertex = IntArray(bakedVertexRows.size)
+    for ((oldIndex, vertex) in bakedVertexRows.withIndex()) {
+        val key = BakedVertexKey(vertex[0], vertex[1], vertex[2], vertex[3], vertex[4])
+        oldToCompactVertex[oldIndex] = compactVertexMap.getOrPut(key) {
+            compactVertexRows += vertex
+            compactVertexRows.lastIndex
+        }
+    }
+
+    val compactTriangles = mutableListOf<IntArray>()
+    val compactTriangleKeys = linkedSetOf<DaeTriangleKey>()
+    for (triangle in allTriangles) {
+        val a = oldToCompactVertex[triangle[0]]
+        val b = oldToCompactVertex[triangle[1]]
+        val c = oldToCompactVertex[triangle[2]]
+        val materialIndex = triangle[3]
+        if (a == b || b == c || c == a) continue
+        val key = when {
+            a <= b && a <= c -> DaeTriangleKey(materialIndex, a, b, c)
+            b <= a && b <= c -> DaeTriangleKey(materialIndex, b, c, a)
+            else -> DaeTriangleKey(materialIndex, c, a, b)
+        }
+        if (compactTriangleKeys.add(key)) {
+            compactTriangles += intArrayOf(a, b, c, materialIndex)
+        }
+    }
+
+    val bakedVertices = compactVertexRows.flatten()
 
     val textures = mutableListOf<BakedMario64Texture>()
     for ((matId, matIdx) in materialIndexes) {
@@ -325,14 +390,14 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
         }
     }
 
-    val bakedTriangles = allTriangles.flatMap { it.toList() }
+    val bakedTriangles = compactTriangles.flatMap { it.toList() }
 
     return BakedMario64World(
         vertices = bakedVertices,
         triangles = bakedTriangles,
         colors = colors,
-        vertexCount = deduplicatedVertices.size,
-        triangleCount = allTriangles.size,
+        vertexCount = compactVertexRows.size,
+        triangleCount = compactTriangles.size,
         hasUVs = true,
         textures = textures
     )
@@ -510,24 +575,44 @@ fun renderMario64ModelAssets(model: BakedMario64World): String {
         appendLine("object Mario64ModelAssets {")
         appendLine("    val battlefield = Mario64BakedWorld(")
         appendLine("        name = \"Bob-Omb Battlefield\",")
-        appendIntArray("vertices", model.vertices, "        ")
-        appendLine(",")
-        appendIntArray("triangles", model.triangles, "        ")
-        appendLine(",")
-        appendIntArray("colors", model.colors, "        ")
-        appendLine()
+        appendLine("        vertices = battlefieldVertices(),")
+        appendLine("        triangles = battlefieldTriangles(),")
+        appendLine("        colors = battlefieldColors()")
         appendLine("    )")
+        appendLine()
+        appendChunkedIntArrayBuilder("battlefieldVertices", model.vertices, "    ")
+        appendLine()
+        appendChunkedIntArrayBuilder("battlefieldTriangles", model.triangles, "    ")
+        appendLine()
+        appendChunkedIntArrayBuilder("battlefieldColors", model.colors, "    ")
         appendLine("}")
     }
 }
 
-fun StringBuilder.appendIntArray(name: String, values: List<Int>, indent: String) {
-    appendLine("${indent}$name = intArrayOf(")
-    values.chunked(12).forEachIndexed { index, chunk ->
-        val suffix = if (index == (values.size - 1) / 12) "" else ","
-        appendLine("$indent    ${chunk.joinToString(", ")}$suffix")
+fun StringBuilder.appendChunkedIntArrayBuilder(
+    name: String,
+    values: List<Int>,
+    indent: String,
+    chunkSize: Int = 256
+) {
+    val chunks = values.chunked(chunkSize)
+    appendLine("${indent}private fun $name(): IntArray {")
+    appendLine("${indent}    val values = IntArray(${values.size})")
+    chunks.indices.forEach { chunkIndex ->
+        appendLine("${indent}    ${name}Chunk$chunkIndex(values)")
     }
-    append("$indent)")
+    appendLine("${indent}    return values")
+    appendLine("$indent}")
+
+    chunks.forEachIndexed { chunkIndex, chunk ->
+        appendLine()
+        appendLine("${indent}private fun ${name}Chunk$chunkIndex(values: IntArray) {")
+        val start = chunkIndex * chunkSize
+        chunk.forEachIndexed { offset, value ->
+            appendLine("${indent}    values[${start + offset}] = $value")
+        }
+        appendLine("$indent}")
+    }
 }
 
 fun renderMario64MeshC(model: BakedMario64World): String {

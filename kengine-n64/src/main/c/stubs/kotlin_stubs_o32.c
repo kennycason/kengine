@@ -1,5 +1,4 @@
 typedef unsigned int size_t;
-typedef int ssize_t;
 
 extern void* malloc(size_t size);
 extern void free(void* ptr);
@@ -21,12 +20,6 @@ int posix_memalign(void** memptr, size_t alignment, size_t size) {
     if (!ptr) return -1;
     *memptr = ptr;
     return 0;
-}
-
-ssize_t write(int fd, const void* buf, size_t count) {
-    (void)fd;
-    (void)buf;
-    return (ssize_t)count;
 }
 
 unsigned long long __atomic_load_8(const volatile void* ptr, int memorder) {

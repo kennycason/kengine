@@ -16,7 +16,7 @@ class Mario64GameTest {
         assertTrue(world.name.isNotEmpty())
         assertTrue(world.vertexCount > 0, "world should have vertices")
         assertTrue(world.triangleCount > 0, "world should have triangles")
-        assertEquals(0, world.vertices.size % 3)
+        assertEquals(0, world.vertices.size % Mario64BakedWorld.VERTEX_STRIDE)
         assertEquals(0, world.triangles.size % Mario64BakedWorld.TRIANGLE_FIELD_COUNT)
         assertTrue(world.colors.isNotEmpty(), "world should have material colors")
     }
@@ -24,8 +24,8 @@ class Mario64GameTest {
     @Test
     fun worldModelVertexCountMatchesDaeSource() {
         val world = Mario64ModelAssets.battlefield
-        assertTrue(world.vertexCount > 2000, "Bob-Omb Battlefield should have >2000 vertices (has ${world.vertexCount})")
-        assertTrue(world.triangleCount > 1500, "Bob-Omb Battlefield should have >1500 triangles (has ${world.triangleCount})")
+        assertEquals(1623, world.vertexCount, "identical DAE vertices should be reused")
+        assertEquals(1100, world.triangleCount, "duplicates and quantized degenerates should be removed")
     }
 
     @Test

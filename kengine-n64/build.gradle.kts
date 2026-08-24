@@ -1323,7 +1323,6 @@ fun registerGameBuildTasks(
         inputs.file(bridgeHeader)
         inputs.file(kotlinApiHeader)
         inputs.file(file("src/main/c/main.c"))
-        inputs.file(file("src/main/c/kotlin_stubs.c"))
         outputs.dir(dockerStagingDir)
 
         doLast {
@@ -1334,7 +1333,6 @@ fun registerGameBuildTasks(
             staging.resolve("build").mkdirs()
 
             file("src/main/c/main.c").copyTo(staging.resolve("src/main.c"), overwrite = true)
-            file("src/main/c/kotlin_stubs.c").copyTo(staging.resolve("src/kotlin_stubs.c"), overwrite = true)
 
             rebuiltKotlinArchive.get().asFile.copyTo(
                 staging.resolve("kotlin/lib${kotlinOutputBaseName}.a"), overwrite = true
@@ -1400,8 +1398,8 @@ fun registerGameBuildTasks(
                 |.PHONY: all
                 |
                 |CFLAGS += -I${'$'}(CURDIR)/kotlin -I${'$'}(CURDIR)/src
-                |LDFLAGS += --noinhibit-exec --no-warn-mismatch$spriteDefs$soundDefs$worldMeshDefs$glLibs
-                |OBJS = ${'$'}(BUILD_DIR)/main.o ${'$'}(BUILD_DIR)/kotlin_stubs.o$spriteObjs$soundObjs
+                |LDFLAGS += --no-warn-mismatch$spriteDefs$soundDefs$worldMeshDefs$glLibs
+                |OBJS = ${'$'}(BUILD_DIR)/main.o$spriteObjs$soundObjs
                 |KOTLIN_LIB = ${'$'}(CURDIR)/kotlin/$libName.a
                 |
                 |$artifactBaseName.z64: N64_ROM_TITLE="$displayName"

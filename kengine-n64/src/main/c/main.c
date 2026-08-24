@@ -779,6 +779,10 @@ static int w3d_gl_tex_count = 0;
 static int w3d_gl_initialized = 0;
 static int w3d_gl_rendered_frame = 0;
 static int w3d_gl_projection_set = 0;
+static GLuint w3d_gl_world_list = 0;
+static const KengineWorldMesh* w3d_gl_world_list_mesh = NULL;
+
+#define WORLD3D_GL_SCALE (1.0f / 100.0f)
 
 static void w3d_gl_setup_projection(void) {
     if (w3d_gl_projection_set) return;
@@ -810,47 +814,7 @@ static void w3d_gl_init_textures(const KengineWorldMesh* mesh) {
     w3d_gl_initialized = 1;
 }
 
-static void draw_world_3d(
-    surface_t* disp,
-    const KengineWorldMesh* mesh,
-    int cam_x, int cam_y, int cam_z,
-    int yaw, int pitch,
-    int proj_dist
-) {
-    if (!mesh) return;
-
-    w3d_gl_init_textures(mesh);
-    w3d_gl_rendered_frame = 1;
-
-    #define W3D_SCALE (1.0f / 100.0f)
-    float yaw_rad = (float)yaw * 6.283185f / (float)WORLD3D_ANGLE_FULL;
-    float pitch_rad = (float)pitch * 6.283185f / (float)WORLD3D_ANGLE_FULL;
-    float fx = sinf(yaw_rad) * cosf(pitch_rad);
-    float fy = sinf(pitch_rad);
-    float fz = cosf(yaw_rad) * cosf(pitch_rad);
-
-    w3d_gl_setup_projection();
-
-    surface_t *zbuf = display_get_zbuf();
-    rdpq_attach(disp, zbuf);
-    gl_context_begin();
-
-    glClearColor(0.36f, 0.58f, 0.99f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
-
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    gluLookAt(
-        (double)cam_x * W3D_SCALE, (double)cam_y * W3D_SCALE, (double)cam_z * W3D_SCALE,
-        ((double)cam_x + (double)fx * 1000.0) * W3D_SCALE,
-        ((double)cam_y + (double)fy * 1000.0) * W3D_SCALE,
-        ((double)cam_z + (double)fz * 1000.0) * W3D_SCALE,
-        0.0, 1.0, 0.0
-    );
-
+static void w3d_gl_submit_world(const KengineWorldMesh* mesh) {
     int tc = mesh->triangle_count;
     const int* tris = mesh->triangles;
     const int* verts = mesh->vertices;
@@ -866,7 +830,6 @@ static void draw_world_3d(
         }
     }
 
-    /* Scale factor: world coords are large, RSP needs smaller values */
     int current_mat = -1;
     int using_tex = 0;
     int batch_count = 0;
@@ -897,25 +860,108 @@ static void draw_world_3d(
             glBegin(GL_TRIANGLES);
         }
 
-        int ab = a * vstride, bb2 = b * vstride, cb = c * vstride;
+        int ab = a * vstride, bb = b * vstride, cb = c * vstride;
         if (using_tex && vstride >= 5) {
-            glTexCoord2f((float)verts[ab+3] / 1024.0f, (float)verts[ab+4] / 1024.0f);
+            glTexCoord2f((float)verts[ab + 3] / 1024.0f, (float)verts[ab + 4] / 1024.0f);
         }
-        glVertex3f((float)verts[ab] * W3D_SCALE, (float)verts[ab+1] * W3D_SCALE, (float)verts[ab+2] * W3D_SCALE);
+        glVertex3f(
+            (float)verts[ab] * WORLD3D_GL_SCALE,
+            (float)verts[ab + 1] * WORLD3D_GL_SCALE,
+            (float)verts[ab + 2] * WORLD3D_GL_SCALE
+        );
         if (using_tex && vstride >= 5) {
-            glTexCoord2f((float)verts[bb2+3] / 1024.0f, (float)verts[bb2+4] / 1024.0f);
+            glTexCoord2f((float)verts[bb + 3] / 1024.0f, (float)verts[bb + 4] / 1024.0f);
         }
-        glVertex3f((float)verts[bb2] * W3D_SCALE, (float)verts[bb2+1] * W3D_SCALE, (float)verts[bb2+2] * W3D_SCALE);
+        glVertex3f(
+            (float)verts[bb] * WORLD3D_GL_SCALE,
+            (float)verts[bb + 1] * WORLD3D_GL_SCALE,
+            (float)verts[bb + 2] * WORLD3D_GL_SCALE
+        );
         if (using_tex && vstride >= 5) {
-            glTexCoord2f((float)verts[cb+3] / 1024.0f, (float)verts[cb+4] / 1024.0f);
+            glTexCoord2f((float)verts[cb + 3] / 1024.0f, (float)verts[cb + 4] / 1024.0f);
         }
-        glVertex3f((float)verts[cb] * W3D_SCALE, (float)verts[cb+1] * W3D_SCALE, (float)verts[cb+2] * W3D_SCALE);
+        glVertex3f(
+            (float)verts[cb] * WORLD3D_GL_SCALE,
+            (float)verts[cb + 1] * WORLD3D_GL_SCALE,
+            (float)verts[cb + 2] * WORLD3D_GL_SCALE
+        );
         batch_count++;
     }
     if (batch_count > 0) glEnd();
+}
+
+static void w3d_gl_prepare_world_list(const KengineWorldMesh* mesh) {
+    if (w3d_gl_world_list != 0 && w3d_gl_world_list_mesh == mesh) return;
+
+    if (w3d_gl_world_list != 0) {
+        glDeleteLists(w3d_gl_world_list, 1);
+        w3d_gl_world_list = 0;
+        w3d_gl_world_list_mesh = NULL;
+    }
+
+    GLuint list = glGenLists(1);
+    if (list == 0) return;
+
+    glNewList(list, GL_COMPILE);
+    w3d_gl_submit_world(mesh);
+    glEndList();
+
+    w3d_gl_world_list = list;
+    w3d_gl_world_list_mesh = mesh;
+}
+
+static void draw_world_3d(
+    surface_t* disp,
+    const KengineWorldMesh* mesh,
+    int cam_x, int cam_y, int cam_z,
+    int yaw, int pitch,
+    int proj_dist
+) {
+    if (!mesh) return;
+
+    w3d_gl_init_textures(mesh);
+    w3d_gl_rendered_frame = 1;
+
+    float yaw_rad = (float)yaw * 6.283185f / (float)WORLD3D_ANGLE_FULL;
+    float pitch_rad = (float)pitch * 6.283185f / (float)WORLD3D_ANGLE_FULL;
+    float fx = sinf(yaw_rad) * cosf(pitch_rad);
+    float fy = sinf(pitch_rad);
+    float fz = cosf(yaw_rad) * cosf(pitch_rad);
+
+    w3d_gl_setup_projection();
+
+    surface_t *zbuf = display_get_zbuf();
+    rdpq_attach(disp, zbuf);
+    gl_context_begin();
+
+    glClearColor(0.36f, 0.58f, 0.99f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    gluLookAt(
+        (double)cam_x * WORLD3D_GL_SCALE,
+        (double)cam_y * WORLD3D_GL_SCALE,
+        (double)cam_z * WORLD3D_GL_SCALE,
+        ((double)cam_x + (double)fx * 1000.0) * WORLD3D_GL_SCALE,
+        ((double)cam_y + (double)fy * 1000.0) * WORLD3D_GL_SCALE,
+        ((double)cam_z + (double)fz * 1000.0) * WORLD3D_GL_SCALE,
+        0.0, 1.0, 0.0
+    );
+
+    w3d_gl_prepare_world_list(mesh);
+    if (w3d_gl_world_list != 0 && w3d_gl_world_list_mesh == mesh) {
+        glCallList(w3d_gl_world_list);
+    } else {
+        w3d_gl_submit_world(mesh);
+    }
 
     gl_context_end();
-    rdpq_detach_show();
+    /* Wait for GL/RDP work before the CPU writes the performance overlay. */
+    rdpq_detach_wait();
 }
 
 #else
@@ -1449,8 +1495,14 @@ int main(void) {
             }
             if (!gl_rendered) {
                 execute_render_commands(disp, g_render_commands, render_count);
-                display_show(disp);
             }
+
+            phase_end = timer_ticks();
+            timing.render_us = ticks_to_us(phase_end - phase_start);
+            timing.total_us = ticks_to_us(timer_ticks() - work_start);
+            draw_perf_overlay(disp, frame, step_count, render_count, render_dropped,
+                              audio_count, audio_dropped, timing);
+            display_show(disp);
         }
 #else
         execute_render_commands(disp, g_render_commands, render_count);
