@@ -1,6 +1,6 @@
 # Mario N64 Physics Follow-Up
 
-Status: rendering and the first floor-controller slice work; body-radius wall collision is the next physics milestone.
+Status: rendering, floor physics, and the first body-radius wall/slide slice work; manual traversal and tuning are next.
 
 Last reviewed: 2026-08-24
 
@@ -10,7 +10,7 @@ The review covered the hand-written game, backend, build, and runtime code in `g
 
 ## Executive Summary
 
-The textured Bob-omb Battlefield renderer is real and produces a stable ROM. The first playable controller slice now replaces the noclip camera: it has generated collision data, a grid-accelerated floor query, grounded spawn, terrain following, vertical velocity, gravity, jumping, landing, and separate body/camera height. Body-radius wall response, a visible Mario model, and a third-person follow camera are not implemented yet.
+The textured Bob-omb Battlefield renderer is real and produces a stable ROM. The playable controller now replaces the noclip camera: it has generated collision data, grid-accelerated floor and wall queries, grounded spawn, terrain following, a 50-unit horizontal body radius, bounded wall push/slide, vertical velocity, gravity, jumping, landing, and separate body/camera height. A visible Mario model and third-person follow camera are not implemented yet.
 
 The shortest reliable route to a playable build is:
 
@@ -32,14 +32,16 @@ Do not begin with a general rigid-body engine. A purpose-built kinematic charact
 - Y: `485` (queried from the collision mesh)
 - Z: `-3000`
 
-The directional inputs request camera-relative body movement. A jumps on its rising edge, B selects the faster run speed, the C buttons change yaw/pitch, and Start resets the complete controller state. Drawing emits one `DRAW_WORLD_3D` command at the body X/Z and body Y plus a 180-unit eye height.
+The directional inputs request camera-relative body movement. A jumps on its rising edge, B selects the faster run speed, the C buttons change yaw/pitch, and Start resets the complete controller state. Normal movement is 19 units per frame, approximately 20% below the previous 24; holding B restores the previous 24-unit pace. Drawing emits one `DRAW_WORLD_3D` command at the body X/Z and body Y plus a 180-unit eye height.
 
-The floor controller now provides:
+The controller now provides:
 
 - mutable body position and vertical velocity;
 - gravity, terminal velocity, grounded state, and supporting triangle;
 - an allocation-free grid floor query and ground snap/step thresholds;
 - jump-edge detection, landing, edge falling, and safe fall reset;
+- a 50-unit upper-body radius, precomputed wall planes, movement substeps, and bounded wall sliding;
+- an 8-unit seam probe used only when the exact center floor query misses;
 - separate body and camera positions.
 
 The reusable `KinematicGroundBody3D` expresses the same controller and is
@@ -49,7 +51,7 @@ an exception in the experimental Kotlin MIPS target even when its initializer
 does no collision work. This duplication is an explicit temporary ABI/codegen
 workaround, not the intended engine boundary.
 
-It still has no player radius/capsule or steep-triangle wall response. This means the test build follows and falls from floor geometry, but can pass through walls until the next controller slice is added.
+This is still a deliberately small character controller rather than a full capsule solver. It has no ceiling response, lower-body second-radius pass, moving-platform support, or ledge-grab logic. The current wall slice needs manual coverage across the real level before its dimensions and slope classification are treated as final.
 
 ### Actual N64 rendering path
 
@@ -185,6 +187,15 @@ falls from edges. A direct ten-second ares boot check on 2026-08-24 produced no
 CPU freeze or RCP-unmapped-access log. Manual controller traversal remains the
 next verification.
 
+The first wall-response build is 917,504 bytes with SHA-256
+`1cd3ff9c7d9362e7de0c6a6614d0a665ea3378d5736343aacafd3dc0a8cb8dac`.
+It bakes a Q10 normalized plane and origin offset into every collision
+triangle, resolves a 50-unit horizontal body circle against the 503 steep/wall
+triangles in at most three passes, and divides ordinary movement into at most
+12-unit substeps. A direct ares boot check on 2026-08-24 ran the idle collision
+loop without an exception; real-level wall coverage and performance still need
+manual confirmation.
+
 ### Linker failures found during the review
 
 The linker reported multiple definitions of:
@@ -267,13 +278,13 @@ previously failed while compiling generated assets with:
 Method too large: mario64/Mario64ModelAssets.<clinit> ()V
 ```
 
-The generator now emits a final `IntArray` filled by bounded 256-value functions. This avoids the JVM 64 KiB static-initializer limit without allocating temporary chunk arrays. `:games:mario-n64:jvmTest` now compiles and all twelve current tests pass, including material-layer distribution, compact collision-grid validation, spawn-ground lookup, overflow-safe interpolation across a maximum-size sloped triangle, jump/landing behavior, held-jump edge behavior, safe far-fall reset, and complete Start reset state.
+The generator now emits a final `IntArray` filled by bounded 256-value functions. This avoids the JVM 64 KiB static-initializer limit without allocating temporary chunk arrays. `:games:mario-n64:jvmTest` now compiles and all fifteen current tests pass, including material-layer distribution, compact collision-grid and wall-normal validation, spawn-ground lookup, overflow-safe interpolation across a maximum-size sloped triangle, seam probing, wall push/tangent slide, walk/run pacing, jump/landing behavior, held-jump edge behavior, safe far-fall reset, and complete Start reset state.
 
 The assertions were partially strengthened:
 
 - The vertex-layout test now uses the declared stride of five `(x, y, z, u, v)` and checks the compact mesh counts.
 - The Start/reset test now asserts exact body coordinates, grounded state, zero vertical velocity, a valid supporting triangle, and camera eye offset.
-- Body-radius wall collision and sliding remain untested because that implementation is the next slice.
+- Body-radius wall push and tangent preservation now have a focused synthetic test; corners, short walls, and complete real-level traversal remain manual acceptance work.
 
 ### Unused Kotlin renderer is internally inconsistent
 
@@ -335,10 +346,11 @@ Generate collision data from the same DAE as the render mesh, but keep the rende
 1. Deduplicate triangles by position.
 2. Remove degenerate triangles.
 3. Compute/classify normals as floor/walkable versus steep/wall.
-4. Quantize or validate coordinates for signed 16-bit storage.
-5. Build the 16 by 16 XZ cell table and compact triangle-reference lists.
-6. Emit primitive arrays with bounded initialization chunks so JVM tests compile.
-7. Emit validation metadata such as bounds, triangle counts, and the expected spawn-ground result.
+4. Bake Q10 normalized plane normals and origin offsets for allocation-free wall distance tests.
+5. Quantize or validate coordinates for signed 16-bit storage.
+6. Build the 16 by 16 XZ cell table and compact triangle-reference lists.
+7. Emit primitive arrays with bounded initialization chunks so JVM tests compile.
+8. Emit validation metadata such as bounds, triangle counts, and the expected spawn-ground result.
 
 Suggested storage is `ShortArray` for coordinates and triangle references where the validated ranges permit it, plus `IntArray` for cell offsets/counts and any fixed-point values that need more range. On the current MIPS target, avoid `Long` arithmetic in the hot query. Validate coordinate bounds, compute edge products in `Int`, interpolate relative height instead of absolute height, and scale barycentric weights and their denominator together before a product could overflow.
 
@@ -459,7 +471,8 @@ Exit condition: a common Kotlin test can query the expected ground around `(-300
 - [x] Add camera-relative horizontal movement.
 - [x] Add point-ground selection, snapping, step up/down, and slope limits.
 - [x] Add gravity, terminal velocity, jump, landing, and edge falling.
-- [ ] Add body-radius wall collision and sliding with bounded iterations.
+- [x] Add the first body-radius wall collision and sliding pass with bounded iterations.
+- [ ] Manually validate/tune wall response across the complete level and add lower-body/ceiling response if needed.
 - [x] Separate body and camera positions.
 - [x] Make Start reset the full state to grounded spawn.
 
@@ -501,7 +514,7 @@ Exit condition: a visible animated character follows the already-proven physics 
 - [x] Jump only starts while grounded and only on the input edge.
 - [x] A complete jump arc lands without tunneling through the starting floor.
 - [ ] A reachable step is climbed and a step above the configured limit is blocked.
-- [ ] Motion into a wall retains the tangential component and slides.
+- [x] Motion into a wall retains the tangential component and slides in the focused controller test.
 - [x] Walking off an edge clears grounded state and starts falling.
 - [x] Start restores the exact spawn state and supporting floor.
 - [x] Out-of-grid/far-fall movement resets to the safe spawn.
@@ -561,10 +574,10 @@ Use an emulator/configuration that supports libdragon custom RSP microcode; see 
 
 ## Immediate Next Slice
 
-1. Manually test the new ROM in ares. Confirm the circular shadows are stable under movement, record `FPS`, `K`, `R`, and `H`, and exercise walking, running with B, jumping with A, cliff falling, landing, and Start reset.
-2. Add body-radius collision against the 503 steep/wall triangles, with a bounded projection/slide iteration count and focused JVM tests.
-3. Add controller diagnostics (position, vertical velocity, grounded/support state, candidate counts, and collision flags) to the N64 overlay.
+1. Manually test the new ROM in ares. Record `FPS`, `K`, `R`, and `H`; walk and run into broad walls, corners, fences, and steep slopes; try glancing movement to confirm sliding; and identify any remaining fall-through coordinates or screenshots.
+2. Tune the 50-unit upper-body radius, 60-unit sample height, seam probe, and slope threshold from those results. Add SM64's smaller lower-body wall pass or ceiling response only where the real level demonstrates the need.
+3. Add controller diagnostics (position, vertical velocity, grounded/support state, floor/wall triangle, candidate counts, and collision flags) to the N64 overlay.
 4. Promote `StaticTriangleGrid3D` and the proven controller primitives into an appropriate reusable kengine common module; keep Bob-omb-specific generation/assets in `games/mario-n64`.
 5. Add generator-time ambient plus directional face shading and compare depth readability and performance.
 
-The current ROM is deliberately a floor-physics checkpoint. Manual results from it will establish whether the scale, eye height, movement speed, step/snap values, and shadow decal fix feel right before wall/capsule resolution makes the controller more complex.
+The current ROM is the first floor-plus-wall physics checkpoint. Manual results from it will establish whether the scale, eye height, 19/24 movement speeds, body radius, wall height, step/snap values, and shadow decal fix feel right before lower-body, ceiling, or capsule behavior makes the controller more complex.

@@ -5,6 +5,7 @@ import com.kengine.input.InputState
 import com.kengine.render.RenderCommandBuffer
 import com.kengine.render.RenderCommandType
 import com.kengine.render.RenderContext
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -49,6 +50,23 @@ class Mario64GameTest {
         assertEquals(0, collision.cellOffsets.first())
         assertEquals(collision.cellTriangleIndices.size, collision.cellOffsets.last())
         assertTrue(collision.cellTriangleIndices.all { it in 0 until collision.triangleCount })
+
+        var triangle = 0
+        while (triangle < collision.triangleCount) {
+            val base = triangle * StaticTriangleGrid3D.TRIANGLE_STRIDE
+            val normalX = collision.triangles[base + StaticTriangleGrid3D.TRIANGLE_NORMAL_X]
+            val normalY = collision.triangles[base + StaticTriangleGrid3D.TRIANGLE_NORMAL_Y]
+            val normalZ = collision.triangles[base + StaticTriangleGrid3D.TRIANGLE_NORMAL_Z]
+            assertTrue(abs(normalX) <= StaticTriangleGrid3D.NORMAL_SCALE)
+            assertTrue(abs(normalY) <= StaticTriangleGrid3D.NORMAL_SCALE)
+            assertTrue(abs(normalZ) <= StaticTriangleGrid3D.NORMAL_SCALE)
+            if ((collision.triangles[base + StaticTriangleGrid3D.TRIANGLE_FLAGS] and
+                    StaticTriangleGrid3D.FLAG_FLOOR) == 0
+            ) {
+                assertTrue(normalX != 0 || normalZ != 0, "wall must have a horizontal normal")
+            }
+            triangle += 1
+        }
     }
 
     @Test
@@ -73,7 +91,10 @@ class Mario64GameTest {
                 4096, 2147, -4096,
                 -4096, 2147, 4096
             ),
-            triangles = intArrayOf(0, 1, 2, StaticTriangleGrid3D.FLAG_FLOOR),
+            triangles = intArrayOf(
+                0, 1, 2, StaticTriangleGrid3D.FLAG_FLOOR,
+                0, -StaticTriangleGrid3D.NORMAL_SCALE, 0, 0
+            ),
             cellOffsets = intArrayOf(0, 1),
             cellTriangleIndices = intArrayOf(0),
             metadata = intArrayOf(-4096, -192, -4096, 4096, 2147, 4096, 1, 1, 8192)
@@ -81,6 +102,63 @@ class Mario64GameTest {
 
         assertEquals(978, collision.groundHeightAt(-2048, -2048))
         assertEquals(0, collision.lastSupportTriangle)
+    }
+
+    @Test
+    fun smallFloorProbeBridgesAQuantizedSeam() {
+        val collision = createFloorAndWallGrid()
+
+        assertEquals(
+            StaticTriangleGrid3D.NO_GROUND,
+            collision.groundHeightAt(-260, 0)
+        )
+        assertEquals(
+            0,
+            collision.groundHeightNear(-260, 0, probeDistance = 8)
+        )
+        assertTrue(collision.lastSupportTriangle >= 0)
+    }
+
+    @Test
+    fun wallCirclePushesOutAndPreservesTangentMovement() {
+        val collision = createFloorAndWallGrid()
+
+        assertTrue(collision.resolveWalls(x = 40, sampleY = 60, z = 0, radius = 50))
+        assertEquals(50, collision.lastResolvedX)
+        assertEquals(0, collision.lastResolvedZ)
+        assertTrue(collision.lastWallTriangle >= 0)
+
+        val body = KinematicGroundBody3D(collision, spawnX = 80, spawnZ = -100)
+        body.step(moveX = -60, moveZ = 80, jumpPressed = false)
+
+        assertTrue(body.grounded)
+        assertTrue(body.x >= 50, "body radius should remain outside the x=0 wall")
+        assertEquals(-20, body.z, "movement tangent to the wall should be preserved")
+        assertTrue(body.wallCollisionCount > 0)
+    }
+
+    @Test
+    fun normalWalkIsSlowerAndBHoldsThePreviousPace() {
+        val walkGame = Mario64Game()
+        val walkInput = InputState()
+        walkInput.set(InputButton.DPAD_UP)
+        walkGame.update(walkInput)
+
+        val runGame = Mario64Game()
+        val runInput = InputState()
+        runInput.set(InputButton.DPAD_UP)
+        runInput.set(InputButton.B)
+        runGame.update(runInput)
+
+        val walkX = walkGame.bodyX + 3000
+        val walkZ = walkGame.bodyZ + 3000
+        val runX = runGame.bodyX + 3000
+        val runZ = runGame.bodyZ + 3000
+        val walkDistanceSquared = walkX * walkX + walkZ * walkZ
+        val runDistanceSquared = runX * runX + runZ * runZ
+
+        assertTrue(runDistanceSquared > walkDistanceSquared)
+        assertTrue(maxOf(abs(runX), abs(runZ)) <= 24)
     }
 
     @Test
@@ -240,5 +318,33 @@ class Mario64GameTest {
             index += 1
         }
         return false
+    }
+
+    private fun createFloorAndWallGrid(): StaticTriangleGrid3D {
+        return StaticTriangleGrid3D(
+            vertices = intArrayOf(
+                -256, 0, -256,
+                256, 0, -256,
+                -256, 0, 256,
+                256, 0, 256,
+                0, 200, -256,
+                0, 200, 256,
+                0, 0, -256,
+                0, 0, 256
+            ),
+            triangles = intArrayOf(
+                0, 1, 2, StaticTriangleGrid3D.FLAG_FLOOR,
+                0, StaticTriangleGrid3D.NORMAL_SCALE, 0, 0,
+                1, 3, 2, StaticTriangleGrid3D.FLAG_FLOOR,
+                0, StaticTriangleGrid3D.NORMAL_SCALE, 0, 0,
+                6, 4, 7, 0,
+                StaticTriangleGrid3D.NORMAL_SCALE, 0, 0, 0,
+                4, 5, 7, 0,
+                StaticTriangleGrid3D.NORMAL_SCALE, 0, 0, 0
+            ),
+            cellOffsets = intArrayOf(0, 4),
+            cellTriangleIndices = intArrayOf(0, 1, 2, 3),
+            metadata = intArrayOf(-256, 0, -256, 256, 200, 256, 1, 1, 512)
+        )
     }
 }

@@ -21,6 +21,8 @@ class Mario64Game : PortableGame {
     private var playerVerticalVelocity = 0
     private var playerGrounded = false
     private var playerSupportTriangle = StaticTriangleGrid3D.NO_TRIANGLE
+    private var playerWallTriangle = StaticTriangleGrid3D.NO_TRIANGLE
+    private var playerWallCollisionCount = 0
     private var cameraYaw = INITIAL_YAW
     private var cameraPitch = INITIAL_PITCH
 
@@ -45,6 +47,12 @@ class Mario64Game : PortableGame {
 
     val supportTriangle: Int
         get() = playerSupportTriangle
+
+    val wallTriangle: Int
+        get() = playerWallTriangle
+
+    val wallCollisionCount: Int
+        get() = playerWallCollisionCount
 
     override fun update(input: InputState) {
         val forwardAxis = input.axis(InputButton.DPAD_DOWN, InputButton.DPAD_UP)
@@ -107,7 +115,7 @@ class Mario64Game : PortableGame {
     private fun resetPlayer() {
         playerX = PLAYER_START_X
         playerZ = PLAYER_START_Z
-        val spawnGround = collision.groundHeightAt(playerX, playerZ)
+        val spawnGround = collision.groundHeightNear(playerX, playerZ)
         if (spawnGround == StaticTriangleGrid3D.NO_GROUND) {
             playerY = collision.maxY + MAXIMUM_STEP_UP
             playerGrounded = false
@@ -118,6 +126,8 @@ class Mario64Game : PortableGame {
             playerSupportTriangle = collision.lastSupportTriangle
         }
         playerVerticalVelocity = 0
+        playerWallTriangle = StaticTriangleGrid3D.NO_TRIANGLE
+        playerWallCollisionCount = 0
     }
 
     private fun stepPlayer(moveX: Int, moveZ: Int, jumpPressed: Boolean) {
@@ -127,26 +137,9 @@ class Mario64Game : PortableGame {
             playerVerticalVelocity = JUMP_VELOCITY
         }
 
-        val nextX = playerX + moveX
-        val nextZ = playerZ + moveZ
-        if (playerGrounded) {
-            val ground = collision.groundHeightAt(nextX, nextZ, playerY + MAXIMUM_STEP_UP)
-            if (ground != StaticTriangleGrid3D.NO_GROUND && ground >= playerY - GROUND_SNAP_DISTANCE) {
-                playerX = nextX
-                playerY = ground
-                playerZ = nextZ
-                playerVerticalVelocity = 0
-                playerSupportTriangle = collision.lastSupportTriangle
-            } else {
-                playerX = nextX
-                playerZ = nextZ
-                playerGrounded = false
-                playerSupportTriangle = StaticTriangleGrid3D.NO_TRIANGLE
-            }
-        } else {
-            playerX = nextX
-            playerZ = nextZ
-        }
+        playerWallTriangle = StaticTriangleGrid3D.NO_TRIANGLE
+        playerWallCollisionCount = 0
+        movePlayerHorizontal(moveX, moveZ)
 
         if (!playerGrounded) {
             playerVerticalVelocity = maxOf(
@@ -156,7 +149,7 @@ class Mario64Game : PortableGame {
             val previousY = playerY
             val nextY = playerY + playerVerticalVelocity
             if (playerVerticalVelocity <= 0) {
-                val ground = collision.groundHeightAt(playerX, playerZ, previousY)
+                val ground = collision.groundHeightNear(playerX, playerZ, previousY)
                 if (ground != StaticTriangleGrid3D.NO_GROUND && nextY <= ground) {
                     playerY = ground
                     playerVerticalVelocity = 0
@@ -173,12 +166,70 @@ class Mario64Game : PortableGame {
         }
     }
 
+    private fun movePlayerHorizontal(moveX: Int, moveZ: Int) {
+        val greatestMovement = maxOf(absInt(moveX), absInt(moveZ))
+        val substepCount = minOf(
+            MAXIMUM_HORIZONTAL_SUBSTEPS,
+            maxOf(1, (greatestMovement + MAXIMUM_HORIZONTAL_SUBSTEP - 1) / MAXIMUM_HORIZONTAL_SUBSTEP)
+        )
+        var appliedX = 0
+        var appliedZ = 0
+        var substep = 1
+        while (substep <= substepCount) {
+            val targetAppliedX = moveX * substep / substepCount
+            val targetAppliedZ = moveZ * substep / substepCount
+            val nextX = playerX + targetAppliedX - appliedX
+            val nextZ = playerZ + targetAppliedZ - appliedZ
+            collision.resolveWalls(
+                x = nextX,
+                sampleY = playerY + WALL_SAMPLE_HEIGHT,
+                z = nextZ,
+                radius = BODY_RADIUS
+            )
+            val resolvedX = collision.lastResolvedX
+            val resolvedZ = collision.lastResolvedZ
+            playerWallCollisionCount += collision.lastWallCollisionCount
+            if (collision.lastWallTriangle != StaticTriangleGrid3D.NO_TRIANGLE) {
+                playerWallTriangle = collision.lastWallTriangle
+            }
+
+            if (playerGrounded) {
+                val ground = collision.groundHeightNear(
+                    resolvedX,
+                    resolvedZ,
+                    playerY + MAXIMUM_STEP_UP
+                )
+                if (ground != StaticTriangleGrid3D.NO_GROUND && ground >= playerY - GROUND_SNAP_DISTANCE) {
+                    playerX = resolvedX
+                    playerY = ground
+                    playerZ = resolvedZ
+                    playerVerticalVelocity = 0
+                    playerSupportTriangle = collision.lastSupportTriangle
+                } else {
+                    playerX = resolvedX
+                    playerZ = resolvedZ
+                    playerGrounded = false
+                    playerSupportTriangle = StaticTriangleGrid3D.NO_TRIANGLE
+                }
+            } else {
+                playerX = resolvedX
+                playerZ = resolvedZ
+            }
+
+            appliedX = targetAppliedX
+            appliedZ = targetAppliedZ
+            substep += 1
+        }
+    }
+
+    private fun absInt(value: Int): Int = if (value < 0) -value else value
+
     override fun cleanup() {}
 
     companion object {
         val BATTLEFIELD_MESH_ID = RenderAssetId.mesh("battlefield")
-        private const val WALK_SPEED = 24
-        private const val RUN_SPEED = 64
+        private const val WALK_SPEED = 19
+        private const val RUN_SPEED = 24
         private const val YAW_SPEED = 18
         private const val PITCH_SPEED = 9
         private const val INITIAL_YAW = 128
@@ -193,6 +244,10 @@ class Mario64Game : PortableGame {
         private const val JUMP_VELOCITY = 48
         private const val TERMINAL_FALL_VELOCITY = -80
         private const val FALL_RESET_DISTANCE = 2048
+        private const val BODY_RADIUS = 50
+        private const val WALL_SAMPLE_HEIGHT = 60
+        private const val MAXIMUM_HORIZONTAL_SUBSTEP = 12
+        private const val MAXIMUM_HORIZONTAL_SUBSTEPS = 4
         const val CAMERA_EYE_HEIGHT = 180
         private const val PROJECTION_DISTANCE = 300
     }

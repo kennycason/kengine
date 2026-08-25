@@ -555,8 +555,25 @@ fun buildCollisionWorld(
 
         val isFloor = abs(normalY.toDouble()) / normalLength >= 0.55
         val flags = if (isFloor) 1 else 0
+        val unitNormalX = (normalX.toDouble() / normalLength * 1024.0).roundToInt()
+        val unitNormalY = (normalY.toDouble() / normalLength * 1024.0).roundToInt()
+        val unitNormalZ = (normalZ.toDouble() / normalLength * 1024.0).roundToInt()
+        val originOffset = -(
+            unitNormalX * av[0] +
+                unitNormalY * av[1] +
+                unitNormalZ * av[2]
+            )
         if (isFloor) floorTriangleCount += 1
-        collisionTriangles += intArrayOf(a, b, c, flags)
+        collisionTriangles += intArrayOf(
+            a,
+            b,
+            c,
+            flags,
+            unitNormalX,
+            unitNormalY,
+            unitNormalZ,
+            originOffset
+        )
     }
 
     val minX = collisionVertices.minOf { it[0] }
