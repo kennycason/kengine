@@ -8,7 +8,8 @@ object Mario64ModelAssets {
         name = "Bob-Omb Battlefield",
         vertices = battlefieldVertices(),
         triangles = battlefieldTriangles(),
-        colors = battlefieldColors()
+        colors = battlefieldColors(),
+        materialModes = battlefieldMaterialModes()
     )
 
     private fun battlefieldVertices(): IntArray {
@@ -12761,5 +12762,32 @@ object Mario64ModelAssets {
         values[15] = -15774795
         values[16] = -11443586
         values[17] = -15188383
+    }
+
+    private fun battlefieldMaterialModes(): IntArray {
+        val values = IntArray(18)
+        battlefieldMaterialModesChunk0(values)
+        return values
+    }
+
+    private fun battlefieldMaterialModesChunk0(values: IntArray) {
+        values[0] = 0
+        values[1] = 0
+        values[2] = 0
+        values[3] = 0
+        values[4] = 0
+        values[5] = 0
+        values[6] = 0
+        values[7] = 0
+        values[8] = 0
+        values[9] = 0
+        values[10] = 0
+        values[11] = 0
+        values[12] = 2
+        values[13] = 1
+        values[14] = 1
+        values[15] = 0
+        values[16] = 0
+        values[17] = 0
     }
 }

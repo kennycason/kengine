@@ -1,6 +1,6 @@
 # Mario N64 Physics Follow-Up
 
-Status: rendering works; the playable physics/controller milestone is not implemented yet.
+Status: rendering and the first floor-controller slice work; body-radius wall collision is the next physics milestone.
 
 Last reviewed: 2026-08-24
 
@@ -10,7 +10,7 @@ The review covered the hand-written game, backend, build, and runtime code in `g
 
 ## Executive Summary
 
-The textured Bob-omb Battlefield renderer is real and produces a stable ROM, but the current controls are a noclip camera rather than a character controller. There is no collision query, velocity, gravity, grounded state, jump state, wall response, body shape, Mario model, or third-person follow camera.
+The textured Bob-omb Battlefield renderer is real and produces a stable ROM. The first playable controller slice now replaces the noclip camera: it has generated collision data, a grid-accelerated floor query, grounded spawn, terrain following, vertical velocity, gravity, jumping, landing, and separate body/camera height. Body-radius wall response, a visible Mario model, and a third-person follow camera are not implemented yet.
 
 The shortest reliable route to a playable build is:
 
@@ -26,23 +26,30 @@ Do not begin with a general rigid-body engine. A purpose-built kinematic charact
 
 ### Game behavior
 
-`Mario64Game` starts at approximately:
+`Mario64Game` now starts its body at:
 
 - X: `-3000`
-- Y: `2500`
+- Y: `485` (queried from the collision mesh)
 - Z: `-3000`
 
-The directional inputs directly mutate camera X/Z. A raises Y, Z lowers Y, and the C buttons change yaw/pitch. Drawing emits one `DRAW_WORLD_3D` command whose player coordinates are used as the camera coordinates.
+The directional inputs request camera-relative body movement. A jumps on its rising edge, B selects the faster run speed, the C buttons change yaw/pitch, and Start resets the complete controller state. Drawing emits one `DRAW_WORLD_3D` command at the body X/Z and body Y plus a 180-unit eye height.
 
-This is useful for inspecting the world, but it is noclip movement. In particular, it has none of the state a physics controller needs:
+The floor controller now provides:
 
-- no horizontal or vertical velocity;
-- no gravity or terminal velocity;
-- no grounded state or supporting triangle;
-- no player radius, height, capsule, or cylinder;
-- no floor, slope, step, wall, or edge tests;
-- no jump edge detection;
-- no separation between player position and camera position.
+- mutable body position and vertical velocity;
+- gravity, terminal velocity, grounded state, and supporting triangle;
+- an allocation-free grid floor query and ground snap/step thresholds;
+- jump-edge detection, landing, edge falling, and safe fall reset;
+- separate body and camera positions.
+
+The reusable `KinematicGroundBody3D` expresses the same controller and is
+covered by the JVM tests. The current N64 executable keeps the live controller
+fields directly in `Mario64Game`: constructing the wrapper currently triggers
+an exception in the experimental Kotlin MIPS target even when its initializer
+does no collision work. This duplication is an explicit temporary ABI/codegen
+workaround, not the intended engine boundary.
+
+It still has no player radius/capsule or steep-triangle wall response. This means the test build follows and falls from floor geometry, but can pass through walls until the next controller slice is added.
 
 ### Actual N64 rendering path
 
@@ -98,13 +105,28 @@ FPS=18 CMD=2+0 K=2 R=53
 
 That is about a 2.6x frame-rate improvement. Rendering still dominates, but its measured time fell from 148 ms to roughly 53 ms, Kotlin remains 2 ms, and no commands are dropped.
 
-The imported render mesh has since been compacted before code generation. The DAE contained 1,043 pairs of exact, same-winding triangles with the same positions, UVs, and material. Removing those redundant pairs and compacting identical baked vertices changes the submitted world from 6,432 vertices / 2,144 triangles to 1,623 vertices / 1,100 triangles without intentionally changing visible geometry. This compact build still needs a manual FPS and artifact comparison.
+The imported render mesh has since been compacted before code generation. The DAE contained 1,043 pairs of exact, same-winding triangles with the same positions, UVs, and material. Removing those redundant pairs and compacting identical baked vertices changes the submitted world from 6,432 vertices / 2,144 triangles to 1,623 vertices / 1,100 triangles without intentionally changing visible geometry.
+
+The manual compact-mesh test reached 32–33 FPS, approximately 4.7x the original 7 FPS. The visual artifacts remained, confirming that duplicate geometry was a major performance cost but not their cause.
 
 ### Camera-dependent surface artifacts
 
 The display-list build showed jagged green/black regions appearing and disappearing during camera movement. See [debug image 1](../games/mario-n64/debug/img.png), [debug image 2](../games/mario-n64/debug/img_1.png), and [debug image 3](../games/mario-n64/debug/img_2.png).
 
-The exact duplicate coplanar faces in the DAE were a plausible contributor, so the compact build removes them. This is not yet considered the confirmed fix: exact duplicates with matching UVs and material should ordinarily produce the same color. If the artifacts remain, investigate display-list texture/state transitions, UV fixed-point interpolation and clipping, and depth precision before adding visibility culling. Keep culling disabled until the complete surface set is stable.
+Comparison with the original SM64 render layers identified the actual missing behavior. The apparent patches are geometry using two special material classes:
+
+- `generic_0900B000` is an IA16 translucent shadow/decal texture (`LAYER_TRANSPARENT_DECAL` in SM64).
+- `generic_09008800` and `bob_seg7_texture_07000000` are binary-alpha fence/foliage textures (`LAYER_ALPHA` in SM64).
+
+The old renderer flattened all of them into opaque RGBA16, reducing alpha to one bit and never enabling alpha test or blending. Transparent texels therefore appeared black, while coplanar shadow decals had the wrong depth behavior.
+
+The replacement is reusable backend functionality. `kengine-n64` now defines RGBA16/IA16 texture formats and opaque/masked/translucent-decal material modes, compiles static geometry into ordered passes, applies alpha testing to masked materials, and blends IA16 decals with N64 coplanar-decal depth and disabled depth writes. The Mario importer classifies source textures automatically and preserves 8-bit alpha for translucent IA16 data.
+
+The first alpha-material test made the circular shadow texture visible correctly, but the circles still appeared wholly or partially according to camera movement; [debug image 4](../games/mario-n64/debug/img_3.png) shows one such shadow. The circles themselves are intentional baked SM64 shadow quads. The instability came from using libdragon's `GL_LESS_INTERPENETRATING_N64`, which selects the RDP mode for intersecting surfaces. Libdragon maps `GL_EQUAL` to the RDP's actual coplanar decal Z-mode, matching SM64's `LAYER_TRANSPARENT_DECAL`/`G_RM_AA_ZB_XLU_DECAL`; the renderer now uses that mode. This corrected ROM still needs manual confirmation because the RDP's decal comparison can remain sensitive when a decal and its receiver do not share sufficiently close depth.
+
+### Reusable engine boundary
+
+Bob-omb-specific DAE parsing, texture classification, generated geometry, and material declarations remain in `games/mario-n64`. The N64 texture formats, world-mesh data contract, material modes, pass ordering, GL state, and display-list playback live in `kengine-n64`. Future N64 games can emit the same asset contract without copying Mario-specific renderer code. Collision queries and a kinematic controller should be portable common Kotlin rather than N64 C; once proven game-local, move their general primitives to an engine module instead of tying physics to this level or backend.
 
 ### Lighting and depth readability
 
@@ -146,6 +168,23 @@ The display-list experiment build is 622,592 bytes and has SHA-256 `d94fb93e6641
 
 The compact-mesh build is 688,128 bytes and has SHA-256 `0017e465b1ab22286829473a118301518d216977964c984df53ada0b0d303560`. Its generated data is much smaller, but bounded Kotlin initializer functions encode more literals in ELF text, so ROM size alone is not a measure of runtime mesh cost.
 
+The reusable alpha-material build is 688,128 bytes and has SHA-256 `7f4139e5de4993ac6a3bca4003a7f4c8c5419aac8a5e5131bc41c94ea5365067`.
+
+The corrected coplanar-decal build is 688,128 bytes and has SHA-256 `95d345ae1471ce865f20cf4fe8f8212dce9cf43f99bf7fa997bfc79e8a6ac490`.
+
+The initial collision-grid/floor-controller build was 851,968 bytes with
+SHA-256 `11bfc2fd31aaa1dba205a866ecba328518291960223468e0653a0aa166d52b5a`.
+It passed JVM tests but is a failed checkpoint: ares froze on load, so it must
+not be used for manual testing.
+
+The corrected floor-controller build is 851,968 bytes with SHA-256
+`6d64c9d8ccdd16b194a450ce7c34d5712306672608c8d73f82126ec64ea6ae20`.
+It initializes the complete collision grid, queries the terrain every grounded
+frame, spawns at terrain height, follows walkable ground, jumps, lands, and
+falls from edges. A direct ten-second ares boot check on 2026-08-24 produced no
+CPU freeze or RCP-unmapped-access log. Manual controller traversal remains the
+next verification.
+
 ### Linker failures found during the review
 
 The linker reported multiple definitions of:
@@ -181,6 +220,31 @@ The current Kotlin/C bridge mostly passes simple integers and pointers, so it ca
 
 Kotlin is compiled with `-Xbinary=gc=noop`. Per-frame allocation is therefore not acceptable. Physics code should use preallocated primitive arrays and mutable integer fields; it should avoid temporary lists, boxed numbers, data-class churn, and allocation-heavy vector APIs.
 
+### Kotlin MIPS physics codegen constraint
+
+The first physics ROM black-screened with ares reporting repeated accesses to
+the unmapped RCP range around `0x04fffe20`, while the PC was in libdragon's
+exception handler near `0x80000484`. A known-good renderer ROM booted in the
+same emulator, and an uncompressed physics ROM failed identically, excluding
+the renderer and ELF compression.
+
+The startup bisect found two independent triggers in the experimental Kotlin
+MIPS output:
+
+- constructing `KinematicGroundBody3D`, even with a trivial initializer;
+- executing the original `Long`-based barycentric height query.
+
+The complete generated collision object boots when initialized without a
+query. The fixed build therefore keeps the live controller as primitive fields
+in `Mario64Game` and uses an overflow-bounded 32-bit barycentric interpolator.
+The mesh bounds guarantee the edge cross-products fit signed `Int`; height is
+calculated relative to one vertex, and weights are scaled together only when
+needed to keep the remaining products in range. JVM results remain unchanged.
+
+Keep the generic wrapper as the portable reference implementation, but do not
+promote it to a shared engine module until a focused MIPS ABI/codegen smoke test
+can construct and step it reliably.
+
 ### Input loses analog magnitude
 
 The runtime currently sends one input bitmask. The C `translate_input` path quantizes the analog stick into direction bits, so stick magnitude is lost.
@@ -203,13 +267,13 @@ previously failed while compiling generated assets with:
 Method too large: mario64/Mario64ModelAssets.<clinit> ()V
 ```
 
-The generator now emits a final `IntArray` filled by bounded 256-value functions. This avoids the JVM 64 KiB static-initializer limit without allocating temporary chunk arrays. `:games:mario-n64:jvmTest` now compiles and all five current tests pass.
+The generator now emits a final `IntArray` filled by bounded 256-value functions. This avoids the JVM 64 KiB static-initializer limit without allocating temporary chunk arrays. `:games:mario-n64:jvmTest` now compiles and all twelve current tests pass, including material-layer distribution, compact collision-grid validation, spawn-ground lookup, overflow-safe interpolation across a maximum-size sloped triangle, jump/landing behavior, held-jump edge behavior, safe far-fall reset, and complete Start reset state.
 
 The assertions were partially strengthened:
 
 - The vertex-layout test now uses the declared stride of five `(x, y, z, u, v)` and checks the compact mesh counts.
-- The Start/reset test only checks `droppedCommandCount`, not the reset coordinates or controller state.
-- Tests currently establish that assets and a render command exist, not that movement or collision behaves correctly.
+- The Start/reset test now asserts exact body coordinates, grounded state, zero vertical velocity, a valid supporting triangle, and camera eye offset.
+- Body-radius wall collision and sliding remain untested because that implementation is the next slice.
 
 ### Unused Kotlin renderer is internally inconsistent
 
@@ -243,7 +307,7 @@ The generated rendering data now contains:
 
 The DAE's paired geometry nodes produced 1,043 exact duplicate triangle pairs. Same-winding/material/position/UV deduplication, final baked-vertex compaction, and removal of a quantized degenerate leave 1,100 useful triangles. With `abs(normalY) >= 0.55` as an initial walkable-floor classification, the set is approximately:
 
-- 597 floor/walkable triangles;
+- 563 floor/walkable triangles;
 - 503 wall or steep-surface triangles.
 
 An exact height query at the current X/Z spawn location `(-3000, -3000)` finds ground at approximately `Y = 485.235`. The current camera Y of 2,500 is therefore roughly 2,015 world units above the ground.
@@ -256,8 +320,8 @@ A 16 by 16 uniform grid over X/Z, with 512-unit cells, is a good fit for this le
 
 | Metric | Observed value |
 | --- | ---: |
-| Total triangle-to-cell references | 4,240 |
-| Average candidates per cell | 16.56 |
+| Total triangle-to-cell references | 4,172 |
+| Average candidates per cell | 16.30 |
 | Maximum candidates in one cell | 66 |
 | Maximum floor candidates | 39 |
 | Maximum wall candidates | 29 |
@@ -276,7 +340,7 @@ Generate collision data from the same DAE as the render mesh, but keep the rende
 6. Emit primitive arrays with bounded initialization chunks so JVM tests compile.
 7. Emit validation metadata such as bounds, triangle counts, and the expected spawn-ground result.
 
-Suggested storage is `ShortArray` for coordinates and triangle references where the validated ranges permit it, plus `IntArray` for cell offsets/counts and any fixed-point values that need more range. Use `Long` intermediates in cross products and barycentric calculations where 32-bit multiplication could overflow.
+Suggested storage is `ShortArray` for coordinates and triangle references where the validated ranges permit it, plus `IntArray` for cell offsets/counts and any fixed-point values that need more range. On the current MIPS target, avoid `Long` arithmetic in the hot query. Validate coordinate bounds, compute edge products in `Int`, interpolate relative height instead of absolute height, and scale barycentric weights and their denominator together before a product could overflow.
 
 ## Recommended Controller Design
 
@@ -373,31 +437,31 @@ This prevents camera controls from becoming physics state and makes a later thir
 - [ ] Add a deterministic Kotlin/C ABI smoke test.
 - [x] Split the generated Kotlin asset initializer so JVM tests compile.
 - [x] Fix the vertex-stride assertion.
-- [ ] Add meaningful Start/reset coordinate and controller-state assertions.
+- [x] Add meaningful Start/reset coordinate and controller-state assertions.
 - [ ] Remove or repair and test the unused `Mario64WorldRenderer`.
 
 Exit condition: JVM tests run, the ROM links cleanly, and failures are no longer hidden by build flags.
 
 ### Phase 1: Generate collision data
 
-- [ ] Extend the model conversion pipeline with a collision-output mode.
-- [ ] Deduplicate position triangles and remove degenerates.
-- [ ] Classify floors/walls with an explicit slope threshold.
-- [ ] Generate the 16 by 16 XZ grid and compact reference lists.
-- [ ] Emit JVM-safe, allocation-free primitive data.
-- [ ] Validate counts, bounds, cell coverage, and spawn ground.
+- [x] Extend the model conversion pipeline with collision output.
+- [x] Deduplicate position triangles and remove degenerates.
+- [x] Classify floors/walls with an explicit slope threshold.
+- [x] Generate the 16 by 16 XZ grid and compact reference lists.
+- [x] Emit JVM-safe, allocation-free primitive data.
+- [x] Validate counts, bounds, cell coverage, and spawn ground.
 
 Exit condition: a common Kotlin test can query the expected ground around `(-3000, -3000)` without scanning the full mesh.
 
 ### Phase 2: Implement the playable controller
 
-- [ ] Add fixed-point controller configuration and mutable state.
-- [ ] Add camera-relative horizontal movement.
-- [ ] Add ground selection, snapping, step up/down, and slope limits.
-- [ ] Add gravity, terminal velocity, jump, landing, and edge falling.
+- [x] Add integer fixed-step controller configuration and mutable state.
+- [x] Add camera-relative horizontal movement.
+- [x] Add point-ground selection, snapping, step up/down, and slope limits.
+- [x] Add gravity, terminal velocity, jump, landing, and edge falling.
 - [ ] Add body-radius wall collision and sliding with bounded iterations.
-- [ ] Separate body and camera positions.
-- [ ] Make Start reset the full state to grounded spawn.
+- [x] Separate body and camera positions.
+- [x] Make Start reset the full state to grounded spawn.
 
 Exit condition: the player can traverse the level, step onto reachable geometry, collide and slide against walls, jump, land, fall from edges, and reset.
 
@@ -433,15 +497,15 @@ Exit condition: a visible animated character follows the already-proven physics 
 
 ### Character controller
 
-- [ ] A falling body lands on a floor, becomes grounded, and zeroes downward velocity.
-- [ ] Jump only starts while grounded and only on the input edge.
-- [ ] A complete jump arc lands without tunneling through the starting floor.
+- [x] A falling body lands on a floor, becomes grounded, and zeroes downward velocity.
+- [x] Jump only starts while grounded and only on the input edge.
+- [x] A complete jump arc lands without tunneling through the starting floor.
 - [ ] A reachable step is climbed and a step above the configured limit is blocked.
 - [ ] Motion into a wall retains the tangential component and slides.
-- [ ] Walking off an edge clears grounded state and starts falling.
-- [ ] Start restores the exact spawn state and supporting floor.
-- [ ] Out-of-grid movement follows a defined safe behavior.
-- [ ] Controller updates allocate no runtime objects.
+- [x] Walking off an edge clears grounded state and starts falling.
+- [x] Start restores the exact spawn state and supporting floor.
+- [x] Out-of-grid/far-fall movement resets to the safe spawn.
+- [x] Controller updates allocate no runtime objects.
 
 ### Build and integration
 
@@ -497,10 +561,10 @@ Use an emulator/configuration that supports libdragon custom RSP microcode; see 
 
 ## Immediate Next Slice
 
-1. Manually test the compact-mesh ROM from the same camera paths as the three debug images. Record `FPS`, `K`, `R`, and `H`, and confirm whether the moving surface patches remain.
-2. If geometry is stable, add generator-time ambient plus directional face shading and compare readability and performance. If the artifacts remain, diagnose render state/UV/depth first.
-3. Generate the deduplicated collision triangles and 16 by 16 grid from the same DAE.
-4. Add a deterministic `groundHeightAt(x, z)` query and tests, including the spawn result.
-5. Replace vertical noclip at startup with a separate body whose Y is initialized from the spawn ground plus the configured eye offset.
+1. Manually test the new ROM in ares. Confirm the circular shadows are stable under movement, record `FPS`, `K`, `R`, and `H`, and exercise walking, running with B, jumping with A, cliff falling, landing, and Start reset.
+2. Add body-radius collision against the 503 steep/wall triangles, with a bounded projection/slide iteration count and focused JVM tests.
+3. Add controller diagnostics (position, vertical velocity, grounded/support state, candidate counts, and collision flags) to the N64 overlay.
+4. Promote `StaticTriangleGrid3D` and the proven controller primitives into an appropriate reusable kengine common module; keep Bob-omb-specific generation/assets in `games/mario-n64`.
+5. Add generator-time ambient plus directional face shading and compare depth readability and performance.
 
-That order validates the newly compacted render input before visual work, then proves the collision representation, grid lookup, fixed-point math, and first visible terrain contact before wall/capsule resolution is added.
+The current ROM is deliberately a floor-physics checkpoint. Manual results from it will establish whether the scale, eye height, movement speed, step/snap values, and shadow decal fix feel right before wall/capsule resolution makes the controller more complex.

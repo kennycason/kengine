@@ -808,8 +808,15 @@ static void w3d_gl_init_textures(const KengineWorldMesh* mesh) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wt->width, wt->height, 0,
-                     GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1_EXT, wt->data);
+        if (wt->format == KENGINE_WORLD_TEXTURE_IA16) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE_ALPHA,
+                         wt->width, wt->height, 0,
+                         GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, wt->data);
+        } else {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                         wt->width, wt->height, 0,
+                         GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1_EXT, wt->data);
+        }
     }
     w3d_gl_initialized = 1;
 }
@@ -822,72 +829,117 @@ static void w3d_gl_submit_world(const KengineWorldMesh* mesh) {
     int vstride = mesh->vertex_stride;
 
     int tex_mat_map[32];
+    int material_modes[32];
     memset(tex_mat_map, -1, sizeof(tex_mat_map));
+    for (int i = 0; i < 32; i++) {
+        material_modes[i] = KENGINE_WORLD_MATERIAL_OPAQUE;
+    }
     if (mesh->textures) {
         for (int i = 0; i < mesh->texture_count && i < 32; i++) {
             int mi = mesh->textures[i].material_index;
-            if (mi >= 0 && mi < 32) tex_mat_map[mi] = i;
-        }
-    }
-
-    int current_mat = -1;
-    int using_tex = 0;
-    int batch_count = 0;
-
-    for (int ti = 0; ti < tc; ti++) {
-        int tb = ti * 4;
-        int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2], ci = tris[tb + 3];
-
-        if (ci != current_mat || batch_count >= 32) {
-            if (batch_count > 0) glEnd();
-            batch_count = 0;
-            current_mat = ci;
-            int tex_idx = (ci >= 0 && ci < 32) ? tex_mat_map[ci] : -1;
-            if (tex_idx >= 0 && tex_idx < w3d_gl_tex_count) {
-                glEnable(GL_TEXTURE_2D);
-                glBindTexture(GL_TEXTURE_2D, w3d_gl_textures[tex_idx]);
-                glColor3f(1.0f, 1.0f, 1.0f);
-                using_tex = 1;
-            } else {
-                glDisable(GL_TEXTURE_2D);
-                int bc = (ci >= 0 && ci < mesh->color_count) ? colors[ci] : 0xFFB4B4B4;
-                float r = (float)(bc & 0xFF) / 255.0f;
-                float g = (float)((bc >> 8) & 0xFF) / 255.0f;
-                float bl = (float)((bc >> 16) & 0xFF) / 255.0f;
-                glColor3f(r, g, bl);
-                using_tex = 0;
+            if (mi >= 0 && mi < 32) {
+                tex_mat_map[mi] = i;
+                material_modes[mi] = mesh->textures[i].material_mode;
             }
-            glBegin(GL_TRIANGLES);
+        }
+    }
+
+    /*
+     * Static meshes are split into material passes at display-list compile
+     * time. This is a backend feature: game asset generators only describe
+     * each material and do not need to issue N64-specific render state.
+     */
+    for (int pass = KENGINE_WORLD_MATERIAL_OPAQUE;
+         pass <= KENGINE_WORLD_MATERIAL_TRANSLUCENT_DECAL;
+         pass++) {
+        if (pass == KENGINE_WORLD_MATERIAL_OPAQUE) {
+            glDisable(GL_ALPHA_TEST);
+            glDisable(GL_BLEND);
+            glDepthFunc(GL_LESS);
+            glDepthMask(GL_TRUE);
+        } else if (pass == KENGINE_WORLD_MATERIAL_MASKED) {
+            glDisable(GL_BLEND);
+            glEnable(GL_ALPHA_TEST);
+            glAlphaFunc(GL_GREATER, 0.5f);
+            glDepthFunc(GL_LESS);
+            glDepthMask(GL_TRUE);
+        } else {
+            glDisable(GL_ALPHA_TEST);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            /* libdragon maps GL_EQUAL to the RDP's coplanar decal Z mode. */
+            glDepthFunc(GL_EQUAL);
+            glDepthMask(GL_FALSE);
         }
 
-        int ab = a * vstride, bb = b * vstride, cb = c * vstride;
-        if (using_tex && vstride >= 5) {
-            glTexCoord2f((float)verts[ab + 3] / 1024.0f, (float)verts[ab + 4] / 1024.0f);
+        int current_mat = -1;
+        int using_tex = 0;
+        int batch_count = 0;
+
+        for (int ti = 0; ti < tc; ti++) {
+            int tb = ti * 4;
+            int a = tris[tb], b = tris[tb + 1], c = tris[tb + 2], ci = tris[tb + 3];
+            int material_mode = (ci >= 0 && ci < 32)
+                ? material_modes[ci]
+                : KENGINE_WORLD_MATERIAL_OPAQUE;
+            if (material_mode != pass) continue;
+
+            if (ci != current_mat || batch_count >= 32) {
+                if (batch_count > 0) glEnd();
+                batch_count = 0;
+                current_mat = ci;
+                int tex_idx = (ci >= 0 && ci < 32) ? tex_mat_map[ci] : -1;
+                if (tex_idx >= 0 && tex_idx < w3d_gl_tex_count) {
+                    glEnable(GL_TEXTURE_2D);
+                    glBindTexture(GL_TEXTURE_2D, w3d_gl_textures[tex_idx]);
+                    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                    using_tex = 1;
+                } else {
+                    glDisable(GL_TEXTURE_2D);
+                    int bc = (ci >= 0 && ci < mesh->color_count) ? colors[ci] : 0xFFB4B4B4;
+                    float r = (float)(bc & 0xFF) / 255.0f;
+                    float g = (float)((bc >> 8) & 0xFF) / 255.0f;
+                    float bl = (float)((bc >> 16) & 0xFF) / 255.0f;
+                    glColor4f(r, g, bl, 1.0f);
+                    using_tex = 0;
+                }
+                glBegin(GL_TRIANGLES);
+            }
+
+            int ab = a * vstride, bb = b * vstride, cb = c * vstride;
+            if (using_tex && vstride >= 5) {
+                glTexCoord2f((float)verts[ab + 3] / 1024.0f, (float)verts[ab + 4] / 1024.0f);
+            }
+            glVertex3f(
+                (float)verts[ab] * WORLD3D_GL_SCALE,
+                (float)verts[ab + 1] * WORLD3D_GL_SCALE,
+                (float)verts[ab + 2] * WORLD3D_GL_SCALE
+            );
+            if (using_tex && vstride >= 5) {
+                glTexCoord2f((float)verts[bb + 3] / 1024.0f, (float)verts[bb + 4] / 1024.0f);
+            }
+            glVertex3f(
+                (float)verts[bb] * WORLD3D_GL_SCALE,
+                (float)verts[bb + 1] * WORLD3D_GL_SCALE,
+                (float)verts[bb + 2] * WORLD3D_GL_SCALE
+            );
+            if (using_tex && vstride >= 5) {
+                glTexCoord2f((float)verts[cb + 3] / 1024.0f, (float)verts[cb + 4] / 1024.0f);
+            }
+            glVertex3f(
+                (float)verts[cb] * WORLD3D_GL_SCALE,
+                (float)verts[cb + 1] * WORLD3D_GL_SCALE,
+                (float)verts[cb + 2] * WORLD3D_GL_SCALE
+            );
+            batch_count++;
         }
-        glVertex3f(
-            (float)verts[ab] * WORLD3D_GL_SCALE,
-            (float)verts[ab + 1] * WORLD3D_GL_SCALE,
-            (float)verts[ab + 2] * WORLD3D_GL_SCALE
-        );
-        if (using_tex && vstride >= 5) {
-            glTexCoord2f((float)verts[bb + 3] / 1024.0f, (float)verts[bb + 4] / 1024.0f);
-        }
-        glVertex3f(
-            (float)verts[bb] * WORLD3D_GL_SCALE,
-            (float)verts[bb + 1] * WORLD3D_GL_SCALE,
-            (float)verts[bb + 2] * WORLD3D_GL_SCALE
-        );
-        if (using_tex && vstride >= 5) {
-            glTexCoord2f((float)verts[cb + 3] / 1024.0f, (float)verts[cb + 4] / 1024.0f);
-        }
-        glVertex3f(
-            (float)verts[cb] * WORLD3D_GL_SCALE,
-            (float)verts[cb + 1] * WORLD3D_GL_SCALE,
-            (float)verts[cb + 2] * WORLD3D_GL_SCALE
-        );
-        batch_count++;
+        if (batch_count > 0) glEnd();
     }
-    if (batch_count > 0) glEnd();
+
+    glDisable(GL_ALPHA_TEST);
+    glDisable(GL_BLEND);
+    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);
 }
 
 static void w3d_gl_prepare_world_list(const KengineWorldMesh* mesh) {

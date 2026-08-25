@@ -4,7 +4,9 @@ import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.w3c.dom.NodeList
+import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -24,8 +26,10 @@ val generateMario64ModelAssets by tasks.registering {
     inputs.file(daeFile)
     inputs.dir(textureDir)
     val kotlinOutputFile = layout.projectDirectory.file("src/commonMain/kotlin/mario64/Mario64ModelAssets.kt")
+    val collisionKotlinOutputFile = layout.projectDirectory.file("src/commonMain/kotlin/mario64/Mario64CollisionAssets.kt")
     val cOutputFile = layout.projectDirectory.file("src/main/c/kengine_n64_world_mesh.h")
     outputs.file(kotlinOutputFile)
+    outputs.file(collisionKotlinOutputFile)
     outputs.file(cOutputFile)
 
     doLast {
@@ -35,11 +39,19 @@ val generateMario64ModelAssets by tasks.registering {
         kotlinOut.parentFile.mkdirs()
         writeTextIfChanged(kotlinOut, renderMario64ModelAssets(model))
 
+        val collisionKotlinOut = collisionKotlinOutputFile.asFile
+        collisionKotlinOut.parentFile.mkdirs()
+        writeTextIfChanged(collisionKotlinOut, renderMario64CollisionAssets(model.collision))
+
         val cOut = cOutputFile.asFile
         cOut.parentFile.mkdirs()
         writeTextIfChanged(cOut, renderMario64MeshC(model))
 
-        println("Mario64 world: ${model.vertexCount} vertices, ${model.triangleCount} triangles, ${model.colors.size} materials")
+        println(
+            "Mario64 world: ${model.vertexCount} render vertices, ${model.triangleCount} render triangles, " +
+                "${model.collision.vertexCount} collision vertices, ${model.collision.triangleCount} collision triangles, " +
+                "${model.colors.size} materials"
+        )
     }
 }
 
@@ -108,10 +120,31 @@ data class BakedMario64World(
     val vertices: List<Int>,
     val triangles: List<Int>,
     val colors: List<Int>,
+    val materialModes: List<Int>,
     val vertexCount: Int,
     val triangleCount: Int,
     val hasUVs: Boolean,
-    val textures: List<BakedMario64Texture>
+    val textures: List<BakedMario64Texture>,
+    val collision: BakedCollisionWorld
+)
+
+data class BakedCollisionWorld(
+    val vertices: List<Int>,
+    val triangles: List<Int>,
+    val cellOffsets: List<Int>,
+    val cellTriangleIndices: List<Int>,
+    val vertexCount: Int,
+    val triangleCount: Int,
+    val floorTriangleCount: Int,
+    val minX: Int,
+    val minY: Int,
+    val minZ: Int,
+    val maxX: Int,
+    val maxY: Int,
+    val maxZ: Int,
+    val gridWidth: Int,
+    val gridDepth: Int,
+    val cellSize: Int
 )
 
 data class BakedMario64Texture(
@@ -119,8 +152,21 @@ data class BakedMario64Texture(
     val filename: String,
     val width: Int,
     val height: Int,
-    val rgba16Data: ShortArray
+    val format: BakedTextureFormat,
+    val materialMode: BakedMaterialMode,
+    val texelData: ShortArray
 )
+
+enum class BakedTextureFormat(val cName: String) {
+    RGBA16("KENGINE_WORLD_TEXTURE_RGBA16"),
+    IA16("KENGINE_WORLD_TEXTURE_IA16")
+}
+
+enum class BakedMaterialMode(val value: Int, val cName: String) {
+    OPAQUE(0, "KENGINE_WORLD_MATERIAL_OPAQUE"),
+    MASKED(1, "KENGINE_WORLD_MATERIAL_MASKED"),
+    TRANSLUCENT_DECAL(2, "KENGINE_WORLD_MATERIAL_TRANSLUCENT_DECAL")
+}
 
 private val NS = "http://www.collada.org/2005/11/COLLADASchema"
 
@@ -146,6 +192,10 @@ data class BakedVertexKey(
     val u: Int,
     val v: Int
 )
+
+data class BakedPositionKey(val x: Int, val y: Int, val z: Int)
+
+data class CollisionTriangleKey(val vertex0: Int, val vertex1: Int, val vertex2: Int)
 
 fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
     val factory = DocumentBuilderFactory.newInstance()
@@ -373,33 +423,202 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
             if (texFile.exists()) {
                 val img = ImageIO.read(texFile)
                 if (img != null) {
-                    val rgba16 = ShortArray(img.width * img.height)
+                    var hasZeroAlpha = false
+                    var hasPartialAlpha = false
+                    for (py in 0 until img.height) {
+                        for (px in 0 until img.width) {
+                            val alpha = (img.getRGB(px, py) ushr 24) and 0xFF
+                            if (alpha == 0) hasZeroAlpha = true
+                            else if (alpha < 255) hasPartialAlpha = true
+                        }
+                    }
+                    val materialMode = when {
+                        hasPartialAlpha -> BakedMaterialMode.TRANSLUCENT_DECAL
+                        hasZeroAlpha -> BakedMaterialMode.MASKED
+                        else -> BakedMaterialMode.OPAQUE
+                    }
+                    val textureFormat = if (materialMode == BakedMaterialMode.TRANSLUCENT_DECAL) {
+                        BakedTextureFormat.IA16
+                    } else {
+                        BakedTextureFormat.RGBA16
+                    }
+                    val texels = ShortArray(img.width * img.height)
                     for (py in 0 until img.height) {
                         for (px in 0 until img.width) {
                             val pixel = img.getRGB(px, py)
-                            val r = ((pixel ushr 16) and 0xFF) shr 3
-                            val g = ((pixel ushr 8) and 0xFF) shr 3
-                            val b = (pixel and 0xFF) shr 3
-                            val a = if (((pixel ushr 24) and 0xFF) > 127) 1 else 0
-                            rgba16[py * img.width + px] = ((r shl 11) or (g shl 6) or (b shl 1) or a).toShort()
+                            val red = (pixel ushr 16) and 0xFF
+                            val green = (pixel ushr 8) and 0xFF
+                            val blue = pixel and 0xFF
+                            val alpha = (pixel ushr 24) and 0xFF
+                            val texel = if (textureFormat == BakedTextureFormat.IA16) {
+                                val intensity = (red * 77 + green * 150 + blue * 29 + 128) shr 8
+                                (intensity shl 8) or alpha
+                            } else {
+                                ((red shr 3) shl 11) or
+                                    ((green shr 3) shl 6) or
+                                    ((blue shr 3) shl 1) or
+                                    if (alpha > 127) 1 else 0
+                            }
+                            texels[py * img.width + px] = texel.toShort()
                         }
                     }
-                    textures += BakedMario64Texture(matIdx, texFilename, img.width, img.height, rgba16)
+                    textures += BakedMario64Texture(
+                        matIdx,
+                        texFilename,
+                        img.width,
+                        img.height,
+                        textureFormat,
+                        materialMode,
+                        texels
+                    )
                 }
             }
         }
     }
 
     val bakedTriangles = compactTriangles.flatMap { it.toList() }
+    val materialModes = MutableList(colors.size) { BakedMaterialMode.OPAQUE.value }
+    for (texture in textures) {
+        materialModes[texture.materialIndex] = texture.materialMode.value
+    }
+    val collision = buildCollisionWorld(compactVertexRows, compactTriangles, materialModes)
 
     return BakedMario64World(
         vertices = bakedVertices,
         triangles = bakedTriangles,
         colors = colors,
+        materialModes = materialModes,
         vertexCount = compactVertexRows.size,
         triangleCount = compactTriangles.size,
         hasUVs = true,
-        textures = textures
+        textures = textures,
+        collision = collision
+    )
+}
+
+fun buildCollisionWorld(
+    renderVertices: List<List<Int>>,
+    renderTriangles: List<IntArray>,
+    materialModes: List<Int>
+): BakedCollisionWorld {
+    val collisionVertices = mutableListOf<List<Int>>()
+    val positionIndexes = linkedMapOf<BakedPositionKey, Int>()
+    fun collisionVertexIndex(renderIndex: Int): Int {
+        val vertex = renderVertices[renderIndex]
+        val key = BakedPositionKey(vertex[0], vertex[1], vertex[2])
+        return positionIndexes.getOrPut(key) {
+            collisionVertices += listOf(key.x, key.y, key.z)
+            collisionVertices.lastIndex
+        }
+    }
+
+    val collisionTriangles = mutableListOf<IntArray>()
+    val triangleKeys = linkedSetOf<CollisionTriangleKey>()
+    var floorTriangleCount = 0
+    for (renderTriangle in renderTriangles) {
+        val materialIndex = renderTriangle[3]
+        if (materialIndex in materialModes.indices &&
+            materialModes[materialIndex] == BakedMaterialMode.TRANSLUCENT_DECAL.value
+        ) {
+            continue
+        }
+        val a = collisionVertexIndex(renderTriangle[0])
+        val b = collisionVertexIndex(renderTriangle[1])
+        val c = collisionVertexIndex(renderTriangle[2])
+        if (a == b || b == c || c == a) continue
+
+        val key = when {
+            a <= b && a <= c -> CollisionTriangleKey(a, b, c)
+            b <= a && b <= c -> CollisionTriangleKey(b, c, a)
+            else -> CollisionTriangleKey(c, a, b)
+        }
+        if (!triangleKeys.add(key)) continue
+
+        val av = collisionVertices[a]
+        val bv = collisionVertices[b]
+        val cv = collisionVertices[c]
+        val abx = (bv[0] - av[0]).toLong()
+        val aby = (bv[1] - av[1]).toLong()
+        val abz = (bv[2] - av[2]).toLong()
+        val acx = (cv[0] - av[0]).toLong()
+        val acy = (cv[1] - av[1]).toLong()
+        val acz = (cv[2] - av[2]).toLong()
+        val normalX = aby * acz - abz * acy
+        val normalY = abz * acx - abx * acz
+        val normalZ = abx * acy - aby * acx
+        val normalLength = sqrt(
+            normalX.toDouble() * normalX.toDouble() +
+                normalY.toDouble() * normalY.toDouble() +
+                normalZ.toDouble() * normalZ.toDouble()
+        )
+        if (normalLength == 0.0) continue
+
+        val isFloor = abs(normalY.toDouble()) / normalLength >= 0.55
+        val flags = if (isFloor) 1 else 0
+        if (isFloor) floorTriangleCount += 1
+        collisionTriangles += intArrayOf(a, b, c, flags)
+    }
+
+    val minX = collisionVertices.minOf { it[0] }
+    val minY = collisionVertices.minOf { it[1] }
+    val minZ = collisionVertices.minOf { it[2] }
+    val maxX = collisionVertices.maxOf { it[0] }
+    val maxY = collisionVertices.maxOf { it[1] }
+    val maxZ = collisionVertices.maxOf { it[2] }
+    val gridWidth = 16
+    val gridDepth = 16
+    val cellSize = 512
+    val cellTriangles = Array(gridWidth * gridDepth) { mutableListOf<Int>() }
+
+    fun gridCoordinate(value: Int, minimum: Int, size: Int): Int {
+        val coordinate = (value - minimum) / cellSize
+        return coordinate.coerceIn(0, size - 1)
+    }
+
+    for ((triangleIndex, triangle) in collisionTriangles.withIndex()) {
+        val av = collisionVertices[triangle[0]]
+        val bv = collisionVertices[triangle[1]]
+        val cv = collisionVertices[triangle[2]]
+        val triangleMinX = minOf(av[0], bv[0], cv[0])
+        val triangleMaxX = maxOf(av[0], bv[0], cv[0])
+        val triangleMinZ = minOf(av[2], bv[2], cv[2])
+        val triangleMaxZ = maxOf(av[2], bv[2], cv[2])
+        val minCellX = gridCoordinate(triangleMinX, minX, gridWidth)
+        val maxCellX = gridCoordinate(triangleMaxX, minX, gridWidth)
+        val minCellZ = gridCoordinate(triangleMinZ, minZ, gridDepth)
+        val maxCellZ = gridCoordinate(triangleMaxZ, minZ, gridDepth)
+        for (cellZ in minCellZ..maxCellZ) {
+            for (cellX in minCellX..maxCellX) {
+                cellTriangles[cellZ * gridWidth + cellX] += triangleIndex
+            }
+        }
+    }
+
+    val cellOffsets = MutableList(cellTriangles.size + 1) { 0 }
+    val cellTriangleIndices = mutableListOf<Int>()
+    for ((cellIndex, references) in cellTriangles.withIndex()) {
+        cellOffsets[cellIndex] = cellTriangleIndices.size
+        cellTriangleIndices += references
+    }
+    cellOffsets[cellTriangles.size] = cellTriangleIndices.size
+
+    return BakedCollisionWorld(
+        vertices = collisionVertices.flatten(),
+        triangles = collisionTriangles.flatMap { it.toList() },
+        cellOffsets = cellOffsets,
+        cellTriangleIndices = cellTriangleIndices,
+        vertexCount = collisionVertices.size,
+        triangleCount = collisionTriangles.size,
+        floorTriangleCount = floorTriangleCount,
+        minX = minX,
+        minY = minY,
+        minZ = minZ,
+        maxX = maxX,
+        maxY = maxY,
+        maxZ = maxZ,
+        gridWidth = gridWidth,
+        gridDepth = gridDepth,
+        cellSize = cellSize
     )
 }
 
@@ -577,7 +796,8 @@ fun renderMario64ModelAssets(model: BakedMario64World): String {
         appendLine("        name = \"Bob-Omb Battlefield\",")
         appendLine("        vertices = battlefieldVertices(),")
         appendLine("        triangles = battlefieldTriangles(),")
-        appendLine("        colors = battlefieldColors()")
+        appendLine("        colors = battlefieldColors(),")
+        appendLine("        materialModes = battlefieldMaterialModes()")
         appendLine("    )")
         appendLine()
         appendChunkedIntArrayBuilder("battlefieldVertices", model.vertices, "    ")
@@ -585,6 +805,43 @@ fun renderMario64ModelAssets(model: BakedMario64World): String {
         appendChunkedIntArrayBuilder("battlefieldTriangles", model.triangles, "    ")
         appendLine()
         appendChunkedIntArrayBuilder("battlefieldColors", model.colors, "    ")
+        appendLine()
+        appendChunkedIntArrayBuilder("battlefieldMaterialModes", model.materialModes, "    ")
+        appendLine("}")
+    }
+}
+
+fun renderMario64CollisionAssets(collision: BakedCollisionWorld): String {
+    return buildString {
+        appendLine("package mario64")
+        appendLine()
+        appendLine("// Generated by :games:mario-n64:generateMario64ModelAssets")
+        appendLine("// Source: Bob-Omb Battlefield (Area1.dae)")
+        appendLine("// ${collision.vertexCount} vertices, ${collision.triangleCount} triangles (${collision.floorTriangleCount} walkable), ${collision.cellTriangleIndices.size} grid references")
+        appendLine("object Mario64CollisionAssets {")
+        appendLine("    val battlefield = StaticTriangleGrid3D(")
+        appendLine("        vertices = battlefieldCollisionVertices(),")
+        appendLine("        triangles = battlefieldCollisionTriangles(),")
+        appendLine("        cellOffsets = battlefieldCollisionCellOffsets(),")
+        appendLine("        cellTriangleIndices = battlefieldCollisionCellTriangleIndices(),")
+        appendLine("        metadata = intArrayOf(")
+        appendLine("            ${collision.minX}, ${collision.minY}, ${collision.minZ},")
+        appendLine("            ${collision.maxX}, ${collision.maxY}, ${collision.maxZ},")
+        appendLine("            ${collision.gridWidth}, ${collision.gridDepth}, ${collision.cellSize}")
+        appendLine("        )")
+        appendLine("    )")
+        appendLine()
+        appendChunkedIntArrayBuilder("battlefieldCollisionVertices", collision.vertices, "    ")
+        appendLine()
+        appendChunkedIntArrayBuilder("battlefieldCollisionTriangles", collision.triangles, "    ")
+        appendLine()
+        appendChunkedIntArrayBuilder("battlefieldCollisionCellOffsets", collision.cellOffsets, "    ")
+        appendLine()
+        appendChunkedIntArrayBuilder(
+            "battlefieldCollisionCellTriangleIndices",
+            collision.cellTriangleIndices,
+            "    "
+        )
         appendLine("}")
     }
 }
@@ -623,7 +880,7 @@ fun renderMario64MeshC(model: BakedMario64World): String {
         appendLine("#ifndef KENGINE_N64_WORLD_MESH_H")
         appendLine("#define KENGINE_N64_WORLD_MESH_H")
         appendLine()
-        appendLine("#include <stdint.h>")
+        appendLine("#include \"kengine_n64_world_mesh_types.h\"")
         appendLine()
         appendLine("#define KENGINE_WORLD_MESH_BATTLEFIELD_ID $meshId")
         appendLine("#define KENGINE_WORLD_MESH_BATTLEFIELD_VERTEX_COUNT ${model.vertexCount}")
@@ -642,38 +899,17 @@ fun renderMario64MeshC(model: BakedMario64World): String {
         for ((idx, tex) in model.textures.withIndex()) {
             appendLine("// Texture $idx: ${tex.filename} (${tex.width}x${tex.height})")
             append("static const uint16_t kengine_world_tex_${idx}[] = {\n")
-            tex.rgba16Data.toList().chunked(16).forEach { chunk ->
+            tex.texelData.toList().chunked(16).forEach { chunk ->
                 appendLine("    ${chunk.joinToString(", ") { "0x${(it.toInt() and 0xFFFF).toString(16).padStart(4, '0')}" }},")
             }
             appendLine("};")
             appendLine()
         }
 
-        appendLine("typedef struct {")
-        appendLine("    int material_index;")
-        appendLine("    int width;")
-        appendLine("    int height;")
-        appendLine("    const uint16_t* data;")
-        appendLine("} KengineWorldTexture;")
-        appendLine()
-        appendLine("typedef struct {")
-        appendLine("    int mesh_id;")
-        appendLine("    int vertex_count;")
-        appendLine("    int triangle_count;")
-        appendLine("    int color_count;")
-        appendLine("    int vertex_stride;")
-        appendLine("    int texture_count;")
-        appendLine("    const int* vertices;")
-        appendLine("    const int* triangles;")
-        appendLine("    const int* colors;")
-        appendLine("    const KengineWorldTexture* textures;")
-        appendLine("} KengineWorldMesh;")
-        appendLine()
-
         if (model.textures.isNotEmpty()) {
             appendLine("static const KengineWorldTexture kengine_world_mesh_battlefield_textures[] = {")
             for ((idx, tex) in model.textures.withIndex()) {
-                appendLine("    { ${tex.materialIndex}, ${tex.width}, ${tex.height}, kengine_world_tex_$idx },")
+                appendLine("    { ${tex.materialIndex}, ${tex.width}, ${tex.height}, ${tex.format.cName}, ${tex.materialMode.cName}, kengine_world_tex_$idx },")
             }
             appendLine("};")
         } else {

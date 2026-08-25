@@ -1323,6 +1323,7 @@ fun registerGameBuildTasks(
         inputs.file(bridgeHeader)
         inputs.file(kotlinApiHeader)
         inputs.file(file("src/main/c/main.c"))
+        inputs.file(file("src/main/c/kengine_n64_world_mesh_types.h"))
         outputs.dir(dockerStagingDir)
 
         doLast {
@@ -1333,6 +1334,10 @@ fun registerGameBuildTasks(
             staging.resolve("build").mkdirs()
 
             file("src/main/c/main.c").copyTo(staging.resolve("src/main.c"), overwrite = true)
+            file("src/main/c/kengine_n64_world_mesh_types.h").copyTo(
+                staging.resolve("src/kengine_n64_world_mesh_types.h"),
+                overwrite = true
+            )
 
             rebuiltKotlinArchive.get().asFile.copyTo(
                 staging.resolve("kotlin/lib${kotlinOutputBaseName}.a"), overwrite = true
@@ -1430,6 +1435,7 @@ fun registerGameBuildTasks(
         }
 
         inputs.file(file("src/main/c/main.c"))
+        inputs.file(file("src/main/c/kengine_n64_world_mesh_types.h"))
         inputs.file(kotlinApiHeader)
         outputs.file(mainObject)
 
