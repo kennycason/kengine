@@ -787,7 +787,7 @@ static const KengineWorldMesh* w3d_gl_world_list_mesh = NULL;
 static void w3d_gl_setup_projection(void) {
     if (w3d_gl_projection_set) return;
     float aspect = 320.0f / 240.0f;
-    float near = 1.0f;
+    float near = 0.2f;
     float far = 200.0f;
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();

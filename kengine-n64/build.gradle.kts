@@ -698,6 +698,7 @@ fun registerGameBuildTasks(
     val taskPrefix = kengineN64TaskPrefix(artifactBaseName)
     val buildTaskName = kengineN64BuildTaskName(artifactBaseName)
     val gameOutputDir = n64OutputDir.map { it.dir("games/$artifactBaseName") }
+    val gameN64OutputDir = gameProject.layout.buildDirectory.dir("n64")
 
     val kotlinSources = mutableListOf<File>()
     kotlinSources.add(file("src/main/kotlin"))
@@ -1467,7 +1468,7 @@ fun registerGameBuildTasks(
     }
 
     val gameElf = gameOutputDir.map { it.file("$artifactBaseName.elf") }
-    val gameZ64 = gameOutputDir.map { it.file("$artifactBaseName.z64") }
+    val gameZ64 = gameN64OutputDir.map { it.file("$artifactBaseName.z64") }
 
     tasks.register<Exec>("link${taskPrefix}Elf") {
         group = "n64"
@@ -1562,7 +1563,6 @@ fun registerGameBuildTasks(
         }
     }
 
-    val dockerGameZ64 = gameOutputDir.map { it.file("$artifactBaseName.z64") }
     val dockerBuildTaskName = kengineN64DockerBuildTaskName(artifactBaseName)
 
     tasks.register<Exec>(dockerBuildTaskName) {
@@ -1574,7 +1574,7 @@ fun registerGameBuildTasks(
         val staging = dockerStagingDir.get().asFile
         inputs.dir(dockerStagingDir)
             .withPathSensitivity(PathSensitivity.RELATIVE)
-        outputs.file(dockerGameZ64)
+        outputs.file(gameZ64)
 
         doFirst {
             exec {
@@ -1604,7 +1604,9 @@ fun registerGameBuildTasks(
         doLast {
             val builtRom = staging.resolve("$artifactBaseName.z64")
             if (builtRom.exists()) {
-                builtRom.copyTo(dockerGameZ64.get().asFile, overwrite = true)
+                val outputFile = gameZ64.get().asFile
+                outputFile.parentFile.mkdirs()
+                builtRom.copyTo(outputFile, overwrite = true)
             }
         }
     }
@@ -1615,13 +1617,13 @@ fun registerGameBuildTasks(
         dependsOn(dockerBuildTaskName)
 
         doFirst {
-            val rom = dockerGameZ64.get().asFile
+            val rom = gameZ64.get().asFile
             if (!rom.exists()) {
                 throw GradleException("ROM not found: ${rom.absolutePath}. Run $dockerBuildTaskName first.")
             }
         }
 
-        commandLine("open", "-a", "ares", dockerGameZ64.get().asFile.absolutePath)
+        commandLine("open", "-a", "ares", gameZ64.get().asFile.absolutePath)
     }
 
     return N64GameRegistration(
