@@ -7,6 +7,22 @@ import kotlin.test.assertTrue
 
 class InputStateTest {
     @Test
+    fun primaryStickIsNormalizedCopiedAndReset() {
+        val source = InputState()
+        val target = InputState()
+
+        source.setLeftStick(500, -1_500)
+        target.copyFrom(source)
+
+        assertEquals(500, target.leftStickX)
+        assertEquals(-InputState.ANALOG_AXIS_MAX, target.leftStickY)
+
+        target.reset()
+        assertEquals(0, target.leftStickX)
+        assertEquals(0, target.leftStickY)
+    }
+
+    @Test
     fun tracksPressedButtons() {
         val input = InputState()
 

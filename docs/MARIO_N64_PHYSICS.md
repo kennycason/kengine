@@ -2,7 +2,7 @@
 
 Status: rendering, floor physics, and the first body-radius wall/slide slice work; manual traversal and tuning are next.
 
-Last reviewed: 2026-08-24
+Last reviewed: 2026-09-14
 
 This document records the current state of `games/mario-n64` and `kengine-n64`, the issues found during the code and build review, and a concrete path to walking and jumping through the rendered Bob-omb Battlefield world.
 
@@ -32,7 +32,7 @@ Do not begin with a general rigid-body engine. A purpose-built kinematic charact
 - Y: `485` (queried from the collision mesh)
 - Z: `-3000`
 
-The directional inputs request camera-relative body movement. A jumps on its rising edge, B selects the faster run speed, the C buttons change yaw/pitch, and Start resets the complete controller state. Normal movement is 19 units per frame, approximately 20% below the previous 24; holding B restores the previous 24-unit pace. Drawing emits one `DRAW_WORLD_3D` command at the body X/Z and body Y plus a 180-unit eye height.
+The directional inputs request camera-relative body movement. The N64 stick now retains its analog magnitude through the Kotlin bridge, with the D-pad remaining a full-speed fallback. A jumps on its rising edge, B selects the faster run speed, the C buttons change yaw/pitch, and Start resets the complete controller state. Normal full-stick movement is 17 units per frame and holding B selects 22. Drawing emits one `DRAW_WORLD_3D` command at the body X/Z and body Y plus a 180-unit eye height.
 
 The controller now provides:
 
@@ -256,11 +256,9 @@ Keep the generic wrapper as the portable reference implementation, but do not
 promote it to a shared engine module until a focused MIPS ABI/codegen smoke test
 can construct and step it reliably.
 
-### Input loses analog magnitude
+### Analog input magnitude
 
-The runtime currently sends one input bitmask. The C `translate_input` path quantizes the analog stick into direction bits, so stick magnitude is lost.
-
-Digital movement is sufficient for the first playable milestone. A compact follow-up design can preserve the existing two-argument bridge by packing raw signed stick X/Y into the high bytes of the existing 32-bit input word while retaining buttons in the low bits. `InputState` can then expose continuous axes without breaking existing games.
+Implemented on 2026-09-14. The runtime preserves the existing two-argument bridge by packing raw signed stick X/Y into bits 14 through 29 of the 32-bit input word while retaining buttons in bits 0 through 13 and leaving the sign bit clear. `InputState` exposes normalized `leftStickX`/`leftStickY` values in `[-1000, 1000]`; existing digital games continue to use the unchanged low button bits. Mario uses analog magnitude for camera-relative walking and retains the D-pad as a full-speed fallback.
 
 ## Test and Code Problems to Fix
 
@@ -278,22 +276,19 @@ previously failed while compiling generated assets with:
 Method too large: mario64/Mario64ModelAssets.<clinit> ()V
 ```
 
-The generator now emits a final `IntArray` filled by bounded 256-value functions. This avoids the JVM 64 KiB static-initializer limit without allocating temporary chunk arrays. `:games:mario-n64:jvmTest` now compiles and all fifteen current tests pass, including material-layer distribution, compact collision-grid and wall-normal validation, spawn-ground lookup, overflow-safe interpolation across a maximum-size sloped triangle, seam probing, wall push/tangent slide, walk/run pacing, jump/landing behavior, held-jump edge behavior, safe far-fall reset, and complete Start reset state.
+The active renderer consumes the generated C world mesh, so the generator now emits only small Kotlin metadata constants for render-asset tests instead of a second copy of every render vertex and triangle. This avoids the JVM 64 KiB static-initializer limit and prevents the native linker from retaining unreachable software-renderer data. `:games:mario-n64:jvmTest` now compiles and all sixteen current tests pass, including material-layer distribution, compact collision-grid and wall-normal validation, spawn-ground lookup, overflow-safe interpolation across a maximum-size sloped triangle, seam probing, wall push/tangent slide, digital/analog walk pacing, jump/landing behavior, held-jump edge behavior, safe far-fall reset, and complete Start reset state.
 
 The assertions were partially strengthened:
 
-- The vertex-layout test now uses the declared stride of five `(x, y, z, u, v)` and checks the compact mesh counts.
+- Lightweight generated metadata tests check the compact mesh, material, texture, and render-layer counts without linking a duplicate vertex array.
 - The Start/reset test now asserts exact body coordinates, grounded state, zero vertical velocity, a valid supporting triangle, and camera eye offset.
 - Body-radius wall push and tangent preservation now have a focused synthetic test; corners, short walls, and complete real-level traversal remain manual acceptance work.
 
-### Unused Kotlin renderer is internally inconsistent
+### Removed duplicate Kotlin renderer
 
-`Mario64WorldRenderer` has no construction/reference in the active render path and appears to be dead code. It remains internally inconsistent:
+Removed on 2026-09-14. `Mario64WorldRenderer` had no construction/reference in the active render path and indexed five-component vertices with a stride of three. Its fixed-point camera math was moved into `Mario64FixedMath.kt`, while the active C GL renderer remains the only owner of render geometry.
 
-- It indexes each vertex with `vertexIndex * 3`, even though the declared vertex stride is five.
-- Its fixed capacity happens to contain the compact 1,623-vertex mesh, but it would still read the array incorrectly.
-
-Either remove it to avoid maintaining a misleading second renderer, or repair it and add a focused test before declaring it part of the design. The active C GL renderer uses the correct mesh stride.
+The resulting ROM built successfully at 737,280 bytes, down from the previous 917,504-byte checkpoint. The same change also made the GL clear color follow the portable `CLEAR` command, made `projectionDistance` functional while preserving the current default view, and allowed 2D commands after `DRAW_WORLD_3D` to composite over the world.
 
 ## World and Collision Data
 
@@ -321,7 +316,7 @@ The DAE's paired geometry nodes produced 1,043 exact duplicate triangle pairs. S
 - 563 floor/walkable triangles;
 - 503 wall or steep-surface triangles.
 
-An exact height query at the current X/Z spawn location `(-3000, -3000)` finds ground at approximately `Y = 485.235`. The current camera Y of 2,500 is therefore roughly 2,015 world units above the ground.
+An exact height query at the current X/Z spawn location `(-3000, -3000)` finds ground at approximately `Y = 485.235`. The first-person camera derives its position from the body and therefore starts near `Y = 665` with the current 180-unit eye height.
 
 All observed world coordinates fit signed 16-bit storage.
 
@@ -574,10 +569,11 @@ Use an emulator/configuration that supports libdragon custom RSP microcode; see 
 
 ## Immediate Next Slice
 
-1. Manually test the new ROM in ares. Record `FPS`, `K`, `R`, and `H`; walk and run into broad walls, corners, fences, and steep slopes; try glancing movement to confirm sliding; and identify any remaining fall-through coordinates or screenshots.
-2. Tune the 50-unit upper-body radius, 60-unit sample height, seam probe, and slope threshold from those results. Add SM64's smaller lower-body wall pass or ceiling response only where the real level demonstrates the need.
-3. Add controller diagnostics (position, vertical velocity, grounded/support state, floor/wall triangle, candidate counts, and collision flags) to the N64 overlay.
-4. Promote `StaticTriangleGrid3D` and the proven controller primitives into an appropriate reusable kengine common module; keep Bob-omb-specific generation/assets in `games/mario-n64`.
-5. Add generator-time ambient plus directional face shading and compare depth readability and performance.
+1. Manually test the 737,280-byte scene-foundation ROM in ares. Confirm analog magnitude, default perspective, clear color, stable FPS, wall sliding, jumping, and landing.
+2. Move the Battlefield DAE parser/baker out of the game build script behind a reusable N64 world-mesh asset configuration while keeping the level data game-owned.
+3. Add a transformed mesh-instance command, per-mesh renderer resources, a static Mario model, and a third-person follow camera.
+4. Add controller diagnostics (position, vertical velocity, grounded/support state, floor/wall triangle, candidate counts, and collision flags) through the newly composable 2D overlay path.
+5. Deduplicate wall candidates across grid cells, tune collision from real-level traversal, and then promote the proven fixed-grid/controller primitives into an appropriate common module.
+6. Add generator-time ambient plus directional face shading and compare depth readability and performance.
 
-The current ROM is the first floor-plus-wall physics checkpoint. Manual results from it will establish whether the scale, eye height, 19/24 movement speeds, body radius, wall height, step/snap values, and shadow decal fix feel right before lower-body, ceiling, or capsule behavior makes the controller more complex.
+The current ROM is the first N64 scene-foundation checkpoint. Manual results from it will establish whether analog movement, the 17/22 movement speeds, body radius, wall height, step/snap values, projection handling, HUD composition, and shadow decal fix feel right before adding a visible third-person Mario and transformed model instances.

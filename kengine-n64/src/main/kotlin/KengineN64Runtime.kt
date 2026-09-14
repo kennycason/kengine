@@ -24,6 +24,11 @@ private const val INPUT_R = 1 shl 10
 private const val INPUT_Z = 1 shl 11
 private const val INPUT_C_LEFT = 1 shl 12
 private const val INPUT_C_RIGHT = 1 shl 13
+// Buttons occupy bits 0..13. Two signed-byte stick axes use bits 14..29,
+// deliberately leaving the sign bit clear across the experimental ABI bridge.
+private const val INPUT_STICK_X_SHIFT = 14
+private const val INPUT_STICK_Y_SHIFT = 22
+private const val N64_STICK_MAX = 85
 private const val COMMAND_CAPACITY = 512
 private const val AUDIO_COMMAND_CAPACITY = 16
 
@@ -176,6 +181,20 @@ private class KengineN64Runtime {
         input.set(InputButton.L, (inputMask and INPUT_L) != 0)
         input.set(InputButton.R, (inputMask and INPUT_R) != 0)
         input.set(InputButton.Z, (inputMask and INPUT_Z) != 0)
+        input.setLeftStick(
+            normalizeN64StickAxis(signedByte(inputMask ushr INPUT_STICK_X_SHIFT)),
+            normalizeN64StickAxis(signedByte(inputMask ushr INPUT_STICK_Y_SHIFT))
+        )
+    }
+
+    private fun signedByte(value: Int): Int {
+        val byteValue = value and 0xFF
+        return if (byteValue >= 0x80) byteValue - 0x100 else byteValue
+    }
+
+    private fun normalizeN64StickAxis(value: Int): Int {
+        return ((value * InputState.ANALOG_AXIS_MAX) / N64_STICK_MAX)
+            .coerceIn(-InputState.ANALOG_AXIS_MAX, InputState.ANALOG_AXIS_MAX)
     }
 
     private fun snapshotPayload(): String {

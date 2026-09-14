@@ -4,8 +4,18 @@ class InputState(initialMask: Int = 0) {
     var mask: Int = initialMask
         private set
 
+    /** Normalized horizontal position of the primary stick in [-1000, 1000]. */
+    var leftStickX: Int = 0
+        private set
+
+    /** Normalized vertical position of the primary stick in [-1000, 1000]. */
+    var leftStickY: Int = 0
+        private set
+
     fun reset() {
         mask = 0
+        leftStickX = 0
+        leftStickY = 0
     }
 
     fun set(button: InputButton, pressed: Boolean = true) {
@@ -21,8 +31,15 @@ class InputState(initialMask: Int = 0) {
         this.mask = mask
     }
 
+    fun setLeftStick(x: Int, y: Int) {
+        leftStickX = x.coerceIn(-ANALOG_AXIS_MAX, ANALOG_AXIS_MAX)
+        leftStickY = y.coerceIn(-ANALOG_AXIS_MAX, ANALOG_AXIS_MAX)
+    }
+
     fun copyFrom(other: InputState) {
         mask = other.mask
+        leftStickX = other.leftStickX
+        leftStickY = other.leftStickY
     }
 
     fun isPressed(button: InputButton): Boolean {
@@ -37,6 +54,8 @@ class InputState(initialMask: Int = 0) {
     }
 
     companion object {
+        const val ANALOG_AXIS_MAX = 1000
+
         fun bitFor(button: InputButton): Int {
             return when (button) {
                 InputButton.LEFT,

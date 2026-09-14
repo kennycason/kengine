@@ -55,8 +55,16 @@ class Mario64Game : PortableGame {
         get() = playerWallCollisionCount
 
     override fun update(input: InputState) {
-        val forwardAxis = input.axis(InputButton.DPAD_DOWN, InputButton.DPAD_UP)
-        val strafeAxis = input.axis(InputButton.DPAD_LEFT, InputButton.DPAD_RIGHT)
+        val forwardAxis = if (input.leftStickY != 0) {
+            input.leftStickY
+        } else {
+            input.axis(InputButton.DPAD_DOWN, InputButton.DPAD_UP) * InputState.ANALOG_AXIS_MAX
+        }
+        val strafeAxis = if (input.leftStickX != 0) {
+            input.leftStickX
+        } else {
+            input.axis(InputButton.DPAD_LEFT, InputButton.DPAD_RIGHT) * InputState.ANALOG_AXIS_MAX
+        }
 
         var moveX = 0
         var moveZ = 0
@@ -64,8 +72,14 @@ class Mario64Game : PortableGame {
             val fwdCos = cosAngle(cameraYaw)
             val fwdSin = sinAngle(cameraYaw)
             val speed = if (input.isPressed(InputButton.B)) RUN_SPEED else WALK_SPEED
-            moveX = trigMul(-strafeAxis * speed, fwdCos) + trigMul(forwardAxis * speed, fwdSin)
-            moveZ = trigMul(strafeAxis * speed, fwdSin) + trigMul(forwardAxis * speed, fwdCos)
+            moveX = (
+                trigMul(-strafeAxis * speed, fwdCos) +
+                    trigMul(forwardAxis * speed, fwdSin)
+                ) / InputState.ANALOG_AXIS_MAX
+            moveZ = (
+                trigMul(strafeAxis * speed, fwdSin) +
+                    trigMul(forwardAxis * speed, fwdCos)
+                ) / InputState.ANALOG_AXIS_MAX
         }
 
         cameraYaw = wrapAngle(

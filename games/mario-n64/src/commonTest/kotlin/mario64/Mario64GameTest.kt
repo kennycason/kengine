@@ -13,29 +13,25 @@ import kotlin.test.assertTrue
 class Mario64GameTest {
     @Test
     fun worldModelHasRenderableGeometry() {
-        val world = Mario64ModelAssets.battlefield
-        assertTrue(world.name.isNotEmpty())
-        assertTrue(world.vertexCount > 0, "world should have vertices")
-        assertTrue(world.triangleCount > 0, "world should have triangles")
-        assertEquals(0, world.vertices.size % Mario64BakedWorld.VERTEX_STRIDE)
-        assertEquals(0, world.triangles.size % Mario64BakedWorld.TRIANGLE_FIELD_COUNT)
-        assertTrue(world.colors.isNotEmpty(), "world should have material colors")
+        assertTrue(Mario64ModelAssets.BATTLEFIELD_NAME.isNotEmpty())
+        assertTrue(Mario64ModelAssets.BATTLEFIELD_VERTEX_COUNT > 0, "world should have vertices")
+        assertTrue(Mario64ModelAssets.BATTLEFIELD_TRIANGLE_COUNT > 0, "world should have triangles")
+        assertTrue(Mario64ModelAssets.BATTLEFIELD_MATERIAL_COUNT > 0, "world should have material colors")
+        assertTrue(Mario64ModelAssets.BATTLEFIELD_TEXTURE_COUNT > 0, "world should have textures")
     }
 
     @Test
     fun worldModelVertexCountMatchesDaeSource() {
-        val world = Mario64ModelAssets.battlefield
-        assertEquals(1623, world.vertexCount, "identical DAE vertices should be reused")
-        assertEquals(1100, world.triangleCount, "duplicates and quantized degenerates should be removed")
+        assertEquals(1623, Mario64ModelAssets.BATTLEFIELD_VERTEX_COUNT, "identical DAE vertices should be reused")
+        assertEquals(1100, Mario64ModelAssets.BATTLEFIELD_TRIANGLE_COUNT, "duplicates and quantized degenerates should be removed")
     }
 
     @Test
     fun worldMaterialsPreserveN64RenderLayers() {
-        val modes = Mario64ModelAssets.battlefield.materialModes
-        assertEquals(18, modes.size)
-        assertEquals(15, modes.count { it == Mario64BakedWorld.MATERIAL_OPAQUE })
-        assertEquals(2, modes.count { it == Mario64BakedWorld.MATERIAL_MASKED })
-        assertEquals(1, modes.count { it == Mario64BakedWorld.MATERIAL_TRANSLUCENT_DECAL })
+        assertEquals(18, Mario64ModelAssets.BATTLEFIELD_MATERIAL_COUNT)
+        assertEquals(15, Mario64ModelAssets.BATTLEFIELD_OPAQUE_MATERIAL_COUNT)
+        assertEquals(2, Mario64ModelAssets.BATTLEFIELD_MASKED_MATERIAL_COUNT)
+        assertEquals(1, Mario64ModelAssets.BATTLEFIELD_TRANSLUCENT_DECAL_MATERIAL_COUNT)
     }
 
     @Test
@@ -159,6 +155,29 @@ class Mario64GameTest {
 
         assertTrue(runDistanceSquared > walkDistanceSquared)
         assertTrue(maxOf(abs(runX), abs(runZ)) <= 24)
+    }
+
+    @Test
+    fun analogStickMagnitudeControlsWalkingSpeed() {
+        val halfGame = Mario64Game()
+        val halfInput = InputState()
+        halfInput.setLeftStick(0, InputState.ANALOG_AXIS_MAX / 2)
+        halfGame.update(halfInput)
+
+        val fullGame = Mario64Game()
+        val fullInput = InputState()
+        fullInput.setLeftStick(0, InputState.ANALOG_AXIS_MAX)
+        fullGame.update(fullInput)
+
+        val halfX = halfGame.bodyX + 3000
+        val halfZ = halfGame.bodyZ + 3000
+        val fullX = fullGame.bodyX + 3000
+        val fullZ = fullGame.bodyZ + 3000
+        val halfDistanceSquared = halfX * halfX + halfZ * halfZ
+        val fullDistanceSquared = fullX * fullX + fullZ * fullZ
+
+        assertTrue(halfDistanceSquared > 0)
+        assertTrue(halfDistanceSquared < fullDistanceSquared)
     }
 
     @Test

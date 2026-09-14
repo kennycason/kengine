@@ -779,22 +779,29 @@ static int w3d_gl_tex_count = 0;
 static int w3d_gl_initialized = 0;
 static int w3d_gl_rendered_frame = 0;
 static int w3d_gl_projection_set = 0;
+static int w3d_gl_projection_distance = -1;
 static GLuint w3d_gl_world_list = 0;
 static const KengineWorldMesh* w3d_gl_world_list_mesh = NULL;
 
 #define WORLD3D_GL_SCALE (1.0f / 100.0f)
 
-static void w3d_gl_setup_projection(void) {
-    if (w3d_gl_projection_set) return;
+static void w3d_gl_setup_projection(int projection_distance) {
+    if (projection_distance <= 0) projection_distance = 200;
+    if (w3d_gl_projection_set && w3d_gl_projection_distance == projection_distance) return;
     float aspect = 320.0f / 240.0f;
     float near = 0.2f;
     float far = 200.0f;
+    /* Preserve the original 90-degree vertical view at the default value of
+     * 200 while allowing games to zoom through the portable command field. */
+    float half_height = near * (200.0f / (float)projection_distance);
+    float half_width = half_height * aspect;
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glFrustum(-near * aspect, near * aspect, -near, near, near, far);
+    glFrustum(-half_width, half_width, -half_height, half_height, near, far);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     w3d_gl_projection_set = 1;
+    w3d_gl_projection_distance = projection_distance;
 }
 
 static void w3d_gl_init_textures(const KengineWorldMesh* mesh) {
@@ -967,7 +974,8 @@ static void draw_world_3d(
     const KengineWorldMesh* mesh,
     int cam_x, int cam_y, int cam_z,
     int yaw, int pitch,
-    int proj_dist
+    int proj_dist,
+    int clear_color
 ) {
     if (!mesh) return;
 
@@ -980,13 +988,19 @@ static void draw_world_3d(
     float fy = sinf(pitch_rad);
     float fz = cosf(yaw_rad) * cosf(pitch_rad);
 
-    w3d_gl_setup_projection();
+    w3d_gl_setup_projection(proj_dist);
 
     surface_t *zbuf = display_get_zbuf();
     rdpq_attach(disp, zbuf);
     gl_context_begin();
 
-    glClearColor(0.36f, 0.58f, 0.99f, 1.0f);
+    uint32_t clear_rgba = (uint32_t)clear_color;
+    glClearColor(
+        (float)(clear_rgba & 0xFF) / 255.0f,
+        (float)((clear_rgba >> 8) & 0xFF) / 255.0f,
+        (float)((clear_rgba >> 16) & 0xFF) / 255.0f,
+        (float)((clear_rgba >> 24) & 0xFF) / 255.0f
+    );
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glEnable(GL_DEPTH_TEST);
@@ -1042,8 +1056,10 @@ static void draw_world_3d(
     const KengineWorldMesh* mesh,
     int cam_x, int cam_y, int cam_z,
     int yaw, int pitch,
-    int proj_dist
+    int proj_dist,
+    int clear_color
 ) {
+    (void)clear_color;
     if (!mesh || mesh->vertex_count > WORLD3D_MAX_VERTICES) return;
 
     int yaw_cos = w3d_cos(yaw), yaw_sin = w3d_sin(yaw);
@@ -1247,7 +1263,7 @@ static int g_render_commands[KENGINE_RENDER_MAX_COMMANDS * KENGINE_RENDER_FIELD_
 static int g_audio_commands[KENGINE_AUDIO_MAX_COMMANDS * KENGINE_AUDIO_FIELD_COUNT];
 
 static int translate_input(joypad_inputs_t inputs, joypad_buttons_t held, joypad_buttons_t pressed) {
-    int mask = 0;
+    uint32_t mask = 0;
 
     if (held.d_left || pressed.d_left || inputs.stick_x < -STICK_DEADZONE) mask |= KENGINE_INPUT_LEFT;
     if (held.d_right || pressed.d_right || inputs.stick_x > STICK_DEADZONE) mask |= KENGINE_INPUT_RIGHT;
@@ -1264,11 +1280,27 @@ static int translate_input(joypad_inputs_t inputs, joypad_buttons_t held, joypad
     if (held.r || pressed.r) mask |= KENGINE_INPUT_R;
     if (held.z || pressed.z) mask |= KENGINE_INPUT_Z;
 
-    return mask;
+    int stick_x = (inputs.stick_x < -STICK_DEADZONE || inputs.stick_x > STICK_DEADZONE)
+        ? inputs.stick_x : 0;
+    int stick_y = (inputs.stick_y < -STICK_DEADZONE || inputs.stick_y > STICK_DEADZONE)
+        ? inputs.stick_y : 0;
+    /* Buttons occupy bits 0..13. Keep bit 31 clear so the packed word remains
+     * non-negative across the experimental O64/O32 Kotlin ABI boundary. */
+    mask |= (uint32_t)(uint8_t)stick_x << 14;
+    mask |= (uint32_t)(uint8_t)stick_y << 22;
+
+    return (int)mask;
 }
 
-static void execute_render_commands(surface_t* disp, int* commands, int command_count) {
-    for (int i = 0; i < command_count; ++i) {
+static void execute_render_commands(
+    surface_t* disp,
+    int* commands,
+    int command_start,
+    int command_count,
+    bool skip_clear,
+    bool skip_world_3d
+) {
+    for (int i = command_start; i < command_count; ++i) {
         int base = i * KENGINE_RENDER_FIELD_COUNT;
         int type = commands[base + KENGINE_RENDER_FIELD_TYPE];
         int x = commands[base + KENGINE_RENDER_FIELD_X];
@@ -1281,6 +1313,7 @@ static void execute_render_commands(surface_t* disp, int* commands, int command_
 
         switch (type) {
             case KENGINE_RENDER_CLEAR: {
+                if (skip_clear) break;
 #if KENGINE_N64_USE_RDPQ_RENDER
                 clear_rdpq(disp, color);
 #else
@@ -1317,6 +1350,7 @@ static void execute_render_commands(surface_t* disp, int* commands, int command_
 #endif
                 break;
             case KENGINE_RENDER_DRAW_WORLD_3D: {
+                if (skip_world_3d) break;
 #ifdef KENGINE_N64_WORLD_MESH
                 int cam_x = x, cam_y = y, cam_z = w;
                 int cam_yaw = h, cam_pitch = color;
@@ -1327,7 +1361,12 @@ static void execute_render_commands(surface_t* disp, int* commands, int command_
 #endif
                 const KengineWorldMesh* mesh = kengine_find_world_mesh(mesh_id);
                 if (mesh) {
-                    draw_world_3d(disp, mesh, cam_x, cam_y, cam_z, cam_yaw, cam_pitch, proj_dist);
+                    draw_world_3d(
+                        disp, mesh,
+                        cam_x, cam_y, cam_z,
+                        cam_yaw, cam_pitch,
+                        proj_dist, (int)0xFF000000u
+                    );
                 }
 #endif
                 break;
@@ -1479,7 +1518,7 @@ int main(void) {
 #endif
 #ifdef KENGINE_N64_USE_GL
     gl_init();
-    w3d_gl_setup_projection();
+    w3d_gl_setup_projection(200);
 #endif
     joypad_init();
     timer_init();
@@ -1525,12 +1564,22 @@ int main(void) {
         phase_start = phase_end;
 
 #if defined(KENGINE_N64_USE_GL) && defined(KENGINE_N64_WORLD_MESH)
-        /* GL path: extract camera from DRAW_WORLD_3D command, render directly */
+        /*
+         * GL renders the first 3D world, then the ordinary command executor
+         * composites commands that follow it (HUD, sprites, text, and debug
+         * primitives). CLEAR is folded into the GL clear so it cannot erase
+         * the completed world frame.
+         */
         {
             int gl_rendered = 0;
+            int world_command_index = -1;
+            int clear_color = (int)0xFFFC945Cu;
             for (int ci = 0; ci < render_count && !gl_rendered; ci++) {
                 int* cmd = &g_render_commands[ci * KENGINE_RENDER_FIELD_COUNT];
-                if (cmd[KENGINE_RENDER_FIELD_TYPE] == KENGINE_RENDER_DRAW_WORLD_3D) {
+                int command_type = cmd[KENGINE_RENDER_FIELD_TYPE];
+                if (command_type == KENGINE_RENDER_CLEAR) {
+                    clear_color = cmd[KENGINE_RENDER_FIELD_COLOR];
+                } else if (command_type == KENGINE_RENDER_DRAW_WORLD_3D) {
                     int cam_x = cmd[KENGINE_RENDER_FIELD_X];
                     int cam_y = cmd[KENGINE_RENDER_FIELD_Y];
                     int cam_z = cmd[KENGINE_RENDER_FIELD_WIDTH];
@@ -1540,13 +1589,29 @@ int main(void) {
                     int proj_dist = cmd[KENGINE_RENDER_FIELD_PARAM];
                     const KengineWorldMesh* mesh = kengine_find_world_mesh(mesh_id);
                     if (mesh) {
-                        draw_world_3d(disp, mesh, cam_x, cam_y, cam_z, cam_yaw, cam_pitch, proj_dist);
+                        draw_world_3d(
+                            disp, mesh,
+                            cam_x, cam_y, cam_z,
+                            cam_yaw, cam_pitch,
+                            proj_dist, clear_color
+                        );
                         gl_rendered = 1;
+                        world_command_index = ci;
                     }
                 }
             }
-            if (!gl_rendered) {
-                execute_render_commands(disp, g_render_commands, render_count);
+            if (gl_rendered) {
+                execute_render_commands(
+                    disp, g_render_commands,
+                    world_command_index + 1, render_count,
+                    true, true
+                );
+            } else {
+                execute_render_commands(
+                    disp, g_render_commands,
+                    0, render_count,
+                    false, false
+                );
             }
 
             phase_end = timer_ticks();
@@ -1557,7 +1622,11 @@ int main(void) {
             display_show(disp);
         }
 #else
-        execute_render_commands(disp, g_render_commands, render_count);
+        execute_render_commands(
+            disp, g_render_commands,
+            0, render_count,
+            false, false
+        );
         phase_end = timer_ticks();
         timing.render_us = ticks_to_us(phase_end - phase_start);
 
