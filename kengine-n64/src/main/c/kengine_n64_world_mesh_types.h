@@ -19,12 +19,20 @@ typedef enum {
     KENGINE_WORLD_MATERIAL_TRANSLUCENT_DECAL = 2
 } KengineWorldMaterialMode;
 
+typedef enum {
+    KENGINE_WORLD_TEXTURE_REPEAT = 0,
+    KENGINE_WORLD_TEXTURE_CLAMP_TO_EDGE = 1,
+    KENGINE_WORLD_TEXTURE_MIRRORED_REPEAT = 2
+} KengineWorldTextureWrap;
+
 typedef struct {
     int material_index;
     int width;
     int height;
     int format;
     int material_mode;
+    int wrap_s;
+    int wrap_t;
     const uint16_t* data;
 } KengineWorldTexture;
 

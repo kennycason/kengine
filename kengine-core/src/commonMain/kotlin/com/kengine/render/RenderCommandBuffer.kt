@@ -56,6 +56,19 @@ class RenderCommandBuffer(capacity: Int = 128) {
         add(RenderCommandType.DRAW_WORLD_3D, cameraX, cameraY, cameraZ, cameraYaw, cameraPitch, meshId, projectionDistance)
     }
 
+    fun drawMesh3D(
+        meshId: Int,
+        x: Int,
+        y: Int,
+        z: Int,
+        yaw: Int,
+        pitch: Int = 0,
+        scale: Int = 1000
+    ) {
+        if (scale <= 0) return
+        add(RenderCommandType.DRAW_MESH_3D, x, y, z, yaw, meshId, scale, pitch)
+    }
+
     fun field(commandIndex: Int, fieldIndex: Int): Int {
         if (commandIndex !in 0 until count || fieldIndex !in 0 until FIELD_COUNT) {
             return 0

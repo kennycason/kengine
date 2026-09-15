@@ -83,6 +83,10 @@ The black screen on mupen64plus does NOT indicate a broken ROM. Commercial N64 g
 - `Super Mario 64 Bowser.glb`: static Bowser landmark/enemy mesh.
 - `Ridley64.glb`: animated N64-era character test asset used by the model viewer.
 
+`games/mario-n64/assets/models/mario-static` contains the first N64-ready static derivative of `Mario 64 Model.glb`, including its nine source textures and attribution/provenance note. Its glTF clamp/repeat modes are retained by the generated N64 mesh contract, preventing the face and cap edge textures from wrapping across their opposite sides.
+
+`games/mario-n64/assets/models/mario-animated-poses` contains seven N64-ready poses sampled from the same `Mario64Animated.glb` used by the desktop game: idle, two walk frames, two run frames, jump, and fall. `tools/bake_glb_pose.py` performs skeletal skinning offline using only the Python standard library; Assimp converts each result to the checked-in COLLADA inputs. At runtime these are ordinary display-list meshes, avoiding per-frame skinning cost on the N64. The portable `DRAW_MESH_3D` command, texture address modes, and N64 per-mesh resource cache are reusable; pose selection and source assets remain owned by the Mario game.
+
 The larger local Mario animation source remains outside the repo at `~/code/mario64-assets/assets/models/Mario 64 Odyssey All Animations 2025.glb`.
 
 To regenerate the split animated Mario asset:

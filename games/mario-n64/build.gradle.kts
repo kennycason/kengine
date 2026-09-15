@@ -16,15 +16,37 @@ plugins {
 group = "kengine.n64.mario"
 version = "1.0.0"
 
-val daeFile = file("assets/models/bob-omb-battlefield/Area1.dae")
-val textureDir = file("assets/models/bob-omb-battlefield")
+val battlefieldDaeFile = file("assets/models/bob-omb-battlefield/Area1.dae")
+val battlefieldTextureDir = file("assets/models/bob-omb-battlefield")
+val marioDaeFile = file("assets/models/mario-static/Mario64Static.dae")
+val marioTextureDir = file("assets/models/mario-static")
+val marioPoseTextureDir = file("assets/models/mario-animated-poses")
+val marioPoseDaeFiles = linkedMapOf(
+    "mario-idle" to file("assets/models/mario-animated-poses/mario-idle.dae"),
+    "mario-walk-a" to file("assets/models/mario-animated-poses/mario-walk-a.dae"),
+    "mario-walk-b" to file("assets/models/mario-animated-poses/mario-walk-b.dae"),
+    "mario-run-a" to file("assets/models/mario-animated-poses/mario-run-a.dae"),
+    "mario-run-b" to file("assets/models/mario-animated-poses/mario-run-b.dae"),
+    "mario-jump" to file("assets/models/mario-animated-poses/mario-jump.dae"),
+    "mario-fall" to file("assets/models/mario-animated-poses/mario-fall.dae")
+)
+val marioTextureWrapModes = mapOf(
+    "Mario64Static_texture_0001.png" to BakedTextureWrapModes.clampBoth(),
+    "Mario64Static_texture_0002.png" to BakedTextureWrapModes.clampS(),
+    "Mario64Static_texture_0006.png" to BakedTextureWrapModes.clampBoth(),
+    "Mario64Static_texture_0008.png" to BakedTextureWrapModes.clampS()
+)
 
 val generateMario64ModelAssets by tasks.registering {
     group = "n64"
-    description = "Parses Bob-Omb Battlefield COLLADA DAE and bakes collision, metadata, and C render data."
+    description = "Bakes Bob-Omb Battlefield and Mario COLLADA assets for the N64 renderer."
 
-    inputs.file(daeFile)
-    inputs.dir(textureDir)
+    inputs.file(battlefieldDaeFile)
+    inputs.dir(battlefieldTextureDir)
+    inputs.file(marioDaeFile)
+    inputs.dir(marioTextureDir)
+    inputs.files(marioPoseDaeFiles.values)
+    inputs.dir(marioPoseTextureDir)
     val kotlinOutputFile = layout.projectDirectory.file("src/commonMain/kotlin/mario64/Mario64ModelAssets.kt")
     val collisionKotlinOutputFile = layout.projectDirectory.file("src/commonMain/kotlin/mario64/Mario64CollisionAssets.kt")
     val cOutputFile = layout.projectDirectory.file("src/main/c/kengine_n64_world_mesh.h")
@@ -33,24 +55,46 @@ val generateMario64ModelAssets by tasks.registering {
     outputs.file(cOutputFile)
 
     doLast {
-        val model = parseDaeWorld(daeFile, textureDir)
+        val battlefield = parseDaeWorld(battlefieldDaeFile, battlefieldTextureDir)
+        val staticMario = parseDaeWorld(
+            marioDaeFile,
+            marioTextureDir,
+            targetSize = 180.0,
+            placeOnGround = true,
+            mergeEquivalentMaterials = true,
+            textureWrapModes = marioTextureWrapModes
+        )
+        val marioPoses = marioPoseDaeFiles.map { (assetName, daeFile) ->
+            assetName to parseDaeWorld(
+                daeFile,
+                marioPoseTextureDir,
+                targetSize = 180.0,
+                placeOnGround = true,
+                mergeEquivalentMaterials = true
+            )
+        }
+        val mario = marioPoses.first().second
 
         val kotlinOut = kotlinOutputFile.asFile
         kotlinOut.parentFile.mkdirs()
-        writeTextIfChanged(kotlinOut, renderMario64ModelAssets(model))
+        writeTextIfChanged(
+            kotlinOut,
+            renderMario64ModelAssets(battlefield, mario, marioPoses.size, staticMario)
+        )
 
         val collisionKotlinOut = collisionKotlinOutputFile.asFile
         collisionKotlinOut.parentFile.mkdirs()
-        writeTextIfChanged(collisionKotlinOut, renderMario64CollisionAssets(model.collision))
+        writeTextIfChanged(collisionKotlinOut, renderMario64CollisionAssets(battlefield.collision))
 
         val cOut = cOutputFile.asFile
         cOut.parentFile.mkdirs()
-        writeTextIfChanged(cOut, renderMario64MeshC(model))
+        writeTextIfChanged(cOut, renderMario64MeshC(battlefield, marioPoses))
 
         println(
-            "Mario64 world: ${model.vertexCount} render vertices, ${model.triangleCount} render triangles, " +
-                "${model.collision.vertexCount} collision vertices, ${model.collision.triangleCount} collision triangles, " +
-                "${model.colors.size} materials"
+            "Mario64 world: ${battlefield.vertexCount} render vertices, ${battlefield.triangleCount} render triangles, " +
+                "${battlefield.collision.vertexCount} collision vertices, ${battlefield.collision.triangleCount} collision triangles, " +
+                "${battlefield.colors.size} materials; Mario: ${mario.vertexCount} vertices, " +
+                "${mario.triangleCount} triangles, ${mario.colors.size} materials, ${marioPoses.size} baked poses"
         )
     }
 }
@@ -154,6 +198,8 @@ data class BakedMario64Texture(
     val height: Int,
     val format: BakedTextureFormat,
     val materialMode: BakedMaterialMode,
+    val wrapS: BakedTextureWrap,
+    val wrapT: BakedTextureWrap,
     val texelData: ShortArray
 )
 
@@ -166,6 +212,26 @@ enum class BakedMaterialMode(val value: Int, val cName: String) {
     OPAQUE(0, "KENGINE_WORLD_MATERIAL_OPAQUE"),
     MASKED(1, "KENGINE_WORLD_MATERIAL_MASKED"),
     TRANSLUCENT_DECAL(2, "KENGINE_WORLD_MATERIAL_TRANSLUCENT_DECAL")
+}
+
+enum class BakedTextureWrap(val cName: String) {
+    REPEAT("KENGINE_WORLD_TEXTURE_REPEAT"),
+    CLAMP_TO_EDGE("KENGINE_WORLD_TEXTURE_CLAMP_TO_EDGE"),
+    MIRRORED_REPEAT("KENGINE_WORLD_TEXTURE_MIRRORED_REPEAT")
+}
+
+data class BakedTextureWrapModes(
+    val s: BakedTextureWrap = BakedTextureWrap.REPEAT,
+    val t: BakedTextureWrap = BakedTextureWrap.REPEAT
+) {
+    companion object {
+        fun clampBoth() = BakedTextureWrapModes(
+            BakedTextureWrap.CLAMP_TO_EDGE,
+            BakedTextureWrap.CLAMP_TO_EDGE
+        )
+
+        fun clampS() = BakedTextureWrapModes(s = BakedTextureWrap.CLAMP_TO_EDGE)
+    }
 }
 
 private val NS = "http://www.collada.org/2005/11/COLLADASchema"
@@ -197,7 +263,14 @@ data class BakedPositionKey(val x: Int, val y: Int, val z: Int)
 
 data class CollisionTriangleKey(val vertex0: Int, val vertex1: Int, val vertex2: Int)
 
-fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
+fun parseDaeWorld(
+    daeFile: File,
+    textureDir: File,
+    targetSize: Double = 8192.0,
+    placeOnGround: Boolean = false,
+    mergeEquivalentMaterials: Boolean = false,
+    textureWrapModes: Map<String, BakedTextureWrapModes> = emptyMap()
+): BakedMario64World {
     val factory = DocumentBuilderFactory.newInstance()
     factory.isNamespaceAware = true
     val doc = factory.newDocumentBuilder().parse(daeFile)
@@ -212,15 +285,23 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
     val deduplicatedVertices = mutableListOf<DoubleArray>()
     val vertexMap = linkedMapOf<DaeVertexKey, Int>()
     val colors = mutableListOf<Int>()
-    val colorIndexes = linkedMapOf<Int, Int>()
     val materialIndexes = linkedMapOf<String, Int>()
+    val materialSourceIds = linkedMapOf<String, String>()
     val allTriangles = mutableListOf<IntArray>()
     val triangleKeys = linkedSetOf<DaeTriangleKey>()
 
-    fun colorIndex(color: Int): Int = colorIndexes.getOrPut(color) { colors += color; colors.lastIndex }
-
     fun materialIndex(matId: String, color: Int): Int {
-        return materialIndexes.getOrPut(matId) { colorIndex(color) }
+        val textureFilename = materialTextures[matId]
+        val materialKey = if (mergeEquivalentMaterials) {
+            textureFilename?.let { "texture:$it" } ?: "color:$color"
+        } else {
+            matId
+        }
+        return materialIndexes.getOrPut(materialKey) {
+            materialSourceIds[materialKey] = matId
+            colors += color
+            colors.lastIndex
+        }
     }
 
     fun deduplicateVertex(px: Double, py: Double, pz: Double, u: Double, v: Double): Int {
@@ -369,15 +450,15 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
     val centerX = (minX + maxX) / 2.0
     val centerZ = (minZ + maxZ) / 2.0
     val maxExtent = maxOf(maxX - minX, maxY - minY, maxZ - minZ).coerceAtLeast(0.0001)
-    val worldSize = 8192.0
-    val scale = worldSize / maxExtent
+    val scale = targetSize / maxExtent
+    val yOrigin = if (placeOnGround) minY else 0.0
 
     val bakedVertexRows = deduplicatedVertices.map { v ->
         val u16 = (v[3] * 1024.0).roundToInt()
         val v16 = ((1.0 - v[4]) * 1024.0).roundToInt()
         listOf(
             ((v[0] - centerX) * scale).roundToInt(),
-            (v[1] * scale).roundToInt(),
+            ((v[1] - yOrigin) * scale).roundToInt(),
             ((v[2] - centerZ) * scale).roundToInt(),
             u16,
             v16
@@ -416,7 +497,8 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
     val bakedVertices = compactVertexRows.flatten()
 
     val textures = mutableListOf<BakedMario64Texture>()
-    for ((matId, matIdx) in materialIndexes) {
+    for ((materialKey, matIdx) in materialIndexes) {
+        val matId = materialSourceIds[materialKey] ?: materialKey
         val texFilename = materialTextures[matId]
         if (texFilename != null) {
             val texFile = File(textureDir, texFilename)
@@ -442,10 +524,17 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
                     } else {
                         BakedTextureFormat.RGBA16
                     }
-                    val texels = ShortArray(img.width * img.height)
-                    for (py in 0 until img.height) {
-                        for (px in 0 until img.width) {
-                            val pixel = img.getRGB(px, py)
+                    // RGBA16 and IA16 both use two bytes per texel. Keep each
+                    // baked texture at or below 32x32 so one upload always fits
+                    // comfortably inside the N64's 4 KiB TMEM.
+                    val bakedWidth = minOf(img.width, 32)
+                    val bakedHeight = minOf(img.height, 32)
+                    val texels = ShortArray(bakedWidth * bakedHeight)
+                    for (py in 0 until bakedHeight) {
+                        for (px in 0 until bakedWidth) {
+                            val sourceX = px * img.width / bakedWidth
+                            val sourceY = py * img.height / bakedHeight
+                            val pixel = img.getRGB(sourceX, sourceY)
                             val red = (pixel ushr 16) and 0xFF
                             val green = (pixel ushr 8) and 0xFF
                             val blue = pixel and 0xFF
@@ -459,16 +548,18 @@ fun parseDaeWorld(daeFile: File, textureDir: File): BakedMario64World {
                                     ((blue shr 3) shl 1) or
                                     if (alpha > 127) 1 else 0
                             }
-                            texels[py * img.width + px] = texel.toShort()
+                            texels[py * bakedWidth + px] = texel.toShort()
                         }
                     }
                     textures += BakedMario64Texture(
                         matIdx,
                         texFilename,
-                        img.width,
-                        img.height,
+                        bakedWidth,
+                        bakedHeight,
                         textureFormat,
                         materialMode,
+                        textureWrapModes[texFilename]?.s ?: BakedTextureWrap.REPEAT,
+                        textureWrapModes[texFilename]?.t ?: BakedTextureWrap.REPEAT,
                         texels
                     )
                 }
@@ -801,7 +892,12 @@ fun childElement(parent: Element, localName: String): Element? {
 // Code generation
 // ---------------------------------------------------------------------------
 
-fun renderMario64ModelAssets(model: BakedMario64World): String {
+fun renderMario64ModelAssets(
+    battlefield: BakedMario64World,
+    mario: BakedMario64World,
+    marioPoseCount: Int,
+    staticMario: BakedMario64World
+): String {
     return buildString {
         appendLine("package mario64")
         appendLine()
@@ -813,13 +909,19 @@ fun renderMario64ModelAssets(model: BakedMario64World): String {
         appendLine("// validation without adding runtime arrays to the ROM.")
         appendLine("internal object Mario64ModelAssets {")
         appendLine("    const val BATTLEFIELD_NAME = \"Bob-Omb Battlefield\"")
-        appendLine("    const val BATTLEFIELD_VERTEX_COUNT = ${model.vertexCount}")
-        appendLine("    const val BATTLEFIELD_TRIANGLE_COUNT = ${model.triangleCount}")
-        appendLine("    const val BATTLEFIELD_MATERIAL_COUNT = ${model.colors.size}")
-        appendLine("    const val BATTLEFIELD_TEXTURE_COUNT = ${model.textures.size}")
-        appendLine("    const val BATTLEFIELD_OPAQUE_MATERIAL_COUNT = ${model.materialModes.count { it == BakedMaterialMode.OPAQUE.value }}")
-        appendLine("    const val BATTLEFIELD_MASKED_MATERIAL_COUNT = ${model.materialModes.count { it == BakedMaterialMode.MASKED.value }}")
-        appendLine("    const val BATTLEFIELD_TRANSLUCENT_DECAL_MATERIAL_COUNT = ${model.materialModes.count { it == BakedMaterialMode.TRANSLUCENT_DECAL.value }}")
+        appendLine("    const val BATTLEFIELD_VERTEX_COUNT = ${battlefield.vertexCount}")
+        appendLine("    const val BATTLEFIELD_TRIANGLE_COUNT = ${battlefield.triangleCount}")
+        appendLine("    const val BATTLEFIELD_MATERIAL_COUNT = ${battlefield.colors.size}")
+        appendLine("    const val BATTLEFIELD_TEXTURE_COUNT = ${battlefield.textures.size}")
+        appendLine("    const val BATTLEFIELD_OPAQUE_MATERIAL_COUNT = ${battlefield.materialModes.count { it == BakedMaterialMode.OPAQUE.value }}")
+        appendLine("    const val BATTLEFIELD_MASKED_MATERIAL_COUNT = ${battlefield.materialModes.count { it == BakedMaterialMode.MASKED.value }}")
+        appendLine("    const val BATTLEFIELD_TRANSLUCENT_DECAL_MATERIAL_COUNT = ${battlefield.materialModes.count { it == BakedMaterialMode.TRANSLUCENT_DECAL.value }}")
+        appendLine("    const val MARIO_VERTEX_COUNT = ${mario.vertexCount}")
+        appendLine("    const val MARIO_TRIANGLE_COUNT = ${mario.triangleCount}")
+        appendLine("    const val MARIO_MATERIAL_COUNT = ${mario.colors.size}")
+        appendLine("    const val MARIO_TEXTURE_COUNT = ${mario.textures.size}")
+        appendLine("    const val MARIO_POSE_COUNT = $marioPoseCount")
+        appendLine("    const val MARIO_STATIC_CLAMPED_TEXTURE_COUNT = ${staticMario.textures.count { it.wrapS == BakedTextureWrap.CLAMP_TO_EDGE || it.wrapT == BakedTextureWrap.CLAMP_TO_EDGE }}")
         appendLine("}")
     }
 }
@@ -885,66 +987,56 @@ fun StringBuilder.appendChunkedIntArrayBuilder(
     }
 }
 
-fun renderMario64MeshC(model: BakedMario64World): String {
-    val meshId = stableAssetId("mesh:battlefield")
+fun renderMario64MeshC(
+    battlefield: BakedMario64World,
+    marioPoses: List<Pair<String, BakedMario64World>>
+): String {
+    require(battlefield.colors.size <= 32) { "Battlefield exceeds the renderer's 32-material limit" }
+    require(marioPoses.isNotEmpty()) { "Mario must have at least one baked pose" }
+    require(marioPoses.map { it.first }.distinct().size == marioPoses.size) { "Mario pose names must be unique" }
+    val marioMaterialSource = marioPoses.first()
+    marioPoses.forEach { (name, mario) ->
+        require(mario.colors.size <= 32) { "$name exceeds the renderer's 32-material limit" }
+        require(haveEquivalentMaterials(marioMaterialSource.second, mario)) {
+            "$name must share the ${marioMaterialSource.first} material and texture layout"
+        }
+    }
+    val battlefieldMeshId = stableAssetId("mesh:battlefield")
     return buildString {
         appendLine("// Generated by :games:mario-n64:generateMario64ModelAssets")
-        appendLine("// Source: Bob-Omb Battlefield (Area1.dae)")
+        appendLine("// Sources: Bob-Omb Battlefield (Area1.dae), baked Mario64Animated poses")
         appendLine("#ifndef KENGINE_N64_WORLD_MESH_H")
         appendLine("#define KENGINE_N64_WORLD_MESH_H")
         appendLine()
         appendLine("#include \"kengine_n64_world_mesh_types.h\"")
         appendLine()
-        appendLine("#define KENGINE_WORLD_MESH_BATTLEFIELD_ID $meshId")
-        appendLine("#define KENGINE_WORLD_MESH_BATTLEFIELD_VERTEX_COUNT ${model.vertexCount}")
-        appendLine("#define KENGINE_WORLD_MESH_BATTLEFIELD_TRIANGLE_COUNT ${model.triangleCount}")
-        appendLine("#define KENGINE_WORLD_MESH_BATTLEFIELD_COLOR_COUNT ${model.colors.size}")
-        appendLine("#define KENGINE_WORLD_MESH_BATTLEFIELD_VERTEX_STRIDE 5")
-        appendLine("#define KENGINE_WORLD_MESH_BATTLEFIELD_TEXTURE_COUNT ${model.textures.size}")
-        appendLine()
-        appendCIntArray("kengine_world_mesh_battlefield_vertices", model.vertices)
-        appendLine()
-        appendCIntArray("kengine_world_mesh_battlefield_triangles", model.triangles)
-        appendLine()
-        appendCIntArray("kengine_world_mesh_battlefield_colors", model.colors)
-        appendLine()
-
-        for ((idx, tex) in model.textures.withIndex()) {
-            appendLine("// Texture $idx: ${tex.filename} (${tex.width}x${tex.height})")
-            append("static const uint16_t kengine_world_tex_${idx}[] = {\n")
-            tex.texelData.toList().chunked(16).forEach { chunk ->
-                appendLine("    ${chunk.joinToString(", ") { "0x${(it.toInt() and 0xFFFF).toString(16).padStart(4, '0')}" }},")
-            }
-            appendLine("};")
-            appendLine()
+        appendWorldMeshC("battlefield", "BATTLEFIELD", battlefieldMeshId, battlefield)
+        marioPoses.forEachIndexed { index, (assetName, mario) ->
+            val symbol = assetName.replace('-', '_')
+            val macro = assetName.replace('-', '_').uppercase()
+            appendWorldMeshC(
+                symbol,
+                macro,
+                stableAssetId("mesh:$assetName"),
+                mario,
+                sharedMaterialSymbol = if (index == 0) null else marioMaterialSource.first.replace('-', '_')
+            )
         }
-
-        if (model.textures.isNotEmpty()) {
-            appendLine("static const KengineWorldTexture kengine_world_mesh_battlefield_textures[] = {")
-            for ((idx, tex) in model.textures.withIndex()) {
-                appendLine("    { ${tex.materialIndex}, ${tex.width}, ${tex.height}, ${tex.format.cName}, ${tex.materialMode.cName}, kengine_world_tex_$idx },")
-            }
-            appendLine("};")
-        } else {
-            appendLine("static const KengineWorldTexture* kengine_world_mesh_battlefield_textures = 0;")
-        }
-        appendLine()
 
         appendLine("static const KengineWorldMesh kengine_world_meshes[] = {")
-        appendLine("    {")
-        appendLine("        $meshId,")
-        appendLine("        KENGINE_WORLD_MESH_BATTLEFIELD_VERTEX_COUNT,")
-        appendLine("        KENGINE_WORLD_MESH_BATTLEFIELD_TRIANGLE_COUNT,")
-        appendLine("        KENGINE_WORLD_MESH_BATTLEFIELD_COLOR_COUNT,")
-        appendLine("        KENGINE_WORLD_MESH_BATTLEFIELD_VERTEX_STRIDE,")
-        appendLine("        KENGINE_WORLD_MESH_BATTLEFIELD_TEXTURE_COUNT,")
-        appendLine("        kengine_world_mesh_battlefield_vertices,")
-        appendLine("        kengine_world_mesh_battlefield_triangles,")
-        appendLine("        kengine_world_mesh_battlefield_colors,")
-        appendLine("        kengine_world_mesh_battlefield_textures")
-        appendLine("    }")
+        appendWorldMeshCInitializer("battlefield", "BATTLEFIELD", battlefieldMeshId)
+        marioPoses.forEachIndexed { index, (assetName, _) ->
+            val symbol = assetName.replace('-', '_')
+            val macro = assetName.replace('-', '_').uppercase()
+            appendWorldMeshCInitializer(
+                symbol,
+                macro,
+                stableAssetId("mesh:$assetName"),
+                materialSymbol = if (index == 0) symbol else marioMaterialSource.first.replace('-', '_')
+            )
+        }
         appendLine("};")
-        appendLine("#define KENGINE_WORLD_MESH_COUNT 1")
+        appendLine("#define KENGINE_WORLD_MESH_COUNT ${marioPoses.size + 1}")
         appendLine()
         appendLine("static const KengineWorldMesh* kengine_find_world_mesh(int mesh_id) {")
         appendLine("    for (int i = 0; i < KENGINE_WORLD_MESH_COUNT; i++) {")
@@ -954,6 +1046,99 @@ fun renderMario64MeshC(model: BakedMario64World): String {
         appendLine("}")
         appendLine()
         appendLine("#endif")
+    }
+}
+
+fun StringBuilder.appendWorldMeshC(
+    symbol: String,
+    macro: String,
+    meshId: Int,
+    model: BakedMario64World,
+    sharedMaterialSymbol: String? = null
+) {
+    appendLine("#define KENGINE_WORLD_MESH_${macro}_ID $meshId")
+    appendLine("#define KENGINE_WORLD_MESH_${macro}_VERTEX_COUNT ${model.vertexCount}")
+    appendLine("#define KENGINE_WORLD_MESH_${macro}_TRIANGLE_COUNT ${model.triangleCount}")
+    appendLine("#define KENGINE_WORLD_MESH_${macro}_COLOR_COUNT ${model.colors.size}")
+    appendLine("#define KENGINE_WORLD_MESH_${macro}_VERTEX_STRIDE 5")
+    appendLine("#define KENGINE_WORLD_MESH_${macro}_TEXTURE_COUNT ${model.textures.size}")
+    appendLine()
+    appendCIntArray("kengine_world_mesh_${symbol}_vertices", model.vertices)
+    appendLine()
+    appendCIntArray("kengine_world_mesh_${symbol}_triangles", model.triangles)
+    appendLine()
+    if (sharedMaterialSymbol != null) {
+        appendLine("// Material colors and textures are shared with $sharedMaterialSymbol.")
+        appendLine()
+        return
+    }
+    appendCIntArray("kengine_world_mesh_${symbol}_colors", model.colors)
+    appendLine()
+
+    for ((index, texture) in model.textures.withIndex()) {
+        appendLine("// Texture $index: ${texture.filename} (${texture.width}x${texture.height})")
+        append("static const uint16_t kengine_world_mesh_${symbol}_tex_${index}[] = {\n")
+        texture.texelData.toList().chunked(16).forEach { chunk ->
+            appendLine(
+                "    ${chunk.joinToString(", ") { "0x${(it.toInt() and 0xFFFF).toString(16).padStart(4, '0')}" }},"
+            )
+        }
+        appendLine("};")
+        appendLine()
+    }
+
+    if (model.textures.isNotEmpty()) {
+        appendLine("static const KengineWorldTexture kengine_world_mesh_${symbol}_textures[] = {")
+        for ((index, texture) in model.textures.withIndex()) {
+            appendLine(
+                "    { ${texture.materialIndex}, ${texture.width}, ${texture.height}, " +
+                    "${texture.format.cName}, ${texture.materialMode.cName}, " +
+                    "${texture.wrapS.cName}, ${texture.wrapT.cName}, " +
+                    "kengine_world_mesh_${symbol}_tex_$index },"
+            )
+        }
+        appendLine("};")
+    } else {
+        appendLine("static const KengineWorldTexture* kengine_world_mesh_${symbol}_textures = 0;")
+    }
+    appendLine()
+}
+
+fun StringBuilder.appendWorldMeshCInitializer(
+    symbol: String,
+    macro: String,
+    meshId: Int,
+    materialSymbol: String = symbol
+) {
+    appendLine("    {")
+    appendLine("        $meshId,")
+    appendLine("        KENGINE_WORLD_MESH_${macro}_VERTEX_COUNT,")
+    appendLine("        KENGINE_WORLD_MESH_${macro}_TRIANGLE_COUNT,")
+    appendLine("        KENGINE_WORLD_MESH_${macro}_COLOR_COUNT,")
+    appendLine("        KENGINE_WORLD_MESH_${macro}_VERTEX_STRIDE,")
+    appendLine("        KENGINE_WORLD_MESH_${macro}_TEXTURE_COUNT,")
+    appendLine("        kengine_world_mesh_${symbol}_vertices,")
+    appendLine("        kengine_world_mesh_${symbol}_triangles,")
+    appendLine("        kengine_world_mesh_${materialSymbol}_colors,")
+    appendLine("        kengine_world_mesh_${materialSymbol}_textures")
+    appendLine("    },")
+}
+
+fun haveEquivalentMaterials(left: BakedMario64World, right: BakedMario64World): Boolean {
+    if (left.colors != right.colors || left.materialModes != right.materialModes) return false
+    if (left.textures.size != right.textures.size) return false
+    return left.textures.indices.all { index ->
+        val a = left.textures[index]
+        val b = right.textures[index]
+        a.materialIndex == b.materialIndex &&
+            a.filename == b.filename &&
+            a.width == b.width &&
+            a.height == b.height &&
+            a.format == b.format &&
+            a.materialMode == b.materialMode &&
+            a.wrapS == b.wrapS &&
+            a.wrapT == b.wrapT &&
+            a.texelData.contentEquals(b.texelData)
     }
 }
 

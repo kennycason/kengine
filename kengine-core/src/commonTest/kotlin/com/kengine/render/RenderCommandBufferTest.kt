@@ -98,4 +98,30 @@ class RenderCommandBufferTest {
         assertEquals(7, destination[RenderCommandBuffer.FIELD_COUNT + RenderCommandBuffer.FIELD_COLOR2])
         assertEquals(8, destination[RenderCommandBuffer.FIELD_COUNT + RenderCommandBuffer.FIELD_PARAM])
     }
+
+    @Test
+    fun storesReusable3DMeshTransform() {
+        val commands = RenderCommandBuffer(capacity = 1)
+        val meshId = RenderAssetId.mesh("mario")
+
+        commands.drawMesh3D(
+            meshId,
+            x = 11,
+            y = 22,
+            z = 33,
+            yaw = 444,
+            pitch = -77,
+            scale = 1250
+        )
+
+        assertEquals(1, commands.count)
+        assertEquals(RenderCommandType.DRAW_MESH_3D, commands.field(0, RenderCommandBuffer.FIELD_TYPE))
+        assertEquals(11, commands.field(0, RenderCommandBuffer.FIELD_X))
+        assertEquals(22, commands.field(0, RenderCommandBuffer.FIELD_Y))
+        assertEquals(33, commands.field(0, RenderCommandBuffer.FIELD_WIDTH))
+        assertEquals(444, commands.field(0, RenderCommandBuffer.FIELD_HEIGHT))
+        assertEquals(meshId, commands.field(0, RenderCommandBuffer.FIELD_COLOR))
+        assertEquals(1250, commands.field(0, RenderCommandBuffer.FIELD_COLOR2))
+        assertEquals(-77, commands.field(0, RenderCommandBuffer.FIELD_PARAM))
+    }
 }

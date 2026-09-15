@@ -69,6 +69,19 @@ class RenderContext(commandCapacity: Int = 128) {
         commands.drawWorld3D(meshId, cameraX, cameraY, cameraZ, cameraYaw, cameraPitch, projectionDistance)
     }
 
+    /** Draws a reusable mesh in the active 3D world scene. Scale is per-thousand. */
+    fun drawMesh3D(
+        meshId: Int,
+        x: Int,
+        y: Int,
+        z: Int,
+        yaw: Int = 0,
+        pitch: Int = 0,
+        scale: Int = 1000
+    ) {
+        commands.drawMesh3D(meshId, x, y, z, yaw, pitch, scale)
+    }
+
     fun commandField(commandIndex: Int, fieldIndex: Int): Int {
         return commands.field(commandIndex, fieldIndex)
     }

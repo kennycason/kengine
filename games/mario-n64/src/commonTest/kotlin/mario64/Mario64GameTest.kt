@@ -18,6 +18,12 @@ class Mario64GameTest {
         assertTrue(Mario64ModelAssets.BATTLEFIELD_TRIANGLE_COUNT > 0, "world should have triangles")
         assertTrue(Mario64ModelAssets.BATTLEFIELD_MATERIAL_COUNT > 0, "world should have material colors")
         assertTrue(Mario64ModelAssets.BATTLEFIELD_TEXTURE_COUNT > 0, "world should have textures")
+        assertEquals(666, Mario64ModelAssets.MARIO_VERTEX_COUNT, "animated Mario vertices should be compacted")
+        assertEquals(989, Mario64ModelAssets.MARIO_TRIANGLE_COUNT)
+        assertEquals(5, Mario64ModelAssets.MARIO_MATERIAL_COUNT)
+        assertEquals(5, Mario64ModelAssets.MARIO_TEXTURE_COUNT, "equivalent texture materials should merge")
+        assertEquals(7, Mario64ModelAssets.MARIO_POSE_COUNT)
+        assertEquals(4, Mario64ModelAssets.MARIO_STATIC_CLAMPED_TEXTURE_COUNT)
     }
 
     @Test
@@ -248,7 +254,7 @@ class Mario64GameTest {
     }
 
     @Test
-    fun drawFrameProducesWorldCommand() {
+    fun drawFrameProducesWorldAndMarioCommands() {
         val game = Mario64Game()
         val render = RenderContext(512)
 
@@ -257,6 +263,7 @@ class Mario64GameTest {
 
         assertTrue(render.commandCount > 0, "draw should produce render commands")
         assertTrue(containsType(render, RenderCommandType.DRAW_WORLD_3D), "should emit DRAW_WORLD_3D command")
+        assertTrue(containsType(render, RenderCommandType.DRAW_MESH_3D), "should emit Mario mesh command")
     }
 
     @Test
@@ -278,6 +285,83 @@ class Mario64GameTest {
             index += 1
         }
         assertTrue(found, "should find DRAW_WORLD_3D command")
+    }
+
+    @Test
+    fun horizontalCameraButtonsOrbitInMario64Direction() {
+        val leftGame = Mario64Game()
+        val leftInput = InputState()
+        leftInput.set(InputButton.C_LEFT)
+        leftGame.update(leftInput)
+
+        val rightGame = Mario64Game()
+        val rightInput = InputState()
+        rightInput.set(InputButton.C_RIGHT)
+        rightGame.update(rightInput)
+
+        assertEquals(110, drawWorldField(leftGame, RenderCommandBuffer.FIELD_HEIGHT))
+        assertEquals(146, drawWorldField(rightGame, RenderCommandBuffer.FIELD_HEIGHT))
+    }
+
+    @Test
+    fun drawMarioCommandUsesPlayerTransform() {
+        val game = Mario64Game()
+        val render = RenderContext(512)
+
+        render.beginFrame(320, 240)
+        game.draw(render)
+
+        assertEquals(
+            Mario64Game.MARIO_MESH_ID,
+            commandFieldForType(render, RenderCommandType.DRAW_MESH_3D, RenderCommandBuffer.FIELD_COLOR)
+        )
+        assertEquals(
+            game.bodyX,
+            commandFieldForType(render, RenderCommandType.DRAW_MESH_3D, RenderCommandBuffer.FIELD_X)
+        )
+        assertEquals(
+            game.bodyY,
+            commandFieldForType(render, RenderCommandType.DRAW_MESH_3D, RenderCommandBuffer.FIELD_Y)
+        )
+        assertEquals(
+            game.bodyZ,
+            commandFieldForType(render, RenderCommandType.DRAW_MESH_3D, RenderCommandBuffer.FIELD_WIDTH)
+        )
+        assertEquals(
+            1000,
+            commandFieldForType(render, RenderCommandType.DRAW_MESH_3D, RenderCommandBuffer.FIELD_COLOR2)
+        )
+    }
+
+    @Test
+    fun movementAndAirStateSelectBakedMarioPoses() {
+        val walkGame = Mario64Game()
+        val walkInput = InputState()
+        walkInput.set(InputButton.DPAD_UP)
+        walkGame.update(walkInput)
+        assertEquals(Mario64Game.MARIO_WALK_A_MESH_ID, drawMarioMeshId(walkGame))
+        repeat(4) { walkGame.update(walkInput) }
+        assertEquals(Mario64Game.MARIO_WALK_B_MESH_ID, drawMarioMeshId(walkGame))
+
+        val runGame = Mario64Game()
+        val runInput = InputState()
+        runInput.set(InputButton.DPAD_UP)
+        runInput.set(InputButton.B)
+        runGame.update(runInput)
+        assertEquals(Mario64Game.MARIO_RUN_A_MESH_ID, drawMarioMeshId(runGame))
+        repeat(2) { runGame.update(runInput) }
+        assertEquals(Mario64Game.MARIO_RUN_B_MESH_ID, drawMarioMeshId(runGame))
+
+        val jumpGame = Mario64Game()
+        val jumpInput = InputState()
+        jumpInput.set(InputButton.A)
+        jumpGame.update(jumpInput)
+        assertEquals(Mario64Game.MARIO_JUMP_MESH_ID, drawMarioMeshId(jumpGame))
+        jumpInput.reset()
+        while (jumpGame.verticalVelocity > 0) {
+            jumpGame.update(jumpInput)
+        }
+        assertEquals(Mario64Game.MARIO_FALL_MESH_ID, drawMarioMeshId(jumpGame))
     }
 
     @Test
@@ -312,8 +396,27 @@ class Mario64GameTest {
 
         assertEquals(0, render.droppedCommandCount)
         assertEquals(
-            485 + Mario64Game.CAMERA_EYE_HEIGHT,
+            485 + Mario64Game.CAMERA_TARGET_HEIGHT -
+                trigMul(Mario64Game.CAMERA_DISTANCE, sinAngle(-48)),
             worldCommandField(render, RenderCommandBuffer.FIELD_Y)
+        )
+    }
+
+    private fun drawWorldField(game: Mario64Game, field: Int): Int {
+        val render = RenderContext(512)
+        render.beginFrame(320, 240)
+        game.draw(render)
+        return worldCommandField(render, field)
+    }
+
+    private fun drawMarioMeshId(game: Mario64Game): Int {
+        val render = RenderContext(512)
+        render.beginFrame(320, 240)
+        game.draw(render)
+        return commandFieldForType(
+            render,
+            RenderCommandType.DRAW_MESH_3D,
+            RenderCommandBuffer.FIELD_COLOR
         )
     }
 
@@ -337,6 +440,17 @@ class Mario64GameTest {
             index += 1
         }
         return false
+    }
+
+    private fun commandFieldForType(render: RenderContext, type: Int, field: Int): Int {
+        var index = 0
+        while (index < render.commandCount) {
+            if (render.commandField(index, RenderCommandBuffer.FIELD_TYPE) == type) {
+                return render.commandField(index, field)
+            }
+            index += 1
+        }
+        error("render command $type not found")
     }
 
     private fun createFloorAndWallGrid(): StaticTriangleGrid3D {

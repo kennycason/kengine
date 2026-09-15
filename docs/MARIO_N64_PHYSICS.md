@@ -1,6 +1,6 @@
 # Mario N64 Physics Follow-Up
 
-Status: rendering, floor physics, and the first body-radius wall/slide slice work; manual traversal and tuning are next.
+Status: textured rendering, floor/wall physics, analog movement, an animated visible Mario, and a centered third-person orbit camera work; gameplay expansion and rendering performance are next.
 
 Last reviewed: 2026-09-14
 
@@ -10,7 +10,7 @@ The review covered the hand-written game, backend, build, and runtime code in `g
 
 ## Executive Summary
 
-The textured Bob-omb Battlefield renderer is real and produces a stable ROM. The playable controller now replaces the noclip camera: it has generated collision data, grid-accelerated floor and wall queries, grounded spawn, terrain following, a 50-unit horizontal body radius, bounded wall push/slide, vertical velocity, gravity, jumping, landing, and separate body/camera height. A visible Mario model and third-person follow camera are not implemented yet.
+The textured Bob-omb Battlefield renderer is real and produces a stable ROM. The playable controller now replaces the noclip camera: it has generated collision data, grid-accelerated floor and wall queries, grounded spawn, terrain following, a 50-unit horizontal body radius, bounded wall push/slide, vertical velocity, gravity, jumping, and landing. The reusable transformed-mesh path now renders offline-baked poses from the repo's animated Mario model, selects idle/walk/run/jump/fall/land presentation from controller state, turns Mario toward movement, and views him through a centered third-person orbit camera.
 
 The shortest reliable route to a playable build is:
 
@@ -32,7 +32,7 @@ Do not begin with a general rigid-body engine. A purpose-built kinematic charact
 - Y: `485` (queried from the collision mesh)
 - Z: `-3000`
 
-The directional inputs request camera-relative body movement. The N64 stick now retains its analog magnitude through the Kotlin bridge, with the D-pad remaining a full-speed fallback. A jumps on its rising edge, B selects the faster run speed, the C buttons change yaw/pitch, and Start resets the complete controller state. Normal full-stick movement is 17 units per frame and holding B selects 22. Drawing emits one `DRAW_WORLD_3D` command at the body X/Z and body Y plus a 180-unit eye height.
+The directional inputs request camera-relative body movement. The N64 stick now retains its analog magnitude through the Kotlin bridge, with the D-pad remaining a full-speed fallback. A jumps on its rising edge, B selects the faster run speed, horizontal C buttons orbit in the original Mario 64 direction, vertical C buttons change pitch, and Start resets the complete controller state. Normal full-stick movement is 17 units per frame and holding B selects 22. Drawing emits a `DRAW_WORLD_3D` camera/scene command plus a `DRAW_MESH_3D` Mario pose at the body transform. The camera orbits 650 units from a target 90 units above Mario's feet; camera position and aim use matching fixed-point yaw/pitch math so the orbit stays centered on that target.
 
 The controller now provides:
 
@@ -60,18 +60,16 @@ The active path is:
 ```text
 Mario64Game.draw
   -> portable DRAW_WORLD_3D command
+  -> portable DRAW_MESH_3D command(s)
   -> KengineN64Runtime command copy
   -> kengine-n64/src/main/c/main.c
   -> libdragon OpenGL renderer
   -> generated C world mesh and textures
 ```
 
-`KENGINE_N64_USE_GL` is enabled. The C host finds the 3D world command, clears the buffers, enables depth testing, establishes its projection/view state, and draws the generated mesh.
+`KENGINE_N64_USE_GL` is enabled. The C host finds the 3D world command, clears the buffers, enables depth testing, establishes its projection/view state, and draws the generated world plus subsequent transformed mesh instances into the same depth buffer. It caches textures and a display list independently for each mesh, then composites later 2D commands over the completed scene.
 
-Two consequences are worth remembering:
-
-- The command's `projectionDistance` is currently ignored by the GL renderer because the projection is hard-coded in C.
-- The GL fast path bypasses the normal portable clear command and its clear behavior is hard-coded.
+The GL renderer now honors the portable clear color and `projectionDistance`. The software fallback still draws only `DRAW_WORLD_3D`; transformed `DRAW_MESH_3D` instances are currently an N64 GL-path feature.
 
 ### Performance baseline and overlay
 
@@ -111,6 +109,10 @@ The imported render mesh has since been compacted before code generation. The DA
 
 The manual compact-mesh test reached 32–33 FPS, approximately 4.7x the original 7 FPS. The visual artifacts remained, confirming that duplicate geometry was a major performance cost but not their cause.
 
+The first static-Mario build adds 473 vertices and 722 triangles to the same scene. A direct ares boot test on 2026-09-14 renders the final 10-material/9-texture model and third-person view correctly at about 19 FPS (`K=4 ms`, `R=49 ms`) in the diagnostic-overlay build. Material consolidation reduced asset/state duplication but did not change the measured frame rate. This is functional but below the desired 30 FPS target, so visibility culling and removing or toggling the synchronous performance overlay are now higher priority than adding many actors at once.
+
+The first baked-animation build uses 664–666 compact vertices and 985–989 triangles per active pose. Only one Mario pose is drawn each frame, but it is about 15% more total scene triangles than the static checkpoint and lazily compiles a display list the first time each pose appears. Sharing the common Mario material and uploaded texture set across all poses produces an 835,584-byte ROM. Controller traversal and an overlay reading are still required before adopting it as the new performance baseline.
+
 ### Camera-dependent surface artifacts
 
 The display-list build showed jagged green/black regions appearing and disappearing during camera movement. See [debug image 1](../games/mario-n64/debug/img.png), [debug image 2](../games/mario-n64/debug/img_1.png), and [debug image 3](../games/mario-n64/debug/img_2.png).
@@ -128,7 +130,13 @@ The first alpha-material test made the circular shadow texture visible correctly
 
 ### Reusable engine boundary
 
-Bob-omb-specific DAE parsing, texture classification, generated geometry, and material declarations remain in `games/mario-n64`. The N64 texture formats, world-mesh data contract, material modes, pass ordering, GL state, and display-list playback live in `kengine-n64`. Future N64 games can emit the same asset contract without copying Mario-specific renderer code. Collision queries and a kinematic controller should be portable common Kotlin rather than N64 C; once proven game-local, move their general primitives to an engine module instead of tying physics to this level or backend.
+Bob-omb/Mario-specific DAE parsing, texture classification, generated geometry, and material declarations remain in `games/mario-n64`. The portable `DRAW_MESH_3D` instance command lives in `kengine-core`; N64 texture formats, the mesh data contract, material modes, pass ordering, per-mesh GL resources, transforms, and display-list playback live in `kengine-n64`. Future N64 games can emit the same asset contract and position/rotate/scale actors without copying Mario-specific renderer code. Collision queries and the kinematic controller should remain common Kotlin rather than N64 C; once proven game-local, move their general primitives to an engine module instead of tying physics to this level or backend.
+
+### Mario asset reuse and animation decision
+
+The existing Mario assets are sufficient; another online model is not technically necessary. `games/mario-3d/assets/models/Mario 64 Model.glb` remains a useful 473-vertex / 722-triangle static fallback. Its glTF sampler metadata revealed the face/cap artifact: four textures require clamp-to-edge on at least one axis, while the old N64 renderer forced repeat. Texture S/T wrap modes now live in the reusable N64 mesh contract and are applied by the GL backend.
+
+The active character now comes from `Mario64Animated.glb`, the same rigged asset used by `mario-3d`. `tools/bake_glb_pose.py` samples its skeleton offline, and the N64 game currently ships seven compact static display-list poses: idle, two walk frames, two run frames, jump, and fall. A short landing state reuses idle with a squash transform. This costs ROM/data space but avoids real-time skeletal skinning at the current 20 FPS budget. Both checked-in derivatives contain their author, Sketchfab URL, and CC BY 4.0 provenance; that metadata does not grant Nintendo's underlying Mario character/trademark rights.
 
 ### Lighting and depth readability
 
@@ -276,7 +284,7 @@ previously failed while compiling generated assets with:
 Method too large: mario64/Mario64ModelAssets.<clinit> ()V
 ```
 
-The active renderer consumes the generated C world mesh, so the generator now emits only small Kotlin metadata constants for render-asset tests instead of a second copy of every render vertex and triangle. This avoids the JVM 64 KiB static-initializer limit and prevents the native linker from retaining unreachable software-renderer data. `:games:mario-n64:jvmTest` now compiles and all sixteen current tests pass, including material-layer distribution, compact collision-grid and wall-normal validation, spawn-ground lookup, overflow-safe interpolation across a maximum-size sloped triangle, seam probing, wall push/tangent slide, digital/analog walk pacing, jump/landing behavior, held-jump edge behavior, safe far-fall reset, and complete Start reset state.
+The active renderer consumes the generated C world mesh, so the generator now emits only small Kotlin metadata constants for render-asset tests instead of a second copy of every render vertex and triangle. This avoids the JVM 64 KiB static-initializer limit and prevents the native linker from retaining unreachable software-renderer data. `:games:mario-n64:jvmTest` now compiles and all nineteen current tests pass, including material-layer distribution, baked-pose selection, texture wrap metadata, camera direction, model command transforms, compact collision-grid and wall-normal validation, spawn-ground lookup, overflow-safe interpolation across a maximum-size sloped triangle, seam probing, wall push/tangent slide, digital/analog walk pacing, jump/landing behavior, held-jump edge behavior, safe far-fall reset, and complete Start reset state.
 
 The assertions were partially strengthened:
 
@@ -316,7 +324,7 @@ The DAE's paired geometry nodes produced 1,043 exact duplicate triangle pairs. S
 - 563 floor/walkable triangles;
 - 503 wall or steep-surface triangles.
 
-An exact height query at the current X/Z spawn location `(-3000, -3000)` finds ground at approximately `Y = 485.235`. The first-person camera derives its position from the body and therefore starts near `Y = 665` with the current 180-unit eye height.
+An exact height query at the current X/Z spawn location `(-3000, -3000)` finds ground at approximately `Y = 485.235`. The third-person camera orbits 650 units from a target 90 units above Mario's feet and starts pitched down toward that center point.
 
 All observed world coordinates fit signed 16-bit storage.
 
@@ -425,13 +433,13 @@ A simple fallback that tries the combined move followed by X-only and Z-only alt
 
 ### Body and camera separation
 
-The first playable milestone may remain first-person. Even then, store a body position independently and derive the camera from:
+The first third-person milestone stores the body independently and derives the camera from:
 
 ```text
-camera = body position + eye height
+camera = body position - forward * follow distance + vertical height
 ```
 
-This prevents camera controls from becoming physics state and makes a later third-person camera possible. A visible Mario requires a separate renderer milestone: an additional model draw path/transforms, a Mario asset pipeline, animation, facing state, and a follow camera. None of that exists in `games/mario-n64` today, so it should not block proving locomotion.
+This keeps camera controls out of physics state. A visible animated Mario, transforms, facing, pose selection, and the centered follow/orbit camera now exist. Camera obstruction and follow smoothing remain separate renderer/gameplay milestones.
 
 ## Phased Implementation Plan
 
@@ -445,7 +453,7 @@ This prevents camera controls from becoming physics state and makes a later thir
 - [x] Split the generated Kotlin asset initializer so JVM tests compile.
 - [x] Fix the vertex-stride assertion.
 - [x] Add meaningful Start/reset coordinate and controller-state assertions.
-- [ ] Remove or repair and test the unused `Mario64WorldRenderer`.
+- [x] Remove the unused `Mario64WorldRenderer` while preserving its fixed math helpers.
 
 Exit condition: JVM tests run, the ROM links cleanly, and failures are no longer hidden by build flags.
 
@@ -475,8 +483,8 @@ Exit condition: the player can traverse the level, step onto reachable geometry,
 
 ### Phase 3: Improve control and observability
 
-- [ ] Keep digital controls working as the baseline.
-- [ ] Preserve raw analog X/Y through the bridge and expose continuous axes.
+- [x] Keep digital controls working as the baseline.
+- [x] Preserve raw analog X/Y through the bridge and expose continuous axes.
 - [x] Add FPS, Kotlin/render timing, heap, and render-command drop metrics to the active GL path.
 - [ ] Add position, vertical velocity, grounded state, support triangle, candidate count, and collision flags to a debug display or rate-limited log.
 - [ ] Add collision debug lines and controller query-limit metrics.
@@ -485,10 +493,12 @@ Exit condition: movement is tunable on a controller and collision failures can b
 
 ### Phase 4: Add third-person Mario presentation
 
-- [ ] Add a portable or N64-specific model draw command with transforms.
-- [ ] Add a legal, runtime-sized Mario model/texture pipeline.
-- [ ] Add a follow/orbit camera with obstruction handling as needed.
-- [ ] Add facing, idle/run/jump/fall/land animation state.
+- [x] Add a portable model-instance draw command with position, yaw, pitch, and scale.
+- [x] Add provenance-recorded, runtime-sized static and baked-pose Mario model/texture pipelines.
+- [x] Add a centered follow/orbit camera with Mario 64-style horizontal C-button direction.
+- [ ] Add camera obstruction and follow smoothing as needed.
+- [x] Add movement-facing state.
+- [x] Add idle/walk/run/jump/fall/land state and the first offline-skinned N64 animation asset path.
 
 Exit condition: a visible animated character follows the already-proven physics body. This phase is deliberately outside the first physics MVP.
 
@@ -520,7 +530,7 @@ Exit condition: a visible animated character follows the already-proven physics 
 - [x] `:games:mario-n64:jvmTest` compiles and passes.
 - [x] The N64 linker reports no duplicate-definition errors.
 - [ ] Any remaining ABI warning has a documented, tested justification; ideally there are none.
-- [x] The instrumented renderer reports `CMD=2+0` during manual traversal.
+- [x] The instrumented renderer reports `CMD=3+0` with world, Mario, and clear commands.
 - [x] Rebuilt ROM runs in a libdragon-compatible emulator configuration such as ares/LLE.
 - [ ] Long-running movement remains stable with the no-op GC runtime.
 
@@ -569,11 +579,13 @@ Use an emulator/configuration that supports libdragon custom RSP microcode; see 
 
 ## Immediate Next Slice
 
-1. Manually test the 737,280-byte scene-foundation ROM in ares. Confirm analog magnitude, default perspective, clear color, stable FPS, wall sliding, jumping, and landing.
-2. Move the Battlefield DAE parser/baker out of the game build script behind a reusable N64 world-mesh asset configuration while keeping the level data game-owned.
-3. Add a transformed mesh-instance command, per-mesh renderer resources, a static Mario model, and a third-person follow camera.
-4. Add controller diagnostics (position, vertical velocity, grounded/support state, floor/wall triangle, candidate counts, and collision flags) through the newly composable 2D overlay path.
-5. Deduplicate wall candidates across grid cells, tune collision from real-level traversal, and then promote the proven fixed-grid/controller primitives into an appropriate common module.
-6. Add generator-time ambient plus directional face shading and compare depth readability and performance.
+1. Manually traverse the baked-animation ROM in ares. Confirm model scale/orientation, face/cap appearance, walk/run pose cadence, jump/fall/land transitions, horizontal camera direction, and centered camera orbit.
+2. Restore a 30 FPS target before multiplying actors: add coarse world visibility/section culling, share repeated pose texture/material data, and make the synchronous performance overlay toggleable.
+3. Add controller diagnostics (position, vertical velocity, grounded/support state, floor/wall triangle, candidate counts, and collision flags) through the composable 2D overlay path.
+4. Implement long jump and ground pound as deterministic controller states; then add double jump/backflip/crouch behavior where the shared desktop gameplay rules transfer cleanly.
+5. Refine the offline-skinned pose path with a few more carefully chosen frames only after measuring display-list memory and frame rate; add crouch/long-jump/ground-pound poses alongside their controller states.
+6. Deduplicate wall candidates across grid cells, tune collision from real-level traversal, and promote only the proven fixed-grid/controller primitives into an appropriate common module.
+7. Move the DAE parser/baker behind reusable N64 mesh asset configuration while keeping level and character source data game-owned.
+8. Add generator-time ambient plus directional face shading and compare depth readability and performance.
 
-The current ROM is the first N64 scene-foundation checkpoint. Manual results from it will establish whether analog movement, the 17/22 movement speeds, body radius, wall height, step/snap values, projection handling, HUD composition, and shadow decal fix feel right before adding a visible third-person Mario and transformed model instances.
+The current ROM is the first animated-character N64 checkpoint. A direct ares boot test confirms the textured world, baked idle pose, centered third-person camera, shared depth buffer, TMEM-safe textures, and diagnostic overlay initialize without an assertion. Manual controller traversal remains necessary before animation cadence, camera, and collision tuning are considered final.

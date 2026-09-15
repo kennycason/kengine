@@ -9,4 +9,5 @@ object RenderCommandType {
     const val DRAW_TEXT = 6
     const val DRAW_TRIANGLE = 7
     const val DRAW_WORLD_3D = 8
+    const val DRAW_MESH_3D = 9
 }

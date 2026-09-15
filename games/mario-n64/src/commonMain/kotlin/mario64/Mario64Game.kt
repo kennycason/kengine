@@ -8,6 +8,15 @@ import com.kengine.render.RenderAssetId
 import com.kengine.render.RenderContext
 import com.kengine.storage.PortableStorage
 
+internal enum class Mario64AnimationState {
+    IDLE,
+    WALK,
+    RUN,
+    JUMP,
+    FALL,
+    LAND
+}
+
 class Mario64Game : PortableGame {
     override val storageNamespace: String = "mario64"
 
@@ -23,8 +32,12 @@ class Mario64Game : PortableGame {
     private var playerSupportTriangle = StaticTriangleGrid3D.NO_TRIANGLE
     private var playerWallTriangle = StaticTriangleGrid3D.NO_TRIANGLE
     private var playerWallCollisionCount = 0
+    private var playerYaw = INITIAL_YAW
     private var cameraYaw = INITIAL_YAW
     private var cameraPitch = INITIAL_PITCH
+    private var animationState = Mario64AnimationState.IDLE
+    private var animationFrame = 0
+    private var landingFramesRemaining = 0
 
     init {
         resetPlayer()
@@ -80,10 +93,13 @@ class Mario64Game : PortableGame {
                 trigMul(strafeAxis * speed, fwdSin) +
                     trigMul(forwardAxis * speed, fwdCos)
                 ) / InputState.ANALOG_AXIS_MAX
+            if (moveX != 0 || moveZ != 0) {
+                playerYaw = yawForDirection(moveX, moveZ)
+            }
         }
 
         cameraYaw = wrapAngle(
-            cameraYaw + input.axis(InputButton.C_RIGHT, InputButton.C_LEFT) * YAW_SPEED
+            cameraYaw + input.axis(InputButton.C_LEFT, InputButton.C_RIGHT) * YAW_SPEED
         )
         cameraPitch = clampInt(
             cameraPitch + input.axis(InputButton.C_DOWN, InputButton.C_UP) * PITCH_SPEED,
@@ -97,10 +113,19 @@ class Mario64Game : PortableGame {
             resetPlayer()
             cameraYaw = INITIAL_YAW
             cameraPitch = INITIAL_PITCH
+            resetAnimation()
         } else {
             val jumpJustPressed = (input.mask and InputState.bitFor(InputButton.A)) != 0 &&
                 (previousInputMask and InputState.bitFor(InputButton.A)) == 0
+            val wasGrounded = playerGrounded
             stepPlayer(moveX, moveZ, jumpJustPressed)
+            if (!wasGrounded && playerGrounded) {
+                landingFramesRemaining = LAND_ANIMATION_FRAMES
+            }
+            updateAnimation(
+                moving = moveX != 0 || moveZ != 0,
+                running = input.isPressed(InputButton.B)
+            )
         }
 
         frame += 1
@@ -108,16 +133,73 @@ class Mario64Game : PortableGame {
     }
 
     override fun draw(render: RenderContext) {
+        val horizontalDistance = trigMul(CAMERA_DISTANCE, cosAngle(cameraPitch))
+        val cameraX = playerX - trigMul(horizontalDistance, sinAngle(cameraYaw))
+        val cameraY = playerY + CAMERA_TARGET_HEIGHT - trigMul(CAMERA_DISTANCE, sinAngle(cameraPitch))
+        val cameraZ = playerZ - trigMul(horizontalDistance, cosAngle(cameraYaw))
         render.clear(rgba(92, 148, 252))
         render.drawWorld3D(
             meshId = BATTLEFIELD_MESH_ID,
-            cameraX = playerX,
-            cameraY = playerY + CAMERA_EYE_HEIGHT,
-            cameraZ = playerZ,
+            cameraX = cameraX,
+            cameraY = cameraY,
+            cameraZ = cameraZ,
             cameraYaw = cameraYaw,
             cameraPitch = cameraPitch,
             projectionDistance = PROJECTION_DISTANCE
         )
+        render.drawMesh3D(
+            meshId = marioAnimationMeshId(),
+            x = playerX,
+            y = playerY,
+            z = playerZ,
+            yaw = playerYaw,
+            scale = if (animationState == Mario64AnimationState.LAND) LAND_SCALE else 1000
+        )
+    }
+
+    private fun resetAnimation() {
+        animationState = Mario64AnimationState.IDLE
+        animationFrame = 0
+        landingFramesRemaining = 0
+    }
+
+    private fun updateAnimation(moving: Boolean, running: Boolean) {
+        val nextState = when {
+            !playerGrounded && playerVerticalVelocity > 0 -> Mario64AnimationState.JUMP
+            !playerGrounded -> Mario64AnimationState.FALL
+            landingFramesRemaining > 0 -> Mario64AnimationState.LAND
+            moving && running -> Mario64AnimationState.RUN
+            moving -> Mario64AnimationState.WALK
+            else -> Mario64AnimationState.IDLE
+        }
+        if (nextState == animationState) {
+            animationFrame += 1
+        } else {
+            animationState = nextState
+            animationFrame = 0
+        }
+        if (landingFramesRemaining > 0) {
+            landingFramesRemaining -= 1
+        }
+    }
+
+    private fun marioAnimationMeshId(): Int {
+        return when (animationState) {
+            Mario64AnimationState.IDLE,
+            Mario64AnimationState.LAND -> MARIO_IDLE_MESH_ID
+            Mario64AnimationState.WALK -> if ((animationFrame / WALK_POSE_FRAMES) % 2 == 0) {
+                MARIO_WALK_A_MESH_ID
+            } else {
+                MARIO_WALK_B_MESH_ID
+            }
+            Mario64AnimationState.RUN -> if ((animationFrame / RUN_POSE_FRAMES) % 2 == 0) {
+                MARIO_RUN_A_MESH_ID
+            } else {
+                MARIO_RUN_B_MESH_ID
+            }
+            Mario64AnimationState.JUMP -> MARIO_JUMP_MESH_ID
+            Mario64AnimationState.FALL -> MARIO_FALL_MESH_ID
+        }
     }
 
     /**
@@ -142,6 +224,7 @@ class Mario64Game : PortableGame {
         playerVerticalVelocity = 0
         playerWallTriangle = StaticTriangleGrid3D.NO_TRIANGLE
         playerWallCollisionCount = 0
+        playerYaw = INITIAL_YAW
     }
 
     private fun stepPlayer(moveX: Int, moveZ: Int, jumpPressed: Boolean) {
@@ -238,16 +321,40 @@ class Mario64Game : PortableGame {
 
     private fun absInt(value: Int): Int = if (value < 0) -value else value
 
+    private fun yawForDirection(x: Int, z: Int): Int {
+        val absX = absInt(x)
+        val absZ = absInt(z)
+        val firstQuadrant = if (absZ >= absX) {
+            if (absZ == 0) 0 else absX * 128 / absZ
+        } else {
+            256 - absZ * 128 / absX
+        }
+        return when {
+            z >= 0 && x >= 0 -> firstQuadrant
+            z >= 0 -> wrapAngle(1024 - firstQuadrant)
+            x >= 0 -> 512 - firstQuadrant
+            else -> 512 + firstQuadrant
+        }
+    }
+
     override fun cleanup() {}
 
     companion object {
         val BATTLEFIELD_MESH_ID = RenderAssetId.mesh("battlefield")
+        val MARIO_IDLE_MESH_ID = RenderAssetId.mesh("mario-idle")
+        val MARIO_WALK_A_MESH_ID = RenderAssetId.mesh("mario-walk-a")
+        val MARIO_WALK_B_MESH_ID = RenderAssetId.mesh("mario-walk-b")
+        val MARIO_RUN_A_MESH_ID = RenderAssetId.mesh("mario-run-a")
+        val MARIO_RUN_B_MESH_ID = RenderAssetId.mesh("mario-run-b")
+        val MARIO_JUMP_MESH_ID = RenderAssetId.mesh("mario-jump")
+        val MARIO_FALL_MESH_ID = RenderAssetId.mesh("mario-fall")
+        val MARIO_MESH_ID = MARIO_IDLE_MESH_ID
         private const val WALK_SPEED = 17
         private const val RUN_SPEED = 22
         private const val YAW_SPEED = 18
         private const val PITCH_SPEED = 9
         private const val INITIAL_YAW = 128
-        private const val INITIAL_PITCH = -60
+        private const val INITIAL_PITCH = -48
         private const val MIN_PITCH = -250
         private const val MAX_PITCH = 250
         private const val PLAYER_START_X = -3000
@@ -262,7 +369,12 @@ class Mario64Game : PortableGame {
         private const val WALL_SAMPLE_HEIGHT = 60
         private const val MAXIMUM_HORIZONTAL_SUBSTEP = 12
         private const val MAXIMUM_HORIZONTAL_SUBSTEPS = 4
-        const val CAMERA_EYE_HEIGHT = 180
+        private const val WALK_POSE_FRAMES = 4
+        private const val RUN_POSE_FRAMES = 2
+        private const val LAND_ANIMATION_FRAMES = 4
+        private const val LAND_SCALE = 880
+        const val CAMERA_DISTANCE = 650
+        const val CAMERA_TARGET_HEIGHT = 90
         private const val PROJECTION_DISTANCE = 300
     }
 }

@@ -15,4 +15,10 @@ internal object Mario64ModelAssets {
     const val BATTLEFIELD_OPAQUE_MATERIAL_COUNT = 15
     const val BATTLEFIELD_MASKED_MATERIAL_COUNT = 2
     const val BATTLEFIELD_TRANSLUCENT_DECAL_MATERIAL_COUNT = 1
+    const val MARIO_VERTEX_COUNT = 666
+    const val MARIO_TRIANGLE_COUNT = 989
+    const val MARIO_MATERIAL_COUNT = 5
+    const val MARIO_TEXTURE_COUNT = 5
+    const val MARIO_POSE_COUNT = 7
+    const val MARIO_STATIC_CLAMPED_TEXTURE_COUNT = 4
 }

@@ -3,36 +3,20 @@ package mario64
 private const val TRIG_SCALE = 4096
 private const val ANGLE_FULL = 1024
 private const val ANGLE_RIGHT = ANGLE_FULL / 4
+private const val ANGLE_HALF = ANGLE_FULL / 2
 
 internal fun sinAngle(angle: Int): Int {
     val wrapped = angle and (ANGLE_FULL - 1)
-    return when {
-        wrapped < ANGLE_RIGHT -> quarterSin(wrapped)
-        wrapped < ANGLE_RIGHT * 2 -> quarterSin(ANGLE_RIGHT * 2 - wrapped)
-        wrapped < ANGLE_RIGHT * 3 -> -quarterSin(wrapped - ANGLE_RIGHT * 2)
-        else -> -quarterSin(ANGLE_FULL - wrapped)
-    }
+    val halfAngle = if (wrapped <= ANGLE_HALF) wrapped else ANGLE_FULL - wrapped
+    val product = halfAngle * (ANGLE_HALF - halfAngle)
+    val denominator = 5 * ANGLE_HALF * ANGLE_HALF / 16 - product / 4
+    val magnitude = if (denominator == 0) 0 else (product * TRIG_SCALE + denominator / 2) / denominator
+    return if (wrapped <= ANGLE_HALF) magnitude else -magnitude
 }
 
 internal fun cosAngle(angle: Int): Int = sinAngle(angle + ANGLE_RIGHT)
 
 internal fun trigMul(value: Int, trig: Int): Int = (value * trig) / TRIG_SCALE
-
-private fun quarterSin(value: Int): Int {
-    val bounded = clampInt(value, 0, ANGLE_RIGHT)
-    val numerator = bounded * (ANGLE_RIGHT * 2 - bounded)
-    return scaleValue(numerator, TRIG_SCALE, ANGLE_RIGHT * ANGLE_RIGHT)
-}
-
-private fun scaleValue(value: Int, numerator: Int, denominator: Int): Int {
-    if (denominator == 0) return 0
-    val scaled = value * numerator
-    return if (scaled >= 0) {
-        (scaled + denominator / 2) / denominator
-    } else {
-        (scaled - denominator / 2) / denominator
-    }
-}
 
 internal fun wrapAngle(angle: Int): Int = angle and (ANGLE_FULL - 1)
 

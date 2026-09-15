@@ -59,6 +59,7 @@
 #define KENGINE_RENDER_DRAW_TEXT 6
 #define KENGINE_RENDER_DRAW_TRIANGLE 7
 #define KENGINE_RENDER_DRAW_WORLD_3D 8
+#define KENGINE_RENDER_DRAW_MESH_3D 9
 
 #define KENGINE_RENDER_FIELD_TYPE 0
 #define KENGINE_RENDER_FIELD_X 1
@@ -774,14 +775,21 @@ static int w3d_bucket_next[WORLD3D_MAX_VISIBLE];
 /* GL-based 3D world renderer — hardware vertex transform, clipping, Z-buffer */
 #ifdef KENGINE_N64_USE_GL
 
-static GLuint w3d_gl_textures[32];
-static int w3d_gl_tex_count = 0;
-static int w3d_gl_initialized = 0;
-static int w3d_gl_rendered_frame = 0;
+#define WORLD3D_GL_MAX_MESHES 16
+#define WORLD3D_GL_MAX_TEXTURES 32
+
+typedef struct {
+    const KengineWorldMesh* mesh;
+    GLuint textures[WORLD3D_GL_MAX_TEXTURES];
+    int texture_count;
+    int textures_initialized;
+    GLuint display_list;
+} KengineWorldGlResources;
+
+static KengineWorldGlResources w3d_gl_resources[WORLD3D_GL_MAX_MESHES];
+static int w3d_gl_resource_count = 0;
 static int w3d_gl_projection_set = 0;
 static int w3d_gl_projection_distance = -1;
-static GLuint w3d_gl_world_list = 0;
-static const KengineWorldMesh* w3d_gl_world_list_mesh = NULL;
 
 #define WORLD3D_GL_SCALE (1.0f / 100.0f)
 
@@ -804,15 +812,52 @@ static void w3d_gl_setup_projection(int projection_distance) {
     w3d_gl_projection_distance = projection_distance;
 }
 
-static void w3d_gl_init_textures(const KengineWorldMesh* mesh) {
-    if (w3d_gl_initialized || !mesh->textures) return;
-    w3d_gl_tex_count = mesh->texture_count < 32 ? mesh->texture_count : 32;
-    glGenTextures(w3d_gl_tex_count, w3d_gl_textures);
-    for (int i = 0; i < w3d_gl_tex_count; i++) {
+static KengineWorldGlResources* w3d_gl_get_resources(const KengineWorldMesh* mesh) {
+    for (int i = 0; i < w3d_gl_resource_count; i++) {
+        if (w3d_gl_resources[i].mesh == mesh) return &w3d_gl_resources[i];
+    }
+    if (w3d_gl_resource_count >= WORLD3D_GL_MAX_MESHES) return NULL;
+    KengineWorldGlResources* resources = &w3d_gl_resources[w3d_gl_resource_count++];
+    memset(resources, 0, sizeof(*resources));
+    resources->mesh = mesh;
+    return resources;
+}
+
+static GLint w3d_gl_texture_wrap(int wrap) {
+    switch (wrap) {
+        case KENGINE_WORLD_TEXTURE_CLAMP_TO_EDGE:
+            /* libdragon's N64 GL exposes edge clamping as GL_CLAMP. */
+            return GL_CLAMP;
+        case KENGINE_WORLD_TEXTURE_MIRRORED_REPEAT:
+            return GL_MIRRORED_REPEAT_ARB;
+        default:
+            return GL_REPEAT;
+    }
+}
+
+static void w3d_gl_init_textures(KengineWorldGlResources* resources) {
+    const KengineWorldMesh* mesh = resources->mesh;
+    if (resources->textures_initialized || !mesh->textures) return;
+    resources->texture_count = mesh->texture_count < WORLD3D_GL_MAX_TEXTURES
+        ? mesh->texture_count : WORLD3D_GL_MAX_TEXTURES;
+    for (int resource_index = 0; resource_index < w3d_gl_resource_count; resource_index++) {
+        KengineWorldGlResources* shared = &w3d_gl_resources[resource_index];
+        if (shared != resources &&
+            shared->textures_initialized &&
+            shared->mesh->textures == mesh->textures &&
+            shared->texture_count == resources->texture_count) {
+            memcpy(resources->textures, shared->textures,
+                   sizeof(GLuint) * resources->texture_count);
+            resources->textures_initialized = 1;
+            return;
+        }
+    }
+    glGenTextures(resources->texture_count, resources->textures);
+    for (int i = 0; i < resources->texture_count; i++) {
         const KengineWorldTexture* wt = &mesh->textures[i];
-        glBindTexture(GL_TEXTURE_2D, w3d_gl_textures[i]);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glBindTexture(GL_TEXTURE_2D, resources->textures[i]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, w3d_gl_texture_wrap(wt->wrap_s));
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, w3d_gl_texture_wrap(wt->wrap_t));
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         if (wt->format == KENGINE_WORLD_TEXTURE_IA16) {
@@ -825,10 +870,13 @@ static void w3d_gl_init_textures(const KengineWorldMesh* mesh) {
                          GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1_EXT, wt->data);
         }
     }
-    w3d_gl_initialized = 1;
+    resources->textures_initialized = 1;
 }
 
-static void w3d_gl_submit_world(const KengineWorldMesh* mesh) {
+static void w3d_gl_submit_mesh(
+    const KengineWorldMesh* mesh,
+    const KengineWorldGlResources* resources
+) {
     int tc = mesh->triangle_count;
     const int* tris = mesh->triangles;
     const int* verts = mesh->vertices;
@@ -896,9 +944,9 @@ static void w3d_gl_submit_world(const KengineWorldMesh* mesh) {
                 batch_count = 0;
                 current_mat = ci;
                 int tex_idx = (ci >= 0 && ci < 32) ? tex_mat_map[ci] : -1;
-                if (tex_idx >= 0 && tex_idx < w3d_gl_tex_count) {
+                if (tex_idx >= 0 && tex_idx < resources->texture_count) {
                     glEnable(GL_TEXTURE_2D);
-                    glBindTexture(GL_TEXTURE_2D, w3d_gl_textures[tex_idx]);
+                    glBindTexture(GL_TEXTURE_2D, resources->textures[tex_idx]);
                     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                     using_tex = 1;
                 } else {
@@ -949,39 +997,25 @@ static void w3d_gl_submit_world(const KengineWorldMesh* mesh) {
     glDepthMask(GL_TRUE);
 }
 
-static void w3d_gl_prepare_world_list(const KengineWorldMesh* mesh) {
-    if (w3d_gl_world_list != 0 && w3d_gl_world_list_mesh == mesh) return;
-
-    if (w3d_gl_world_list != 0) {
-        glDeleteLists(w3d_gl_world_list, 1);
-        w3d_gl_world_list = 0;
-        w3d_gl_world_list_mesh = NULL;
-    }
-
+static void w3d_gl_prepare_mesh_list(KengineWorldGlResources* resources) {
+    if (resources->display_list != 0) return;
     GLuint list = glGenLists(1);
     if (list == 0) return;
 
     glNewList(list, GL_COMPILE);
-    w3d_gl_submit_world(mesh);
+    w3d_gl_submit_mesh(resources->mesh, resources);
     glEndList();
 
-    w3d_gl_world_list = list;
-    w3d_gl_world_list_mesh = mesh;
+    resources->display_list = list;
 }
 
-static void draw_world_3d(
+static void w3d_gl_begin_scene(
     surface_t* disp,
-    const KengineWorldMesh* mesh,
     int cam_x, int cam_y, int cam_z,
     int yaw, int pitch,
     int proj_dist,
     int clear_color
 ) {
-    if (!mesh) return;
-
-    w3d_gl_init_textures(mesh);
-    w3d_gl_rendered_frame = 1;
-
     float yaw_rad = (float)yaw * 6.283185f / (float)WORLD3D_ANGLE_FULL;
     float pitch_rad = (float)pitch * 6.283185f / (float)WORLD3D_ANGLE_FULL;
     float fx = sinf(yaw_rad) * cosf(pitch_rad);
@@ -1017,17 +1051,62 @@ static void draw_world_3d(
         ((double)cam_z + (double)fz * 1000.0) * WORLD3D_GL_SCALE,
         0.0, 1.0, 0.0
     );
+}
 
-    w3d_gl_prepare_world_list(mesh);
-    if (w3d_gl_world_list != 0 && w3d_gl_world_list_mesh == mesh) {
-        glCallList(w3d_gl_world_list);
+static void w3d_gl_draw_mesh(
+    const KengineWorldMesh* mesh,
+    int x, int y, int z,
+    int yaw,
+    int pitch,
+    int scale
+) {
+    if (!mesh || scale <= 0) return;
+    KengineWorldGlResources* resources = w3d_gl_get_resources(mesh);
+    if (!resources) return;
+
+    w3d_gl_init_textures(resources);
+    w3d_gl_prepare_mesh_list(resources);
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glTranslatef(
+        (float)x * WORLD3D_GL_SCALE,
+        (float)y * WORLD3D_GL_SCALE,
+        (float)z * WORLD3D_GL_SCALE
+    );
+    glRotatef((float)yaw * 360.0f / (float)WORLD3D_ANGLE_FULL, 0.0f, 1.0f, 0.0f);
+    glRotatef((float)pitch * 360.0f / (float)WORLD3D_ANGLE_FULL, 1.0f, 0.0f, 0.0f);
+    float mesh_scale = (float)scale / 1000.0f;
+    glScalef(mesh_scale, mesh_scale, mesh_scale);
+
+    if (resources->display_list != 0) {
+        glCallList(resources->display_list);
     } else {
-        w3d_gl_submit_world(mesh);
+        w3d_gl_submit_mesh(mesh, resources);
     }
+    glPopMatrix();
+}
 
+static void w3d_gl_end_scene(void) {
     gl_context_end();
     /* Wait for GL/RDP work before the CPU writes the performance overlay. */
     rdpq_detach_wait();
+}
+
+static void draw_world_3d(
+    surface_t* disp,
+    const KengineWorldMesh* mesh,
+    int cam_x, int cam_y, int cam_z,
+    int yaw, int pitch,
+    int proj_dist,
+    int clear_color
+) {
+    if (!mesh) return;
+    w3d_gl_begin_scene(
+        disp, cam_x, cam_y, cam_z, yaw, pitch, proj_dist, clear_color
+    );
+    w3d_gl_draw_mesh(mesh, 0, 0, 0, 0, 0, 1000);
+    w3d_gl_end_scene();
 }
 
 #else
@@ -1371,6 +1450,11 @@ static void execute_render_commands(
 #endif
                 break;
             }
+            case KENGINE_RENDER_DRAW_MESH_3D:
+                /* GL batches these into the active world scene so they share
+                 * its camera and depth buffer. The software fallback does not
+                 * yet support transformed reusable meshes. */
+                break;
             case KENGINE_RENDER_DRAW_SPRITE:
 #if KENGINE_N64_USE_RDPQ_RENDER
                 rdpq_flush();
@@ -1565,10 +1649,10 @@ int main(void) {
 
 #if defined(KENGINE_N64_USE_GL) && defined(KENGINE_N64_WORLD_MESH)
         /*
-         * GL renders the first 3D world, then the ordinary command executor
-         * composites commands that follow it (HUD, sprites, text, and debug
-         * primitives). CLEAR is folded into the GL clear so it cannot erase
-         * the completed world frame.
+         * GL renders the first 3D world and subsequent reusable 3D meshes in
+         * one scene, then the ordinary command executor composites HUD,
+         * sprites, text, and debug primitives. CLEAR is folded into the GL
+         * clear so it cannot erase the completed world frame.
          */
         {
             int gl_rendered = 0;
@@ -1589,12 +1673,34 @@ int main(void) {
                     int proj_dist = cmd[KENGINE_RENDER_FIELD_PARAM];
                     const KengineWorldMesh* mesh = kengine_find_world_mesh(mesh_id);
                     if (mesh) {
-                        draw_world_3d(
-                            disp, mesh,
+                        w3d_gl_begin_scene(
+                            disp,
                             cam_x, cam_y, cam_z,
                             cam_yaw, cam_pitch,
                             proj_dist, clear_color
                         );
+                        w3d_gl_draw_mesh(mesh, 0, 0, 0, 0, 0, 1000);
+                        for (int mi = ci + 1; mi < render_count; mi++) {
+                            int* mesh_cmd = &g_render_commands[
+                                mi * KENGINE_RENDER_FIELD_COUNT
+                            ];
+                            if (mesh_cmd[KENGINE_RENDER_FIELD_TYPE] !=
+                                KENGINE_RENDER_DRAW_MESH_3D) continue;
+                            const KengineWorldMesh* instance_mesh =
+                                kengine_find_world_mesh(
+                                    mesh_cmd[KENGINE_RENDER_FIELD_COLOR]
+                                );
+                            w3d_gl_draw_mesh(
+                                instance_mesh,
+                                mesh_cmd[KENGINE_RENDER_FIELD_X],
+                                mesh_cmd[KENGINE_RENDER_FIELD_Y],
+                                mesh_cmd[KENGINE_RENDER_FIELD_WIDTH],
+                                mesh_cmd[KENGINE_RENDER_FIELD_HEIGHT],
+                                mesh_cmd[KENGINE_RENDER_FIELD_PARAM],
+                                mesh_cmd[KENGINE_RENDER_FIELD_COLOR2]
+                            );
+                        }
+                        w3d_gl_end_scene();
                         gl_rendered = 1;
                         world_command_index = ci;
                     }
