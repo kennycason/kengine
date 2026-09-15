@@ -1056,6 +1056,9 @@ fun StringBuilder.appendWorldMeshC(
     model: BakedMario64World,
     sharedMaterialSymbol: String? = null
 ) {
+    require(model.vertexCount <= 0xFFFF) {
+        "$symbol has too many vertices for the N64 indexed mesh contract"
+    }
     appendLine("#define KENGINE_WORLD_MESH_${macro}_ID $meshId")
     appendLine("#define KENGINE_WORLD_MESH_${macro}_VERTEX_COUNT ${model.vertexCount}")
     appendLine("#define KENGINE_WORLD_MESH_${macro}_TRIANGLE_COUNT ${model.triangleCount}")
@@ -1063,7 +1066,7 @@ fun StringBuilder.appendWorldMeshC(
     appendLine("#define KENGINE_WORLD_MESH_${macro}_VERTEX_STRIDE 5")
     appendLine("#define KENGINE_WORLD_MESH_${macro}_TEXTURE_COUNT ${model.textures.size}")
     appendLine()
-    appendCIntArray("kengine_world_mesh_${symbol}_vertices", model.vertices)
+    appendCInt16Array("kengine_world_mesh_${symbol}_vertices", model.vertices)
     appendLine()
     appendCIntArray("kengine_world_mesh_${symbol}_triangles", model.triangles)
     appendLine()
@@ -1144,6 +1147,17 @@ fun haveEquivalentMaterials(left: BakedMario64World, right: BakedMario64World): 
 
 fun StringBuilder.appendCIntArray(name: String, values: List<Int>) {
     appendLine("static const int ${name}[] = {")
+    values.chunked(12).forEach { chunk ->
+        appendLine("    ${chunk.joinToString(", ")},")
+    }
+    appendLine("};")
+}
+
+fun StringBuilder.appendCInt16Array(name: String, values: List<Int>) {
+    require(values.all { it in Short.MIN_VALUE..Short.MAX_VALUE }) {
+        "$name contains a value outside signed 16-bit range"
+    }
+    appendLine("static const int16_t ${name}[] = {")
     values.chunked(12).forEach { chunk ->
         appendLine("    ${chunk.joinToString(", ")},")
     }

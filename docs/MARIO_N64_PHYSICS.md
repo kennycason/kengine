@@ -111,7 +111,11 @@ The manual compact-mesh test reached 32–33 FPS, approximately 4.7x the origina
 
 The first static-Mario build adds 473 vertices and 722 triangles to the same scene. A direct ares boot test on 2026-09-14 renders the final 10-material/9-texture model and third-person view correctly at about 19 FPS (`K=4 ms`, `R=49 ms`) in the diagnostic-overlay build. Material consolidation reduced asset/state duplication but did not change the measured frame rate. This is functional but below the desired 30 FPS target, so visibility culling and removing or toggling the synchronous performance overlay are now higher priority than adding many actors at once.
 
-The first baked-animation build uses 664–666 compact vertices and 985–989 triangles per active pose. Only one Mario pose is drawn each frame, but it is about 15% more total scene triangles than the static checkpoint and lazily compiles a display list the first time each pose appears. Sharing the common Mario material and uploaded texture set across all poses produces an 835,584-byte ROM. Controller traversal and an overlay reading are still required before adopting it as the new performance baseline.
+The first baked-animation build uses 664–666 compact vertices and 985–989 triangles per active pose. Only one Mario pose is drawn each frame, but it is about 15% more total scene triangles than the static checkpoint and lazily compiles a display list the first time each pose appears. Sharing the common Mario material and uploaded texture set across all poses produces an 835,584-byte ROM.
+
+A controller test of the original animated build measured `FPS=17`, `K=3 ms`, and `R=55 ms`, confirming that rendering—not Kotlin controller or animation selection—caused the regression. Although the generated assets were indexed, the display-list compiler still expanded every triangle into three immediate-mode vertices: the 1,100-triangle world plus a 989-triangle Mario pose submitted 6,267 vertices per frame.
+
+The reusable N64 GL path now consumes the compact indices through `glDrawElements`, uses libdragon's 32-entry transformed-vertex cache, batches up to 256 adjacent same-material triangles, and stores position/UV rows as signed 16-bit fixed-point data. At the initial camera this reduces approximate cache vertex loads from 6,267 to 2,394 and material/index calls from about 81 to 32. An ares native screenshot of the rebuilt ROM showed the same scene and Mario at `FPS=33` with `R=30 ms`, recovering the 30 FPS target while the synchronous diagnostic overlay remained enabled. Moving-camera/controller validation is still required because visible fill and clipping cost vary by view.
 
 ### Camera-dependent surface artifacts
 
@@ -579,8 +583,8 @@ Use an emulator/configuration that supports libdragon custom RSP microcode; see 
 
 ## Immediate Next Slice
 
-1. Manually traverse the baked-animation ROM in ares. Confirm model scale/orientation, face/cap appearance, walk/run pose cadence, jump/fall/land transitions, horizontal camera direction, and centered camera orbit.
-2. Restore a 30 FPS target before multiplying actors: add coarse world visibility/section culling, share repeated pose texture/material data, and make the synchronous performance overlay toggleable.
+1. Manually traverse the indexed-animation ROM in ares. Confirm walk/run pose cadence, jump/fall/land transitions, and that performance remains near 30 FPS across expensive camera angles; model scale/orientation, face/cap appearance, horizontal camera direction, and centered camera orbit have been confirmed.
+2. Preserve headroom before multiplying actors: add coarse world visibility/section culling and make the synchronous performance overlay toggleable. Shared pose materials/textures and indexed vertex-cache reuse are complete.
 3. Add controller diagnostics (position, vertical velocity, grounded/support state, floor/wall triangle, candidate counts, and collision flags) through the composable 2D overlay path.
 4. Implement long jump and ground pound as deterministic controller states; then add double jump/backflip/crouch behavior where the shared desktop gameplay rules transfer cleanly.
 5. Refine the offline-skinned pose path with a few more carefully chosen frames only after measuring display-list memory and frame rate; add crouch/long-jump/ground-pound poses alongside their controller states.
@@ -588,4 +592,4 @@ Use an emulator/configuration that supports libdragon custom RSP microcode; see 
 7. Move the DAE parser/baker behind reusable N64 mesh asset configuration while keeping level and character source data game-owned.
 8. Add generator-time ambient plus directional face shading and compare depth readability and performance.
 
-The current ROM is the first animated-character N64 checkpoint. A direct ares boot test confirms the textured world, baked idle pose, centered third-person camera, shared depth buffer, TMEM-safe textures, and diagnostic overlay initialize without an assertion. Manual controller traversal remains necessary before animation cadence, camera, and collision tuning are considered final.
+The current ROM is the first indexed animated-character N64 checkpoint. A direct ares boot test confirms the textured world, baked idle pose, centered third-person camera, shared depth buffer, TMEM-safe textures, diagnostic overlay, and 16-bit fixed-point indexed display lists initialize without an assertion. Manual controller traversal remains necessary before animation cadence, camera, collision tuning, and worst-case frame time are considered final.

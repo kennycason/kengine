@@ -43,7 +43,9 @@ typedef struct {
     int color_count;
     int vertex_stride;
     int texture_count;
-    const int* vertices;
+    /* Interleaved signed 16-bit x/y/z[/u/v] rows. Position values are game
+     * units; texture coordinates use 1/1024 units. */
+    const int16_t* vertices;
     const int* triangles;
     const int* colors;
     const KengineWorldTexture* textures;

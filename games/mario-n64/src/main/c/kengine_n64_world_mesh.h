@@ -12,7 +12,7 @@
 #define KENGINE_WORLD_MESH_BATTLEFIELD_VERTEX_STRIDE 5
 #define KENGINE_WORLD_MESH_BATTLEFIELD_TEXTURE_COUNT 18
 
-static const int kengine_world_mesh_battlefield_vertices[] = {
+static const int16_t kengine_world_mesh_battlefield_vertices[] = {
     2432, 512, 2048, 22366, -6504, 3840, 384, 0, 27050, -13318, 1920, 384,
     1152, 20664, -9486, 1152, 384, 2176, 18108, -6078, 1792, 328, -384, 20238,
     -14596, 2944, 512, 2048, 24070, -6504, 3843, 384, 3550, 27060, -1506, 4096,
@@ -2319,7 +2319,7 @@ static const KengineWorldTexture kengine_world_mesh_battlefield_textures[] = {
 #define KENGINE_WORLD_MESH_MARIO_IDLE_VERTEX_STRIDE 5
 #define KENGINE_WORLD_MESH_MARIO_IDLE_TEXTURE_COUNT 5
 
-static const int kengine_world_mesh_mario_idle_vertices[] = {
+static const int16_t kengine_world_mesh_mario_idle_vertices[] = {
     -12, 84, 10, 52, 980, -19, 85, 7, 350, 1006, -24, 80,
     5, 510, 833, -24, 75, 6, 524, 667, -20, 71, 9, 334,
     505, -13, 72, 12, 71, 542, -10, 78, 12, -30, 766, 23,
@@ -3292,7 +3292,7 @@ static const KengineWorldTexture kengine_world_mesh_mario_idle_textures[] = {
 #define KENGINE_WORLD_MESH_MARIO_WALK_A_VERTEX_STRIDE 5
 #define KENGINE_WORLD_MESH_MARIO_WALK_A_TEXTURE_COUNT 5
 
-static const int kengine_world_mesh_mario_walk_a_vertices[] = {
+static const int16_t kengine_world_mesh_mario_walk_a_vertices[] = {
     -10, 89, 20, 52, 980, -17, 90, 15, 350, 1006, -21, 85,
     14, 510, 833, -21, 81, 14, 524, 667, -18, 76, 18, 334,
     505, -13, 78, 23, 71, 542, -10, 84, 23, -30, 766, 23,
@@ -3913,7 +3913,7 @@ static const int kengine_world_mesh_mario_walk_a_triangles[] = {
 #define KENGINE_WORLD_MESH_MARIO_WALK_B_VERTEX_STRIDE 5
 #define KENGINE_WORLD_MESH_MARIO_WALK_B_TEXTURE_COUNT 5
 
-static const int kengine_world_mesh_mario_walk_b_vertices[] = {
+static const int16_t kengine_world_mesh_mario_walk_b_vertices[] = {
     -10, 89, 25, 52, 980, -18, 90, 23, 350, 1006, -22, 85,
     23, 510, 833, -23, 81, 23, 524, 667, -18, 77, 26, 334,
     505, -11, 78, 27, 71, 542, -8, 84, 27, -30, 766, 21,
@@ -4534,7 +4534,7 @@ static const int kengine_world_mesh_mario_walk_b_triangles[] = {
 #define KENGINE_WORLD_MESH_MARIO_RUN_A_VERTEX_STRIDE 5
 #define KENGINE_WORLD_MESH_MARIO_RUN_A_TEXTURE_COUNT 5
 
-static const int kengine_world_mesh_mario_run_a_vertices[] = {
+static const int16_t kengine_world_mesh_mario_run_a_vertices[] = {
     1, 75, 27, 52, 980, -7, 76, 23, 350, 1006, -12, 71,
     20, 510, 833, -12, 67, 20, 524, 667, -8, 61, 23, 334,
     505, -1, 62, 27, 71, 542, 2, 69, 28, -30, 766, 38,
@@ -5157,7 +5157,7 @@ static const int kengine_world_mesh_mario_run_a_triangles[] = {
 #define KENGINE_WORLD_MESH_MARIO_RUN_B_VERTEX_STRIDE 5
 #define KENGINE_WORLD_MESH_MARIO_RUN_B_TEXTURE_COUNT 5
 
-static const int kengine_world_mesh_mario_run_b_vertices[] = {
+static const int16_t kengine_world_mesh_mario_run_b_vertices[] = {
     -23, 76, 27, 52, 980, -31, 78, 23, 350, 1006, -35, 73,
     22, 510, 833, -36, 68, 21, 524, 667, -31, 63, 24, 334,
     505, -24, 64, 27, 71, 542, -21, 70, 28, -30, 766, 14,
@@ -5779,7 +5779,7 @@ static const int kengine_world_mesh_mario_run_b_triangles[] = {
 #define KENGINE_WORLD_MESH_MARIO_JUMP_VERTEX_STRIDE 5
 #define KENGINE_WORLD_MESH_MARIO_JUMP_TEXTURE_COUNT 5
 
-static const int kengine_world_mesh_mario_jump_vertices[] = {
+static const int16_t kengine_world_mesh_mario_jump_vertices[] = {
     -11, 91, 21, 52, 980, -19, 91, 18, 350, 1006, -23, 87,
     19, 510, 833, -24, 82, 20, 524, 667, -20, 79, 24, 334,
     505, -13, 80, 26, 71, 542, -10, 85, 25, -30, 766, 21,
@@ -6402,7 +6402,7 @@ static const int kengine_world_mesh_mario_jump_triangles[] = {
 #define KENGINE_WORLD_MESH_MARIO_FALL_VERTEX_STRIDE 5
 #define KENGINE_WORLD_MESH_MARIO_FALL_TEXTURE_COUNT 5
 
-static const int kengine_world_mesh_mario_fall_vertices[] = {
+static const int16_t kengine_world_mesh_mario_fall_vertices[] = {
     -11, 89, 7, 52, 980, -18, 90, 3, 350, 1006, -22, 85,
     1, 510, 833, -23, 81, 1, 524, 667, -19, 77, 3, 334,
     505, -13, 77, 7, 71, 542, -10, 83, 8, -30, 766, 21,

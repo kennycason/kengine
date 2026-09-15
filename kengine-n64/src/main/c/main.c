@@ -777,6 +777,15 @@ static int w3d_bucket_next[WORLD3D_MAX_VISIBLE];
 
 #define WORLD3D_GL_MAX_MESHES 16
 #define WORLD3D_GL_MAX_TEXTURES 32
+#define WORLD3D_GL_INDEX_BATCH_TRIANGLES 256
+
+/* Generated positions use integer game units and UVs use 1/1024 units. Pack
+ * both into libdragon's signed 16-bit fixed-point vertex format. Positions are
+ * interpreted as 7-fractional-bit values, then scaled from 1/128 to the GL
+ * world's 1/100 coordinate system by the model matrix. */
+#define WORLD3D_GL_VERTEX_PRECISION 7
+#define WORLD3D_GL_TEXCOORD_PRECISION 10
+#define WORLD3D_GL_PACKED_VERTEX_SCALE (128.0f / 100.0f)
 
 typedef struct {
     const KengineWorldMesh* mesh;
@@ -879,9 +888,28 @@ static void w3d_gl_submit_mesh(
 ) {
     int tc = mesh->triangle_count;
     const int* tris = mesh->triangles;
-    const int* verts = mesh->vertices;
+    const int16_t* verts = mesh->vertices;
     const int* colors = mesh->colors;
     int vstride = mesh->vertex_stride;
+    uint16_t draw_indices[WORLD3D_GL_INDEX_BATCH_TRIANGLES * 3];
+
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexHalfFixedPrecisionN64(WORLD3D_GL_VERTEX_PRECISION);
+    glVertexPointer(
+        3,
+        GL_HALF_FIXED_N64,
+        vstride * (int)sizeof(*verts),
+        verts
+    );
+    if (vstride >= 5) {
+        glTexCoordHalfFixedPrecisionN64(WORLD3D_GL_TEXCOORD_PRECISION);
+        glTexCoordPointer(
+            2,
+            GL_HALF_FIXED_N64,
+            vstride * (int)sizeof(*verts),
+            verts + 3
+        );
+    }
 
     int tex_mat_map[32];
     int material_modes[32];
@@ -928,7 +956,6 @@ static void w3d_gl_submit_mesh(
         }
 
         int current_mat = -1;
-        int using_tex = 0;
         int batch_count = 0;
 
         for (int ti = 0; ti < tc; ti++) {
@@ -939,58 +966,55 @@ static void w3d_gl_submit_mesh(
                 : KENGINE_WORLD_MATERIAL_OPAQUE;
             if (material_mode != pass) continue;
 
-            if (ci != current_mat || batch_count >= 32) {
-                if (batch_count > 0) glEnd();
-                batch_count = 0;
-                current_mat = ci;
-                int tex_idx = (ci >= 0 && ci < 32) ? tex_mat_map[ci] : -1;
-                if (tex_idx >= 0 && tex_idx < resources->texture_count) {
-                    glEnable(GL_TEXTURE_2D);
-                    glBindTexture(GL_TEXTURE_2D, resources->textures[tex_idx]);
-                    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-                    using_tex = 1;
-                } else {
-                    glDisable(GL_TEXTURE_2D);
-                    int bc = (ci >= 0 && ci < mesh->color_count) ? colors[ci] : 0xFFB4B4B4;
-                    float r = (float)(bc & 0xFF) / 255.0f;
-                    float g = (float)((bc >> 8) & 0xFF) / 255.0f;
-                    float bl = (float)((bc >> 16) & 0xFF) / 255.0f;
-                    glColor4f(r, g, bl, 1.0f);
-                    using_tex = 0;
+            if (ci != current_mat ||
+                batch_count >= WORLD3D_GL_INDEX_BATCH_TRIANGLES) {
+                if (batch_count > 0) {
+                    glDrawElements(
+                        GL_TRIANGLES,
+                        batch_count * 3,
+                        GL_UNSIGNED_SHORT,
+                        draw_indices
+                    );
                 }
-                glBegin(GL_TRIANGLES);
+                batch_count = 0;
+                if (ci != current_mat) {
+                    current_mat = ci;
+                    int tex_idx = (ci >= 0 && ci < 32) ? tex_mat_map[ci] : -1;
+                    if (tex_idx >= 0 && tex_idx < resources->texture_count) {
+                        glEnable(GL_TEXTURE_2D);
+                        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+                        glBindTexture(GL_TEXTURE_2D, resources->textures[tex_idx]);
+                        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                    } else {
+                        glDisable(GL_TEXTURE_2D);
+                        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+                        int bc = (ci >= 0 && ci < mesh->color_count) ? colors[ci] : 0xFFB4B4B4;
+                        float r = (float)(bc & 0xFF) / 255.0f;
+                        float g = (float)((bc >> 8) & 0xFF) / 255.0f;
+                        float bl = (float)((bc >> 16) & 0xFF) / 255.0f;
+                        glColor4f(r, g, bl, 1.0f);
+                    }
+                }
             }
 
-            int ab = a * vstride, bb = b * vstride, cb = c * vstride;
-            if (using_tex && vstride >= 5) {
-                glTexCoord2f((float)verts[ab + 3] / 1024.0f, (float)verts[ab + 4] / 1024.0f);
-            }
-            glVertex3f(
-                (float)verts[ab] * WORLD3D_GL_SCALE,
-                (float)verts[ab + 1] * WORLD3D_GL_SCALE,
-                (float)verts[ab + 2] * WORLD3D_GL_SCALE
-            );
-            if (using_tex && vstride >= 5) {
-                glTexCoord2f((float)verts[bb + 3] / 1024.0f, (float)verts[bb + 4] / 1024.0f);
-            }
-            glVertex3f(
-                (float)verts[bb] * WORLD3D_GL_SCALE,
-                (float)verts[bb + 1] * WORLD3D_GL_SCALE,
-                (float)verts[bb + 2] * WORLD3D_GL_SCALE
-            );
-            if (using_tex && vstride >= 5) {
-                glTexCoord2f((float)verts[cb + 3] / 1024.0f, (float)verts[cb + 4] / 1024.0f);
-            }
-            glVertex3f(
-                (float)verts[cb] * WORLD3D_GL_SCALE,
-                (float)verts[cb + 1] * WORLD3D_GL_SCALE,
-                (float)verts[cb + 2] * WORLD3D_GL_SCALE
-            );
+            int index_base = batch_count * 3;
+            draw_indices[index_base] = (uint16_t)a;
+            draw_indices[index_base + 1] = (uint16_t)b;
+            draw_indices[index_base + 2] = (uint16_t)c;
             batch_count++;
         }
-        if (batch_count > 0) glEnd();
+        if (batch_count > 0) {
+            glDrawElements(
+                GL_TRIANGLES,
+                batch_count * 3,
+                GL_UNSIGNED_SHORT,
+                draw_indices
+            );
+        }
     }
 
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    glDisableClientState(GL_VERTEX_ARRAY);
     glDisable(GL_ALPHA_TEST);
     glDisable(GL_BLEND);
     glDepthFunc(GL_LESS);
@@ -1076,7 +1100,8 @@ static void w3d_gl_draw_mesh(
     );
     glRotatef((float)yaw * 360.0f / (float)WORLD3D_ANGLE_FULL, 0.0f, 1.0f, 0.0f);
     glRotatef((float)pitch * 360.0f / (float)WORLD3D_ANGLE_FULL, 1.0f, 0.0f, 0.0f);
-    float mesh_scale = (float)scale / 1000.0f;
+    float mesh_scale =
+        ((float)scale / 1000.0f) * WORLD3D_GL_PACKED_VERTEX_SCALE;
     glScalef(mesh_scale, mesh_scale, mesh_scale);
 
     if (resources->display_list != 0) {
@@ -1145,7 +1170,7 @@ static void draw_world_3d(
     int pitch_cos = w3d_cos(pitch), pitch_sin = w3d_sin(pitch);
     int center_x = FB_WIDTH / 2, center_y = FB_HEIGHT / 2;
     int vc = mesh->vertex_count;
-    const int* verts = mesh->vertices;
+    const int16_t* verts = mesh->vertices;
 
     for (int vi = 0; vi < vc; vi++) {
         int base = vi * mesh->vertex_stride;
